@@ -19,6 +19,7 @@ class SingleDatabaseConnectionSource implements DatabaseConnectionSource {
 
   SingleDatabaseConnectionSource(Connection connection) {
     this.connection = connection;
+    this.connectionInitializer = c -> {};
   }
 
   @Override
