@@ -73,6 +73,10 @@ public interface TilesetFeatures
   @Override
   Map<String, List<LevelTransformation>> getTransformations();
 
+  @DocIgnore
+  @Override
+  List<String> getProfiles();
+
   /**
    * @langEn The name of the feature type. By default the tileset id is used.
    * @langDe Der Name des Feature-Types. Standardmäßig wird die Tileset-Id verwendet.
@@ -135,6 +139,9 @@ public interface TilesetFeatures
     }
     if (this.getTransformations().isEmpty()) {
       withDefaults.transformations(defaults.getTransformations());
+    }
+    if (this.getProfiles().isEmpty()) {
+      withDefaults.profiles(defaults.getProfiles());
     }
     if (Objects.isNull(this.getFeatureLimit()) && Objects.nonNull(defaults.getFeatureLimit())) {
       withDefaults.featureLimit(defaults.getFeatureLimit());

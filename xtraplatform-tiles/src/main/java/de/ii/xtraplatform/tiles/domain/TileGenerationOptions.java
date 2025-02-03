@@ -82,4 +82,13 @@ public interface TileGenerationOptions {
    * @since v3.4
    */
   Map<String, List<LevelTransformation>> getTransformations();
+
+  /**
+   * @langEn The feature profiles to be applied when generating features for the tileset.
+   * @langDe Die Feature-Profile, die bei der Erstellung von Features für das Tileset angewendet
+   *     werden sollen.
+   * @default []
+   * @since v4.3
+   */
+  List<String> getProfiles();
 }

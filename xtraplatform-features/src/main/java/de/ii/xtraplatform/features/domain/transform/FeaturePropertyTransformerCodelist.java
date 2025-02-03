@@ -7,9 +7,13 @@
  */
 package de.ii.xtraplatform.features.domain.transform;
 
+import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.codelists.domain.Codelist.ImportType;
+import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.strings.domain.StringTemplateFilters;
+import java.util.List;
 import java.util.Map;
 import org.immutables.value.Value;
 import org.slf4j.Logger;
@@ -20,6 +24,11 @@ public interface FeaturePropertyTransformerCodelist extends FeaturePropertyValue
 
   Logger LOGGER = LoggerFactory.getLogger(FeaturePropertyTransformerCodelist.class);
   String TYPE = "CODELIST";
+
+  @Override
+  default List<Type> getSupportedPropertyTypes() {
+    return ImmutableList.of(SchemaBase.Type.STRING, SchemaBase.Type.INTEGER);
+  }
 
   @Override
   default String getType() {

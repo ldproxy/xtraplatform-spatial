@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
+import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SchemaVisitorTopDown;
 import java.util.AbstractMap.SimpleEntry;
@@ -182,6 +183,16 @@ public class SchemaTransformerChain
                               .propertyPath(path)
                               .parameter(remove)
                               .inCollection(inCollection)
+                              .build()));
+
+          propertyTransformation
+              .getCodelist()
+              .ifPresent(
+                  codelist ->
+                      transformers.add(
+                          ImmutableFeaturePropertyTransformerValueType.builder()
+                              .propertyPath(path)
+                              .parameter(SchemaBase.Type.STRING.name())
                               .build()));
         });
 
