@@ -38,6 +38,10 @@ import de.ii.xtraplatform.features.domain.FeatureStream.ResultReduced;
 import de.ii.xtraplatform.features.domain.FeatureTokenEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.profile.ImmutableProfileTransformations;
+import de.ii.xtraplatform.features.domain.profile.ProfileSet;
+import de.ii.xtraplatform.features.domain.profile.ProfileSetRel;
+import de.ii.xtraplatform.features.domain.profile.ProfileSetVal;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.WithTransformationsApplied;
@@ -101,6 +105,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
   private final TileProviderFeaturesData data;
   private final Cql cql;
   private final Map<String, DelayedVolatile<FeatureProvider>> featureProviders;
+  private final List<ProfileSet> profileSets;
   private final boolean async;
 
   public TileGeneratorFeatures(
@@ -118,6 +123,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
     this.entityRegistry = entityRegistry;
     this.cql = cql;
     this.featureProviders = new LinkedHashMap<>();
+    this.profileSets = List.of(new ProfileSetRel(), new ProfileSetVal());
     this.async = asyncStartup;
 
     if (async) {
@@ -231,18 +237,46 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
     FeatureTokenEncoder<?> encoder =
         ENCODERS.get(tileQuery.getMediaType()).apply(tileGenerationContext);
 
+    FeatureProvider featureProvider = getFeatureProvider(tileset);
     String featureType = tileset.getFeatureType().orElse(tileset.getId());
+    FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
+
+    if (Objects.isNull(schema)) {
+      throw new IllegalArgumentException(
+          String.format("Unknown feature type '%s' in tileset '%s'", featureType, tileset.getId()));
+    }
+
+    final PropertyTransformations baseTransformations =
+        getPropertyTransformations(tileset, schema, tileQuery.getMediaType());
     PropertyTransformations propertyTransformations =
         tileQuery
             .getGenerationParameters()
             .flatMap(TileGenerationParameters::getPropertyTransformations)
-            .map(pt -> pt.mergeInto(TRANSFORMATIONS.get(tileQuery.getMediaType())))
-            .orElse(TRANSFORMATIONS.get(tileQuery.getMediaType()));
+            .map(pt -> pt.mergeInto(baseTransformations))
+            .orElse(baseTransformations);
 
     ResultReduced<byte[]> resultReduced =
         generateTile(tileSource, encoder, Map.of(featureType, propertyTransformations));
 
     return resultReduced.reduced();
+  }
+
+  private PropertyTransformations getPropertyTransformations(
+      TilesetFeatures tileset, FeatureSchema schema, MediaType mediaType) {
+    ImmutableProfileTransformations.Builder transformationBuilder =
+        new ImmutableProfileTransformations.Builder().from(TRANSFORMATIONS.get(mediaType));
+    tileset
+        .getProfiles()
+        .forEach(
+            profile -> {
+              profileSets.stream()
+                  .filter(p -> profile.startsWith(p.getPrefix()))
+                  .forEach(
+                      p ->
+                          p.addPropertyTransformations(
+                              profile, schema, mediaType.toString(), transformationBuilder));
+            });
+    return transformationBuilder.build();
   }
 
   @Override
@@ -399,13 +433,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
           String.format("Unknown feature type '%s' in tileset '%s'", featureType, tilesetId));
     }
 
-    PropertyTransformations transformations = TRANSFORMATIONS.get(encoding);
-
-    if (Objects.nonNull(transformations)) {
-      featureSchema = featureSchema.accept(new WithTransformationsApplied(transformations));
-    }
-
-    return featureSchema;
+    return featureSchema.accept(
+        new WithTransformationsApplied(
+            getPropertyTransformations(tileset, featureSchema, encoding)));
   }
 
   @Override
