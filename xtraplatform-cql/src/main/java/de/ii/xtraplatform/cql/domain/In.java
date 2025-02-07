@@ -7,9 +7,11 @@
  */
 package de.ii.xtraplatform.cql.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -23,6 +25,14 @@ public interface In extends BinaryOperation2<Scalar>, CqlNode {
   @Value.Derived
   default String getOp() {
     return TYPE;
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isIdFilter() {
+    return !getArgs().isEmpty()
+        && getArgs().get(0) instanceof Property
+        && Objects.equals(((Property) getArgs().get(0)).getName(), ID_PLACEHOLDER);
   }
 
   static In of(String property, List<Scalar> values) {

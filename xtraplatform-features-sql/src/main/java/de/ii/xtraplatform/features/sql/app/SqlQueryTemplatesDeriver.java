@@ -150,7 +150,11 @@ public class SqlQueryTemplatesDeriver
 
   ValueQueryTemplate createValueQueryTemplate(SchemaSql schema, List<SchemaSql> parents) {
     return (limit, offset, additionalSortKeys, filter, minMaxKeys, virtualTables) -> {
-      boolean isIdFilter = filter.filter(cql2Predicate -> cql2Predicate instanceof In).isPresent();
+      boolean isIdFilter =
+          filter
+              .filter(
+                  cql2Predicate -> cql2Predicate instanceof In && ((In) cql2Predicate).isIdFilter())
+              .isPresent();
       List<String> aliases = AliasGenerator.getAliases(schema);
 
       SchemaSql rootSchema = parents.isEmpty() ? schema : parents.get(0);
