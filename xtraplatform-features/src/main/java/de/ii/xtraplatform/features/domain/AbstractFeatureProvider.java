@@ -124,7 +124,7 @@ public abstract class AbstractFeatureProvider<
 
   @Override
   protected boolean onStartup() throws InterruptedException {
-    //TODO: call after addSubcomponent?
+    // TODO: call after addSubcomponent?
     onVolatileStart();
 
     addCapability(FeatureInfo.CAPABILITY);
