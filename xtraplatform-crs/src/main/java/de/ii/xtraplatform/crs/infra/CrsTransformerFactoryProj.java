@@ -88,6 +88,10 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
       VolatileRegistry volatileRegistry,
       AppContext appContext) {
     super(volatileRegistry, "app/crs");
+    setHealthInfo(
+        "PROJ CRS Transformations",
+        "Might be LIMITED if store sources with custom PROJ configurations could not be loaded.\nMight be UNAVAILABLE if the native PROJ library could not be initialized.");
+
     this.projLoader = projLoader;
     this.projStore = resourceStore.with("proj");
     this.crsCache = new ConcurrentHashMap<>();

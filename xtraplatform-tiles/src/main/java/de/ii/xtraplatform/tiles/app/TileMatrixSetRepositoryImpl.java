@@ -48,7 +48,7 @@ public class TileMatrixSetRepositoryImpl extends AbstractVolatile
   /** set data directory */
   @Inject
   public TileMatrixSetRepositoryImpl(ValueStore valueStore, VolatileRegistry volatileRegistry) {
-    super(volatileRegistry, "app/tilematrixsets");
+    super(volatileRegistry, true, "app/tilematrixsets");
     this.customTileMatrixSetsStore = valueStore.forType(TileMatrixSetData.class);
     this.tileMatrixSets = new LinkedHashMap<>();
     this.volatileRegistry = volatileRegistry;
