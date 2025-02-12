@@ -260,7 +260,7 @@ import org.threeten.extra.Interval;
  * @ref:sourcePathDefaults {@link de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults}
  * @ref:queryGeneration {@link
  *     de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings}
- * @ref:datasetChanges {@link
+ * @ref:datasetChanges2 {@link
  *     de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.DatasetChangeSettings}
  */
 @DocDefs(
@@ -305,7 +305,7 @@ import org.threeten.extra.Interval;
       @DocVar(
           name = "datasetChanges",
           value = {
-            @DocStep(type = Step.TAG_REFS, params = "{@ref:datasetChanges}"),
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:datasetChanges2}"),
             @DocStep(type = Step.TAG, params = "{@bodyBlock}")
           }),
     })
