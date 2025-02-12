@@ -34,6 +34,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapters;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryBatch;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
+import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import java.util.Map;
@@ -127,6 +128,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
       DecoderFactories decoderFactories,
       VolatileRegistry volatileRegistry,
       Cache cache,
+      Scheduler scheduler,
       @Assisted FeatureProviderDataV2 data) {
     super(
         crsTransformerFactory,
@@ -140,6 +142,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
         decoderFactories,
         volatileRegistry,
         cache,
+        scheduler,
         data,
         Map.of());
   }

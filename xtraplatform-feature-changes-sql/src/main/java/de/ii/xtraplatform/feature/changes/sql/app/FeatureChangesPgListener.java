@@ -23,6 +23,7 @@ import de.ii.xtraplatform.features.domain.FeatureProviderEntity;
 import de.ii.xtraplatform.features.domain.FeatureQueriesExtension;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.Query;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlConnector;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsPgis;
@@ -95,9 +96,21 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
   }
 
   @Override
-  public boolean isSupported(FeatureProviderConnector<?, ?, ?> connector) {
-    return connector instanceof SqlConnector
-        && ((SqlConnector) connector).getDialect().equals(SqlDbmsPgis.ID);
+  public boolean isSupported(
+      FeatureProviderConnector<?, ?, ?> connector, FeatureProviderDataV2 data) {
+    if (!(connector instanceof SqlConnector)
+        || !Objects.equals(((SqlConnector) connector).getDialect(), SqlDbmsPgis.ID)
+        || !(data instanceof FeatureProviderSqlData)) {
+      return false;
+    }
+    if (!((FeatureProviderSqlData) data).getDatasetChanges().isModeTrigger()) {
+      LOGGER.warn(
+          "Feature provider with id '{}' does not support change listeners: datasetChanges.mode is not 'TRIGGER'",
+          data.getId());
+      return false;
+    }
+
+    return true;
   }
 
   @Override

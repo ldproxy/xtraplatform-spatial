@@ -544,7 +544,8 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
   }
 
   @Override
-  public boolean isSupported(FeatureProviderConnector<?, ?, ?> connector) {
+  public boolean isSupported(
+      FeatureProviderConnector<?, ?, ?> connector, FeatureProviderDataV2 data) {
     return true;
   }
 
