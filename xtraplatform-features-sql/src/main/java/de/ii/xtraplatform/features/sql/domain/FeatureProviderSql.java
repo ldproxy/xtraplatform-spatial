@@ -599,6 +599,12 @@ public class FeatureProviderSql
 
     if (Objects.isNull(cronJob)
         && Objects.nonNull(getData().getDatasetChanges().getSyncPeriodic())) {
+      if (getData().getDatasetChanges().isModeCrud() || getData().getDatasetChanges().isModeOff()) {
+        LOGGER.warn(
+            "Periodic dataset sync is not supported in mode '{}'",
+            getData().getDatasetChanges().getMode());
+        return;
+      }
       LOGGER.debug(
           "Scheduling periodic dataset sync: {}", getData().getDatasetChanges().getSyncPeriodic());
 

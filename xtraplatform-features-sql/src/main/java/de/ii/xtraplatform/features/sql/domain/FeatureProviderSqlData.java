@@ -242,6 +242,12 @@ public interface FeatureProviderSqlData
 
     @JsonIgnore
     @Value.Lazy
+    default boolean isModeOff() {
+      return getMode() == Mode.OFF;
+    }
+
+    @JsonIgnore
+    @Value.Lazy
     default boolean isModeExternal() {
       return getMode() == Mode.EXTERNAL;
     }
