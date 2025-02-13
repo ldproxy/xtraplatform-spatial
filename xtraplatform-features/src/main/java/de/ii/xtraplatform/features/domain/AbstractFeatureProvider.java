@@ -277,7 +277,7 @@ public abstract class AbstractFeatureProvider<
 
     LOGGER.info("Feature provider with id '{}' reloaded successfully.{}", getId(), startupInfo);
 
-    if (datasetChanged || datasetChangedForced || forceReload) {
+    if (datasetChanged || datasetChangedForced || (forceReload && allowForceReload())) {
       if (datasetChangedForced || forceReload) {
         LOGGER.info("Dataset has changed (forced).");
       } else {
@@ -415,6 +415,10 @@ public abstract class AbstractFeatureProvider<
   }
 
   protected boolean assumeExternalChanges() {
+    return false;
+  }
+
+  protected boolean allowForceReload() {
     return false;
   }
 

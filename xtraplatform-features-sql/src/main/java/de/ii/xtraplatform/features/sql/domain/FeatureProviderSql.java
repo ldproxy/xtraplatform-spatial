@@ -658,6 +658,12 @@ public class FeatureProviderSql
     return getData().getDatasetChanges().isModeExternal();
   }
 
+  @Override
+  protected boolean allowForceReload() {
+    return getData().getDatasetChanges().isModeExternal()
+        || getData().getDatasetChanges().isModeTrigger();
+  }
+
   private void clearCache(String type) {
     LOGGER.debug("Clearing cache for type: {}", type);
     cache.del(type, "stats", "count");
