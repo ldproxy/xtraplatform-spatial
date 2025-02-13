@@ -225,7 +225,7 @@ public interface FeatureProviderSqlData
      * @langEn The mode for dataset change detection, see above.
      * @langDe Der Modus für die Erkennung von Datensatzänderungen, siehe oben.
      * @since v4.3
-     * @default CRUD v4 | OFF v5
+     * @default CRUD v4 \| OFF v5
      */
     @Value.Default
     default Mode getMode() {
