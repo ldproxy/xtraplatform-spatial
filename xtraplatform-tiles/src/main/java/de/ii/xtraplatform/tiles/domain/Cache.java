@@ -26,8 +26,9 @@ import org.immutables.value.Value;
  *     <p>
  *     <p>There are two different storage types:
  *     <p><code>
- * - `PLAIN` Every tile is stored in a single file. This is recommended for remote storage (coming soon).
- * - `MBTILES` Tiles are stored in a [MBTiles](https://github.com/mapbox/mbtiles-spec) file per tiling scheme. This is recommended for local storage.
+ * - `PER_JOB` Tiles are stored in one file per seeding job, see `jobSize` in [Seeding](#seeding). This is the recommended setting for seeded caches.
+ * - `PER_TILE` (or deprecated `PLAIN`) Every tile is stored in a separate file.
+ * - `PER_TILESET` (or deprecated `MBTILES`) Tiles are stored in a single file per tiling scheme.
  *     </code>
  *     <p>
  * @langDe ### Cache
@@ -44,8 +45,9 @@ import org.immutables.value.Value;
  *     <p>
  *     <p>Es gibt zwei verschiedene Storage-Typen:
  *     <p><code>
- * - `PLAIN` Jede Kachel wird in einer einzelnen Datei gespeichert. Das wird für Remote-Speicherung empfohlen  (coming soon).
- * - `MBTILES` Kacheln werden in einer [MBTiles](https://github.com/mapbox/mbtiles-spec) Datei pro Kachelschema gespeichert. Das wird für lokale Speicherung empfohlen.
+ * - `PER_JOB` Kacheln werden in einer Datei pro Seeding-Job gespeichert, siehe `jobSize` in [Seeding](#seeding). Dies ist die empfohlene Einstellung für geseedete Caches.
+ * - `PER_TILE` (oder deprecated `PLAIN`) Jede Kachel wird in einer separaten Datei gespeichert.
+ * - `PER_TILESET` (oder deprecated `MBTILES`) Kacheln werden in einer einzigen Datei pro Kachelschema gespeichert.
  *      </code>
  *     <p>
  */

@@ -49,6 +49,7 @@ public interface FeatureProviderSqlData
    *     below.
    * @langDe Behandlung von Datensatzänderungen, für Details siehe
    *     [Datensatzänderungen](10-sql.md#dataset-changes).
+   * @since v4.3
    */
   @DocMarker("specific")
   @Nullable
@@ -223,6 +224,7 @@ public interface FeatureProviderSqlData
     /**
      * @langEn The mode for dataset change detection, see above.
      * @langDe Der Modus für die Erkennung von Datensatzänderungen, siehe oben.
+     * @since v4.3
      * @default CRUD v4 | OFF v5
      */
     @Value.Default
@@ -235,6 +237,7 @@ public interface FeatureProviderSqlData
      *     dataset. Only available for modes `EXTERNAL` and `TRIGGER`.
      * @langDe Ein Crontab-Pattern zum regelmäßigen Aktualisieren aller gecachten Daten, die sich
      *     aus dem Datensatz ableiten. Nur verfügbar für die Modi `EXTERNAL` und `TRIGGER`.
+     * @since v4.3
      * @default null
      */
     @Nullable

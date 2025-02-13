@@ -84,6 +84,7 @@ public interface SeedingOptions {
    *     Changes](../feature/10-sql.md#dataset-changes).
    * @langDe Steuert, ob das Seeding bei Dataset Change Events ausgeführt wird. Siehe
    *     [Datensatzänderungen](../feature/10-sql.md#dataset-changes).
+   * @since v4.3
    * @default true
    */
   @Nullable
