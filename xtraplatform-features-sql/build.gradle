@@ -13,6 +13,7 @@ dependencies {
     provided 'de.interactive_instruments:xtraplatform-values'
     provided 'de.interactive_instruments:xtraplatform-nativ-loader'
     provided 'de.interactive_instruments:xtraplatform-spatialite'
+    provided 'de.interactive_instruments:xtraplatform-services'
     provided 'de.interactive_instruments:xtraplatform-web'
     provided project(':xtraplatform-geometries')
     provided project(':xtraplatform-codelists')

@@ -31,6 +31,4 @@ public interface ConnectionInfo {
   }
 
   String getDatasetIdentifier();
-
-  boolean getAssumeExternalChanges();
 }

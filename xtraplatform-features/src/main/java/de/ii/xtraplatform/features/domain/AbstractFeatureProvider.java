@@ -161,7 +161,7 @@ public abstract class AbstractFeatureProvider<
 
     this.datasetChanged =
         connector.isPresent() && !connector.get().isSameDataset(getConnectionInfo());
-    this.datasetChangedForced = getConnectionInfo().getAssumeExternalChanges();
+    this.datasetChangedForced = assumeExternalChanges();
     this.previousDataset =
         Optional.ofNullable(connector.get())
             .map(FeatureProviderConnector::getDatasetIdentifier)
@@ -250,11 +250,18 @@ public abstract class AbstractFeatureProvider<
 
     LOGGER.info("Feature provider with id '{}' started successfully.{}", getId(), startupInfo);
 
+    if (datasetChangedForced) {
+      LOGGER.info("Dataset has changed (forced).");
+      changes()
+          .handle(
+              ImmutableDatasetChange.builder().featureTypes(getData().getTypes().keySet()).build());
+    }
+
     extensionRegistry
         .getAll()
         .forEach(
             extension -> {
-              if (extension.isSupported(getConnector())) {
+              if (extension.isSupported(getConnector(), getData())) {
                 extension.on(LIFECYCLE_HOOK.STARTED, this, getConnector());
                 // TODO: addSubcomponent
               }
@@ -262,7 +269,7 @@ public abstract class AbstractFeatureProvider<
   }
 
   @Override
-  protected void onReloaded() {
+  protected void onReloaded(boolean forceReload) {
     String startupInfo =
         getStartupInfo()
             .map(map -> String.format(" (%s)", map.toString().replace("{", "").replace("}", "")))
@@ -270,8 +277,8 @@ public abstract class AbstractFeatureProvider<
 
     LOGGER.info("Feature provider with id '{}' reloaded successfully.{}", getId(), startupInfo);
 
-    if (datasetChanged || datasetChangedForced) {
-      if (datasetChangedForced) {
+    if (datasetChanged || datasetChangedForced || (forceReload && allowForceReload())) {
+      if (datasetChangedForced || forceReload) {
         LOGGER.info("Dataset has changed (forced).");
       } else {
         LOGGER.info(
@@ -405,6 +412,14 @@ public abstract class AbstractFeatureProvider<
     }
 
     return isSuccess;
+  }
+
+  protected boolean assumeExternalChanges() {
+    return false;
+  }
+
+  protected boolean allowForceReload() {
+    return false;
   }
 
   @Override
@@ -629,7 +644,7 @@ public abstract class AbstractFeatureProvider<
         .getAll()
         .forEach(
             extension -> {
-              if (extension.isSupported(getConnector())) {
+              if (extension.isSupported(getConnector(), getData())) {
                 extension.on(
                     FeatureQueriesExtension.QUERY_HOOK.BEFORE,
                     getData(),
@@ -647,7 +662,7 @@ public abstract class AbstractFeatureProvider<
         .getAll()
         .forEach(
             extension -> {
-              if (extension.isSupported(getConnector())) {
+              if (extension.isSupported(getConnector(), getData())) {
                 extension.on(
                     FeatureQueriesExtension.QUERY_HOOK.AFTER,
                     getData(),

@@ -109,11 +109,4 @@ public interface ConnectionInfoWfsHttp extends ConnectionInfo, WfsInfo {
   default String getDatasetIdentifier() {
     return Optional.ofNullable(getUri()).map(URI::toString).orElse("");
   }
-
-  @Override
-  @JsonIgnore
-  @Value.Default
-  default boolean getAssumeExternalChanges() {
-    return true;
-  }
 }

@@ -29,6 +29,7 @@ import de.ii.xtraplatform.docs.DocStep;
 import de.ii.xtraplatform.docs.DocStep.Step;
 import de.ii.xtraplatform.docs.DocTable;
 import de.ii.xtraplatform.docs.DocTable.ColumnSet;
+import de.ii.xtraplatform.docs.DocVar;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.AbstractFeatureProvider;
@@ -56,6 +57,7 @@ import de.ii.xtraplatform.features.domain.FeatureTokenTransformer;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Builder;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Type;
+import de.ii.xtraplatform.features.domain.ImmutableDatasetChange;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMutationResult;
@@ -95,6 +97,7 @@ import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
+import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
@@ -163,6 +166,9 @@ import org.threeten.extra.Interval;
  *     <p>#### Pool
  *     <p>Settings for the connection pool.
  *     <p>{@docTable:pool}
+ *     <p>### Dataset Changes
+ *     <p>{@docVar:datasetChanges}
+ *     <p>{@docTable:datasetChanges}
  *     <p>### Source Path Defaults
  *     <p>Defaults for the path expressions in `sourcePath`, also see [Source Path
  *     Syntax](#path-syntax).
@@ -203,6 +209,9 @@ import org.threeten.extra.Interval;
  *     <p>#### Pool
  *     <p>Einstellungen für den Connection-Pool.
  *     <p>{@docTable:pool}
+ *     <p>### Datensatzänderungen
+ *     <p>{@docVar:datasetChanges}
+ *     <p>{@docTable:datasetChanges}
  *     <p>### SQL-Pfad-Defaults
  *     <p>Defaults für die Pfad-Ausdrücke in `sourcePath`, siehe auch
  *     [SQL-Pfad-Syntax](#path-syntax).
@@ -247,9 +256,12 @@ import org.threeten.extra.Interval;
  * @ref:cfgProperties {@link de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData}
  * @ref:connectionInfo {@link de.ii.xtraplatform.features.sql.domain.ImmutableConnectionInfoSql}
  * @ref:pool {@link de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings}
+ * @ref:datasetChanges {@link de.ii.xtraplatform.features.sql.domain.ImmutableDatasetChangeSettings}
  * @ref:sourcePathDefaults {@link de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults}
  * @ref:queryGeneration {@link
  *     de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings}
+ * @ref:datasetChanges2 {@link
+ *     de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.DatasetChangeSettings}
  */
 @DocDefs(
     tables = {
@@ -268,6 +280,13 @@ import org.threeten.extra.Interval;
           },
           columnSet = ColumnSet.JSON_PROPERTIES),
       @DocTable(
+          name = "datasetChanges",
+          rows = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:datasetChanges}"),
+            @DocStep(type = Step.JSON_PROPERTIES)
+          },
+          columnSet = ColumnSet.JSON_PROPERTIES),
+      @DocTable(
           name = "sourcePathDefaults",
           rows = {
             @DocStep(type = Step.TAG_REFS, params = "{@ref:sourcePathDefaults}"),
@@ -281,6 +300,14 @@ import org.threeten.extra.Interval;
             @DocStep(type = Step.JSON_PROPERTIES)
           },
           columnSet = ColumnSet.JSON_PROPERTIES),
+    },
+    vars = {
+      @DocVar(
+          name = "datasetChanges",
+          value = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:datasetChanges2}"),
+            @DocStep(type = Step.TAG, params = "{@bodyBlock}")
+          }),
     })
 @Entity(
     type = ProviderData.ENTITY_TYPE,
@@ -312,6 +339,7 @@ public class FeatureProviderSql
   private final Map<String, DecoderFactory> subdecoders;
 
   private final de.ii.xtraplatform.cache.domain.Cache cache;
+  private final Scheduler scheduler;
 
   private FeatureQueryEncoderSql queryTransformer;
   private AggregateStatsReader<SchemaSql> aggregateStatsReader;
@@ -322,6 +350,7 @@ public class FeatureProviderSql
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SchemaSql>> tableSchemasQueryables;
   private Map<String, List<SchemaSql>> tableSchemasMutations;
+  private String cronJob;
 
   @AssistedInject
   public FeatureProviderSql(
@@ -336,6 +365,7 @@ public class FeatureProviderSql
       DecoderFactories decoderFactories,
       VolatileRegistry volatileRegistry,
       Cache cache,
+      Scheduler scheduler,
       @Assisted FeatureProviderDataV2 data) {
     this(
         crsTransformerFactory,
@@ -349,6 +379,7 @@ public class FeatureProviderSql
         decoderFactories,
         volatileRegistry,
         cache,
+        scheduler,
         data,
         decoderFactories.getConnectorDecoders());
   }
@@ -365,6 +396,7 @@ public class FeatureProviderSql
       DecoderFactories decoderFactories,
       VolatileRegistry volatileRegistry,
       Cache cache,
+      Scheduler scheduler,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
     super(
@@ -381,7 +413,9 @@ public class FeatureProviderSql
     this.cql = cql;
     this.dbmsAdapters = dbmsAdapters;
     this.cache = cache.withPrefix(getEntityType(), getId());
+    this.scheduler = scheduler;
     this.subdecoders = subdecoders;
+    this.cronJob = null;
   }
 
   private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
@@ -540,7 +574,13 @@ public class FeatureProviderSql
 
   @Override
   protected void onStarted() {
+    changes()
+        .addListener(
+            (DatasetChangeListener) change -> change.getFeatureTypes().forEach(this::clearCache));
+    changes().addListener((FeatureChangeListener) change -> clearCache(change.getFeatureType()));
+
     super.onStarted();
+
     if (Runtime.getRuntime().availableProcessors() > getStreamRunner().getCapacity()) {
       LOGGER.info(
           "Recommended max connections for optimal performance under load: {}",
@@ -555,25 +595,80 @@ public class FeatureProviderSql
                 .accept(new MutationSchemaDeriver(pathParser2, pathParser3)));
       }
     } catch (Throwable e) {
-      boolean br = true;
+      // ignore
     }
-    boolean br = true;
 
-    if (getConnectionInfo().getAssumeExternalChanges()) {
-      getData().getTypes().keySet().forEach(this::clearCache);
-      changes()
-          .addListener(
-              (DatasetChangeListener) change -> change.getFeatureTypes().forEach(this::clearCache));
-      changes().addListener((FeatureChangeListener) change -> clearCache(change.getFeatureType()));
+    if (Objects.isNull(cronJob)
+        && Objects.nonNull(getData().getDatasetChanges().getSyncPeriodic())) {
+      if (getData().getDatasetChanges().isModeCrud() || getData().getDatasetChanges().isModeOff()) {
+        LOGGER.warn(
+            "Periodic dataset sync is not supported in mode '{}'",
+            getData().getDatasetChanges().getMode());
+        return;
+      }
+      LOGGER.debug(
+          "Scheduling periodic dataset sync: {}", getData().getDatasetChanges().getSyncPeriodic());
 
-      // TODO: trigger in AbstractFeatureProvider, remove explicit clear above
-      /* LOGGER.info("Dataset has changed (forced).");
-      changes().handle(
-          ImmutableDatasetChange.builder().featureTypes(getData().getTypes().keySet()).build()); */
+      this.cronJob =
+          scheduler.schedule(
+              LogContext.withMdc(
+                  () ->
+                      changes()
+                          .handle(
+                              ImmutableDatasetChange.builder()
+                                  .featureTypes(getData().getTypes().keySet())
+                                  .build())),
+              getData().getDatasetChanges().getSyncPeriodic());
     }
   }
 
+  @Override
+  protected void onReloaded(boolean forceReload) {
+    super.onReloaded(forceReload);
+
+    if (Objects.nonNull(cronJob)) {
+      scheduler.deschedule(cronJob);
+      this.cronJob = null;
+    }
+
+    if (Objects.isNull(cronJob)
+        && Objects.nonNull(getData().getDatasetChanges().getSyncPeriodic())) {
+      this.cronJob =
+          scheduler.schedule(
+              LogContext.withMdc(
+                  () ->
+                      changes()
+                          .handle(
+                              ImmutableDatasetChange.builder()
+                                  .featureTypes(getData().getTypes().keySet())
+                                  .build())),
+              getData().getDatasetChanges().getSyncPeriodic());
+    }
+  }
+
+  @Override
+  protected void onStopped() {
+    super.onStopped();
+
+    if (Objects.nonNull(cronJob)) {
+      scheduler.deschedule(cronJob);
+      this.cronJob = null;
+    }
+  }
+
+  @Override
+  protected boolean assumeExternalChanges() {
+    return getData().getDatasetChanges().isModeExternal();
+  }
+
+  @Override
+  protected boolean allowForceReload() {
+    return getData().getDatasetChanges().isModeExternal()
+        || getData().getDatasetChanges().isModeTrigger();
+  }
+
   private void clearCache(String type) {
+    LOGGER.debug("Clearing cache for type: {}", type);
     cache.del(type, "stats", "count");
     cache.del(type, "stats", "spatial");
     cache.del(type, "stats", "temporal");
@@ -762,7 +857,17 @@ public class FeatureProviderSql
 
   @Override
   public boolean supportsMutationsInternal() {
-    return Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID);
+    if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
+      return false;
+    }
+    if (!getData().getDatasetChanges().isModeCrud()) {
+      LOGGER.warn(
+          "Feature provider with id '{}' does not support mutations: datasetChanges.mode is not 'CRUD'",
+          getId());
+      return false;
+    }
+
+    return true;
   }
 
   @Override

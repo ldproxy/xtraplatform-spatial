@@ -14,7 +14,9 @@ import com.google.common.io.Files;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
 import de.ii.xtraplatform.base.domain.AppContext;
+import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
+import de.ii.xtraplatform.base.domain.LogContext.MdcCloseable;
 import de.ii.xtraplatform.base.domain.resiliency.OptionalVolatileCapability;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.util.Tuple;
@@ -27,6 +29,11 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
+import de.ii.xtraplatform.features.domain.DatasetChange;
+import de.ii.xtraplatform.features.domain.DatasetChangeListener;
+import de.ii.xtraplatform.features.domain.FeatureChange;
+import de.ii.xtraplatform.features.domain.FeatureChangeListener;
+import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProvider.FeatureVolatileCapability;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
@@ -101,7 +108,7 @@ import org.threeten.extra.AmountFormats;
     },
     data = TileProviderFeaturesData.class)
 public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeaturesData>
-    implements TileProvider, TileAccess, TileSeeding {
+    implements TileProvider, TileAccess, TileSeeding, DatasetChangeListener, FeatureChangeListener {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderFeatures.class);
   static final String TILES_DIR_NAME = "tiles";
@@ -281,6 +288,15 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
     this.rasterProviderChain = current;
 
     loadMetadata();
+
+    registerChangeHandlers();
+  }
+
+  @Override
+  protected void onStopped() {
+    unregisterChangeHandlers();
+
+    super.onStopped();
   }
 
   private Set<String> getTileMatrixSets(String tileset) {
@@ -1089,5 +1105,53 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             .bounds(bounds)
             .styleId(getStyleId(style))
             .build());
+  }
+
+  @Override
+  public void onDatasetChange(DatasetChange change) {
+    try (MdcCloseable ignored =
+        LogContext.withCloseable(LogContext.CONTEXT.SERVICE, getId(), true)) {
+      loadMetadata();
+    }
+  }
+
+  @Override
+  public void onFeatureChange(FeatureChange change) {
+    try (MdcCloseable ignored =
+        LogContext.withCloseable(LogContext.CONTEXT.SERVICE, getId(), true)) {
+      loadMetadata();
+    }
+  }
+
+  void registerChangeHandlers() {
+    getFeatureProviders()
+        .forEach(
+            provider -> {
+              provider.changes().addListener((DatasetChangeListener) this);
+              provider.changes().addListener((FeatureChangeListener) this);
+            });
+  }
+
+  void unregisterChangeHandlers() {
+    getFeatureProviders()
+        .forEach(
+            provider -> {
+              provider.changes().removeListener((DatasetChangeListener) this);
+              provider.changes().removeListener((FeatureChangeListener) this);
+            });
+  }
+
+  private List<FeatureProvider> getFeatureProviders() {
+    return getData().getTilesets().values().stream()
+        .map(ts -> getFeatureProviderId(ts.mergeDefaults(getData().getTilesetDefaults())))
+        .distinct()
+        .map(tileGenerator::getFeatureProvider)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .toList();
+  }
+
+  private String getFeatureProviderId(TilesetFeatures tileset) {
+    return tileset.getFeatureProvider().orElse(TileProviderFeatures.clean(getData().getId()));
   }
 }

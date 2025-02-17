@@ -80,12 +80,4 @@ public interface ConnectionInfoOracle extends ConnectionInfoSql {
   @JsonIgnore
   @Override
   Map<String, String> getDriverOptions();
-
-  @DocIgnore
-  @JsonIgnore
-  @Override
-  @Value.Default
-  default boolean getAssumeExternalChanges() {
-    return ConnectionInfoSql.super.getAssumeExternalChanges();
-  }
 }
