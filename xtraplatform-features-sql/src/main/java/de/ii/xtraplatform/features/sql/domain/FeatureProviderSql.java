@@ -574,7 +574,13 @@ public class FeatureProviderSql
 
   @Override
   protected void onStarted() {
+    changes()
+        .addListener(
+            (DatasetChangeListener) change -> change.getFeatureTypes().forEach(this::clearCache));
+    changes().addListener((FeatureChangeListener) change -> clearCache(change.getFeatureType()));
+
     super.onStarted();
+
     if (Runtime.getRuntime().availableProcessors() > getStreamRunner().getCapacity()) {
       LOGGER.info(
           "Recommended max connections for optimal performance under load: {}",
@@ -592,11 +598,6 @@ public class FeatureProviderSql
       // ignore
     }
 
-    changes()
-        .addListener(
-            (DatasetChangeListener) change -> change.getFeatureTypes().forEach(this::clearCache));
-    changes().addListener((FeatureChangeListener) change -> clearCache(change.getFeatureType()));
-
     if (Objects.isNull(cronJob)
         && Objects.nonNull(getData().getDatasetChanges().getSyncPeriodic())) {
       if (getData().getDatasetChanges().isModeCrud() || getData().getDatasetChanges().isModeOff()) {
@@ -610,12 +611,13 @@ public class FeatureProviderSql
 
       this.cronJob =
           scheduler.schedule(
-              () ->
-                  changes()
-                      .handle(
-                          ImmutableDatasetChange.builder()
-                              .featureTypes(getData().getTypes().keySet())
-                              .build()),
+              LogContext.withMdc(
+                  () ->
+                      changes()
+                          .handle(
+                              ImmutableDatasetChange.builder()
+                                  .featureTypes(getData().getTypes().keySet())
+                                  .build())),
               getData().getDatasetChanges().getSyncPeriodic());
     }
   }
@@ -633,12 +635,13 @@ public class FeatureProviderSql
         && Objects.nonNull(getData().getDatasetChanges().getSyncPeriodic())) {
       this.cronJob =
           scheduler.schedule(
-              () ->
-                  changes()
-                      .handle(
-                          ImmutableDatasetChange.builder()
-                              .featureTypes(getData().getTypes().keySet())
-                              .build()),
+              LogContext.withMdc(
+                  () ->
+                      changes()
+                          .handle(
+                              ImmutableDatasetChange.builder()
+                                  .featureTypes(getData().getTypes().keySet())
+                                  .build())),
               getData().getDatasetChanges().getSyncPeriodic());
     }
   }
