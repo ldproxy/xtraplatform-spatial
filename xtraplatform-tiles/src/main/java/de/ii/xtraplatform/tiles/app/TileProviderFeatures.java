@@ -136,7 +136,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       JobQueue jobQueue,
       TileMatrixSetRepository tileMatrixSetRepository,
       @Assisted TileProviderFeaturesData data) {
-    super(volatileRegistry, data, "access", "generation", "seeding");
+    super(volatileRegistry, data);
 
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
     this.tileMatrixSetRepository = Optional.of(tileMatrixSetRepository);
@@ -168,6 +168,10 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   @Override
   protected boolean onStartup() throws InterruptedException {
     onVolatileStart();
+
+    addCapability("access", "Tile Access");
+    addCapability("generation", "Vector Tile Generation");
+    addHiddenCapability("seeding", "Tile Seeding");
 
     addSubcomponent(tilesStore, true, "access", "generation", "seeding");
     addSubcomponent(tileGenerator, true, "generation", "seeding");

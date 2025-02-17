@@ -117,6 +117,11 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
       VolatileRegistry volatileRegistry,
       boolean asyncStartup) {
     super("generator", volatileRegistry, true);
+    setHealthInfo(
+        "Vector Tile Generator",
+        "Might be UNAVAILABLE if a referenced Feature Provider is not healthy.",
+        false);
+
     this.data = data;
     this.crsInfo = crsInfo;
     this.crsTransformerFactory = crsTransformerFactory;
