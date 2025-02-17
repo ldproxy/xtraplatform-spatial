@@ -195,6 +195,22 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
                     String.format("Feature provider with id '%s' not found.", featureProviderId)));
   }
 
+  Optional<FeatureProvider> getFeatureProvider(String featureProviderId) {
+    if (async) {
+      DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
+
+      if (!provider.isAvailable()) {
+        return Optional.empty();
+      }
+
+      return Optional.of(provider.get());
+    }
+
+    return entityRegistry
+        .getEntity(FeatureProviderEntity.class, featureProviderId)
+        .map(fpe -> (FeatureProvider) fpe);
+  }
+
   @Override
   public Map<String, Map<String, Range<Integer>>> getTmsRanges() {
     return data.getTmsRanges();

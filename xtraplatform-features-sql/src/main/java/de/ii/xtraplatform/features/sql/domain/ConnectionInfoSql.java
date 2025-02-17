@@ -133,15 +133,17 @@ public interface ConnectionInfoSql extends ConnectionInfo {
   }
 
   /**
-   * @langEn Assume that the connected dataset may be changed by external applications. Setting this
-   *     to `true` for example will recompute extents and counts on every provider start or reload.
-   * @langDe Annehmen, dass der verbundene Datensatz durch externe Applikationen geändert werden
-   *     kann. Wenn diese Option auf `true` gesetzt wrid, werden z.B. Extents und Counts bei jedem
-   *     Start oder Reload des Providers neu berechnet.
+   * @langEn *Deprecated* (replaced by `datasetChanges.mode`). Assume that the connected dataset may
+   *     be changed by external applications. Setting this to `true` for example will recompute
+   *     extents and counts on every provider start or reload.
+   * @langDe *Deprecated* (ersetzt durch `datasetChanges.mode`). Annehmen, dass der verbundene
+   *     Datensatz durch externe Applikationen geändert werden kann. Wenn diese Option auf `true`
+   *     gesetzt wrid, werden z.B. Extents und Counts bei jedem Start oder Reload des Providers neu
+   *     berechnet.
    * @since v4.0
    * @default false
    */
-  @Override
+  @Deprecated(since = "4.3", forRemoval = true)
   @Value.Default
   default boolean getAssumeExternalChanges() {
     return false;

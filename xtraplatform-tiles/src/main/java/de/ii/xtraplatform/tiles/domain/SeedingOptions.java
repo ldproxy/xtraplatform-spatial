@@ -48,7 +48,7 @@ public interface SeedingOptions {
   }
 
   /**
-   * @langEn If disabled the seeding will not be run when the API starts.
+   * @langEn If disabled, the seeding will not run when the API starts.
    * @langDe Steuert, ob das Seeding beim Start einer API ausgeführt wird.
    * @default true
    */
@@ -77,6 +77,23 @@ public interface SeedingOptions {
   @JsonIgnore
   default boolean shouldRunPeriodic() {
     return Objects.nonNull(getRunPeriodic());
+  }
+
+  /**
+   * @langEn If disabled, the seeding will not run on dataset change events. See [Dataset
+   *     Changes](../feature/10-sql.md#dataset-changes).
+   * @langDe Steuert, ob das Seeding bei Dataset Change Events ausgeführt wird. Siehe
+   *     [Datensatzänderungen](../feature/10-sql.md#dataset-changes).
+   * @since v4.3
+   * @default true
+   */
+  @Nullable
+  Boolean getRunOnDatasetChange();
+
+  @Value.Lazy
+  @JsonIgnore
+  default boolean shouldRunOnDatasetChange() {
+    return !Objects.equals(getRunOnDatasetChange(), false);
   }
 
   @Value.Lazy

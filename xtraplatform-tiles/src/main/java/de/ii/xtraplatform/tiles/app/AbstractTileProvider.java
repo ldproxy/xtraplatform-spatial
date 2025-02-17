@@ -49,7 +49,7 @@ public abstract class AbstractTileProvider<T extends TileProviderData>
   }
 
   @Override
-  protected void onReloaded() {
+  protected void onReloaded(boolean forceReload) {
     LOGGER.info("Tile provider with id '{}' reloaded successfully.", getId());
   }
 
