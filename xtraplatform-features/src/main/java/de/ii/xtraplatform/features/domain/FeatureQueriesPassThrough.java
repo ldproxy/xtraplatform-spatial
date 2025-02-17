@@ -12,6 +12,7 @@ import javax.ws.rs.core.MediaType;
 public interface FeatureQueriesPassThrough {
 
   String CAPABILITY = "passThrough";
+  String LABEL = "Pass through features";
 
   MediaType getMediaType();
 

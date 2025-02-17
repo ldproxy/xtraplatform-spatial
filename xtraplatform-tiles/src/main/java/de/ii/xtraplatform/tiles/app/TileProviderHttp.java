@@ -86,7 +86,7 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
 
     onVolatileStart();
 
-    addCapability("access", true);
+    addStaticCapability("access", "Tile Access");
 
     return true;
   }

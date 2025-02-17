@@ -12,6 +12,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 public interface FeatureCrs {
 
   String CAPABILITY = "crs";
+  String LABEL = "Retrieve CRS information";
 
   EpsgCrs getNativeCrs();
 

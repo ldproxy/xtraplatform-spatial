@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 public interface FeatureChanges {
 
   String CAPABILITY = "changes";
+  String LABEL = "Detect dataset changes";
 
   void addListener(DatasetChangeListener listener);
 

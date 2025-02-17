@@ -12,6 +12,7 @@ import java.util.List;
 public interface FeatureQueries {
 
   String CAPABILITY = "queries";
+  String LABEL = "Execute queries";
 
   FeatureProviderCapabilities getCapabilities();
 

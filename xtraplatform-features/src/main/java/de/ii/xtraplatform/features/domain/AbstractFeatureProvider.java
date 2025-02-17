@@ -124,33 +124,37 @@ public abstract class AbstractFeatureProvider<
 
   @Override
   protected boolean onStartup() throws InterruptedException {
-    // TODO: call after addSubcomponent?
-    onVolatileStart();
 
-    addCapability(FeatureInfo.CAPABILITY);
-    addCapability(FeatureChanges.CAPABILITY);
+    addHiddenCapability(FeatureInfo.CAPABILITY, FeatureInfo.LABEL);
+    addHiddenCapability(FeatureChanges.CAPABILITY, FeatureChanges.LABEL);
     if (queries().isSupported()) {
-      addCapability(FeatureQueries.CAPABILITY);
+      addCapability(FeatureQueries.CAPABILITY, FeatureQueries.LABEL);
     }
     if (extents().isSupported()) {
-      addCapability(FeatureExtents.CAPABILITY);
+      addCapability(FeatureExtents.CAPABILITY, FeatureExtents.LABEL);
     }
     if (passThrough().isSupported()) {
-      addCapability(FeatureQueriesPassThrough.CAPABILITY);
+      addHiddenCapability(FeatureQueriesPassThrough.CAPABILITY, FeatureQueriesPassThrough.LABEL);
     }
     if (mutations().isSupported()) {
-      addCapability(FeatureTransactions.CAPABILITY);
+      addCapability(FeatureTransactions.CAPABILITY, FeatureTransactions.LABEL);
     }
     if (crs().isSupported()) {
-      addCapability(FeatureCrs.CAPABILITY);
+      addHiddenCapability(FeatureCrs.CAPABILITY, FeatureCrs.LABEL);
     }
     if (metadata().isSupported()) {
-      addCapability(FeatureMetadata.CAPABILITY);
+      addHiddenCapability(FeatureMetadata.CAPABILITY, FeatureMetadata.LABEL);
     }
     if (multiQueries().isSupported()) {
-      addCapability(MultiFeatureQueries.CAPABILITY);
+      addHiddenCapability(MultiFeatureQueries.CAPABILITY, FeatureQueries.LABEL);
     }
-    addSubcomponent(crsTransformerFactory, FeatureCrs.CAPABILITY);
+    addSubcomponent(
+        crsTransformerFactory,
+        FeatureCrs.CAPABILITY,
+        FeatureQueries.CAPABILITY,
+        FeatureExtents.CAPABILITY,
+        FeatureTransactions.CAPABILITY,
+        MultiFeatureQueries.CAPABILITY);
     addSubcomponent(
         connector,
         FeatureQueries.CAPABILITY,
@@ -159,6 +163,8 @@ public abstract class AbstractFeatureProvider<
         FeatureTransactions.CAPABILITY,
         FeatureMetadata.CAPABILITY,
         MultiFeatureQueries.CAPABILITY);
+
+    onVolatileStart();
 
     this.datasetChanged =
         connector.isPresent() && !connector.get().isSameDataset(getConnectionInfo());

@@ -14,6 +14,7 @@ import java.util.Set;
 public interface FeatureInfo {
 
   String CAPABILITY = "info";
+  String LABEL = "Retrieve provider information";
 
   String getId();
 

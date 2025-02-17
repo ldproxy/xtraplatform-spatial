@@ -94,6 +94,10 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
       @Assisted String providerId,
       @Assisted ConnectionInfoSql connectionInfo) {
     super(volatileRegistry);
+    setHealthInfo(
+        "SQL Connection Pool",
+        "Might be UNAVAILABLE if a connection to the database cannot be established.");
+
     this.dbmsAdapters = dbmsAdapters;
     this.connectionInfo = connectionInfo;
     this.poolName = String.format("db.%s", providerId);
