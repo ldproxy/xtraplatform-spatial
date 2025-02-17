@@ -100,7 +100,8 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
       FeatureProviderConnector<?, ?, ?> connector, FeatureProviderDataV2 data) {
     if (!(connector instanceof SqlConnector)
         || !Objects.equals(((SqlConnector) connector).getDialect(), SqlDbmsPgis.ID)
-        || !(data instanceof FeatureProviderSqlData)) {
+        || !(data instanceof FeatureProviderSqlData)
+        || getConfiguration(data.getExtensions()).isEmpty()) {
       return false;
     }
     if (!((FeatureProviderSqlData) data).getDatasetChanges().isModeTrigger()) {
