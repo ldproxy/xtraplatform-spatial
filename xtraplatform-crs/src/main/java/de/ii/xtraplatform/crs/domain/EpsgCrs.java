@@ -9,6 +9,7 @@ package de.ii.xtraplatform.crs.domain;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -84,6 +85,11 @@ public interface EpsgCrs {
 
   OptionalInt getVerticalCode();
 
+  @Value.Lazy
+  default boolean isCompoundCrs() {
+    return getVerticalCode().isPresent();
+  }
+
   @Value.Default
   default Force getForceAxisOrder() {
     return Force.NONE;
@@ -95,8 +101,23 @@ public interface EpsgCrs {
   }
 
   @Value.Lazy
+  default List<String> toSimpleStrings() {
+    return getVerticalCode().isPresent()
+        ? List.of(toSimpleString(), String.format("EPSG:%d", getVerticalCode().getAsInt()))
+        : List.of(toSimpleString());
+  }
+
+  @Value.Lazy
   default String toUrnString() {
     return String.format("urn:ogc:def:crs:EPSG::%d", getCode());
+  }
+
+  @Value.Lazy
+  default List<String> toUrnStrings() {
+    return getVerticalCode().isPresent()
+        ? List.of(
+            toUriString(), String.format("urn:ogc:def:crs:EPSG::%d", getVerticalCode().getAsInt()))
+        : List.of(toUrnString());
   }
 
   @Value.Lazy
@@ -111,6 +132,15 @@ public interface EpsgCrs {
   }
 
   @Value.Lazy
+  default List<String> toUriStrings() {
+    return getVerticalCode().isPresent()
+        ? List.of(
+            toUriString(),
+            String.format("http://www.opengis.net/def/crs/EPSG/0/%d", getVerticalCode().getAsInt()))
+        : List.of(toUriString());
+  }
+
+  @Value.Lazy
   default String toSafeCurie() {
     if (Objects.equals(this, OgcCrs.CRS84)) {
       return OgcCrs.CRS84_CURIE;
@@ -119,6 +149,13 @@ public interface EpsgCrs {
       return OgcCrs.CRS84h_CURIE;
     }
     return String.format("[EPSG:%d]", getCode());
+  }
+
+  @Value.Lazy
+  default List<String> toSafeCuries() {
+    return getVerticalCode().isPresent()
+        ? List.of(toSafeCurie(), String.format("[EPSG:%d]", getVerticalCode().getAsInt()))
+        : List.of(toSafeCurie());
   }
 
   @Value.Lazy
