@@ -56,7 +56,7 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
           .map(tableSchema -> validate(typeName, tableSchema, mode, schemaInfo))
           .reduce(ValidationResult.of(), ValidationResult::mergeWith);
     } catch (SchemaCrawlerException | IOException e) {
-      throw new IllegalStateException("could not parse schema");
+      throw new IllegalStateException("could not parse schema", e);
     }
   }
 

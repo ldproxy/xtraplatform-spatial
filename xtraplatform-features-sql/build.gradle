@@ -1,4 +1,3 @@
-
 maturity = 'MATURE'
 maintenance = 'FULL'
 description = 'SQL feature provider, PostgreSQL and GeoPackage.'
@@ -22,7 +21,7 @@ dependencies {
     provided project(':xtraplatform-features')
     provided project(':xtraplatform-strings')
 
-    embedded (libs.rxjava.jdbc) {
+    embedded(libs.rxjava.jdbc) {
         exclude module: 'rxjava'
         exclude module: 'reactive-streams'
         exclude module: 'commons-io'
@@ -46,8 +45,5 @@ moduleInfo {
             'java.management',
             'java.naming',
             'java.sql',
-    ]
-    uses = [
-            'schemacrawler.tools.databaseconnector.DatabaseConnector'
     ]
 }
