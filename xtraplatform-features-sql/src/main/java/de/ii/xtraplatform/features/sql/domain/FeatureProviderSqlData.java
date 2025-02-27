@@ -138,6 +138,11 @@ public interface FeatureProviderSqlData
   @JsonDeserialize(builder = ImmutableQueryGeneratorSettings.Builder.class)
   interface QueryGeneratorSettings {
 
+    enum NullOrder {
+      FIRST,
+      LAST
+    }
+
     @DocIgnore
     @Value.Default
     default int getChunkSize() {
@@ -157,6 +162,22 @@ public interface FeatureProviderSqlData
     @Value.Default
     default boolean getComputeNumberMatched() {
       return true;
+    }
+
+    /**
+     * @langEn If no value is provided, the sort order of the underlying feature provider (typically
+     *     `last` for ascending and `first` for descending) is used. `last` or `first` can be used
+     *     to force a specific sort order, if some rows have null values.
+     * @langDe Ohne Angabe wird die Sortierreihenfolge des zugrunde liegenden Feature-Providers
+     *     verwendet (normalerweise `last` für aufsteigend und `first` für absteigend). `last` oder
+     *     `first` kann verwendet werden, um eine bestimmte Sortierreihenfolge für Spalten mit
+     *     Nullwerten zu erzwingen.
+     * @default -
+     * @since v4.3
+     */
+    @Value.Default
+    default Optional<NullOrder> getNullOrder() {
+      return Optional.empty();
     }
 
     // TODO
