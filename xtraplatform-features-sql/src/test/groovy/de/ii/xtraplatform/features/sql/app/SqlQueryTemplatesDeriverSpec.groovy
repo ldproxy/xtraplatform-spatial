@@ -29,9 +29,9 @@ class SqlQueryTemplatesDeriverSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
     @Shared
-    SqlQueryTemplatesDeriver td = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false)
+    SqlQueryTemplatesDeriver td = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false, Optional.empty())
     @Shared
-    SqlQueryTemplatesDeriver tdNoNm = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), false, false)
+    SqlQueryTemplatesDeriver tdNoNm = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), false, false, Optional.empty())
 
     @Shared
     QuerySchemaDeriver schemaDeriver

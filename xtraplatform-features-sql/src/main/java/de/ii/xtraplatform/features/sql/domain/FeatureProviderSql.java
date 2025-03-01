@@ -521,7 +521,8 @@ public class FeatureProviderSql
                                           filterEncoder,
                                           sqlDialect,
                                           getData().getQueryGeneration().getComputeNumberMatched(),
-                                          true)))
+                                          true,
+                                          getData().getQueryGeneration().getNullOrder())))
                           .collect(Collectors.toList()));
                 })
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
@@ -544,7 +545,8 @@ public class FeatureProviderSql
                                         filterEncoder,
                                         sqlDialect,
                                         getData().getQueryGeneration().getComputeNumberMatched(),
-                                        false)))))
+                                        false,
+                                        getData().getQueryGeneration().getNullOrder())))))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =

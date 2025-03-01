@@ -17,6 +17,7 @@ import de.ii.xtraplatform.features.domain.SortKey.Direction;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.MetaQueryTemplate;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.sql.Timestamp;
@@ -42,18 +43,28 @@ public class SqlQueryTemplatesDeriver
   private final FilterEncoderSql filterEncoder;
   private final boolean computeNumberMatched;
   private final boolean computeNumberSkipped;
+  private final String nullOrder;
 
   public SqlQueryTemplatesDeriver(
       SchemaSql queryablesSchema,
       FilterEncoderSql filterEncoder,
       SqlDialect sqlDialect,
       boolean computeNumberMatched,
-      boolean computeNumberSkipped) {
+      boolean computeNumberSkipped,
+      Optional<QueryGeneratorSettings.NullOrder> nullOrder) {
     this.queryablesSchema = queryablesSchema;
     this.sqlDialect = sqlDialect;
     this.filterEncoder = filterEncoder;
     this.computeNumberMatched = computeNumberMatched;
     this.computeNumberSkipped = computeNumberSkipped;
+    this.nullOrder =
+        nullOrder
+            .map(
+                nulls ->
+                    nulls == QueryGeneratorSettings.NullOrder.FIRST
+                        ? " NULLS FIRST"
+                        : " NULLS LAST")
+            .orElse("");
   }
 
   @Override
@@ -252,9 +263,9 @@ public class SqlQueryTemplatesDeriver
                   index -> {
                     if (index < additionalSortKeys.size()
                         && additionalSortKeys.get(index).getDirection() == Direction.DESCENDING) {
-                      return sortFields.get(index) + " DESC";
+                      return sortFields.get(index) + " DESC" + nullOrder;
                     }
-                    return sortFields.get(index);
+                    return sortFields.get(index) + nullOrder;
                   })
               .filter(sortField -> sortField.startsWith("A."))
               .map(sortField -> sortField.replace("A.", aliasesNested.get(0) + "."))
@@ -282,9 +293,9 @@ public class SqlQueryTemplatesDeriver
                 index -> {
                   if (index <= additionalSortKeys.size()
                       && additionalSortKeys.get(index - 1).getDirection() == Direction.DESCENDING) {
-                    return index + " DESC";
+                    return index + " DESC" + nullOrder;
                   }
-                  return String.valueOf(index);
+                  return index + nullOrder;
                 })
             .collect(Collectors.joining(","));
 
@@ -434,7 +445,12 @@ public class SqlQueryTemplatesDeriver
       SortKey sortKey = sortKeys.get(i);
 
       orderBy +=
-          CSKEY + "_" + i + (sortKey.getDirection() == Direction.DESCENDING ? " DESC" : "") + ", ";
+          CSKEY
+              + "_"
+              + i
+              + (sortKey.getDirection() == Direction.DESCENDING ? " DESC" : "")
+              + nullOrder
+              + ", ";
     }
 
     orderBy += SKEY;
