@@ -187,15 +187,17 @@ public class SqlClientRx implements SqlClient {
         // TODO: when implementing crud for joins, check if bug in rxjava3-jdbc still exists:
         //  when using returnGeneratedKeys, TransactedConnection.commit is called too often,
         //  therefore close is never called because counter < 0
-        /*toStatements.size() == 2
-        ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
-        :*/
-        session
-            .update(first)
-            .transacted()
-            .returnGeneratedKeys()
-            .get(resultSet -> mapper.apply(resultSet, null))
-            .filter(tx -> !tx.isComplete());
+
+        // for update/replace, the first statement is always delete, so we can skip the
+        // returnGeneratedKeys
+        toStatements.size() == 2
+            ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
+            : session
+                .update(first)
+                .transacted()
+                .returnGeneratedKeys()
+                .get(resultSet -> mapper.apply(resultSet, null))
+                .filter(tx -> !tx.isComplete());
 
     for (int j = 1; j < toStatementsWithLog.size(); j++) {
       String next = toStatementsWithLog.get(j).apply(feature);
