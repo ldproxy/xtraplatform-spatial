@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ser.std.StdDelegatingSerializer;
 import com.fasterxml.jackson.databind.util.StdConverter;
 import com.github.azahnen.dagger.annotations.AutoBind;
 import com.google.common.collect.ImmutableList;
+import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlParseException;
@@ -79,6 +80,12 @@ public class CqlImpl implements Cql {
       case TEXT:
         return cqlTextParser.parse(cql, crs);
       case JSON:
+        // handle boolean value
+        if (cql.trim().equalsIgnoreCase("true")) {
+          return BooleanValue2.of(true);
+        } else if (cql.trim().equalsIgnoreCase("false")) {
+          return BooleanValue2.of(false);
+        }
         cqlJsonMapper.setInjectableValues(
             new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
         try {
