@@ -16,22 +16,18 @@ import de.ii.xtraplatform.features.domain.MappingOperationResolver
 import de.ii.xtraplatform.features.domain.SortKey
 import de.ii.xtraplatform.features.domain.Tuple
 import de.ii.xtraplatform.features.json.app.DecoderFactoryJson
-import de.ii.xtraplatform.features.sql.domain.ConstantsResolver
-import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
-import de.ii.xtraplatform.features.sql.domain.SchemaSql
-import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
-import de.ii.xtraplatform.features.sql.domain.SqlPathParser
+import de.ii.xtraplatform.features.sql.domain.*
 import spock.lang.Shared
 import spock.lang.Specification
 
 class SqlQueryTemplatesDeriverSpec extends Specification {
 
     @Shared
-    FilterEncoderSql filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
+    FilterEncoderSql filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null, false)
     @Shared
-    SqlQueryTemplatesDeriver td = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false, Optional.empty())
+    SqlQueryTemplatesDeriver td = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false, Optional.empty(), false)
     @Shared
-    SqlQueryTemplatesDeriver tdNoNm = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), false, false, Optional.empty())
+    SqlQueryTemplatesDeriver tdNoNm = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), false, false, Optional.empty(), false)
 
     @Shared
     QuerySchemaDeriver schemaDeriver
@@ -107,7 +103,7 @@ class SqlQueryTemplatesDeriverSpec extends Specification {
         when:
 
         def sources = sqlSchemas(schema, schemaDeriver, mappingOperationResolver)
-        List<SqlQueryTemplates> templates = sources.collect {it.accept(deriver) }
+        List<SqlQueryTemplates> templates = sources.collect { it.accept(deriver) }
         List<String> actual = templates.collectMany { values(it, limit, offset, sortBy, filter) }
         List<String> expected = SqlQueryFixtures.fromYaml(queries)
 

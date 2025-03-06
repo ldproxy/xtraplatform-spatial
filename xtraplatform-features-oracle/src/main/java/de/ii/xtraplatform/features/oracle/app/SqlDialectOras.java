@@ -13,6 +13,7 @@ import de.ii.xtraplatform.cql.domain.SpatialFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.Tuple;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.time.Instant;
@@ -34,6 +35,36 @@ public class SqlDialectOras implements SqlDialect {
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
+  private QueryGeneratorSettings settings;
+
+  /*
+    private String applyToGeometry(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
+      if (settings.getGeometryAsWkb()) {
+        return applyToWkb(column, forcePolygonCCW, linearizeCurves);
+      } else {
+        return applyToWkt(column, forcePolygonCCW, linearizeCurves);
+      }
+    }
+
+    private String applyToGeometry(Object geometry, int srid) {
+      if (settings.getGeometryAsWkb()) {
+        if (geometry instanceof byte[]) {
+          return applyToWkb((byte[]) geometry, srid);
+        } else if (geometry instanceof String) {
+          byte[] wkb = ((String) geometry).getBytes(); // Convert the geometry string to a byte array
+          return applyToWkb(wkb, srid);
+        } else {
+          throw new IllegalArgumentException("Expected geometry to be either byte[] or String.");
+        }
+      } else {
+        if (geometry instanceof String) {
+          return applyToWkt((String) geometry, srid);
+        } else {
+          throw new IllegalArgumentException("Expected geometry to be a String for WKT format.");
+        }
+      }
+    }
+  */
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
     if (!forcePolygonCCW) {
@@ -45,6 +76,19 @@ public class SqlDialectOras implements SqlDialect {
   @Override
   public String applyToWkt(String wkt, int srid) {
     return String.format("SDO_GEOMETRY('%s',%s)", wkt, srid);
+  }
+
+  @Override
+  public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
+    if (!forcePolygonCCW) {
+      return String.format("SDO_UTIL.TO_WKBGEOMETRY(%s)", column);
+    }
+    return String.format("SDO_UTIL.TO_WKBGEOMETRY(SDO_UTIL.RECTIFY_GEOMETRY(%s, 0.001))", column);
+  }
+
+  @Override
+  public String applyToWkb(byte[] wkb, int srid) {
+    return "SDO_UTIL.FROM_WKBGEOMETRY(?, ?)";
   }
 
   @Override
