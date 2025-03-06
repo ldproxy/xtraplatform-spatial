@@ -135,31 +135,29 @@ import org.threeten.extra.Interval;
  *     <p>For `PGIS` the following known limitations exist:
  *     <p><code>
  * - Not all CQL2 expressions are supported in JSON columns.
- *     </code>
+ * </code>
  *     <p>For `GPKG` the following known limitations exist:
  *     <p><code>
  * - The option `linearizeCurves` is not supported. All geometries must conform to the OGC Simple
- *   Feature Access standard.
- * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
- * - Arrays as queryables are not supported for GeoPackage feature providers.
- * - Queryables that are values in an array are not supported for GeoPackage feature providers.
- *     </code>
+ * Feature Access standard. - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not
+ * supported. - Arrays as queryables are not supported for GeoPackage feature providers. -
+ * Queryables that are values in an array are not supported for GeoPackage feature providers.
+ * </code>
  * @limitationsDe
  *     <p>Alle Bezeichner müssen nicht in Anführungszeichen gesetzt werden, d.h. die Bezeichner
  *     werden klein geschrieben.
  *     <p>Für `PGIS` gibt es die folgenden bekannten Einschränkungen:
  *     <p><code>
  * - Nicht alle CQL2-Ausdrücke werden in JSON-Spalten unterstützt.
- *     </code>
+ * </code>
  *     <p>Für `GPKG` gibt es die folgenden bekannten Einschränkungen:
  *     <p><code>
  * - Die Option `linearizeCurves` wird nicht unterstützt. Alle Geometrien müssen Geometrien gemäß
- *   dem Standard OGC Simple Feature Access sein.
- * - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
- * - Arrays als Queryables werden für GeoPackage Feature Provider nicht unterstützt.
- * - Queryables, die Werte in einem Array sind, werden für GeoPackage Feature-Anbieter nicht
- *   unterstützt.
- *     </code>
+ * dem Standard OGC Simple Feature Access sein. - Die CQL2-Funktionen `DIAMETER2D()` und
+ * `DIAMETER3D()` werden nicht unterstützt. - Arrays als Queryables werden für GeoPackage Feature
+ * Provider nicht unterstützt. - Queryables, die Werte in einem Array sind, werden für GeoPackage
+ * Feature-Anbieter nicht unterstützt.
+ * </code>
  * @cfgPropertiesAdditionalEn ### Connection Info
  *     <p>The connection info object for SQL databases has the following properties:
  *     <p>{@docTable:connectionInfo}
@@ -492,7 +490,8 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
-            accentiCollation);
+            accentiCollation,
+            getData().getQueryGeneration().getGeometryAsWkb());
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
@@ -522,7 +521,8 @@ public class FeatureProviderSql
                                           sqlDialect,
                                           getData().getQueryGeneration().getComputeNumberMatched(),
                                           true,
-                                          getData().getQueryGeneration().getNullOrder())))
+                                          getData().getQueryGeneration().getNullOrder(),
+                                          getData().getQueryGeneration().getGeometryAsWkb())))
                           .collect(Collectors.toList()));
                 })
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
@@ -546,7 +546,8 @@ public class FeatureProviderSql
                                         sqlDialect,
                                         getData().getQueryGeneration().getComputeNumberMatched(),
                                         false,
-                                        getData().getQueryGeneration().getNullOrder())))))
+                                        getData().getQueryGeneration().getNullOrder(),
+                                        getData().getQueryGeneration().getGeometryAsWkb())))))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =
@@ -1336,8 +1337,9 @@ public class FeatureProviderSql
 
   @Override
   public boolean supportsAccenti() {
-    if (Objects.nonNull(getData().getQueryGeneration()))
+    if (Objects.nonNull(getData().getQueryGeneration())) {
       return getData().getQueryGeneration().getAccentiCollation().isPresent();
+    }
     return false;
   }
 

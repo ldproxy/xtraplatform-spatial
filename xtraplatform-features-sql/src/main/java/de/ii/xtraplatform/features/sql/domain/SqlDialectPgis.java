@@ -72,6 +72,30 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
+  public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
+    StringBuilder binaryBuilder = new StringBuilder("ST_AsBinary(");
+    if (linearizeCurves) {
+      binaryBuilder.append("ST_CurveToLine(");
+    }
+    if (forcePolygonCCW) {
+      binaryBuilder.append("ST_ForcePolygonCCW(");
+    }
+    binaryBuilder.append(column);
+    if (forcePolygonCCW) {
+      binaryBuilder.append(")");
+    }
+    if (linearizeCurves) {
+      binaryBuilder.append(",32,0,1)");
+    }
+    return binaryBuilder.append(")").toString();
+  }
+
+  @Override
+  public String applyToWkb(byte[] wkb, int srid) {
+    return "SDO_UTIL.FROM_WKBGEOMETRY(?, ?)";
+  }
+
+  @Override
   public String applyToExtent(String column, boolean is3d) {
     return is3d ? String.format("ST_3DExtent(%s)", column) : String.format("ST_Extent(%s)", column);
   }
