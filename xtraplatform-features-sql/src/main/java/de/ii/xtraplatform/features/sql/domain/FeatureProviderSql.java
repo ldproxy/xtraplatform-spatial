@@ -817,7 +817,8 @@ public class FeatureProviderSql
               ? tableSchemas.get(featureQuery.getType())
               : tableSchemasMutations.get(featureQuery.getType());
 
-      return new FeatureDecoderSql(mappings, schemas, query, subdecoders);
+      return new FeatureDecoderSql(
+          mappings, schemas, query, subdecoders, getData().getQueryGeneration().getGeometryAsWkb());
     }
 
     if (query instanceof MultiFeatureQuery) {
@@ -828,7 +829,8 @@ public class FeatureProviderSql
               .flatMap(typeQuery -> tableSchemas.get(typeQuery.getType()).stream())
               .collect(Collectors.toList());
 
-      return new FeatureDecoderSql(mappings, schemas, query, subdecoders);
+      return new FeatureDecoderSql(
+          mappings, schemas, query, subdecoders, getData().getQueryGeneration().getGeometryAsWkb());
     }
 
     throw new IllegalArgumentException();

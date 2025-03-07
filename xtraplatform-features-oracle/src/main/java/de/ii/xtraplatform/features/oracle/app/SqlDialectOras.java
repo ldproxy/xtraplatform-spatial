@@ -37,34 +37,6 @@ public class SqlDialectOras implements SqlDialect {
 
   private QueryGeneratorSettings settings;
 
-  /*
-    private String applyToGeometry(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-      if (settings.getGeometryAsWkb()) {
-        return applyToWkb(column, forcePolygonCCW, linearizeCurves);
-      } else {
-        return applyToWkt(column, forcePolygonCCW, linearizeCurves);
-      }
-    }
-
-    private String applyToGeometry(Object geometry, int srid) {
-      if (settings.getGeometryAsWkb()) {
-        if (geometry instanceof byte[]) {
-          return applyToWkb((byte[]) geometry, srid);
-        } else if (geometry instanceof String) {
-          byte[] wkb = ((String) geometry).getBytes(); // Convert the geometry string to a byte array
-          return applyToWkb(wkb, srid);
-        } else {
-          throw new IllegalArgumentException("Expected geometry to be either byte[] or String.");
-        }
-      } else {
-        if (geometry instanceof String) {
-          return applyToWkt((String) geometry, srid);
-        } else {
-          throw new IllegalArgumentException("Expected geometry to be a String for WKT format.");
-        }
-      }
-    }
-  */
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
     if (!forcePolygonCCW) {
@@ -167,7 +139,6 @@ public class SqlDialectOras implements SqlDialect {
   public String applyToInstantMin() {
     return "0001-01-01T00:00:00Z";
   }
-  ;
 
   @Override
   public String applyToInstantMax() {
