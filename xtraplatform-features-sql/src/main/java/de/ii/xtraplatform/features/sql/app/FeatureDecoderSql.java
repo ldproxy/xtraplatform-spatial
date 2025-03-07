@@ -48,6 +48,7 @@ public class FeatureDecoderSql
   private final boolean isSingleFeature;
   private final Map<String, DecoderFactory> subDecoderFactories;
   private final Map<String, Decoder> subDecoders;
+  private final boolean geometryAsWkb;
 
   private boolean started;
   private boolean featureStarted;
@@ -55,16 +56,19 @@ public class FeatureDecoderSql
   private boolean isAtLeastOneFeatureWritten;
 
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
-  private GeometryDecoderWkt geometryDecoder;
+  private GeometryDecoderWkt geometryDecoderWkt;
+  private GeometryDecoderWkb geometryDecoderWkb;
   private NestingTracker nestingTracker;
 
   public FeatureDecoderSql(
       Map<String, SchemaMapping> mappings,
       List<SchemaSql> tableSchemas,
       Query query,
-      Map<String, DecoderFactory> subDecoderFactories) {
+      Map<String, DecoderFactory> subDecoderFactories,
+      boolean geometryAsWkb) {
     this.mappings = mappings;
     this.query = query;
+    this.geometryAsWkb = geometryAsWkb;
 
     this.mainTablePaths =
         tableSchemas.stream().map(SchemaBase::getFullPath).collect(Collectors.toList());
@@ -84,7 +88,11 @@ public class FeatureDecoderSql
   @Override
   protected void init() {
     this.context = createContext().setMappings(mappings).setQuery(query);
-    this.geometryDecoder = new GeometryDecoderWkt(getDownstream(), context);
+    if (geometryAsWkb) {
+      this.geometryDecoderWkb = new GeometryDecoderWkb(getDownstream(), context);
+    } else {
+      this.geometryDecoderWkt = new GeometryDecoderWkt(getDownstream(), context);
+    }
     this.nestingTracker =
         new NestingTracker(getDownstream(), context, mainTablePaths, false, false, false);
 
@@ -244,9 +252,13 @@ public class FeatureDecoderSql
         if (Objects.nonNull(sqlRow.getValues().get(i))) {
           try {
             context.setSchemaIndex(-1);
-            geometryDecoder.decode((String) sqlRow.getValues().get(i));
+            if (geometryAsWkb && sqlRow.getValues().get(i) instanceof byte[]) {
+              geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i));
+            } else if (!geometryAsWkb) {
+              geometryDecoderWkt.decode((String) sqlRow.getValues().get(i));
+            }
           } catch (IOException e) {
-            throw new IllegalStateException("Error parsing WKT geometry", e);
+            throw new IllegalStateException("Error parsing WKT or WKB geometry", e);
           }
         }
       } else {

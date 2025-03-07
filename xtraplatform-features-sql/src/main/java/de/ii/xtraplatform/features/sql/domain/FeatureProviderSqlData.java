@@ -190,11 +190,11 @@ public interface FeatureProviderSqlData
     /**
      * @langEn Option to return geometries as Well-Known Binary (WKB) format.
      * @langDe Option, Geometrien im Well-Known Binary (WKB) Format zurückzugeben.
-     * @default true
+     * @default false
      */
     @Value.Default
     default boolean getGeometryAsWkb() {
-      return true;
+      return false;
     }
   }
 
