@@ -92,7 +92,7 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public String applyToWkb(byte[] wkb, int srid) {
-    return "SDO_UTIL.FROM_WKBGEOMETRY(?, ?)";
+    return String.format("GeomFromWKB('%s', %d)", wkb, srid);
   }
 
   @Override
