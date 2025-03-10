@@ -119,4 +119,26 @@ class GeometryDecoderWktSpec extends Specification {
         3 * handler.onArrayEnd(context)
         1 * handler.onObjectEnd(context)
     }
+
+    def "test decode MULTILINESTRING"() {
+        given:
+        String wkt = "MULTILINESTRING ((10 10, 20 20), (15 15, 30 15))"
+        List<String> expectedTokens = ["10 10,20 20", "15 15,30 15"]
+
+        when:
+        decoder.decode(wkt)
+
+        then:
+        1 * handler.onObjectStart(context)
+        1 * context.setGeometryType(SimpleFeatureGeometry.MULTI_LINE_STRING)
+        1 * context.setGeometryDimension(2)
+        1 * handler.onArrayStart(context)
+        expectedTokens.each { token ->
+            1 * context.setValueType(Type.STRING)
+            1 * context.setValue(token)
+            1 * handler.onValue(context)
+        }
+        1 * handler.onArrayEnd(context)
+        1 * handler.onObjectEnd(context)
+    }
 }
