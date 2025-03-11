@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.crs.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
@@ -85,21 +86,24 @@ public interface EpsgCrs {
 
   OptionalInt getVerticalCode();
 
-  @Value.Lazy
-  default boolean isCompoundCrs() {
-    return getVerticalCode().isPresent();
-  }
-
   @Value.Default
   default Force getForceAxisOrder() {
     return Force.NONE;
   }
 
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isCompoundCrs() {
+    return getVerticalCode().isPresent();
+  }
+
+  @JsonIgnore
   @Value.Lazy
   default String toSimpleString() {
     return String.format("EPSG:%d", getCode());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default List<String> toSimpleStrings() {
     return getVerticalCode().isPresent()
@@ -107,11 +111,13 @@ public interface EpsgCrs {
         : List.of(toSimpleString());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default String toUrnString() {
     return String.format("urn:ogc:def:crs:EPSG::%d", getCode());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default List<String> toUrnStrings() {
     return getVerticalCode().isPresent()
@@ -120,6 +126,7 @@ public interface EpsgCrs {
         : List.of(toUrnString());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default String toUriString() {
     if (Objects.equals(this, OgcCrs.CRS84)) {
@@ -131,6 +138,7 @@ public interface EpsgCrs {
     return String.format("http://www.opengis.net/def/crs/EPSG/0/%d", getCode());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default List<String> toUriStrings() {
     return getVerticalCode().isPresent()
@@ -140,6 +148,7 @@ public interface EpsgCrs {
         : List.of(toUriString());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default String toSafeCurie() {
     if (Objects.equals(this, OgcCrs.CRS84)) {
@@ -151,6 +160,7 @@ public interface EpsgCrs {
     return String.format("[EPSG:%d]", getCode());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default List<String> toSafeCuries() {
     return getVerticalCode().isPresent()
@@ -158,6 +168,7 @@ public interface EpsgCrs {
         : List.of(toSafeCurie());
   }
 
+  @JsonIgnore
   @Value.Lazy
   default String toHumanReadableString() {
     String lonlat =

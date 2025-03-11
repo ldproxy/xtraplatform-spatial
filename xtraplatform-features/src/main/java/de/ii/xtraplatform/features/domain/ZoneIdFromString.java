@@ -13,6 +13,10 @@ import java.util.Optional;
 
 public class ZoneIdFromString extends StdConverter<Optional<String>, Optional<ZoneId>> {
 
+  public ZoneIdFromString() {
+    super();
+  }
+
   @Override
   public Optional<ZoneId> convert(Optional<String> value) {
     return value.map(ZoneId::of);

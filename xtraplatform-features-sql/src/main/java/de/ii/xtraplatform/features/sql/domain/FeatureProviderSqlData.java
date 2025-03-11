@@ -196,9 +196,7 @@ public interface FeatureProviderSqlData
       return new ImmutableFeatureProviderSqlData.Builder()
           .from(this)
           .datasetChanges(
-              new ImmutableDatasetChangeSettings.Builder()
-                  .mode(DatasetChangeSettings.Mode.EXTERNAL)
-                  .build())
+              new ImmutableDatasetChangeSettings.Builder().mode(DatasetChangeMode.EXTERNAL).build())
           .build();
     }
 
@@ -235,13 +233,6 @@ public interface FeatureProviderSqlData
   @JsonDeserialize(builder = ImmutableDatasetChangeSettings.Builder.class)
   interface DatasetChangeSettings {
 
-    enum Mode {
-      OFF,
-      CRUD,
-      TRIGGER,
-      EXTERNAL,
-    }
-
     /**
      * @langEn The mode for dataset change detection, see above.
      * @langDe Der Modus für die Erkennung von Datensatzänderungen, siehe oben.
@@ -249,8 +240,8 @@ public interface FeatureProviderSqlData
      * @default CRUD v4 \| OFF v5
      */
     @Value.Default
-    default Mode getMode() {
-      return Mode.CRUD;
+    default DatasetChangeMode getMode() {
+      return DatasetChangeMode.CRUD;
     }
 
     /**
@@ -267,25 +258,32 @@ public interface FeatureProviderSqlData
     @JsonIgnore
     @Value.Lazy
     default boolean isModeOff() {
-      return getMode() == Mode.OFF;
+      return getMode() == DatasetChangeMode.OFF;
     }
 
     @JsonIgnore
     @Value.Lazy
     default boolean isModeExternal() {
-      return getMode() == Mode.EXTERNAL;
+      return getMode() == DatasetChangeMode.EXTERNAL;
     }
 
     @JsonIgnore
     @Value.Lazy
     default boolean isModeCrud() {
-      return getMode() == Mode.CRUD;
+      return getMode() == DatasetChangeMode.CRUD;
     }
 
     @JsonIgnore
     @Value.Lazy
     default boolean isModeTrigger() {
-      return getMode() == Mode.TRIGGER;
+      return getMode() == DatasetChangeMode.TRIGGER;
     }
+  }
+
+  enum DatasetChangeMode {
+    OFF,
+    CRUD,
+    TRIGGER,
+    EXTERNAL,
   }
 }
