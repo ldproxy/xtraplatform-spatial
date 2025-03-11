@@ -72,7 +72,6 @@ public class GeometryDecoderWkb {
           handleMultiPolygon(geometry);
           break;
         case GEOMETRY_COLLECTION:
-          handleGeometryCollection(geometry);
           break;
       }
 
@@ -123,39 +122,6 @@ public class GeometryDecoderWkb {
     handler.onArrayStart(context);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       handlePolygon(geometry.getGeometryN(i));
-    }
-    handler.onArrayEnd(context);
-  }
-
-  private void handleGeometryCollection(Geometry geometry) {
-    handler.onArrayStart(context);
-    for (int i = 0; i < geometry.getNumGeometries(); i++) {
-      Geometry subGeometry = geometry.getGeometryN(i);
-      SimpleFeatureGeometry subGeometryType =
-          SimpleFeatureGeometryFromToWkb.fromGeometry(subGeometry);
-      switch (subGeometryType) {
-        case POINT:
-          handlePoint(subGeometry);
-          break;
-        case MULTI_POINT:
-          handleMultiPoint(subGeometry);
-          break;
-        case LINE_STRING:
-          handleLineString(subGeometry);
-          break;
-        case MULTI_LINE_STRING:
-          handleMultiLineString(subGeometry);
-          break;
-        case POLYGON:
-          handlePolygon(subGeometry);
-          break;
-        case MULTI_POLYGON:
-          handleMultiPolygon(subGeometry);
-          break;
-        case GEOMETRY_COLLECTION:
-          handleGeometryCollection(subGeometry);
-          break;
-      }
     }
     handler.onArrayEnd(context);
   }
