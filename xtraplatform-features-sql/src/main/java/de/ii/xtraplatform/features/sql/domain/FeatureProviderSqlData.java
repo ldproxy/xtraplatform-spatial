@@ -191,6 +191,7 @@ public interface FeatureProviderSqlData
      * @langEn Option to return geometries as Well-Known Binary (WKB) format.
      * @langDe Option, Geometrien im Well-Known Binary (WKB) Format zurückzugeben.
      * @default false
+     * @since v4.4
      */
     @Value.Default
     default boolean getGeometryAsWkb() {
@@ -217,31 +218,33 @@ public interface FeatureProviderSqlData
    * @langEn Defines how dataset changes should be detected. There are the following modes:
    *     <p><code>
    * - `OFF`: The dataset is considered static and no change detection is performed. If there is a
-   * new dataset version, that should result in changes to `connectionInfo`. (This will be the
-   * default in v5.x) - `CRUD`: Changes to the dataset are exclusively made by the application
-   * itself through the CRUD interface. (This is the default in v4.x) - `TRIGGER`: There are
-   * triggers set up for the dataset that notify the application about changes (see for example
-   * [Change Listener](90-extensions/change_listener.md)). Additionally a periodic synchronization
-   * can be configured with `syncPeriodic` for the case of missed notifications. - `EXTERNAL`:
-   * Assume that the dataset may be changed by external applications. In this mode a synchronization
-   * happens on every provider start or reload. Additionally a periodic synchronization can be
-   * configured with `syncPeriodic`.
-   * </code>
+   *   new dataset version, that should result in changes to `connectionInfo`. (This will be the
+   *   default in v5.x)
+   * - `CRUD`: Changes to the dataset are exclusively made by the application itself through the CRUD
+   *   interface. (This is the default in v4.x)
+   * - `TRIGGER`: There are triggers set up for the dataset that notify the application about changes
+   *   (see for example [Change Listener](90-extensions/change_listener.md)). Additionally a periodic
+   *   synchronization can be configured with `syncPeriodic` for the case of missed notifications.
+   * - `EXTERNAL`: Assume that the dataset may be changed by external applications.
+   *   In this mode a synchronization happens on every provider start or reload.
+   *   Additionally a periodic synchronization can be configured with `syncPeriodic`.
+   *     </code>
    * @langDe Definiert wie Änderungen am Datensatz erkannt werden sollen. Es gibt die folgenden
    *     Modi:
    *     <p><code>
-   * - `OFF`: Der Datensatz wird als statisch betrachtet und es wird keine Änderungserkennung
-   * durchgeführt. Wenn es eine neue Datensatzversion gibt, sollte diese zu Änderungen an
-   * `connectionInfo` führen. (Dies wird in v5.x der Standard sein) - `CRUD`: Änderungen am
-   * Datensatz werden ausschließlich von der Anwendung selbst über die CRUD-Schnittstelle
-   * vorgenommen. (Dies ist in v4.x der Standard) - `TRIGGER`: Es sind Trigger für den Datensatz
-   * eingerichtet, die die Anwendung über Änderungen informieren (siehe z.B. [Change
-   * Listener](90-extensions/change_listener.md)). Zusätzlich kann eine periodische Synchronisation
-   * mit `syncPeriodic` für den Fall von verpassten Benachrichtigungen konfiguriert werden. -
-   * `EXTERNAL`: Annehmen, dass der Datensatz von externen Anwendungen geändert werden kann. In
-   * diesem Modus erfolgt eine Synchronisation bei jedem Start oder Reload des Providers. Zusätzlich
-   * kann eine periodische Synchronisation mit `syncPeriodic` konfiguriert werden.
-   * </code>
+   * - `OFF`: Der Datensatz wird als statisch betrachtet und es wird keine Änderungserkennung durchgeführt.
+   *   Wenn es eine neue Datensatzversion gibt, sollte diese zu Änderungen an connectionInfo` führen. (Dies
+   *   wird in v5.x der Standard sein)
+   * - `CRUD`: Änderungen am Datensatz werden ausschließlich von der Anwendung selbst über die CRUD-
+   *   Schnittstelle vorgenommen. (Dies ist in v4.x der Standard)
+   * - `TRIGGER`: Es sind Trigger für den Datensatz eingerichtet, die die Anwendung über Änderungen
+   *   informieren (siehe z.B. [Change Listener](90-extensions/change_listener.md)). Zusätzlich kann eine
+   *   periodische Synchronisation mit `syncPeriodic` für den Fall von verpassten Benachrichtigungen
+   *   konfiguriert werden.
+   * - `EXTERNAL`: Annehmen, dass der Datensatz von externen Anwendungen geändert werden kann.
+   *   In diesem Modus erfolgt eine Synchronisation bei jedem Start oder Reload des Providers.
+   *   Zusätzlich kann eine periodische Synchronisation mit `syncPeriodic` konfiguriert werden.
+   *     </code>
    */
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableDatasetChangeSettings.Builder.class)
