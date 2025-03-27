@@ -233,7 +233,7 @@ public interface FeatureProviderSqlData
    *     Modi:
    *     <p><code>
    * - `OFF`: Der Datensatz wird als statisch betrachtet und es wird keine Änderungserkennung durchgeführt.
-   *   Wenn es eine neue Datensatzversion gibt, sollte diese zu Änderungen an connectionInfo` führen. (Dies
+   *   Wenn es eine neue Datensatzversion gibt, sollte diese zu Änderungen an `connectionInfo` führen. (Dies
    *   wird in v5.x der Standard sein)
    * - `CRUD`: Änderungen am Datensatz werden ausschließlich von der Anwendung selbst über die CRUD-
    *   Schnittstelle vorgenommen. (Dies ist in v4.x der Standard)
@@ -253,8 +253,8 @@ public interface FeatureProviderSqlData
     /**
      * @langEn The mode for dataset change detection, see above.
      * @langDe Der Modus für die Erkennung von Datensatzänderungen, siehe oben.
-     * @default CRUD v4 \| OFF v5
      * @since v4.3
+     * @default CRUD v4 \| OFF v5
      */
     @Value.Default
     default DatasetChangeMode getMode() {
@@ -266,8 +266,8 @@ public interface FeatureProviderSqlData
      *     dataset. Only available for modes `EXTERNAL` and `TRIGGER`.
      * @langDe Ein Crontab-Pattern zum regelmäßigen Aktualisieren aller gecachten Daten, die sich
      *     aus dem Datensatz ableiten. Nur verfügbar für die Modi `EXTERNAL` und `TRIGGER`.
-     * @default null
      * @since v4.3
+     * @default null
      */
     @Nullable
     String getSyncPeriodic();
