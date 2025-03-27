@@ -140,8 +140,7 @@ import org.threeten.extra.Interval;
  *     <p><code>
  * - The option `linearizeCurves` is not supported. All geometries must conform to the OGC Simple
  *   Feature Access standard.
- * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not
- * supported.
+ * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
  * - Arrays as queryables are not supported for GeoPackage feature providers.
  * - Queryables that are values in an array are not supported for GeoPackage feature providers.
  *     </code>
@@ -156,7 +155,7 @@ import org.threeten.extra.Interval;
  *     <p><code>
  * - Die Option `linearizeCurves` wird nicht unterstützt. Alle Geometrien müssen Geometrien gemäß
  *   dem Standard OGC Simple Feature Access sein.
- * - Die CQL2-Funktionen `DIAMETER2D()` und DIAMETER3D()` werden nicht unterstützt.
+ * - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
  * - Arrays als Queryables werden für GeoPackage Feature Provider nicht unterstützt.
  * - Queryables, die Werte in einem Array sind, werden für GeoPackage Feature-Anbieter nicht
  *   unterstützt.
