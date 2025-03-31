@@ -29,8 +29,6 @@ public interface SqlDialect {
 
   String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves);
 
-  String applyToWkb(byte[] wkb, int srid);
-
   String applyToExtent(String column, boolean is3d);
 
   String applyToString(String string);

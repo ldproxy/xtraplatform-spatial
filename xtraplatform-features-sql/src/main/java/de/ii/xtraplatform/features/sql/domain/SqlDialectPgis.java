@@ -91,11 +91,6 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
-  public String applyToWkb(byte[] wkb, int srid) {
-    return String.format("SDO_UTIL.TO_WKBGEOMETRY(SDO_GEOMETRY('%s', %d))", wkb, srid);
-  }
-
-  @Override
   public String applyToExtent(String column, boolean is3d) {
     return is3d ? String.format("ST_3DExtent(%s)", column) : String.format("ST_Extent(%s)", column);
   }

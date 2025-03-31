@@ -33,13 +33,13 @@ class FilterEncoderSqlSpec extends Specification {
 
     def setupSpec() {
 
-        filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null, false)
+        filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
         ResourceStore resourceStore = Stub()
         VolatileRegistry volatileRegistry = Stub()
         volatileRegistry.onAvailable(*_) >> CompletableFuture.completedFuture(null)
         CrsTransformerFactoryProj transformerFactory = new CrsTransformerFactoryProj(new ProjLoaderImpl(Path.of(System.getProperty("java.io.tmpdir"), "proj", "data")), resourceStore, volatileRegistry)
         transformerFactory.onStart(false).toCompletableFuture().join()
-        filterEncoder2 = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), (CrsTransformerFactory) transformerFactory, null, new CqlImpl(), null, false)
+        filterEncoder2 = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), (CrsTransformerFactory) transformerFactory, null, new CqlImpl(), null)
 
     }
 
@@ -127,7 +127,6 @@ class FilterEncoderSqlSpec extends Specification {
 
         actual == expected
     }
-
     def 'temporal operation, timestamp'() {
 
         given:

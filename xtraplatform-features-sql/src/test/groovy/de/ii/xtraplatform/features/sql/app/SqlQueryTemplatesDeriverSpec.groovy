@@ -23,7 +23,7 @@ import spock.lang.Specification
 class SqlQueryTemplatesDeriverSpec extends Specification {
 
     @Shared
-    FilterEncoderSql filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null, false)
+    FilterEncoderSql filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
     @Shared
     SqlQueryTemplatesDeriver td = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false, Optional.empty(), false)
     @Shared

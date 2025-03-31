@@ -51,11 +51,6 @@ public class SqlDialectGpkg implements SqlDialect {
   }
 
   @Override
-  public String applyToWkb(byte[] wkb, int srid) {
-    return String.format("SDO_UTIL.TO_WKBGEOMETRY(SDO_GEOMETRY('%s', %d))", wkb, srid);
-  }
-
-  @Override
   public String applyToExtent(String column, boolean is3d) {
     // Extent() results in a 2D Polygon in Spatialite
     return String.format("ST_AsText(Extent(%s))", column);

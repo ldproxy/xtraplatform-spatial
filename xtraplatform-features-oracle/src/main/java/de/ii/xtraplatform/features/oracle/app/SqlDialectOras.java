@@ -59,11 +59,6 @@ public class SqlDialectOras implements SqlDialect {
   }
 
   @Override
-  public String applyToWkb(byte[] wkb, int srid) {
-    return String.format("SDO_UTIL.TO_WKBGEOMETRY(SDO_GEOMETRY('%s', %d))", wkb, srid);
-  }
-
-  @Override
   public String applyToExtent(String column, boolean is3d) {
     // SDO_AGGR_MBR() results in a 2D Polygon in Oracle Spatial
     return String.format("SDO_UTIL.TO_WKTGEOMETRY(SDO_AGGR_MBR(%s))", column);
