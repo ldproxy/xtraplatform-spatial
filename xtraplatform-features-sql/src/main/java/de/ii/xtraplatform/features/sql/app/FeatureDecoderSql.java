@@ -252,9 +252,9 @@ public class FeatureDecoderSql
         if (Objects.nonNull(sqlRow.getValues().get(i))) {
           try {
             context.setSchemaIndex(-1);
-            if (geometryAsWkb && sqlRow.getValues().get(i) instanceof byte[]) {
+            if (geometryAsWkb) {
               geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i));
-            } else if (!geometryAsWkb) {
+            } else {
               geometryDecoderWkt.decode((String) sqlRow.getValues().get(i));
             }
           } catch (IOException e) {
