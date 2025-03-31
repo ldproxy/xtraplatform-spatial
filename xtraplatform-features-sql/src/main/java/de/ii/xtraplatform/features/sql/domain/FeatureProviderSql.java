@@ -492,8 +492,7 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
-            accentiCollation,
-            getData().getQueryGeneration().getGeometryAsWkb());
+            accentiCollation);
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 

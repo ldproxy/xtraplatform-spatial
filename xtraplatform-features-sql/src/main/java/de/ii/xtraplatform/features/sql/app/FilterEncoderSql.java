@@ -66,8 +66,6 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import org.locationtech.jts.io.WKBWriter;
-import org.locationtech.jts.io.WKTReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
@@ -85,7 +83,6 @@ public class FilterEncoderSql {
   private final CrsInfo crsInfo;
   private final Cql cql;
   private final String accentiCollation;
-  private final boolean geometryAsWkb;
   BiFunction<List<Double>, Optional<EpsgCrs>, List<Double>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -94,8 +91,7 @@ public class FilterEncoderSql {
       CrsTransformerFactory crsTransformerFactory,
       CrsInfo crsInfo,
       Cql cql,
-      String accentiCollation,
-      boolean geometryAsWkb) {
+      String accentiCollation) {
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -103,7 +99,6 @@ public class FilterEncoderSql {
     this.cql = cql;
     this.accentiCollation = accentiCollation;
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
-    this.geometryAsWkb = geometryAsWkb;
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -255,11 +250,10 @@ public class FilterEncoderSql {
                 }
                 String qualifiedColumn = String.format("%s.%s", alias, column.getName());
                 if (column.isTemporal()) {
-                  if (column.getType() == DATE) {
+                  if (column.getType() == DATE)
                     return Tuple.of(
                         sqlDialect.applyToDate(qualifiedColumn, column.getFormat()),
                         Optional.<String>empty());
-                  }
                   return Tuple.of(
                       sqlDialect.applyToDatetime(qualifiedColumn, column.getFormat()),
                       Optional.<String>empty());
@@ -354,9 +348,7 @@ public class FilterEncoderSql {
               ignoreInstanceFilter,
               true,
               FilterEncoderSql.this);
-      if (!join.isEmpty()) {
-        join = join + " ";
-      }
+      if (!join.isEmpty()) join = join + " ";
 
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
@@ -397,21 +389,18 @@ public class FilterEncoderSql {
       String end = children.get(1);
 
       // process special values for a half-bounded interval
-      if (start.equals("'..'")) {
+      if (start.equals("'..'"))
         start = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      }
-      if (end.equals("'..'")) {
+      if (end.equals("'..'"))
         end = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
-      }
 
       Operand arg1 = interval.getArgs().get(0);
       Operand arg2 = interval.getArgs().get(1);
       if (arg1 instanceof Property && arg2 instanceof Property) {
         String startColumn = reduceToColumn(start);
         String endColumn = reduceToColumn(end);
-        if (startColumn.equals(endColumn)) {
+        if (startColumn.equals(endColumn))
           return String.format(start, "%1$s(", ", " + endColumn + ")%2$s");
-        }
         startColumn =
             String.format(
                 "COALESCE(%s,%s)",
@@ -468,9 +457,8 @@ public class FilterEncoderSql {
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Accenti accenti, List<String> children) {
       if (accenti.getValue() instanceof ScalarLiteral) {
-        if (Objects.nonNull(accentiCollation)) {
+        if (Objects.nonNull(accentiCollation))
           return String.format("%s COLLATE \"%s\"", children.get(0), accentiCollation);
-        }
         throw new IllegalArgumentException("ACCENTI() is not supported by this API.");
       }
       if (Objects.nonNull(accentiCollation)) {
@@ -515,14 +503,13 @@ public class FilterEncoderSql {
     }
 
     private String reduceSelectToColumn(String expression) {
-      if (expression.contains("%1$s") && expression.contains("%2$s")) {
+      if (expression.contains("%1$s") && expression.contains("%2$s"))
         return String.format(
             expression.contains(" WHERE ")
                 ? expression.substring(expression.indexOf(" WHERE ") + 7, expression.length() - 1)
                 : expression,
             "",
             "");
-      }
       return expression;
     }
 
@@ -582,12 +569,8 @@ public class FilterEncoderSql {
       boolean op2hasSelect = operandHasSelect(secondExpression);
       boolean op3hasSelect = operandHasSelect(thirdExpression);
       if (op1hasSelect) {
-        if (op2hasSelect) {
-          secondExpression = reduceSelectToColumn(children.get(1));
-        }
-        if (op3hasSelect) {
-          thirdExpression = reduceSelectToColumn(children.get(2));
-        }
+        if (op2hasSelect) secondExpression = reduceSelectToColumn(children.get(1));
+        if (op3hasSelect) thirdExpression = reduceSelectToColumn(children.get(2));
       } else {
         // the unusual case that a literal is on the left side
         if (op2hasSelect && !op3hasSelect) {
@@ -707,10 +690,9 @@ public class FilterEncoderSql {
     @Override
     public String visit(BinaryTemporalOperation temporalOperation, List<String> children) {
       String operator = sqlDialect.getTemporalOperator(temporalOperation.getTemporalOperator());
-      if (Objects.isNull(operator)) {
+      if (Objects.isNull(operator))
         throw new IllegalStateException(
             String.format("unexpected temporal operator: %s", temporalOperation.getClass()));
-      }
 
       Temporal op1 = (Temporal) temporalOperation.getArgs().get(0);
       Temporal op2 = (Temporal) temporalOperation.getArgs().get(1);
@@ -789,11 +771,10 @@ public class FilterEncoderSql {
 
     private String getStartAsString(TemporalLiteral literal) {
       Object start = getStart(literal);
-      if (start instanceof Instant && start == Instant.MIN) {
+      if (start instanceof Instant && start == Instant.MIN)
         return sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      } else if (start instanceof LocalDate) {
+      else if (start instanceof LocalDate)
         return sqlDialect.applyToDateLiteral(DateTimeFormatter.ISO_DATE.format((LocalDate) start));
-      }
       return sqlDialect.applyToDatetimeLiteral(start.toString());
     }
 
@@ -817,11 +798,10 @@ public class FilterEncoderSql {
 
     private String getEndExclusiveAsString(TemporalLiteral literal) {
       Object end = getEndExclusive(literal);
-      if (end instanceof Instant && end == Instant.MAX) {
+      if (end instanceof Instant && end == Instant.MAX)
         return sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
-      } else if (end instanceof LocalDate) {
+      else if (end instanceof LocalDate)
         return sqlDialect.applyToDateLiteral(DateTimeFormatter.ISO_DATE.format((LocalDate) end));
-      }
       return sqlDialect.applyToDatetimeLiteral(end.toString());
     }
 
@@ -850,13 +830,9 @@ public class FilterEncoderSql {
       if (temporalLiteral.getType() == Instant.class) {
         Instant instant = ((Instant) temporalLiteral.getValue());
         String literal;
-        if (instant == Instant.MIN) {
-          literal = sqlDialect.applyToInstantMin();
-        } else if (instant == Instant.MAX) {
-          literal = sqlDialect.applyToInstantMax();
-        } else {
-          literal = ((Instant) temporalLiteral.getValue()).toString();
-        }
+        if (instant == Instant.MIN) literal = sqlDialect.applyToInstantMin();
+        else if (instant == Instant.MAX) literal = sqlDialect.applyToInstantMax();
+        else literal = ((Instant) temporalLiteral.getValue()).toString();
         return sqlDialect.applyToDatetimeLiteral(literal);
       } else if (temporalLiteral.getType() == Interval.class) {
         // this can only occur in the T_INTERSECTS() operator
@@ -888,129 +864,60 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(Geometry.Point point, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb = convertToWkb(super.visit(point, children));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(super.visit(point, children), nativeCrs.getCode());
-      }
+      return sqlDialect.applyToWkt(super.visit(point, children), nativeCrs.getCode());
     }
 
     @Override
     public String visit(Geometry.LineString lineString, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb = convertToWkb(super.visit(lineString, children));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(super.visit(lineString, children), nativeCrs.getCode());
-      }
+      return sqlDialect.applyToWkt(super.visit(lineString, children), nativeCrs.getCode());
     }
 
     @Override
     public String visit(Geometry.Polygon polygon, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb = convertToWkb(super.visit(polygon, children));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(super.visit(polygon, children), nativeCrs.getCode());
-      }
+      return sqlDialect.applyToWkt(super.visit(polygon, children), nativeCrs.getCode());
     }
 
     @Override
     public String visit(Geometry.MultiPoint multiPoint, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb = convertToWkb(super.visit(multiPoint, children));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(super.visit(multiPoint, children), nativeCrs.getCode());
-      }
+      return sqlDialect.applyToWkt(super.visit(multiPoint, children), nativeCrs.getCode());
     }
 
     @Override
     public String visit(Geometry.MultiLineString multiLineString, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb = convertToWkb(super.visit(multiLineString, children));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(super.visit(multiLineString, children), nativeCrs.getCode());
-      }
+      return sqlDialect.applyToWkt(super.visit(multiLineString, children), nativeCrs.getCode());
     }
 
     @Override
     public String visit(Geometry.MultiPolygon multiPolygon, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb = convertToWkb(super.visit(multiPolygon, children));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(super.visit(multiPolygon, children), nativeCrs.getCode());
-      }
+      return sqlDialect.applyToWkt(super.visit(multiPolygon, children), nativeCrs.getCode());
     }
 
     @Override
     public String visit(Geometry.GeometryCollection geometryCollection, List<String> children) {
-      if (geometryAsWkb) {
-        byte[] wkb =
-            convertToWkb(
-                String.format(
-                    "GEOMETRYCOLLECTION%s",
-                    geometryCollection.getCoordinates().stream()
-                        .map(
-                            geom -> {
-                              if (geom instanceof Geometry.Point) {
-                                return super.visit((Geometry.Point) geom, children);
-                              } else if (geom instanceof Geometry.MultiPoint) {
-                                return super.visit((Geometry.MultiPoint) geom, children);
-                              } else if (geom instanceof Geometry.LineString) {
-                                return super.visit((Geometry.LineString) geom, children);
-                              } else if (geom instanceof Geometry.MultiLineString) {
-                                return super.visit((Geometry.MultiLineString) geom, children);
-                              } else if (geom instanceof Geometry.Polygon) {
-                                return super.visit((Geometry.Polygon) geom, children);
-                              } else if (geom instanceof Geometry.MultiPolygon) {
-                                return super.visit((Geometry.MultiPolygon) geom, children);
-                              }
-                              throw new IllegalStateException(
-                                  "unsupported spatial type: " + geom.getClass().getSimpleName());
-                            })
-                        .collect(Collectors.joining(",", "(", ")"))));
-        return sqlDialect.applyToWkb(wkb, nativeCrs.getCode());
-      } else {
-        return sqlDialect.applyToWkt(
-            String.format(
-                "GEOMETRYCOLLECTION%s",
-                geometryCollection.getCoordinates().stream()
-                    .map(
-                        geom -> {
-                          if (geom instanceof Geometry.Point) {
-                            return super.visit((Geometry.Point) geom, children);
-                          } else if (geom instanceof Geometry.MultiPoint) {
-                            return super.visit((Geometry.MultiPoint) geom, children);
-                          } else if (geom instanceof Geometry.LineString) {
-                            return super.visit((Geometry.LineString) geom, children);
-                          } else if (geom instanceof Geometry.MultiLineString) {
-                            return super.visit((Geometry.MultiLineString) geom, children);
-                          } else if (geom instanceof Geometry.Polygon) {
-                            return super.visit((Geometry.Polygon) geom, children);
-                          } else if (geom instanceof Geometry.MultiPolygon) {
-                            return super.visit((Geometry.MultiPolygon) geom, children);
-                          }
-                          throw new IllegalStateException(
-                              "unsupported spatial type: " + geom.getClass().getSimpleName());
-                        })
-                    .collect(Collectors.joining(",", "(", ")"))),
-            nativeCrs.getCode());
-      }
-    }
-
-    private byte[] convertToWkb(String wkt) {
-      try {
-        WKTReader reader = new WKTReader();
-        org.locationtech.jts.geom.Geometry geometry = reader.read(wkt);
-        WKBWriter writer = new WKBWriter();
-        return writer.write(geometry);
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid WKT format", e);
-      }
+      return sqlDialect.applyToWkt(
+          String.format(
+              "GEOMETRYCOLLECTION%s",
+              geometryCollection.getCoordinates().stream()
+                  .map(
+                      geom -> {
+                        if (geom instanceof Geometry.Point) {
+                          return super.visit((Geometry.Point) geom, children);
+                        } else if (geom instanceof Geometry.MultiPoint) {
+                          return super.visit((Geometry.MultiPoint) geom, children);
+                        } else if (geom instanceof Geometry.LineString) {
+                          return super.visit((Geometry.LineString) geom, children);
+                        } else if (geom instanceof Geometry.MultiLineString) {
+                          return super.visit((Geometry.MultiLineString) geom, children);
+                        } else if (geom instanceof Geometry.Polygon) {
+                          return super.visit((Geometry.Polygon) geom, children);
+                        } else if (geom instanceof Geometry.MultiPolygon) {
+                          return super.visit((Geometry.MultiPolygon) geom, children);
+                        }
+                        throw new IllegalStateException(
+                            "unsupported spatial type: " + geom.getClass().getSimpleName());
+                      })
+                  .collect(Collectors.joining(",", "(", ")"))),
+          nativeCrs.getCode());
     }
 
     @Override
@@ -1071,9 +978,7 @@ public class FilterEncoderSql {
                   : "1=0";
             case A_EQUALS:
               // items must be identical
-              if (firstOp.size() != secondOp.size()) {
-                return "1=0";
-              }
+              if (firstOp.size() != secondOp.size()) return "1=0";
               return secondOp.stream()
                       .allMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
                   ? "1=1"
