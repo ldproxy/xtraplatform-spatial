@@ -56,6 +56,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
   private final int chunkSize;
   private final boolean skipRedundantMetaQueries;
   private final SqlDialect sqlDialect;
+  private final boolean geometryAsWkb;
 
   public FeatureQueryEncoderSql(
       Map<String, List<SqlQueryTemplates>> allQueryTemplates,
@@ -66,6 +67,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     this.allQueryTemplatesMutations = allQueryTemplatesMutations;
     this.chunkSize = queryGeneratorSettings.getChunkSize();
     this.skipRedundantMetaQueries = !queryGeneratorSettings.getComputeNumberMatched();
+    this.geometryAsWkb = queryGeneratorSettings.getGeometryAsWkb();
     this.sqlDialect = sqlDialect;
   }
 
@@ -243,6 +245,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .type(typeQuery.getType())
         .customSortKeys(sortKeys)
         .isHitsOnly(query.hitsOnly())
+        .isGeometryWkb(geometryAsWkb)
         .build();
   }
 
