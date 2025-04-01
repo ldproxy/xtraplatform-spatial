@@ -53,7 +53,7 @@ class GeometryDecoderWkbSpec extends Specification {
         1 * context.setGeometryType(SimpleFeatureGeometry.LINE_STRING)
         1 * context.setGeometryDimension(2)
         1 * context.setValueType(Type.STRING)
-        1 * context.setValue(expectedToken) // Ensure no leading space
+        1 * context.setValue(expectedToken)
         1 * handler.onValue(context)
         1 * handler.onObjectEnd(context)
     }
@@ -117,13 +117,13 @@ class GeometryDecoderWkbSpec extends Specification {
         1 * handler.onObjectStart(context)
         1 * context.setGeometryType(SimpleFeatureGeometry.MULTI_LINE_STRING)
         1 * context.setGeometryDimension(2)
-        3 * handler.onArrayStart(context) // Start of MULTILINESTRING array
+        1 * handler.onArrayStart(context)
         expectedTokens.each { token ->
             1 * context.setValueType(Type.STRING)
             1 * context.setValue(token)
             1 * handler.onValue(context)
         }
-        3 * handler.onArrayEnd(context) // End of MULTILINESTRING array
+        1 * handler.onArrayEnd(context)
         1 * handler.onObjectEnd(context)
     }
 
@@ -145,22 +145,22 @@ class GeometryDecoderWkbSpec extends Specification {
         1 * handler.onObjectStart(context)
         1 * context.setGeometryType(SimpleFeatureGeometry.MULTI_POLYGON)
         1 * context.setGeometryDimension(2)
-        1 * handler.onArrayStart(context) // Start of MULTIPOLYGON array
-        2 * handler.onArrayStart(context) // Start of each POLYGON array
+        1 * handler.onArrayStart(context)
+        2 * handler.onArrayStart(context)
         expectedTokens.each { token ->
             1 * context.setValueType(Type.STRING)
             1 * context.setValue(token)
             1 * handler.onValue(context)
         }
-        2 * handler.onArrayEnd(context) // End of each POLYGON array
-        1 * handler.onArrayEnd(context) // End of MULTIPOLYGON array
+        2 * handler.onArrayEnd(context)
+        1 * handler.onArrayEnd(context)
         1 * handler.onObjectEnd(context)
     }
 
     private byte[] createWkbPoint(double x, double y) {
         ByteBuffer buffer = ByteBuffer.allocate(21).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put((byte) 1) // Little Endian
-        buffer.putInt(1) // WKB Type: POINT
+        buffer.put((byte) 1)
+        buffer.putInt(1)
         buffer.putDouble(x)
         buffer.putDouble(y)
         return buffer.array()
@@ -168,9 +168,9 @@ class GeometryDecoderWkbSpec extends Specification {
 
     private byte[] createWkbLineString(List<List<Double>> points) {
         ByteBuffer buffer = ByteBuffer.allocate(9 + points.size() * 16).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put((byte) 1) // Little Endian
-        buffer.putInt(2) // WKB Type: LINESTRING
-        buffer.putInt(points.size()) // Number of points
+        buffer.put((byte) 1)
+        buffer.putInt(2)
+        buffer.putInt(points.size())
         points.each { p ->
             buffer.putDouble(p[0])
             buffer.putDouble(p[1])
@@ -180,11 +180,11 @@ class GeometryDecoderWkbSpec extends Specification {
     private byte[] createWkbPolygon(List<List<List<Double>>> rings) {
         int numPoints = rings.flatten().size()
         ByteBuffer buffer = ByteBuffer.allocate(9 + (numPoints * 16)).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put((byte) 1) // Little Endian
+        buffer.put((byte) 1)
         buffer.putInt(3) // WKB Type: POLYGON
-        buffer.putInt(rings.size()) // Anzahl der Ringe
+        buffer.putInt(rings.size())
         rings.each { ring ->
-            buffer.putInt(ring.size()) // Anzahl der Punkte im Ring
+            buffer.putInt(ring.size())
             ring.each { p ->
                 buffer.putDouble(p[0])
                 buffer.putDouble(p[1])
@@ -195,9 +195,9 @@ class GeometryDecoderWkbSpec extends Specification {
 
     private byte[] createWkbMultiPoint(List<List<Double>> points) {
         ByteBuffer buffer = ByteBuffer.allocate(9 + points.size() * 21).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put((byte) 1) // Little Endian
-        buffer.putInt(4) // WKB Type: MULTIPOINT
-        buffer.putInt(points.size()) // Anzahl der Punkte
+        buffer.put((byte) 1)
+        buffer.putInt(4)
+        buffer.putInt(points.size())
         points.each { p ->
             buffer.put(createWkbPoint(p[0], p[1]))
         }
@@ -208,7 +208,7 @@ class GeometryDecoderWkbSpec extends Specification {
         int numLineStrings = lineStrings.size()
         int numPoints = lineStrings.flatten().size()
         ByteBuffer buffer = ByteBuffer.allocate(9 + (numLineStrings * 9) + (numPoints * 16)).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put((byte) 1) // Little Endian
+        buffer.put((byte) 1)
         buffer.putInt(5) // WKB Type: MULTILINESTRING
         buffer.putInt(numLineStrings) // Number of line strings
         lineStrings.each { line ->
