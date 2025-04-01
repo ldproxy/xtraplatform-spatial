@@ -16,7 +16,11 @@ import de.ii.xtraplatform.features.domain.MappingOperationResolver
 import de.ii.xtraplatform.features.domain.SortKey
 import de.ii.xtraplatform.features.domain.Tuple
 import de.ii.xtraplatform.features.json.app.DecoderFactoryJson
-import de.ii.xtraplatform.features.sql.domain.*
+import de.ii.xtraplatform.features.sql.domain.ConstantsResolver
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
+import de.ii.xtraplatform.features.sql.domain.SchemaSql
+import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
+import de.ii.xtraplatform.features.sql.domain.SqlPathParser
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -28,11 +32,6 @@ class SqlQueryTemplatesDeriverSpec extends Specification {
     SqlQueryTemplatesDeriver td = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false, Optional.empty(), false)
     @Shared
     SqlQueryTemplatesDeriver tdNoNm = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), false, false, Optional.empty(), false)
-
-    @Shared
-    SqlQueryTemplatesDeriver tdWkb = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), true, false, Optional.empty(), true)
-    @Shared
-    SqlQueryTemplatesDeriver tdNoNmWkb = new SqlQueryTemplatesDeriver(null, filterEncoder, new SqlDialectPgis(), false, false, Optional.empty(), true)
 
     @Shared
     QuerySchemaDeriver schemaDeriver
@@ -108,7 +107,7 @@ class SqlQueryTemplatesDeriverSpec extends Specification {
         when:
 
         def sources = sqlSchemas(schema, schemaDeriver, mappingOperationResolver)
-        List<SqlQueryTemplates> templates = sources.collect { it.accept(deriver) }
+        List<SqlQueryTemplates> templates = sources.collect {it.accept(deriver) }
         List<String> actual = templates.collectMany { values(it, limit, offset, sortBy, filter) }
         List<String> expected = SqlQueryFixtures.fromYaml(queries)
 
@@ -122,82 +121,6 @@ class SqlQueryTemplatesDeriverSpec extends Specification {
         "self join with nested duplicate and filters" | td      | 0     | 0      | []     | null   | "okstra_abschnitt"            || "okstra_abschnitt"
         "embedded object with concat and backlink"    | td      | 0     | 0      | []     | null   | "pfs_plan-hatObjekt-embedded" || "pfs_plan-hatObjekt-embedded"
         "root concat with value concat with constant" | td      | 0     | 0      | []     | null   | "landcoverunit"               || "landcoverunit"
-
-    }
-
-    def 'meta query templates with WKB: #casename'() {
-
-        when:
-
-        SqlQueryTemplates templates = source.get(0).accept(deriver)
-        String actual = meta(templates, sortBy, userFilter)
-
-        then:
-
-        actual == expected
-
-        where:
-
-        casename                      | deriver   | sortBy                                                                            | userFilter | source                            || expected
-        "basic"                       | tdWkb     | []                                                                                | noFilter   | QuerySchemaFixtures.SIMPLE        || SqlQueryTemplatesFixtures.META
-        "basic without numberMatched" | tdNoNmWkb | []                                                                                | noFilter   | QuerySchemaFixtures.SIMPLE        || SqlQueryTemplatesFixtures.META_WITHOUT_NUMBER_MATCHED
-        "sortBy"                      | tdWkb     | [SortKey.of("created")]                                                           | noFilter   | QuerySchemaFixtures.SIMPLE        || SqlQueryTemplatesFixtures.META_SORT_BY
-        "sortBy descending"           | tdWkb     | [SortKey.of("created", SortKey.Direction.DESCENDING)]                             | noFilter   | QuerySchemaFixtures.SIMPLE        || SqlQueryTemplatesFixtures.META_SORT_BY_DESC
-        "sortBy mixed"                | tdWkb     | [SortKey.of("created", SortKey.Direction.DESCENDING), SortKey.of("lastModified")] | noFilter   | QuerySchemaFixtures.SIMPLE        || SqlQueryTemplatesFixtures.META_SORT_BY_MIXED
-        "filter"                      | tdWkb     | []                                                                                | noFilter   | QuerySchemaFixtures.SIMPLE_FILTER || SqlQueryTemplatesFixtures.META_FILTER
-    }
-
-    def 'value query templates with WKB: #casename'() {
-
-        when:
-
-        SqlQueryTemplates templates = source.get(0).accept(deriver)
-        List<String> actual = values(templates, limit, offset, sortBy, filter)
-
-        then:
-
-        actual == expected
-
-        where:
-
-        casename                             | deriver | limit | offset | sortBy                  | filter                                                                                                                      | source                                                  || expected
-        "value array"                        | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.VALUE_ARRAY                         || SqlQueryTemplatesFixtures.VALUE_ARRAY
-        "object array"                       | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.OBJECT_ARRAY                        || SqlQueryTemplatesFixtures.OBJECT_ARRAY
-        "merge"                              | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.MERGE                               || SqlQueryTemplatesFixtures.MERGE
-        "self joins"                         | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.SELF_JOINS                          || SqlQueryTemplatesFixtures.SELF_JOINS
-        "self joins with filters"            | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.SELF_JOINS_FILTER                   || SqlQueryTemplatesFixtures.SELF_JOINS_FILTER
-        "self join with nested duplicate"    | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.SELF_JOIN_NESTED_DUPLICATE          || SqlQueryTemplatesFixtures.SELF_JOIN_NESTED_DUPLICATE
-        "object without sourcePath"          | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.OBJECT_WITHOUT_SOURCE_PATH          || SqlQueryTemplatesFixtures.OBJECT_WITHOUT_SOURCE_PATH
-        "paging"                             | tdWkb   | 10    | 10     | []                      | null                                                                                                                        | QuerySchemaFixtures.OBJECT_ARRAY                        || SqlQueryTemplatesFixtures.OBJECT_ARRAY_PAGING
-        "sortBy"                             | tdWkb   | 0     | 0      | [SortKey.of("created")] | null                                                                                                                        | QuerySchemaFixtures.OBJECT_ARRAY                        || SqlQueryTemplatesFixtures.OBJECT_ARRAY_SORTBY
-        "sortBy + filter"                    | tdWkb   | 0     | 0      | [SortKey.of("created")] | Eq.of(Property.of("task.title"), ScalarLiteral.of("foo"))                                                                   | QuerySchemaFixtures.OBJECT_ARRAY                        || SqlQueryTemplatesFixtures.OBJECT_ARRAY_SORTBY_FILTER
-        "sortBy + paging"                    | tdWkb   | 10    | 10     | [SortKey.of("created")] | null                                                                                                                        | QuerySchemaFixtures.OBJECT_ARRAY                        || SqlQueryTemplatesFixtures.OBJECT_ARRAY_SORTBY_PAGING
-        "sortBy + paging + filter"           | tdWkb   | 10    | 10     | [SortKey.of("created")] | And.of(Eq.of(Property.of("task.title"), ScalarLiteral.of("foo")), Eq.of(Property.of("task.href"), ScalarLiteral.of("bar"))) | QuerySchemaFixtures.OBJECT_ARRAY                        || SqlQueryTemplatesFixtures.OBJECT_ARRAY_SORTBY_PAGING_FILTER
-        "property with multiple sourcePaths" | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.PROPERTY_WITH_MULTIPLE_SOURCE_PATHS || SqlQueryTemplatesFixtures.PROPERTY_WITH_MULTIPLE_SOURCE_PATHS
-        "nested joins"                       | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.NESTED_JOINS                        || SqlQueryTemplatesFixtures.NESTED_JOINS
-        "nested joins"                       | tdWkb   | 0     | 0      | []                      | null                                                                                                                        | QuerySchemaFixtures.NESTED_JOINS                        || SqlQueryTemplatesFixtures.NESTED_JOINS
-
-    }
-
-    def 'value query templates too with WKB: #casename'() {
-
-        when:
-
-        def sources = sqlSchemas(schema, schemaDeriver, mappingOperationResolver)
-        List<SqlQueryTemplates> templates = sources.collect { it.accept(deriver) }
-        List<String> actual = templates.collectMany { values(it, limit, offset, sortBy, filter) }
-        List<String> expected = SqlQueryFixtures.fromYaml(queries)
-
-        then:
-
-        actual == expected
-
-        where:
-
-        casename                                      | deriver | limit | offset | sortBy | filter | schema                        || queries
-        "self join with nested duplicate and filters" | tdWkb   | 0     | 0      | []     | null   | "okstra_abschnitt"            || "okstra_abschnitt"
-        "embedded object with concat and backlink"    | tdWkb   | 0     | 0      | []     | null   | "pfs_plan-hatObjekt-embedded" || "pfs_plan-hatObjekt-embedded"
-        "root concat with value concat with constant" | tdWkb   | 0     | 0      | []     | null   | "landcoverunit"               || "landcoverunit"
 
     }
 
