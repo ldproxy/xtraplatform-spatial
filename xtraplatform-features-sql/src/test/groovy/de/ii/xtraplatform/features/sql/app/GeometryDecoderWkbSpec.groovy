@@ -158,6 +158,80 @@ class GeometryDecoderWkbSpec extends Specification {
         1 * handler.onObjectEnd(context)
     }
 
+    def "test decode POLYGON Z"() {
+        given:
+        byte[] wkb = createWkbPolygonZ([
+                [[30.0, 10.0, 5.0], [40.0, 40.0, 10.0], [20.0, 40.0, 15.0], [10.0, 20.0, 20.0], [30.0, 10.0, 5.0]]
+        ])
+        String expectedToken = "30 10 5,40 40 10,20 40 15,10 20 20,30 10 5"
+
+        when:
+        decoder.decode(wkb)
+
+        then:
+        1 * handler.onObjectStart(context)
+        1 * context.setGeometryType(SimpleFeatureGeometry.POLYGON)
+        1 * context.setGeometryDimension(3)
+        1 * context.setValueType(Type.STRING)
+        1 * context.setValue(expectedToken)
+        1 * handler.onValue(context)
+        1 * handler.onArrayStart(context)
+        1 * handler.onArrayEnd(context)
+        1 * handler.onObjectEnd(context)
+    }
+
+    def "test decode MULTIPOLYGON Z"() {
+        given:
+        byte[] wkb = createWkbMultiPolygonZ([
+                [[[30.0, 20.0, 5.0], [45.0, 40.0, 10.0], [10.0, 40.0, 15.0], [30.0, 20.0, 5.0]]],
+                [[[15.0, 5.0, 2.0], [40.0, 10.0, 4.0], [10.0, 20.0, 6.0], [5.0, 10.0, 8.0], [15.0, 5.0, 2.0]]]
+        ])
+        List<String> expectedTokens = [
+                "30 20 5,45 40 10,10 40 15,30 20 5",
+                "15 5 2,40 10 4,10 20 6,5 10 8,15 5 2"
+        ]
+
+        when:
+        decoder.decode(wkb)
+
+        then:
+        1 * handler.onObjectStart(context)
+        1 * context.setGeometryType(SimpleFeatureGeometry.MULTI_POLYGON)
+        1 * context.setGeometryDimension(3)
+        1 * handler.onArrayStart(context)
+        2 * handler.onArrayStart(context)
+        expectedTokens.each { token ->
+            1 * context.setValueType(Type.STRING)
+            1 * context.setValue(token)
+            1 * handler.onValue(context)
+        }
+        2 * handler.onArrayEnd(context)
+        1 * handler.onArrayEnd(context)
+        1 * handler.onObjectEnd(context)
+    }
+
+    def "test decode MULTIPOINT Z"() {
+        given:
+        byte[] wkb = createWkbMultiPointZ([[10.0, 40.0, 5.0], [40.0, 30.0, 10.0], [20.0, 20.0, 15.0], [30.0, 10.0, 20.0]])
+        List<String> expectedTokens = ["10 40 5", "40 30 10", "20 20 15", "30 10 20"]
+
+        when:
+        decoder.decode(wkb)
+
+        then:
+        1 * handler.onObjectStart(context)
+        1 * context.setGeometryType(SimpleFeatureGeometry.MULTI_POINT)
+        1 * context.setGeometryDimension(3)
+        1 * handler.onArrayStart(context)
+        expectedTokens.each { token ->
+            1 * context.setValueType(Type.STRING)
+            1 * context.setValue(token)
+            1 * handler.onValue(context)
+        }
+        1 * handler.onArrayEnd(context)
+        1 * handler.onObjectEnd(context)
+    }
+
     private byte[] createWkbPoint(double x, double y) {
         ByteBuffer buffer = ByteBuffer.allocate(21).order(ByteOrder.LITTLE_ENDIAN)
         buffer.put((byte) 1)
@@ -243,6 +317,61 @@ class GeometryDecoderWkbSpec extends Specification {
                     buffer.putDouble(p[1])
                 }
             }
+        }
+        return buffer.array()
+    }
+
+    private byte[] createWkbPolygonZ(List<List<List<Double>>> rings) {
+        int numPoints = rings.flatten().size()
+        ByteBuffer buffer = ByteBuffer.allocate(9 + (numPoints * 24)).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put((byte) 1)
+        buffer.putInt(1003) // WKB Type: POLYGON Z
+        buffer.putInt(rings.size())
+        rings.each { ring ->
+            buffer.putInt(ring.size())
+            ring.each { p ->
+                buffer.putDouble(p[0])
+                buffer.putDouble(p[1])
+                buffer.putDouble(p[2])
+            }
+        }
+        return buffer.array()
+    }
+
+    private byte[] createWkbMultiPolygonZ(List<List<List<List<Double>>>> polygons) {
+        int numPolygons = polygons.size()
+        int numPoints = polygons.flatten().flatten().size()
+        ByteBuffer buffer = ByteBuffer.allocate(9 + (numPolygons * 9) + (numPoints * 24)).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put((byte) 1) // Little Endian
+        buffer.putInt(1006) // WKB Type: MULTIPOLYGON Z
+        buffer.putInt(numPolygons) // Number of polygons
+        polygons.each { poly ->
+            buffer.put((byte) 1) // Little Endian for each polygon
+            buffer.putInt(1003) // WKB Type: POLYGON Z
+            buffer.putInt(poly.size()) // Number of rings in the polygon
+            poly.each { ring ->
+                buffer.putInt(ring.size()) // Number of points in the ring
+                ring.each { p ->
+                    buffer.putDouble(p[0])
+                    buffer.putDouble(p[1])
+                    buffer.putDouble(p[2])
+                }
+            }
+        }
+        return buffer.array()
+    }
+
+    private byte[] createWkbMultiPointZ(List<List<Double>> points) {
+        ByteBuffer buffer = ByteBuffer.allocate(9 + points.size() * 29).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put((byte) 1)
+        buffer.putInt(1004)
+        buffer.putInt(points.size())
+        points.each { p ->
+            buffer.put((byte) 1)
+            buffer.putInt(1001)
+            buffer.putDouble(p[0])
+            buffer.putDouble(p[1])
+            buffer.putDouble(p[2])
         }
         return buffer.array()
     }
