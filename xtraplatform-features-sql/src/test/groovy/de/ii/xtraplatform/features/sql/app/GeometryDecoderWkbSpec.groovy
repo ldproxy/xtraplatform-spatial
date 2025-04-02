@@ -7,6 +7,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase.Type
 import de.ii.xtraplatform.features.domain.SchemaMapping
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
 import spock.lang.Specification
+
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -25,7 +26,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode POINT"() {
         given:
         byte[] wkb = createWkbPoint(30.0, 10.0)
-        String expectedToken = "30.000 10.000"
+        String expectedToken = "30 10"
 
         when:
         decoder.decode(wkb)
@@ -43,7 +44,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode LINESTRING"() {
         given:
         byte[] wkb = createWkbLineString([[30.0, 10.0], [10.0, 30.0], [40.0, 40.0]])
-        String expectedToken = " 30.000 10.000,10.000 30.000,40.000 40.000"
+        String expectedToken = "30 10,10 30,40 40"
 
         when:
         decoder.decode(wkb)
@@ -63,7 +64,7 @@ class GeometryDecoderWkbSpec extends Specification {
         byte[] wkb = createWkbPolygon([
                 [[30.0, 10.0], [40.0, 40.0], [20.0, 40.0], [10.0, 20.0], [30.0, 10.0]]
         ])
-        String expectedToken = " 30.000 10.000,40.000 40.000,20.000 40.000,10.000 20.000,30.000 10.000"
+        String expectedToken = "30 10,40 40,20 40,10 20,30 10"
 
         when:
         decoder.decode(wkb)
@@ -83,7 +84,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode MULTIPOINT"() {
         given:
         byte[] wkb = createWkbMultiPoint([[10.0, 40.0], [40.0, 30.0], [20.0, 20.0], [30.0, 10.0]])
-        List<String> expectedTokens = ["10.000 40.000", "40.000 30.000", "20.000 20.000", "30.000 10.000"]
+        List<String> expectedTokens = ["10 40", "40 30", "20 20", "30 10"]
 
         when:
         decoder.decode(wkb)
@@ -108,7 +109,7 @@ class GeometryDecoderWkbSpec extends Specification {
                 [[10.0, 10.0], [20.0, 20.0]],
                 [[15.0, 15.0], [30.0, 15.0]]
         ])
-        List<String> expectedTokens = [" 10.000 10.000,20.000 20.000", " 15.000 15.000,30.000 15.000"]
+        List<String> expectedTokens = ["10 10,20 20", "15 15,30 15"]
 
         when:
         decoder.decode(wkb)
@@ -134,8 +135,8 @@ class GeometryDecoderWkbSpec extends Specification {
                 [[[15.0, 5.0], [40.0, 10.0], [10.0, 20.0], [5.0, 10.0], [15.0, 5.0]]]
         ])
         List<String> expectedTokens = [
-                " 30.000 20.000,45.000 40.000,10.000 40.000,30.000 20.000",
-                " 15.000 5.000,40.000 10.000,10.000 20.000,5.000 10.000,15.000 5.000"
+                "30 20,45 40,10 40,30 20",
+                "15 5,40 10,10 20,5 10,15 5"
         ]
 
         when:
@@ -177,6 +178,7 @@ class GeometryDecoderWkbSpec extends Specification {
         }
         return buffer.array()
     }
+
     private byte[] createWkbPolygon(List<List<List<Double>>> rings) {
         int numPoints = rings.flatten().size()
         ByteBuffer buffer = ByteBuffer.allocate(9 + (numPoints * 16)).order(ByteOrder.LITTLE_ENDIAN)
