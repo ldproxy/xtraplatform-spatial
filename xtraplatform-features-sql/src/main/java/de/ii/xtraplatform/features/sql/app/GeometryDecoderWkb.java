@@ -21,9 +21,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 public class GeometryDecoderWkb {
-
-  private static final long WKB25D = 0x80000000L;
-
   private final FeatureEventHandler<
           FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       handler;
@@ -43,13 +40,12 @@ public class GeometryDecoderWkb {
       byte byteOrder = dis.readByte();
       boolean isLittleEndian = (byteOrder == 1);
 
-      // Reset the stream to re-read the data
       dis.reset();
-      dis.readByte(); // Skip the byteOrder byte again
+      dis.readByte();
 
       long geometryTypeCode = readUnsignedInt(dis, isLittleEndian);
-      boolean hasZ = (geometryTypeCode & WKB25D) != 0;
-      geometryTypeCode &= ~WKB25D;
+
+      boolean hasZ = (geometryTypeCode > 1000);
 
       SimpleFeatureGeometry geometryTypeEnum =
           SimpleFeatureGeometryFromToWkb.fromWkbType((int) geometryTypeCode)
@@ -74,7 +70,7 @@ public class GeometryDecoderWkb {
           handleMultiPoint(dis, isLittleEndian, dimension);
           break;
         case LINE_STRING:
-          handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension);
+          handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension, 1);
           break;
         case MULTI_LINE_STRING:
           handleMultiLineString(dis, isLittleEndian, dimension);
@@ -98,13 +94,14 @@ public class GeometryDecoderWkb {
 
     } catch (Exception e) {
       System.out.println("Failed to decode WKB: " + e.getMessage());
+      e.printStackTrace();
       throw new IOException("Failed to decode WKB", e);
     }
   }
 
   private void handlePointAndGetCoordinates(
       DataInputStream dis, boolean isLittleEndian, int dimension) throws IOException {
-    String coordinates = readCoordinates(dis, isLittleEndian, dimension);
+    String coordinates = readCoordinates(dis, isLittleEndian, dimension, 1);
     context.setValueType(Type.STRING);
     context.setValue(coordinates);
     handler.onValue(context);
@@ -114,25 +111,39 @@ public class GeometryDecoderWkb {
       throws IOException {
     int numPoints = readInt(dis, isLittleEndian);
     handler.onArrayStart(context);
+
     for (int i = 0; i < numPoints; i++) {
-      dis.readByte(); // byte order
-      readInt(dis, isLittleEndian); // geometry type
-      handlePointAndGetCoordinates(dis, isLittleEndian, dimension);
+      dis.readByte();
+      int geometryType = readInt(dis, isLittleEndian);
+      if (geometryType != 1 && geometryType != 1001) {
+        throw new IOException("Invalid point geometry type: " + geometryType);
+      }
+
+      double x = readDouble(dis, isLittleEndian);
+      double y = readDouble(dis, isLittleEndian);
+      StringBuilder point = new StringBuilder(formatCoordinate(x) + " " + formatCoordinate(y));
+
+      if (dimension == 3 && geometryType == 1001) {
+        double z = readDouble(dis, isLittleEndian);
+        point.append(" ").append(formatCoordinate(z));
+      }
+
+      context.setValueType(Type.STRING);
+      context.setValue(point.toString());
+      handler.onValue(context);
     }
+
     handler.onArrayEnd(context);
   }
 
   private String handleLineStringAndGetCoordinates(
-      DataInputStream dis, boolean isLittleEndian, int dimension) throws IOException {
+      DataInputStream dis, boolean isLittleEndian, int dimension, int numRings) throws IOException {
     int numPoints = readInt(dis, isLittleEndian);
-    StringBuilder lineStringCoordinates = new StringBuilder(" ");
-    for (int i = 0; i < numPoints; i++) {
-      if (i > 0) {
-        lineStringCoordinates.append(",");
-      }
-      String coordinates = readCoordinates(dis, isLittleEndian, dimension);
-      lineStringCoordinates.append(coordinates);
-    }
+    StringBuilder lineStringCoordinates = new StringBuilder("");
+
+    String coordinates = readCoordinates(dis, isLittleEndian, dimension, numPoints);
+    lineStringCoordinates.append(coordinates);
+
     context.setValueType(Type.STRING);
     context.setValue(lineStringCoordinates.toString());
     handler.onValue(context);
@@ -141,44 +152,48 @@ public class GeometryDecoderWkb {
 
   private void handleMultiLineString(DataInputStream dis, boolean isLittleEndian, int dimension)
       throws IOException {
+    handler.onArrayStart(context);
+
     int numLineStrings = readInt(dis, isLittleEndian);
-    if (numLineStrings < 0
-        || numLineStrings > 1000) { // Add a reasonable upper limit for validation
+    if (numLineStrings < 0 || numLineStrings > 1000) {
       throw new IOException("Invalid number of lines: " + numLineStrings);
     }
 
-    handler.onArrayStart(context);
     for (int i = 0; i < numLineStrings; i++) {
-      dis.readByte(); // byte order
-      readInt(dis, isLittleEndian); // geometry type
-      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension);
+      dis.readByte();
+      readInt(dis, isLittleEndian);
+      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension, numLineStrings);
     }
     handler.onArrayEnd(context);
   }
 
   private void handlePolygon(DataInputStream dis, boolean isLittleEndian, int dimension)
       throws IOException {
-    int numRings = readInt(dis, isLittleEndian);
     handler.onArrayStart(context);
-    if (numRings < 0 || numRings > 1000) { // Add a reasonable upper limit for validation
+
+    int numRings = readInt(dis, isLittleEndian);
+
+    if (numRings < 0 || numRings > 1000) {
       throw new IOException("Invalid number of rings: " + numRings);
     }
+
     for (int i = 0; i < numRings; i++) {
-      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension);
+      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension, numRings);
     }
     handler.onArrayEnd(context);
   }
 
   private void handleMultiPolygon(DataInputStream dis, boolean isLittleEndian, int dimension)
       throws IOException {
-    int numPolygons = readInt(dis, isLittleEndian);
     handler.onArrayStart(context);
+
+    int numPolygons = readInt(dis, isLittleEndian);
     for (int i = 0; i < numPolygons; i++) {
-      dis.readByte(); // byte order
+      dis.readByte();
       int geometryType = readInt(dis, isLittleEndian);
-      if (geometryType != getWkbType(SimpleFeatureGeometry.POLYGON)) {
+      if (geometryType != 3 && geometryType != 1003) {
         System.err.println("Invalid polygon geometry type: " + geometryType);
-        continue; // Skip the invalid polygon
+        continue;
       }
       handlePolygon(dis, isLittleEndian, dimension);
     }
@@ -206,17 +221,31 @@ public class GeometryDecoderWkb {
     return result;
   }
 
-  private String readCoordinates(DataInputStream dis, boolean isLittleEndian, int dimension)
+  private String readCoordinates(
+      DataInputStream dis, boolean isLittleEndian, int dimension, int numPoints)
       throws IOException {
-    double x = readDouble(dis, isLittleEndian);
-    double y = readDouble(dis, isLittleEndian);
-    Double z = null;
-    if (dimension == 3) {
-      z = readDouble(dis, isLittleEndian);
+    StringBuilder coordinates = new StringBuilder();
+
+    for (int i = 0; i < numPoints; i++) {
+      if (i > 0) {
+        coordinates.append(",");
+      }
+      double x = readDouble(dis, isLittleEndian);
+      double y = readDouble(dis, isLittleEndian);
+      if (dimension == 3) {
+        double z = readDouble(dis, isLittleEndian);
+        coordinates
+            .append(formatCoordinate(x))
+            .append(" ")
+            .append(formatCoordinate(y))
+            .append(" ")
+            .append(formatCoordinate(z));
+      } else {
+        coordinates.append(formatCoordinate(x)).append(" ").append(formatCoordinate(y));
+      }
     }
-    return (z != null)
-        ? String.format(Locale.US, "%.3f %.3f %.3f", x, y, z)
-        : String.format(Locale.US, "%.3f %.3f", x, y);
+    String result = coordinates.toString();
+    return result;
   }
 
   private int getWkbType(SimpleFeatureGeometry geometry) {
@@ -238,5 +267,26 @@ public class GeometryDecoderWkb {
       default:
         return -1;
     }
+  }
+
+  private String bytesToHex(byte[] bytes) {
+    StringBuilder sb = new StringBuilder();
+    for (byte b : bytes) {
+      sb.append(String.format("%02x", b));
+    }
+    return sb.toString();
+  }
+
+  private String formatCoordinate(Double value) {
+    String formatted = String.format(Locale.US, "%.3f", value);
+    String[] parts = formatted.split("\\.");
+    if (parts.length > 1) {
+      parts[1] = parts[1].replaceAll("0+$", ""); // Remove trailing zeros after the decimal point
+      if (parts[1].isEmpty()) {
+        return parts[0]; // If no digits remain after the decimal point, return the integer part
+      }
+      return parts[0] + "." + parts[1]; // Return the number with simplified decimal part
+    }
+    return formatted;
   }
 }

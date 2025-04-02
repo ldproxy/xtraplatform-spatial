@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.sql.app;
 
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
 
-/** Handles conversion between SimpleFeatureGeometry and WKB types. */
 public enum SimpleFeatureGeometryFromToWkb {
   POINT,
   MULTIPOINT,
@@ -18,31 +17,52 @@ public enum SimpleFeatureGeometryFromToWkb {
   POLYGON,
   MULTIPOLYGON,
   GEOMETRYCOLLECTION,
-  ANY,
   NONE;
 
   public static SimpleFeatureGeometryFromToWkb fromWkbType(int type) {
-    boolean hasZ = (type & 0x80000000) != 0; // Prüfen, ob das WKB25D-Flag gesetzt ist
-    type &= ~0x80000000; // Entfernen des WKB25D-Flags, um den Basistyp zu bestimmen
-
+    SimpleFeatureGeometryFromToWkb result;
     switch (type) {
       case 1:
-        return POINT;
+        result = POINT;
+        break;
       case 2:
-        return LINESTRING;
+        result = LINESTRING;
+        break;
       case 3:
-        return POLYGON;
+        result = POLYGON;
+        break;
       case 4:
-        return MULTIPOINT;
+        result = MULTIPOINT;
+        break;
       case 5:
-        return MULTILINESTRING;
+        result = MULTILINESTRING;
+        break;
       case 6:
-        return MULTIPOLYGON;
+      case 1006:
+        result = MULTIPOLYGON;
+        break;
+      case 1005:
+        result = MULTILINESTRING;
+        break;
+      case 1002:
+        result = LINESTRING;
+        break;
+      case 1003:
+        result = POLYGON;
+        break;
+      case 1004:
+        result = MULTIPOINT;
+        break;
+      case 1001:
+        result = POINT;
+        break;
       case 7:
-        return GEOMETRYCOLLECTION;
+        result = GEOMETRYCOLLECTION;
+        break;
       default:
-        return NONE;
+        result = NONE;
     }
+    return result;
   }
 
   public SimpleFeatureGeometry toSimpleFeatureGeometry() {
@@ -61,8 +81,6 @@ public enum SimpleFeatureGeometryFromToWkb {
         return SimpleFeatureGeometry.MULTI_POLYGON;
       case GEOMETRYCOLLECTION:
         return SimpleFeatureGeometry.GEOMETRY_COLLECTION;
-      case ANY:
-        return SimpleFeatureGeometry.ANY;
       default:
         return SimpleFeatureGeometry.NONE;
     }
