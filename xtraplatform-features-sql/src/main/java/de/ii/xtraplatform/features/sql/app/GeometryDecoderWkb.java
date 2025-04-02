@@ -248,35 +248,6 @@ public class GeometryDecoderWkb {
     return result;
   }
 
-  private int getWkbType(SimpleFeatureGeometry geometry) {
-    switch (geometry) {
-      case POINT:
-        return 1;
-      case LINE_STRING:
-        return 2;
-      case POLYGON:
-        return 3;
-      case MULTI_POINT:
-        return 4;
-      case MULTI_LINE_STRING:
-        return 5;
-      case MULTI_POLYGON:
-        return 6;
-      case GEOMETRY_COLLECTION:
-        return 7;
-      default:
-        return -1;
-    }
-  }
-
-  private String bytesToHex(byte[] bytes) {
-    StringBuilder sb = new StringBuilder();
-    for (byte b : bytes) {
-      sb.append(String.format("%02x", b));
-    }
-    return sb.toString();
-  }
-
   private String formatCoordinate(Double value) {
     String formatted = String.format(Locale.US, "%.3f", value);
     String[] parts = formatted.split("\\.");
