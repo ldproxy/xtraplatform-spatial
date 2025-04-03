@@ -16,7 +16,6 @@ import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -121,11 +120,11 @@ public class GeometryDecoderWkb {
 
       double x = readDouble(dis, isLittleEndian);
       double y = readDouble(dis, isLittleEndian);
-      StringBuilder point = new StringBuilder(formatCoordinate(x) + " " + formatCoordinate(y));
+      StringBuilder point = new StringBuilder(x + " " + y);
 
       if (dimension == 3 && geometryType == 1001) {
         double z = readDouble(dis, isLittleEndian);
-        point.append(" ").append(formatCoordinate(z));
+        point.append(" ").append(z);
       }
 
       context.setValueType(Type.STRING);
@@ -229,25 +228,12 @@ public class GeometryDecoderWkb {
       }
       double x = readDouble(dis, isLittleEndian);
       double y = readDouble(dis, isLittleEndian);
-      coordinates.append(formatCoordinate(x)).append(" ").append(formatCoordinate(y));
+      coordinates.append(x).append(" ").append(y);
       if (dimension == 3) {
         double z = readDouble(dis, isLittleEndian);
-        coordinates.append(" ").append(formatCoordinate(z));
+        coordinates.append(" ").append(z);
       }
     }
     return coordinates.toString();
-  }
-
-  private String formatCoordinate(Double value) {
-    String formatted = String.format(Locale.US, "%.3f", value);
-    String[] parts = formatted.split("\\.");
-    if (parts.length > 1) {
-      parts[1] = parts[1].replaceAll("0+$", ""); // Remove trailing zeros after the decimal point
-      if (parts[1].isEmpty()) {
-        return parts[0]; // If no digits remain after the decimal point, return the integer part
-      }
-      return parts[0] + "." + parts[1]; // Return the number with simplified decimal part
-    }
-    return formatted;
   }
 }
