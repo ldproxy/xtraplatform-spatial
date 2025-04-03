@@ -32,7 +32,9 @@ import de.ii.xtraplatform.features.domain.transform.ImplicitMappingResolver;
 import de.ii.xtraplatform.features.domain.transform.LabelTemplateResolver;
 import de.ii.xtraplatform.features.sql.domain.ConstantsResolver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.DatasetChangeMode;
 import de.ii.xtraplatform.features.sql.domain.ImmutableConnectionInfoSql;
+import de.ii.xtraplatform.features.sql.domain.ImmutableDatasetChangeSettings;
 import de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData;
 import de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData.Builder;
 import de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings;
@@ -97,6 +99,8 @@ public class FeatureProviderOracleFactory
   public EntityDataBuilder<FeatureProviderDataV2> dataBuilder() {
     return new ImmutableFeatureProviderSqlData.Builder()
         .typeValidation(MODE.NONE)
+        .datasetChanges(
+            new ImmutableDatasetChangeSettings.Builder().mode(DatasetChangeMode.OFF).build())
         .sourcePathDefaults(new ImmutableSqlPathDefaults.Builder().build())
         .queryGeneration(new ImmutableQueryGeneratorSettings.Builder().build())
         .connectionInfo(
