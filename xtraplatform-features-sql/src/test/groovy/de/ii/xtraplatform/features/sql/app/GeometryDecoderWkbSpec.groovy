@@ -26,7 +26,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode POINT"() {
         given:
         byte[] wkb = createWkbPoint(30.0, 10.0)
-        String expectedToken = "30 10"
+        String expectedToken = "30.0 10.0"
 
         when:
         decoder.decode(wkb)
@@ -44,7 +44,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode LINESTRING"() {
         given:
         byte[] wkb = createWkbLineString([[30.0, 10.0], [10.0, 30.0], [40.0, 40.0]])
-        String expectedToken = "30 10,10 30,40 40"
+        String expectedToken = "30.0 10.0,10.0 30.0,40.0 40.0"
 
         when:
         decoder.decode(wkb)
@@ -64,7 +64,7 @@ class GeometryDecoderWkbSpec extends Specification {
         byte[] wkb = createWkbPolygon([
                 [[30.0, 10.0], [40.0, 40.0], [20.0, 40.0], [10.0, 20.0], [30.0, 10.0]]
         ])
-        String expectedToken = "30 10,40 40,20 40,10 20,30 10"
+        String expectedToken = "30.0 10.0,40.0 40.0,20.0 40.0,10.0 20.0,30.0 10.0"
 
         when:
         decoder.decode(wkb)
@@ -84,7 +84,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode MULTIPOINT"() {
         given:
         byte[] wkb = createWkbMultiPoint([[10.0, 40.0], [40.0, 30.0], [20.0, 20.0], [30.0, 10.0]])
-        List<String> expectedTokens = ["10 40", "40 30", "20 20", "30 10"]
+        List<String> expectedTokens = ["10.0 40.0", "40.0 30.0", "20.0 20.0", "30.0 10.0"]
 
         when:
         decoder.decode(wkb)
@@ -109,7 +109,7 @@ class GeometryDecoderWkbSpec extends Specification {
                 [[10.0, 10.0], [20.0, 20.0]],
                 [[15.0, 15.0], [30.0, 15.0]]
         ])
-        List<String> expectedTokens = ["10 10,20 20", "15 15,30 15"]
+        List<String> expectedTokens = ["10.0 10.0,20.0 20.0", "15.0 15.0,30.0 15.0"]
 
         when:
         decoder.decode(wkb)
@@ -135,8 +135,8 @@ class GeometryDecoderWkbSpec extends Specification {
                 [[[15.0, 5.0], [40.0, 10.0], [10.0, 20.0], [5.0, 10.0], [15.0, 5.0]]]
         ])
         List<String> expectedTokens = [
-                "30 20,45 40,10 40,30 20",
-                "15 5,40 10,10 20,5 10,15 5"
+                "30.0 20.0,45.0 40.0,10.0 40.0,30.0 20.0",
+                "15.0 5.0,40.0 10.0,10.0 20.0,5.0 10.0,15.0 5.0"
         ]
 
         when:
@@ -163,7 +163,7 @@ class GeometryDecoderWkbSpec extends Specification {
         byte[] wkb = createWkbPolygonZ([
                 [[30.0, 10.0, 5.0], [40.0, 40.0, 10.0], [20.0, 40.0, 15.0], [10.0, 20.0, 20.0], [30.0, 10.0, 5.0]]
         ])
-        String expectedToken = "30 10 5,40 40 10,20 40 15,10 20 20,30 10 5"
+        String expectedToken = "30.0 10.0 5.0,40.0 40.0 10.0,20.0 40.0 15.0,10.0 20.0 20.0,30.0 10.0 5.0"
 
         when:
         decoder.decode(wkb)
@@ -187,8 +187,8 @@ class GeometryDecoderWkbSpec extends Specification {
                 [[[15.0, 5.0, 2.0], [40.0, 10.0, 4.0], [10.0, 20.0, 6.0], [5.0, 10.0, 8.0], [15.0, 5.0, 2.0]]]
         ])
         List<String> expectedTokens = [
-                "30 20 5,45 40 10,10 40 15,30 20 5",
-                "15 5 2,40 10 4,10 20 6,5 10 8,15 5 2"
+                "30.0 20.0 5.0,45.0 40.0 10.0,10.0 40.0 15.0,30.0 20.0 5.0",
+                "15.0 5.0 2.0,40.0 10.0 4.0,10.0 20.0 6.0,5.0 10.0 8.0,15.0 5.0 2.0"
         ]
 
         when:
@@ -213,7 +213,7 @@ class GeometryDecoderWkbSpec extends Specification {
     def "test decode MULTIPOINT Z"() {
         given:
         byte[] wkb = createWkbMultiPointZ([[10.0, 40.0, 5.0], [40.0, 30.0, 10.0], [20.0, 20.0, 15.0], [30.0, 10.0, 20.0]])
-        List<String> expectedTokens = ["10 40 5", "40 30 10", "20 20 15", "30 10 20"]
+        List<String> expectedTokens = ["10.0 40.0 5.0", "40.0 30.0 10.0", "20.0 20.0 15.0", "30.0 10.0 20.0"]
 
         when:
         decoder.decode(wkb)
