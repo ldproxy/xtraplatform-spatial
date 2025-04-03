@@ -20,49 +20,36 @@ public enum SimpleFeatureGeometryFromToWkb {
   NONE;
 
   public static SimpleFeatureGeometryFromToWkb fromWkbType(int type) {
-    SimpleFeatureGeometryFromToWkb result;
     switch (type) {
       case 1:
-        result = POINT;
-        break;
+        return POINT;
       case 2:
-        result = LINESTRING;
-        break;
+        return LINESTRING;
       case 3:
-        result = POLYGON;
-        break;
+        return POLYGON;
       case 4:
-        result = MULTIPOINT;
-        break;
+        return MULTIPOINT;
       case 5:
-        result = MULTILINESTRING;
-        break;
+        return MULTILINESTRING;
       case 6:
-      case 1006:
-        result = MULTIPOLYGON;
-        break;
-      case 1005:
-        result = MULTILINESTRING;
-        break;
-      case 1002:
-        result = LINESTRING;
-        break;
-      case 1003:
-        result = POLYGON;
-        break;
-      case 1004:
-        result = MULTIPOINT;
-        break;
-      case 1001:
-        result = POINT;
-        break;
+        return MULTIPOLYGON;
       case 7:
-        result = GEOMETRYCOLLECTION;
-        break;
+        return GEOMETRYCOLLECTION;
+      case 1001:
+        return POINT;
+      case 1002:
+        return LINESTRING;
+      case 1003:
+        return POLYGON;
+      case 1004:
+        return MULTIPOINT;
+      case 1005:
+        return MULTILINESTRING;
+      case 1006:
+        return MULTIPOLYGON;
       default:
-        result = NONE;
+        return NONE;
     }
-    return result;
   }
 
   public SimpleFeatureGeometry toSimpleFeatureGeometry() {
