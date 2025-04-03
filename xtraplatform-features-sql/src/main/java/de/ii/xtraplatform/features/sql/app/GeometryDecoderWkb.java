@@ -70,7 +70,7 @@ public class GeometryDecoderWkb {
           handleMultiPoint(dis, isLittleEndian, dimension);
           break;
         case LINE_STRING:
-          handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension, 1);
+          handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension);
           break;
         case MULTI_LINE_STRING:
           handleMultiLineString(dis, isLittleEndian, dimension);
@@ -136,18 +136,15 @@ public class GeometryDecoderWkb {
     handler.onArrayEnd(context);
   }
 
-  private String handleLineStringAndGetCoordinates(
-      DataInputStream dis, boolean isLittleEndian, int dimension, int numRings) throws IOException {
+  private void handleLineStringAndGetCoordinates(
+      DataInputStream dis, boolean isLittleEndian, int dimension) throws IOException {
     int numPoints = readInt(dis, isLittleEndian);
-    StringBuilder lineStringCoordinates = new StringBuilder("");
 
     String coordinates = readCoordinates(dis, isLittleEndian, dimension, numPoints);
-    lineStringCoordinates.append(coordinates);
 
     context.setValueType(Type.STRING);
-    context.setValue(lineStringCoordinates.toString());
+    context.setValue(coordinates.toString());
     handler.onValue(context);
-    return lineStringCoordinates.toString();
   }
 
   private void handleMultiLineString(DataInputStream dis, boolean isLittleEndian, int dimension)
@@ -162,7 +159,7 @@ public class GeometryDecoderWkb {
     for (int i = 0; i < numLineStrings; i++) {
       dis.readByte();
       readInt(dis, isLittleEndian);
-      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension, numLineStrings);
+      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension);
     }
     handler.onArrayEnd(context);
   }
@@ -178,7 +175,7 @@ public class GeometryDecoderWkb {
     }
 
     for (int i = 0; i < numRings; i++) {
-      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension, numRings);
+      handleLineStringAndGetCoordinates(dis, isLittleEndian, dimension);
     }
     handler.onArrayEnd(context);
   }
@@ -232,20 +229,13 @@ public class GeometryDecoderWkb {
       }
       double x = readDouble(dis, isLittleEndian);
       double y = readDouble(dis, isLittleEndian);
+      coordinates.append(formatCoordinate(x)).append(" ").append(formatCoordinate(y));
       if (dimension == 3) {
         double z = readDouble(dis, isLittleEndian);
-        coordinates
-            .append(formatCoordinate(x))
-            .append(" ")
-            .append(formatCoordinate(y))
-            .append(" ")
-            .append(formatCoordinate(z));
-      } else {
-        coordinates.append(formatCoordinate(x)).append(" ").append(formatCoordinate(y));
+        coordinates.append(" ").append(formatCoordinate(z));
       }
     }
-    String result = coordinates.toString();
-    return result;
+    return coordinates.toString();
   }
 
   private String formatCoordinate(Double value) {
