@@ -48,6 +48,7 @@ import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
 import de.ii.xtraplatform.tiles.domain.MinMax;
 import de.ii.xtraplatform.tiles.domain.SeedingOptions;
 import de.ii.xtraplatform.tiles.domain.TileAccess;
+import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileCache;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
@@ -113,7 +114,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderFeatures.class);
   static final String TILES_DIR_NAME = "tiles";
 
-  private final TileGeneratorFeatures tileGenerator;
+  private final TileGenerator tileGenerator;
   private final Map<Type, Map<Storage, TileStore>> tileStores;
   private final List<TileCache> generatorCaches;
   private final List<TileCache> combinerCaches;
@@ -136,6 +137,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       EntityRegistry entityRegistry,
       AppContext appContext,
       Cql cql,
+      Set<TileBuilder> customGenerators,
       ResourceStore blobStore,
       ValueStore valueStore,
       TileWalker tileWalker,
@@ -155,6 +157,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             crsTransformerFactory,
             entityRegistry,
             cql,
+            customGenerators,
             volatileRegistry,
             asyncStartup);
     this.tileStores =
@@ -498,7 +501,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   }
 
   private static Map<String, Map<String, TileGenerationSchema>> getTileSchemas(
-      TileGeneratorFeatures tileGenerator,
+      TileGenerator tileGenerator,
       Map<String, TilesetFeatures> tilesets,
       List<String> rasterTilesets) {
     return Stream.concat(
