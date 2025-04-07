@@ -14,8 +14,12 @@ import de.ii.xtraplatform.features.domain.FeatureChangeListener;
 import de.ii.xtraplatform.features.domain.FeatureChanges;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FeatureChangeHandlerImpl implements FeatureChanges {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureChangeHandlerImpl.class);
 
   private final List<DatasetChangeListener> datasetListeners;
   private final List<FeatureChangeListener> featureListeners;
@@ -47,7 +51,19 @@ public class FeatureChangeHandlerImpl implements FeatureChanges {
 
   @Override
   public void handle(DatasetChange change) {
-    datasetListeners.forEach(listener -> listener.onDatasetChange(change));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Handling dataset change: {}", change);
+    }
+
+    datasetListeners.forEach(
+        listener -> {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug(
+                "Notifying dataset change listener: {}", listener.getClass().getSimpleName());
+          }
+
+          listener.onDatasetChange(change);
+        });
   }
 
   @Override
