@@ -13,6 +13,7 @@ import de.ii.xtraplatform.cql.domain.SpatialFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.Tuple;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.time.Instant;
@@ -34,6 +35,8 @@ public class SqlDialectOras implements SqlDialect {
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
+  private QueryGeneratorSettings settings;
+
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
     if (!forcePolygonCCW) {
@@ -45,6 +48,14 @@ public class SqlDialectOras implements SqlDialect {
   @Override
   public String applyToWkt(String wkt, int srid) {
     return String.format("SDO_GEOMETRY('%s',%s)", wkt, srid);
+  }
+
+  @Override
+  public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
+    if (!forcePolygonCCW) {
+      return String.format("SDO_UTIL.TO_WKBGEOMETRY(%s)", column);
+    }
+    return String.format("SDO_UTIL.TO_WKBGEOMETRY(SDO_UTIL.RECTIFY_GEOMETRY(%s, 0.001))", column);
   }
 
   @Override
@@ -123,7 +134,6 @@ public class SqlDialectOras implements SqlDialect {
   public String applyToInstantMin() {
     return "0001-01-01T00:00:00Z";
   }
-  ;
 
   @Override
   public String applyToInstantMax() {

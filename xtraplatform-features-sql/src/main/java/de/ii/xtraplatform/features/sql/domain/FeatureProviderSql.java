@@ -522,7 +522,8 @@ public class FeatureProviderSql
                                           sqlDialect,
                                           getData().getQueryGeneration().getComputeNumberMatched(),
                                           true,
-                                          getData().getQueryGeneration().getNullOrder())))
+                                          getData().getQueryGeneration().getNullOrder(),
+                                          getData().getQueryGeneration().getGeometryAsWkb())))
                           .collect(Collectors.toList()));
                 })
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
@@ -546,7 +547,8 @@ public class FeatureProviderSql
                                         sqlDialect,
                                         getData().getQueryGeneration().getComputeNumberMatched(),
                                         false,
-                                        getData().getQueryGeneration().getNullOrder())))))
+                                        getData().getQueryGeneration().getNullOrder(),
+                                        getData().getQueryGeneration().getGeometryAsWkb())))))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =
@@ -816,7 +818,8 @@ public class FeatureProviderSql
               ? tableSchemas.get(featureQuery.getType())
               : tableSchemasMutations.get(featureQuery.getType());
 
-      return new FeatureDecoderSql(mappings, schemas, query, subdecoders);
+      return new FeatureDecoderSql(
+          mappings, schemas, query, subdecoders, getData().getQueryGeneration().getGeometryAsWkb());
     }
 
     if (query instanceof MultiFeatureQuery) {
@@ -827,7 +830,8 @@ public class FeatureProviderSql
               .flatMap(typeQuery -> tableSchemas.get(typeQuery.getType()).stream())
               .collect(Collectors.toList());
 
-      return new FeatureDecoderSql(mappings, schemas, query, subdecoders);
+      return new FeatureDecoderSql(
+          mappings, schemas, query, subdecoders, getData().getQueryGeneration().getGeometryAsWkb());
     }
 
     throw new IllegalArgumentException();
@@ -1336,8 +1340,9 @@ public class FeatureProviderSql
 
   @Override
   public boolean supportsAccenti() {
-    if (Objects.nonNull(getData().getQueryGeneration()))
+    if (Objects.nonNull(getData().getQueryGeneration())) {
       return getData().getQueryGeneration().getAccentiCollation().isPresent();
+    }
     return false;
   }
 

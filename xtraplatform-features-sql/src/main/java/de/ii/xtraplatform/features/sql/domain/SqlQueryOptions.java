@@ -74,6 +74,11 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
     return 1000;
   }
 
+  @Value.Default
+  default boolean isGeometryWkb() {
+    return false;
+  }
+
   @Value.Derived
   default Optional<SchemaSql> getTableSchemaReturnables() {
     return getTableSchema().map(schema -> schema.accept(new OnlyReturnables()));
@@ -110,7 +115,12 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
             attributesContainer ->
                 attributesContainer.getProperties().stream()
                     .filter(SchemaBase::isValue)
-                    .forEach(attribute -> columnTypes.add(String.class)));
+                    .forEach(
+                        attribute ->
+                            columnTypes.add(
+                                attribute.isSpatial() && isGeometryWkb()
+                                    ? byte[].class
+                                    : String.class)));
 
     columnTypes.addAll(getCustomColumnTypes());
 
