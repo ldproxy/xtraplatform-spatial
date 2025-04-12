@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.app;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
@@ -53,25 +54,26 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-public class CqlTypeChecker extends CqlVisitorBase<Type> {
+public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
-  private static final List<Type> NUMBER = ImmutableList.of(Type.Integer, Type.Long, Type.Double);
-  private static final List<Type> INTEGER = ImmutableList.of(Type.Integer, Type.Long);
-  private static final List<Type> TEXT = ImmutableList.of(Type.String);
-  private static final List<Type> BOOLEAN = ImmutableList.of(Type.Boolean);
-  private static final List<Type> TEMPORAL =
-      ImmutableList.of(Type.LocalDate, Type.Instant, Type.Interval);
-  private static final List<Type> INSTANT = ImmutableList.of(Type.LocalDate, Type.Instant);
-  private static final List<Type> TIMESTAMP_IN_INTERVAL = ImmutableList.of(Type.Instant, Type.OPEN);
-  private static final List<Type> DATE_IN_INTERVAL = ImmutableList.of(Type.LocalDate, Type.OPEN);
-  private static final List<Type> SPATIAL = ImmutableList.of(Type.Geometry);
-  private static final List<Type> ARRAY = ImmutableList.of(Type.List);
-  private static final List<List<Type>> SCALAR = ImmutableList.of(NUMBER, TEXT, BOOLEAN, INSTANT);
-  private static final List<List<Type>> SCALAR_ORDERED = ImmutableList.of(NUMBER, TEXT, INSTANT);
-  private static final List<List<Type>> SCALAR_ARRAY =
+  private static final Set<Type> NUMBER = ImmutableSet.of(Type.Integer, Type.Long, Type.Double);
+  private static final Set<Type> INTEGER = ImmutableSet.of(Type.Integer, Type.Long);
+  private static final Set<Type> TEXT = ImmutableSet.of(Type.String);
+  private static final Set<Type> BOOLEAN = ImmutableSet.of(Type.Boolean);
+  private static final Set<Type> TEMPORAL =
+      ImmutableSet.of(Type.LocalDate, Type.Instant, Type.Interval);
+  private static final Set<Type> INSTANT = ImmutableSet.of(Type.LocalDate, Type.Instant);
+  private static final Set<Type> TIMESTAMP_IN_INTERVAL = ImmutableSet.of(Type.Instant, Type.OPEN);
+  private static final Set<Type> DATE_IN_INTERVAL = ImmutableSet.of(Type.LocalDate, Type.OPEN);
+  private static final Set<Type> SPATIAL = ImmutableSet.of(Type.Geometry);
+  private static final Set<Type> ARRAY = ImmutableSet.of(Type.List);
+  private static final List<Set<Type>> SCALAR = ImmutableList.of(NUMBER, TEXT, BOOLEAN, INSTANT);
+  private static final List<Set<Type>> SCALAR_ORDERED = ImmutableList.of(NUMBER, TEXT, INSTANT);
+  private static final List<Set<Type>> SCALAR_ARRAY =
       ImmutableList.of(
-          ImmutableList.<Type>builder()
+          ImmutableSet.<Type>builder()
               .addAll(NUMBER)
               .addAll(TEXT)
               .addAll(BOOLEAN)
@@ -79,8 +81,8 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
               .addAll(ARRAY)
               .build());
 
-  private static final Map<Class<?>, List<List<Type>>> COMPATIBILITY_PREDICATES =
-      new ImmutableMap.Builder<Class<?>, List<List<Type>>>()
+  private static final Map<Class<?>, List<Set<Type>>> COMPATIBILITY_PREDICATES =
+      new ImmutableMap.Builder<Class<?>, List<Set<Type>>>()
           .put(ImmutableEq.class, SCALAR)
           .put(ImmutableNeq.class, SCALAR)
           .put(ImmutableLt.class, SCALAR_ORDERED)
@@ -95,26 +97,57 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
           .put(BinaryArrayOperation.class, ImmutableList.of(ARRAY))
           .build();
 
-  private static final Map<String, Set<List<Type>>> COMPATIBILITY_OTHER =
-      new ImmutableMap.Builder<String, Set<List<Type>>>()
+  private static final Map<String, Set<Set<Type>>> COMPATIBILITY_OTHER =
+      new ImmutableMap.Builder<String, Set<Set<Type>>>()
           .put("INTERVAL", ImmutableSet.of(TIMESTAMP_IN_INTERVAL, DATE_IN_INTERVAL))
           .put("CASEI", ImmutableSet.of(TEXT))
           .put("ACCENTI", ImmutableSet.of(TEXT))
           .build();
 
-  private static final Map<String, Set<List<Type>>> COMPATIBILITY_FUNCTION =
-      new ImmutableMap.Builder<String, Set<List<Type>>>()
-          .put("UPPER", ImmutableSet.of(TEXT))
-          .put("LOWER", ImmutableSet.of(TEXT))
-          .put("POSITION", ImmutableSet.of(INTEGER))
-          .put("DIAMETER2D", ImmutableSet.of(SPATIAL))
-          .put("DIAMETER3D", ImmutableSet.of(SPATIAL))
+  private static final Map<String, List<Set<Type>>> COMPATIBILITY_FUNCTION =
+      new ImmutableMap.Builder<String, List<Set<Type>>>()
+          .put("UPPER", ImmutableList.of(TEXT))
+          .put("LOWER", ImmutableList.of(TEXT))
+          .put("POSITION", ImmutableList.of(INTEGER))
+          .put("DIAMETER2D", ImmutableList.of(SPATIAL))
+          .put("DIAMETER3D", ImmutableList.of(SPATIAL))
+          .put("ALIKE", ImmutableList.of(ImmutableSet.of(Type.List), ImmutableSet.of(Type.String)))
+          .build();
+
+  private static final Map<String, List<Set<Class<?>>>> COMPATIBILITY_FUNCTION_ARGUMENTS =
+      new Builder<String, List<Set<Class<?>>>>()
+          .put(
+              "UPPER",
+              ImmutableList.of(
+                  ImmutableSet.of(
+                      Property.class,
+                      Function.class,
+                      Accenti.class,
+                      Casei.class,
+                      ScalarLiteral.class)))
+          .put(
+              "LOWER",
+              ImmutableList.of(
+                  ImmutableSet.of(
+                      Property.class,
+                      Function.class,
+                      Accenti.class,
+                      Casei.class,
+                      ScalarLiteral.class)))
+          .put("POSITION", ImmutableList.of())
+          .put("DIAMETER2D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
+          .put("DIAMETER3D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
+          .put(
+              "ALIKE",
+              ImmutableList.of(
+                  ImmutableSet.of(Property.class, Function.class),
+                  ImmutableSet.of(ScalarLiteral.class)))
           .build();
 
   private final Map<String, String> propertyTypes;
   private final Cql cql;
 
-  public CqlTypeChecker(Map<String, String> propertyTypes, Cql cql) {
+  public CqlTypeAndFunctionChecker(Map<String, String> propertyTypes, Cql cql) {
     this.propertyTypes = propertyTypes;
     this.cql = cql;
   }
@@ -255,7 +288,7 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
     if (firstType == Type.UNKNOWN) return;
     final List<Type> otherTypes = types.subList(1, types.size());
 
-    List<List<Type>> compatibilityLists = getCompatibilityLists(node.getClass());
+    List<Set<Type>> compatibilityLists = getCompatibilityLists(node.getClass());
     if (compatibilityLists.isEmpty())
       throw new CqlIncompatibleTypes(getText(node), firstType.schemaType(), ImmutableList.of());
     if (compatibilityLists.stream().noneMatch(list -> list.contains(firstType)))
@@ -286,22 +319,53 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
   }
 
   private void checkFunction(Function function, List<Type> types) {
-    final Set<List<Type>> expectedTypes =
+    final List<Set<Class<?>>> expectedNodes =
+        Objects.requireNonNullElse(
+            COMPATIBILITY_FUNCTION_ARGUMENTS.get(function.getName().toUpperCase(Locale.ROOT)),
+            ImmutableList.of());
+    if (function.getArgs().size() != expectedNodes.size()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Function %s expects %d argument(s), but got %d",
+              function.getName(), expectedNodes.size(), function.getArgs().size()));
+    }
+    IntStream.range(0, function.getArgs().size())
+        .forEach(
+            i -> {
+              CqlNode child = function.getArgs().get(i);
+              Set<Class<?>> expected = expectedNodes.get(i);
+              if (expected.stream()
+                  .noneMatch(expectedNode -> expectedNode.isAssignableFrom(child.getClass()))) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Function %s expects argument %d to be a %s, but got %s",
+                        function.getName(),
+                        i + 1,
+                        expected.stream()
+                            .map(Class::getSimpleName)
+                            .collect(Collectors.joining("/")),
+                        child.getClass().getSimpleName().replace("Immutable", "")));
+              }
+            });
+
+    final List<Set<Type>> expectedTypes =
         Objects.requireNonNullElse(
             COMPATIBILITY_FUNCTION.get(function.getName().toUpperCase(Locale.ROOT)),
-            ImmutableSet.of());
-    if (expectedTypes.stream()
-        .noneMatch(
-            typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
-      throw new CqlIncompatibleTypes(
-          getText(function), asSchemaTypes(types), asSchemaTypes(expectedTypes));
-    }
+            ImmutableList.of());
+    IntStream.range(0, types.size())
+        .forEach(
+            i -> {
+              Type type = types.get(i);
+              Set<Type> expected = expectedTypes.get(i);
+              if (expected.stream().noneMatch(expectedType -> expectedType.equals(type))) {
+                throw new CqlIncompatibleTypes(
+                    getText(function), i + 1, type.schemaType(), asSchemaTypesFunction(expected));
+              }
+            });
   }
 
   private void checkString(CqlNode node, List<Type> types) {
-    final Set<List<Type>> expectedTypes =
+    final Set<Set<Type>> expectedTypes =
         Objects.requireNonNullElse(
             COMPATIBILITY_OTHER.get(
                 node.getClass().getSimpleName().replace("Immutable", "").toUpperCase(Locale.ROOT)),
@@ -317,7 +381,7 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
   }
 
   private void checkInterval(CqlNode node, List<Type> types) {
-    final Set<List<Type>> expectedTypes =
+    final Set<Set<Type>> expectedTypes =
         Objects.requireNonNullElse(
             COMPATIBILITY_OTHER.get(
                 node.getClass().getSimpleName().replace("Immutable", "").toUpperCase(Locale.ROOT)),
@@ -336,14 +400,15 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
     return types.stream().map(Type::schemaType).distinct().collect(Collectors.toUnmodifiableList());
   }
 
-  private Set<List<String>> asSchemaTypes(Set<List<Type>> types) {
+  private List<String> asSchemaTypesFunction(Set<Type> types) {
+    return types.stream().map(Type::schemaType).distinct().collect(Collectors.toUnmodifiableList());
+  }
+
+  private Set<Set<String>> asSchemaTypes(Set<Set<Type>> types) {
     return types.stream()
         .map(
             typeList ->
-                typeList.stream()
-                    .map(Type::schemaType)
-                    .distinct()
-                    .collect(Collectors.toUnmodifiableList()))
+                typeList.stream().map(Type::schemaType).collect(Collectors.toUnmodifiableSet()))
         .collect(Collectors.toUnmodifiableSet());
   }
 
@@ -376,7 +441,7 @@ public class CqlTypeChecker extends CqlVisitorBase<Type> {
     return cql.write((Cql2Expression) node, Cql.Format.TEXT);
   }
 
-  List<List<Type>> getCompatibilityLists(Class<?> clazz) {
+  List<Set<Type>> getCompatibilityLists(Class<?> clazz) {
     if (COMPATIBILITY_PREDICATES.containsKey(clazz)) {
       return COMPATIBILITY_PREDICATES.get(clazz);
     }
