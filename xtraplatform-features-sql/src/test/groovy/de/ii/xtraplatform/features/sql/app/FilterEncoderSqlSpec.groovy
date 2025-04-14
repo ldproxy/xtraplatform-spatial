@@ -127,7 +127,6 @@ class FilterEncoderSqlSpec extends Specification {
 
         actual == expected
     }
-
     def 'temporal operation, timestamp'() {
 
         given:
@@ -228,6 +227,7 @@ class FilterEncoderSqlSpec extends Specification {
         actual == expected
 
     }
+
     def 'temporal operation, interval 3'() {
 
         given:
