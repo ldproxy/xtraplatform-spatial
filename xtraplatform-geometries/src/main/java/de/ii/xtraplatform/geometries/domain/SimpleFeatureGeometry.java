@@ -30,9 +30,7 @@ public enum SimpleFeatureGeometry {
   MULTI_POLYGON,
   GEOMETRY_COLLECTION,
   ANY,
-  NONE,
-  POLYGON_Z,
-  MULTI_POLYGON_Z;
+  NONE;
 
   public boolean isValid() {
     return this != NONE;
