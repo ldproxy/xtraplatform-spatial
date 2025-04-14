@@ -8,13 +8,8 @@
 package de.ii.xtraplatform.features.sql.app
 
 import com.google.common.collect.ImmutableList
+import de.ii.xtraplatform.features.domain.*
 import de.ii.xtraplatform.features.sql.domain.SqlRow
-import de.ii.xtraplatform.features.domain.FeatureEventHandler
-import de.ii.xtraplatform.features.domain.FeatureSchema
-import de.ii.xtraplatform.features.domain.FeatureTokenDecoder
-import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery
-import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
-import de.ii.xtraplatform.features.domain.SchemaMapping
 import de.ii.xtraplatform.features.sql.domain.SqlRowFixtures
 import de.ii.xtraplatform.streams.app.ReactiveRx
 import de.ii.xtraplatform.streams.domain.Reactive
@@ -27,7 +22,8 @@ import spock.lang.Specification
 /**
  * @author zahnen
  */
-@Ignore //TODO: use SchemaSql
+@Ignore
+//TODO: use SchemaSql
 class FeatureDecoderSqlSpec extends Specification {
 
     static final Logger LOGGER = LoggerFactory.getLogger(FeatureDecoderSqlSpec.class)
@@ -55,14 +51,16 @@ class FeatureDecoderSqlSpec extends Specification {
                 new ImmutableFeatureSchema.Builder().name("test").build(),
                 ImmutableFeatureQuery.builder()
                         .type("biotop")
-                        .build())
+                        .build(),
+                false)
         singleDecoder = new FeatureDecoderSql(
                 SqlRowFixtures.TYPE_INFOS, ImmutableList.of(),
                 new ImmutableFeatureSchema.Builder().name("test").build(),
                 ImmutableFeatureQuery.builder()
                         .type("biotop")
                         .returnsSingleFeature(true)
-                        .build())
+                        .build(),
+                false)
     }
 
     public <T> T runStream(Reactive.Stream<T> stream) {

@@ -18,6 +18,7 @@ import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.MetaQueryTemplate;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings.NullOrder;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.sql.Timestamp;
@@ -44,6 +45,7 @@ public class SqlQueryTemplatesDeriver
   private final boolean computeNumberMatched;
   private final boolean computeNumberSkipped;
   private final String nullOrder;
+  private final boolean geometryAsWkb;
 
   public SqlQueryTemplatesDeriver(
       SchemaSql queryablesSchema,
@@ -51,7 +53,8 @@ public class SqlQueryTemplatesDeriver
       SqlDialect sqlDialect,
       boolean computeNumberMatched,
       boolean computeNumberSkipped,
-      Optional<QueryGeneratorSettings.NullOrder> nullOrder) {
+      Optional<NullOrder> nullOrder,
+      boolean geometryAsWkb) {
     this.queryablesSchema = queryablesSchema;
     this.sqlDialect = sqlDialect;
     this.filterEncoder = filterEncoder;
@@ -65,6 +68,7 @@ public class SqlQueryTemplatesDeriver
                         ? " NULLS FIRST"
                         : " NULLS LAST")
             .orElse("");
+    this.geometryAsWkb = geometryAsWkb;
   }
 
   @Override
@@ -234,13 +238,17 @@ public class SqlQueryTemplatesDeriver
                                 column.getSubDecoderPaths(),
                                 column.isSpatial());
                           }
-                          if (column.isSpatial()) {
+                          if (column.isSpatial() && geometryAsWkb) {
+                            return sqlDialect.applyToWkb(
+                                name, column.isForcePolygonCCW(), column.shouldLinearizeCurves());
+                          } else if (column.isSpatial()) {
                             return sqlDialect.applyToWkt(
                                 name, column.isForcePolygonCCW(), column.shouldLinearizeCurves());
                           }
                           if (column.isTemporal()) {
-                            if (column.getType() == SchemaBase.Type.DATE)
+                            if (column.getType() == SchemaBase.Type.DATE) {
                               return sqlDialect.applyToDate(name, column.getFormat());
+                            }
                             return sqlDialect.applyToDatetime(name, column.getFormat());
                           }
 

@@ -11,6 +11,7 @@ import com.google.common.base.Splitter;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -22,6 +23,8 @@ import java.util.Optional;
 import org.threeten.extra.Interval;
 
 public class SqlDialectGpkg implements SqlDialect {
+
+  private QueryGeneratorSettings settings;
 
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
@@ -37,6 +40,14 @@ public class SqlDialectGpkg implements SqlDialect {
   @Override
   public String applyToWkt(String wkt, int srid) {
     return String.format("ST_GeomFromText('%s',%s)", wkt, srid);
+  }
+
+  @Override
+  public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
+    if (!forcePolygonCCW) {
+      return String.format("ST_AsBinary(%s)", column);
+    }
+    return String.format("ST_AsBinary(ST_ForcePolygonCCW(%s))", column);
   }
 
   @Override
@@ -194,7 +205,9 @@ public class SqlDialectGpkg implements SqlDialect {
     if (!subDecoderPaths.isEmpty()) {
       String expression =
           subDecoderPaths.values().iterator().next().replaceAll("\\$(?:t|T|table)\\$", table);
-      if (spatial) {
+      if (spatial && settings.getGeometryAsWkb()) {
+        expression = applyToWkb(expression, false, false);
+      } else if (spatial) {
         expression = applyToWkt(expression, false, false);
       }
       return String.format("(%s) AS %s", expression, name);
