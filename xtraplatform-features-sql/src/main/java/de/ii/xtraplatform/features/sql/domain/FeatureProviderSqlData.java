@@ -143,6 +143,11 @@ public interface FeatureProviderSqlData
       LAST
     }
 
+    enum GeometryEncoding {
+      WKB,
+      WKT
+    }
+
     @DocIgnore
     @Value.Default
     default int getChunkSize() {
@@ -188,14 +193,22 @@ public interface FeatureProviderSqlData
     }
 
     /**
-     * @langEn Option to return geometries as Well-Known Binary (WKB) format.
-     * @langDe Option, Geometrien im Well-Known Binary (WKB) Format zurückzugeben.
-     * @default false
+     * @langEn Encoding of the returned geometries, either Well-Known Text (WKT) or Well-Known
+     *     Binary (WKB).
+     * @langDe Kodierung der zurückgegebenen Geometrien, entweder Well-Known Text (WKT) oder
+     *     Well-Known Binary (WKB).
+     * @default WKT
      * @since v4.4
      */
     @Value.Default
+    default GeometryEncoding getGeometryEncoding() {
+      return GeometryEncoding.WKT;
+    }
+
+    @JsonIgnore
+    @Value.Lazy
     default boolean getGeometryAsWkb() {
-      return false;
+      return getGeometryEncoding() == GeometryEncoding.WKB;
     }
   }
 
