@@ -493,6 +493,21 @@ public class FilterEncoderSql {
       } else if (function.isDiameter()) {
         return sqlDialect.applyToDiameter(
             children.get(0), "diameter3d".equalsIgnoreCase(function.getName()));
+      } else if (function.isAlike()) {
+        String operator = "LIKE";
+
+        List<String> expressions = processBinary(function.getArgs(), children);
+
+        // we may need to change the second expression
+        String secondExpression = expressions.get(1);
+
+        String string = sqlDialect.applyToString("DUMMY");
+        String functionStart = string.substring(0, string.indexOf("DUMMY"));
+        String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
+
+        String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
+
+        return String.format(expressions.get(0), functionStart, operation);
       }
 
       return super.visit(function, children);

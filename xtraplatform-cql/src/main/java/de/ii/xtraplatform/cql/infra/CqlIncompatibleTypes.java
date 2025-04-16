@@ -19,21 +19,21 @@ public class CqlIncompatibleTypes extends IllegalArgumentException {
             type, cqlText, String.join(", ", expectedTypes)));
   }
 
-  public CqlIncompatibleTypes(String cqlText, List<String> types, List<String> expectedTypes) {
+  public CqlIncompatibleTypes(String cqlText, List<String> types, Set<Set<String>> expectedTypes) {
     super(
         String.format(
-            "Incompatible types in CQL2 filter. Expression [%s] has types: %s. Valid types: %s",
-            cqlText, String.join(", ", types), String.join(", ", expectedTypes)));
-  }
-
-  public CqlIncompatibleTypes(String cqlText, List<String> types, Set<List<String>> expectedTypes) {
-    super(
-        String.format(
-            "Incompatible types in CQL2 filter. Expression [%s] has types: %s. Valid type combinations: [%s]",
+            "Incompatible types in CQL2 filter. Expression \"%s\" has types: %s. Valid type combinations: %s",
             cqlText,
             String.join(", ", types),
             expectedTypes.stream()
                 .map(typeList -> String.join(", ", typeList))
-                .collect(Collectors.joining("] or ["))));
+                .collect(Collectors.joining(" or "))));
+  }
+
+  public CqlIncompatibleTypes(String cqlText, int i, String type, List<String> expectedTypes) {
+    super(
+        String.format(
+            "Incompatible types in CQL2 filter. Argument %d in function \"%s\" has type %s. Valid types: %s",
+            i, cqlText, type, String.join(", ", expectedTypes)));
   }
 }

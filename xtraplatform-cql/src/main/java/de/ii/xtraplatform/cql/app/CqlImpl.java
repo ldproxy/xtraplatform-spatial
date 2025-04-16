@@ -124,7 +124,7 @@ public class CqlImpl implements Cql {
 
   @Override
   public void checkTypes(Cql2Expression cqlPredicate, Map<String, String> propertyTypes) {
-    CqlTypeChecker visitor = new CqlTypeChecker(propertyTypes, this);
+    CqlTypeAndFunctionChecker visitor = new CqlTypeAndFunctionChecker(propertyTypes, this);
 
     cqlPredicate.accept(visitor, true);
   }

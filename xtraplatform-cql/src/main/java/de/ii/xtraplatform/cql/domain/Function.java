@@ -21,7 +21,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableFunction.Builder.class)
 @JsonSerialize(using = Function.Serializer.class)
-public interface Function extends CqlNode, Scalar, Temporal, Operand {
+public interface Function extends CqlNode, Scalar, Temporal, Operand, Cql2Expression {
 
   String getName();
 
@@ -43,9 +43,15 @@ public interface Function extends CqlNode, Scalar, Temporal, Operand {
   @JsonIgnore
   @Value.Lazy
   default Class<?> getType() {
-    if (isLower() || isUpper()) return String.class;
-    else if (isPosition()) return Integer.class;
-    else if (isDiameter()) return Double.class;
+    if (isLower() || isUpper()) {
+      return String.class;
+    } else if (isPosition()) {
+      return Integer.class;
+    } else if (isDiameter()) {
+      return Double.class;
+    } else if (isAlike()) {
+      return Boolean.class;
+    }
     return Object.class;
   }
 
@@ -91,6 +97,12 @@ public interface Function extends CqlNode, Scalar, Temporal, Operand {
     return "diameter2d".equalsIgnoreCase(getName()) || "diameter3d".equalsIgnoreCase(getName());
   }
 
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isAlike() {
+    return "alike".equalsIgnoreCase(getName());
+  }
+
   class Serializer extends StdSerializer<Function> {
 
     protected Serializer() {
@@ -104,35 +116,6 @@ public interface Function extends CqlNode, Scalar, Temporal, Operand {
     @Override
     public void serialize(Function value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      /*
-      if (value.isCasei() || value.isAccenti()) {
-          gen.writeStartObject();
-          gen.writeFieldName(value.getName().toLowerCase());
-          Operand operand = value.getArgs().get(0);
-          if (operand instanceof ScalarLiteral) {
-              gen.writeString(String.format("%s", ((ScalarLiteral) operand).getValue().toString()));
-          } else {
-              gen.writeObject(operand);
-          }
-          gen.writeEndObject();
-          return;
-      } else if (value.isInterval()) {
-          gen.writeStartObject();
-          gen.writeFieldName(value.getName().toLowerCase());
-          gen.writeStartArray();
-          for (Operand operand : value.getArgs()) {
-              if (operand instanceof TemporalLiteral) {
-                  gen.writeString(String.format("%s", ((TemporalLiteral) operand).getValue().toString()));
-              } else {
-                  gen.writeObject(operand);
-              }
-          }
-          gen.writeEndArray();
-          gen.writeEndObject();
-          return;
-      }
-       */
-
       gen.writeStartObject();
       gen.writeFieldName("function");
       gen.writeStartObject();
