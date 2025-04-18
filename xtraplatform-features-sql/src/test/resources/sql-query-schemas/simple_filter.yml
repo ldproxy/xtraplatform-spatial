@@ -1,0 +1,9 @@
+---
+- name: externalprovider
+  filter:
+    args:
+    - property: type
+    - 1
+    op: =
+  columns:
+  - id

@@ -1,0 +1,25 @@
+---
+- source: /building
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /building/id
+  target: id
+  type: STRING
+  index: 0
+- source: "/building/[id=fk_buildingpart_parent]building"
+  target: consistsOfBuildingPart
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/building/[id=fk_buildingpart_parent]building/id"
+  target: consistsOfBuildingPart.href
+  type: STRING
+  index: 0
+- source: "/building/[fk_buildingpart_parent=id]building"
+  target: parent
+  type: OBJECT
+  index: 0
+- source: "/building/[fk_buildingpart_parent=id]building/id"
+  target: parent.href
+  type: STRING
+  index: 0

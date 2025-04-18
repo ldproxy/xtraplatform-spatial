@@ -1,0 +1,14 @@
+---
+sourcePath: /eignungsflaeche
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  programm:
+    sourcePath: "[JSON]osirisobjekt/programm"
+    type: STRING
+  kennung:
+    sourcePath: "[JSON]osirisobjekt/kennung"
+    type: STRING

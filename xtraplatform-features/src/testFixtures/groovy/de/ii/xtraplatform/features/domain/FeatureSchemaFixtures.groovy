@@ -7,20 +7,46 @@
  */
 package de.ii.xtraplatform.features.domain
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.common.io.Resources
+
 import de.ii.xtraplatform.features.domain.SchemaBase.Type
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
 
 class FeatureSchemaFixtures {
 
-    private static final ObjectMapper YAML = YamlSerialization.createYamlMapper();
-
     public static FeatureSchema fromYaml(String name) {
-        def resource = Resources.getResource("feature-schemas/" + name + ".yml");
-        ImmutableFeatureSchema.Builder builder = YAML.readValue(Resources.toByteArray(resource), ImmutableFeatureSchema.Builder.class);
-        return builder.name(name).build()
+        return YamlSerialization.fromYaml(
+                ImmutableFeatureSchema.Builder.class,
+                name,
+                "feature-schemas",
+                (builder) -> builder.name(name).build());
     }
+
+    static void toYaml(FeatureSchema schema, String name) {
+        YamlSerialization.toYaml(
+                schema,
+                name,
+                "feature-schemas");
+    }
+
+    static FeatureSchema SIMPLE = new ImmutableFeatureSchema.Builder()
+            .name("externalprovider")
+            .sourcePath("/externalprovider")
+            .type(Type.OBJECT)
+            .putProperties2("id", new ImmutableFeatureSchema.Builder()
+                    .sourcePath("id")
+                    .type(Type.STRING)
+                    .role(SchemaBase.Role.ID))
+            .build()
+
+    static FeatureSchema SIMPLE_FILTER = new ImmutableFeatureSchema.Builder()
+            .name("externalprovider")
+            .sourcePath("/externalprovider{filter=type=1}")
+            .type(Type.OBJECT)
+            .putProperties2("id", new ImmutableFeatureSchema.Builder()
+                    .sourcePath("id")
+                    .type(Type.STRING)
+                    .role(SchemaBase.Role.ID))
+            .build()
 
     static FeatureSchema VALUE_ARRAY = new ImmutableFeatureSchema.Builder()
             .name("externalprovider")
@@ -100,20 +126,20 @@ class FeatureSchemaFixtures {
 
     static FeatureSchema SELF_JOINS_FILTER = new ImmutableFeatureSchema.Builder()
             .name("building")
-            .sourcePath("/building{filter=id>1}")
+            .sourcePath("/building{filter=oid>1}")
             .type(Type.OBJECT)
             .putProperties2("id", new ImmutableFeatureSchema.Builder()
                     .sourcePath("oid")
                     .type(Type.STRING)
                     .role(SchemaBase.Role.ID))
             .putProperties2("consistsOfBuildingPart", new ImmutableFeatureSchema.Builder()
-                    .sourcePath("[id=fk_buildingpart_parent]building{filter=href>100}")
+                    .sourcePath("[id=fk_buildingpart_parent]building{filter=id>100}")
                     .type(Type.OBJECT_ARRAY)
                     .putProperties2("href", new ImmutableFeatureSchema.Builder()
                             .sourcePath("id")
                             .type(Type.STRING)))
             .putProperties2("parent", new ImmutableFeatureSchema.Builder()
-                    .sourcePath("[fk_buildingpart_parent=id]building{filter=href>1000}")
+                    .sourcePath("[fk_buildingpart_parent=id]building{filter=id>1000}")
                     .type(Type.OBJECT)
                     .putProperties2("href", new ImmutableFeatureSchema.Builder()
                             .sourcePath("id")
@@ -159,6 +185,25 @@ class FeatureSchemaFixtures {
                     .addSourcePaths("krs")
                     .addSourcePaths("gmd")
                     .type(Type.STRING))
+            .build()
+
+    static FeatureSchema CONCAT_VALUES = new ImmutableFeatureSchema.Builder()
+            .name("address")
+            .sourcePath("/o12006")
+            .type(Type.OBJECT)
+            .putProperties2("id", new ImmutableFeatureSchema.Builder()
+                    .sourcePath("objid")
+                    .type(Type.STRING)
+                    .role(SchemaBase.Role.ID))
+            .putProperties2("component", new ImmutableFeatureSchema.Builder()
+                    .type(Type.VALUE_ARRAY)
+                    .valueType(Type.STRING)
+                    .concatBuilders([
+                            new ImmutableFeatureSchema.Builder().sourcePath("lan"),
+                            new ImmutableFeatureSchema.Builder().sourcePath("rbz"),
+                            new ImmutableFeatureSchema.Builder().sourcePath("krs"),
+                            new ImmutableFeatureSchema.Builder().sourcePath("gmd"),
+                    ]))
             .build()
 
     static FeatureSchema CONCAT_VALUES_JOIN = new ImmutableFeatureSchema.Builder()

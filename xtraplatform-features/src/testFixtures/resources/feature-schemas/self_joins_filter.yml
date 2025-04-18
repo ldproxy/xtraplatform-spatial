@@ -1,0 +1,22 @@
+---
+sourcePath: "/building{filter=oid>1}"
+type: OBJECT
+properties:
+  id:
+    sourcePath: oid
+    type: STRING
+    role: ID
+  consistsOfBuildingPart:
+    sourcePath: "[id=fk_buildingpart_parent]building{filter=id>100}"
+    type: OBJECT_ARRAY
+    properties:
+      href:
+        sourcePath: id
+        type: STRING
+  parent:
+    sourcePath: "[fk_buildingpart_parent=id]building{filter=id>1000}"
+    type: OBJECT
+    properties:
+      href:
+        sourcePath: id
+        type: STRING

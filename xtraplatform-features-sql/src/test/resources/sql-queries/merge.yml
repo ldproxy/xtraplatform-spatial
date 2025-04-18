@@ -1,0 +1,9 @@
+- >-
+  SELECT A.id AS SKEY, A.programm
+  FROM eignungsflaeche A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.id, B.kennung
+  FROM eignungsflaeche A
+  JOIN osirisobjekt B ON (A.id=B.id)
+  ORDER BY 1,2

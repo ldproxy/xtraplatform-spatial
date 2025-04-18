@@ -1,0 +1,45 @@
+---
+- name: o12006
+  type: OBJECT
+  sourcePath: address
+  properties:
+  - name: objid
+    type: STRING
+    role: ID
+    parentPath:
+    - o12006
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: lan
+    type: STRING
+    parentPath:
+    - o12006
+    sourcePath: component
+    sortKeyUnique: true
+    isExpression: false
+  - name: rbz
+    type: STRING
+    parentPath:
+    - o12006
+    sourcePath: component
+    sortKeyUnique: true
+    isExpression: false
+  - name: krs
+    type: STRING
+    parentPath:
+    - o12006
+    sourcePath: component
+    sortKeyUnique: true
+    isExpression: false
+  - name: gmd
+    type: STRING
+    parentPath:
+    - o12006
+    sourcePath: component
+    sortKeyUnique: true
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

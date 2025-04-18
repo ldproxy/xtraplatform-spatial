@@ -1,0 +1,48 @@
+---
+- name: pfs_plan
+  columns:
+  - id
+  - constant_pfs_plan_hatObjekt_embedded_0
+  columnOperations:
+    1:
+      CONSTANT: FOO
+- name: bst_erdgasleitung
+  relations:
+  - name: pfs_plan
+    sourceField: _id
+    target: bst_erdgasleitung
+    targetField: gehoertzuplan_pfs_plan_fk
+  columns:
+  - _id
+  - constant_gehoertZuPlan_1
+  - gehoertzuplan_pfs_plan_fk
+  - gehoertzuplan_pfs_plan_fk
+  columnOperations:
+    1:
+      CONSTANT: pfs_plan
+- name: bst_speicher
+  relations:
+  - name: pfs_plan
+    sourceField: _id
+    target: bst_speicher
+    targetField: gehoertzuplan_pfs_plan_fk
+  columns:
+  - _id
+  - constant_gehoertZuPlan_2
+  - gehoertzuplan_pfs_plan_fk
+  - gehoertzuplan_pfs_plan_fk
+  columnOperations:
+    1:
+      CONSTANT: pfs_plan
+- name: bra_mikrorohr
+  relations:
+  - name: pfs_plan
+    sourceField: _id
+    target: bst_speicher
+    targetField: gehoertzuplan_pfs_plan_fk
+  - name: bst_speicher
+    sourceField: mikrorohr_fk
+    target: bra_mikrorohr
+    targetField: _id
+  columns:
+  - _id

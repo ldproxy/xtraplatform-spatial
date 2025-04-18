@@ -1,0 +1,20 @@
+---
+- name: building
+  columns:
+  - id
+- name: building
+  relations:
+  - name: building
+    sourceField: id
+    target: building
+    targetField: fk_buildingpart_parent
+  columns:
+  - id
+- name: building
+  relations:
+  - name: building
+    sourceField: fk_buildingpart_parent
+    target: building
+    targetField: id
+  columns:
+  - id

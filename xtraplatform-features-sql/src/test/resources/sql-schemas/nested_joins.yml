@@ -1,0 +1,86 @@
+---
+- name: observationsubject
+  type: OBJECT
+  sourcePath: observationsubject
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - observationsubject
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: observationsubject_filtervalues
+    type: OBJECT_ARRAY
+    parentPath:
+    - observationsubject
+    sourcePath: filterValues
+    properties:
+    - name: _type
+      type: STRING
+      parentPath:
+      - observationsubject
+      - "[id=observationsubjectid]observationsubject_filtervalues"
+      sourcePath: filterValues.type
+      sortKeyUnique: true
+      isExpression: false
+    - name: observedproperty
+      type: OBJECT
+      parentPath:
+      - observationsubject
+      - "[id=observationsubjectid]observationsubject_filtervalues"
+      sourcePath: filterValues.filterValueProperty
+      properties:
+      - name: symbol
+        type: STRING
+        parentPath:
+        - observationsubject
+        - "[id=observationsubjectid]observationsubject_filtervalues"
+        - "[filtervalueproperty_fk=code]observedproperty"
+        sourcePath: filterValues.filterValueProperty.title
+        sortKeyUnique: true
+        isExpression: false
+      - name: code
+        type: STRING
+        parentPath:
+        - observationsubject
+        - "[id=observationsubjectid]observationsubject_filtervalues"
+        - "[filtervalueproperty_fk=code]observedproperty"
+        sourcePath: filterValues.filterValueProperty.href
+        sortKeyUnique: true
+        isExpression: false
+      relation:
+      - cardinality: ONE_2_N
+        sourceContainer: observationsubject_filtervalues
+        sourceField: filtervalueproperty_fk
+        sourcePrimaryKey: id
+        sourceSortKey: id
+        targetContainer: observedproperty
+        targetField: code
+        joinType: INNER
+      primaryKey: id
+      sortKey: id
+      sortKeyUnique: true
+      parentSortKeys:
+      - observationsubject.id
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: observationsubject
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: observationsubject_filtervalues
+      targetField: observationsubjectid
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - observationsubject.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

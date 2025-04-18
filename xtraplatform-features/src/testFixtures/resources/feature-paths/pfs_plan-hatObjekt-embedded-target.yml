@@ -1,4 +1,5 @@
 - []
+- [const]
 - [hatObjekt, 0_gehoertZuPlan, id]
 - [hatObjekt, 0_gehoertZuPlan, title]
 - [hatObjekt, 0_gehoertZuPlan, type]
@@ -9,5 +10,7 @@
 - [hatObjekt, 1_gehoertZuPlan, type]
 - [hatObjekt, 1_gehoertZuPlan]
 - [hatObjekt, 1_id]
+- [hatObjekt, 1_mikrorohr, id]
+- [hatObjekt, 1_mikrorohr]
 - [hatObjekt]
 - [oid]

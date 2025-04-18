@@ -1,0 +1,45 @@
+# schema references and feature refs are already resolved
+type: OBJECT
+concat:
+  - sourcePath: "/o41001{sortKey=objid}"
+    type: OBJECT
+    properties:
+      id:
+        sourcePath: objid
+        type: STRING
+        role: ID
+      landCoverObservation:
+        type: OBJECT_ARRAY
+        properties:
+          class:
+            type: OBJECT
+            properties:
+              href:
+                type: VALUE_ARRAY
+                valueType: STRING
+                concat:
+                  - sourcePath: beb
+                    type: STRING
+                  - constantValue: https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/1
+                    type: STRING
+  - sourcePath: "/o41002{sortKey=objid}"
+    type: OBJECT
+    properties:
+      id:
+        sourcePath: objid
+        type: STRING
+        role: ID
+      landCoverObservation:
+        type: OBJECT_ARRAY
+        properties:
+          class:
+            type: OBJECT
+            properties:
+              href:
+                type: VALUE_ARRAY
+                valueType: STRING
+                concat:
+                  - sourcePath: beb
+                    type: STRING
+                  - constantValue: https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/2
+                    type: STRING

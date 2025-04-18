@@ -1,0 +1,75 @@
+---
+sourcePaths:
+- "/o73005{sortKey=sch}"
+- "/o73004{sortKey=sch}"
+type: OBJECT_ARRAY
+transformations:
+- {}
+properties:
+  "0_id":
+    sourcePath: "/o73005{sortKey=sch}/_id"
+    type: INTEGER
+    role: ID
+    additionalInfo:
+      IS_PROPERTY: "true"
+  "0_geometry":
+    sourcePath: "/o73005{sortKey=sch}/[sch=ags]verwaltungseinheit/geometrie"
+    type: GEOMETRY
+    role: PRIMARY_GEOMETRY
+    geometryType: MULTI_POLYGON
+    additionalInfo:
+      IS_PROPERTY: "true"
+  "1_id":
+    sourcePath: "/o73004{sortKey=sch}/_id"
+    type: INTEGER
+    role: ID
+    additionalInfo:
+      IS_PROPERTY: "true"
+  "1_geometry":
+    sourcePath: "/o73004{sortKey=sch}/[sch=ags]verwaltungseinheit/geometrie"
+    type: GEOMETRY
+    role: PRIMARY_GEOMETRY
+    geometryType: MULTI_POLYGON
+    additionalInfo:
+      IS_PROPERTY: "true"
+  "1_upperLevelUnit":
+    sourcePath: "/o73004{sortKey=sch}/[sch=ags]verwaltungseinheit"
+    type: OBJECT
+    properties:
+      href:
+        sourcePath: uebergobjekt
+        type: STRING
+    additionalInfo:
+      IS_PROPERTY: "true"
+concat:
+- sourcePath: "/o73005{sortKey=sch}"
+  type: OBJECT_ARRAY
+  properties:
+    id:
+      sourcePath: _id
+      type: INTEGER
+      role: ID
+    geometry:
+      sourcePath: "[sch=ags]verwaltungseinheit/geometrie"
+      type: GEOMETRY
+      role: PRIMARY_GEOMETRY
+      geometryType: MULTI_POLYGON
+- sourcePath: "/o73004{sortKey=sch}"
+  type: OBJECT_ARRAY
+  properties:
+    id:
+      sourcePath: _id
+      type: INTEGER
+      role: ID
+    geometry:
+      sourcePath: "[sch=ags]verwaltungseinheit/geometrie"
+      type: GEOMETRY
+      role: PRIMARY_GEOMETRY
+      geometryType: MULTI_POLYGON
+    upperLevelUnit:
+      sourcePath: "[sch=ags]verwaltungseinheit"
+      type: OBJECT
+      properties:
+        href:
+          sourcePath: uebergobjekt
+          type: STRING

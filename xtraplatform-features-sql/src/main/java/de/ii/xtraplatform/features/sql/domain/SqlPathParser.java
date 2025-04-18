@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.sql.domain;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -51,7 +52,9 @@ public class SqlPathParser {
     FILTER,
     CONSTANT,
     CONNECTOR,
-    JOINTYPE
+    JOINTYPE,
+    ROOT,
+    JOINED,
   }
 
   private interface Tokens {
@@ -69,6 +72,9 @@ public class SqlPathParser {
         String.format(
             "(?:(?<%s>%s)%s)?%s",
             MatcherGroups.SCHEMA, IDENTIFIER, Pattern.quote(Tokens.SCHEMA_SEPARATOR), IDENTIFIER);
+    String TABLE_PLAIN =
+        String.format(
+            "(?:(?:%s)%s)?%s", IDENTIFIER, Pattern.quote(Tokens.SCHEMA_SEPARATOR), IDENTIFIER);
     String FLAGS = "(?:\\{[a-z_]+.*?(?:=(?:'.*?'|[^}]*))?\\})*";
     String SORT_KEY_FLAG = String.format("\\{sortKey=(?<%s>.+?)\\}", MatcherGroups.SORTKEY);
     String SORT_KEY_FLAG_UNIQUE =
@@ -108,8 +114,21 @@ public class SqlPathParser {
     String JOINED_TABLE =
         String.format(
             "%s(?<%s>%s)(?<%s>%s)?", JOIN, MatcherGroups.TABLE, TABLE, MatcherGroups.FLAGS, FLAGS);
+    String TABLE_PATH =
+        String.format(
+            "(?<%s>%s%s%s)(?<%s>(?:%s%s%s%s)*)",
+            MatcherGroups.ROOT,
+            Tokens.PATH_SEPARATOR,
+            TABLE_PLAIN,
+            FLAGS,
+            MatcherGroups.JOINED,
+            Tokens.PATH_SEPARATOR,
+            JOIN_PLAIN,
+            TABLE_PLAIN,
+            FLAGS);
     String ROOT_OR_JOINED_TABLE_PLAIN =
-        String.format("(?:%s|%s)(?:%s)(?:%s)?", Tokens.PATH_SEPARATOR, JOIN_PLAIN, TABLE, FLAGS);
+        String.format(
+            "(?:%s|%s)(?:%s)(?:%s)?", Tokens.PATH_SEPARATOR, JOIN_PLAIN, TABLE_PLAIN, FLAGS);
     String CONNECTED_COLUMN =
         String.format(
             "(?<%s>(?:%s%s)*)%s(?<%s>%s)%s(?<%s>%s)?(?<%s>%s)?",
@@ -140,6 +159,8 @@ public class SqlPathParser {
     Pattern ROOT_TABLE = Pattern.compile(PatternStrings.ROOT_TABLE);
 
     Pattern JOINED_TABLE = Pattern.compile(PatternStrings.JOINED_TABLE);
+
+    Pattern TABLE_PATH = Pattern.compile(PatternStrings.TABLE_PATH);
 
     Pattern CONNECTED_COLUMN = Pattern.compile(PatternStrings.CONNECTED_COLUMN);
 
@@ -262,6 +283,11 @@ public class SqlPathParser {
     return path2;
   }
 
+  public boolean isTablePath(String path) {
+    return !Patterns.CONNECTED_COLUMN.matcher(path).matches()
+        && !Patterns.COLUMN_PATH.matcher(path).matches();
+  }
+
   public SqlPath parseTablePath(String path) {
     Matcher matcher = Patterns.ROOT_TABLE.matcher(path);
 
@@ -275,6 +301,36 @@ public class SqlPathParser {
       return new ImmutableSqlPath.Builder()
           .from(sqlPaths.get(sqlPaths.size() - 1))
           .parentTables(sqlPaths.subList(0, sqlPaths.size() - 1))
+          .build();
+    }
+
+    throw new IllegalArgumentException(
+        String.format("invalid sourcePath '%s', expected table", path));
+  }
+
+  public SqlPath parseFullTablePath(String path) {
+    Matcher matcher = Patterns.TABLE_PATH.matcher(path);
+
+    if (matcher.matches()) {
+      String rootPath = matcher.group(MatcherGroups.ROOT.name());
+      String joinedPath = matcher.group(MatcherGroups.JOINED.name());
+
+      SqlPath root = parseTablePath(rootPath);
+
+      if (Strings.isNullOrEmpty(joinedPath)) {
+        return root;
+      }
+
+      List<SqlPath> joined = parseTables(joinedPath);
+
+      if (joined.isEmpty()) {
+        return root;
+      }
+
+      return new ImmutableSqlPath.Builder()
+          .from(joined.get(joined.size() - 1))
+          .addParentTables(root)
+          .addParentTables(joined.subList(0, joined.size() - 1).toArray(new SqlPath[0]))
           .build();
     }
 

@@ -1,0 +1,25 @@
+---
+- name: observationsubject
+  columns:
+  - id
+- name: observationsubject_filtervalues
+  relations:
+  - name: observationsubject
+    sourceField: id
+    target: observationsubject_filtervalues
+    targetField: observationsubjectid
+  columns:
+  - _type
+- name: observedproperty
+  relations:
+  - name: observationsubject
+    sourceField: id
+    target: observationsubject_filtervalues
+    targetField: observationsubjectid
+  - name: observationsubject_filtervalues
+    sourceField: filtervalueproperty_fk
+    target: observedproperty
+    targetField: code
+  columns:
+  - symbol
+  - code

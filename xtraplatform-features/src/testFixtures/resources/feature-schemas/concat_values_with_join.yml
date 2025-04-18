@@ -1,0 +1,17 @@
+---
+sourcePath: /o12006
+type: OBJECT
+properties:
+  id:
+    sourcePath: objid
+    type: STRING
+    role: ID
+  component:
+    type: VALUE_ARRAY
+    valueType: STRING
+    concat:
+    - sourcePath: lan
+    - sourcePath: rbz
+    - sourcePath: krs
+    - sourcePath: "[id7=id]o12007/nam"
+    - sourcePath: gmd
