@@ -1,0 +1,19 @@
+---
+- name: o41001
+  sortKey: objid
+  columns:
+  - objid
+  - beb
+  - constant_href_0
+  columnOperations:
+    2:
+      CONSTANT: https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/1
+- name: o41002
+  sortKey: objid
+  columns:
+  - objid
+  - beb
+  - constant_href_1
+  columnOperations:
+    2:
+      CONSTANT: https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/2

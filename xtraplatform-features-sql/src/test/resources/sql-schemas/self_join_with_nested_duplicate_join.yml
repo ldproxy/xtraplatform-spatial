@@ -1,0 +1,94 @@
+---
+- name: building
+  type: OBJECT
+  sourcePath: building
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - building
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: att_string_building
+    type: OBJECT_ARRAY
+    parentPath:
+    - building
+    sourcePath: genericAttributesString
+    properties:
+    - name: name
+      type: STRING
+      parentPath:
+      - building
+      - "[id=fk_feature]att_string_building"
+      sourcePath: genericAttributesString.name
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: building
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: att_string_building
+      targetField: fk_feature
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - building.id
+    isExpression: false
+  - name: building
+    type: OBJECT_ARRAY
+    parentPath:
+    - building
+    sourcePath: consistsOfBuildingPart
+    properties:
+    - name: att_string_building
+      type: OBJECT_ARRAY
+      parentPath:
+      - building
+      - "[id=fk_buildingpart_parent]building"
+      sourcePath: consistsOfBuildingPart.genericAttributesString
+      properties:
+      - name: name
+        type: STRING
+        parentPath:
+        - building
+        - "[id=fk_buildingpart_parent]building"
+        - "[id=fk_feature]att_string_building"
+        sourcePath: consistsOfBuildingPart.genericAttributesString.name
+        sortKeyUnique: true
+        isExpression: false
+      relation:
+      - cardinality: ONE_2_N
+        sourceContainer: building
+        sourceField: id
+        targetContainer: att_string_building
+        targetField: fk_feature
+        joinType: INNER
+      primaryKey: id
+      sortKey: id
+      sortKeyUnique: true
+      parentSortKeys:
+      - building.id
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: building
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: building
+      targetField: fk_buildingpart_parent
+      joinType: INNER
+    sortKeyUnique: true
+    parentSortKeys:
+    - building.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

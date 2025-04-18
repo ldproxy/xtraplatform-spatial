@@ -1,0 +1,25 @@
+---
+- source: /eignungsflaeche
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /eignungsflaeche/id
+  target: id
+  type: STRING
+  index: 0
+- source: "/eignungsflaeche/[JSON]osirisobjekt"
+  target: osirisobjekt
+  type: OBJECT
+  index: 0
+- source: "/eignungsflaeche/[JSON]osirisobjekt/kennung"
+  target: osirisobjekt.kennung
+  type: STRING
+  index: 0
+- source: "/eignungsflaeche/[JSON]osirisobjekt"
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/eignungsflaeche/[JSON]osirisobjekt/programm"
+  target: programm
+  type: STRING
+  index: 0

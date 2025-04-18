@@ -1,0 +1,87 @@
+---
+- name: o42003
+  type: OBJECT
+  sourcePath: strassenachse
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - o42003
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: o42002
+    type: OBJECT
+    parentPath:
+    - o42003
+    sourcePath: strasse
+    properties:
+    - name: nam
+      type: STRING
+      parentPath:
+      - o42003
+      - "[id=rid]o42003__p0000103000"
+      - "[p0000103000=objid]o42002"
+      sourcePath: strasse.name
+      sortKeyUnique: true
+      isExpression: false
+    - name: o42002__bez
+      type: OBJECT_ARRAY
+      parentPath:
+      - o42003
+      - "[id=rid]o42003__p0000103000"
+      - "[p0000103000=objid]o42002"
+      sourcePath: strasse
+      properties:
+      - name: bez
+        type: STRING
+        parentPath:
+        - o42003
+        - "[id=rid]o42003__p0000103000"
+        - "[p0000103000=objid]o42002"
+        - "[id=rid]o42002__bez"
+        sourcePath: strasse.bezeichnung
+        sortKey: id
+        sortKeyUnique: true
+        isExpression: false
+      relation:
+      - cardinality: ONE_2_N
+        sourceContainer: o42002
+        sourceField: id
+        sourcePrimaryKey: id
+        sourceSortKey: id
+        targetContainer: o42002__bez
+        targetField: rid
+        joinType: INNER
+      primaryKey: id
+      sortKey: id
+      sortKeyUnique: true
+      parentSortKeys:
+      - o42003.id
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: o42003
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: o42003__p0000103000
+      targetField: rid
+      joinType: INNER
+    - cardinality: ONE_2_N
+      sourceContainer: o42003__p0000103000
+      sourceField: p0000103000
+      targetContainer: o42002
+      targetField: objid
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - o42003.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

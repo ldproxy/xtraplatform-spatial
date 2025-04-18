@@ -1,0 +1,23 @@
+---
+- name: externalprovider
+  type: OBJECT
+  sourcePath: externalprovider
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - "externalprovider{filter=type=1}"
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  filter:
+    args:
+    - property: type
+    - 1
+    op: =
+  filterString: type=1
+  isExpression: false

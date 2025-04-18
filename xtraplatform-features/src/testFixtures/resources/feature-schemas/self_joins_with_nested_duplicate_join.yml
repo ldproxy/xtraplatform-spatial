@@ -1,0 +1,26 @@
+---
+sourcePath: /building
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  genericAttributesString:
+    sourcePath: "[id=fk_feature]att_string_building"
+    type: OBJECT_ARRAY
+    properties:
+      name:
+        sourcePath: name
+        type: STRING
+  consistsOfBuildingPart:
+    sourcePath: "[id=fk_buildingpart_parent]building"
+    type: OBJECT_ARRAY
+    properties:
+      genericAttributesString:
+        sourcePath: "[id=fk_feature]att_string_building"
+        type: OBJECT_ARRAY
+        properties:
+          name:
+            sourcePath: name
+            type: STRING

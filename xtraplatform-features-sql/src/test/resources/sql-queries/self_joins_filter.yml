@@ -1,0 +1,17 @@
+- >-
+  SELECT A.id AS SKEY, A.oid
+  FROM building A
+  WHERE (A.id IN (SELECT AA.id FROM building AA WHERE AA.oid > 1))
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.id
+  FROM building A
+  JOIN building B ON (A.id=B.fk_buildingpart_parent AND (B.id > 100))
+  WHERE (A.id IN (SELECT AA.id FROM building AA WHERE AA.oid > 1))
+  ORDER BY 1,2
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.id
+  FROM building A
+  JOIN building B ON (A.fk_buildingpart_parent=B.id AND (B.id > 1000))
+  WHERE (A.id IN (SELECT AA.id FROM building AA WHERE AA.oid > 1))
+  ORDER BY 1,2

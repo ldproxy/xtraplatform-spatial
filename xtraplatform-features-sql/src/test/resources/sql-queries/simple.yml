@@ -1,0 +1,4 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM externalprovider A
+  ORDER BY 1

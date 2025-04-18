@@ -1,0 +1,25 @@
+---
+- name: building
+  columns:
+  - id
+- name: att_string_building
+  relations:
+  - name: building
+    sourceField: id
+    target: att_string_building
+    targetField: fk_feature
+  columns:
+  - name
+- name: att_string_building
+  relations:
+  - name: building
+    sourceField: id
+    target: building
+    targetField: fk_buildingpart_parent
+  - name: building
+    sourceField: id
+    target: att_string_building
+    targetField: fk_feature
+    junction: true
+  columns:
+  - name

@@ -1,0 +1,21 @@
+---
+- source: /explorationsite
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /explorationsite/id
+  target: id
+  type: STRING
+  index: 0
+- source: /explorationsite
+  target: legalAvailability
+  type: OBJECT
+  index: 0
+- source: /explorationsite/legalavailability_fk
+  target: legalAvailability.title
+  type: STRING
+  index: 0
+- source: /explorationsite/legalavailability_fk
+  target: legalAvailability.href
+  type: STRING
+  index: 0

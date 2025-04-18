@@ -1,0 +1,12 @@
+---
+sourcePath: /externalprovider
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  externalprovidername:
+    sourcePath: "[id=externalprovider_fk]externalprovider_externalprovidername/externalprovidername"
+    type: VALUE_ARRAY
+    valueType: STRING

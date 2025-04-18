@@ -1,0 +1,5 @@
+---
+- name: eignungsflaeche
+  columns:
+  - id
+  - osirisobjekt

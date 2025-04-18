@@ -1,0 +1,8 @@
+---
+- name: o12006
+  columns:
+  - objid
+  - lan
+  - rbz
+  - krs
+  - gmd

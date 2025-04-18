@@ -1,0 +1,12 @@
+---
+- name: externalprovider
+  columns:
+  - id
+- name: externalprovider_externalprovidername
+  relations:
+  - name: externalprovider
+    sourceField: id
+    target: externalprovider_externalprovidername
+    targetField: externalprovider_fk
+  columns:
+  - externalprovidername

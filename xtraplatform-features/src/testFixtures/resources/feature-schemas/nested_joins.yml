@@ -1,0 +1,26 @@
+---
+sourcePath: /observationsubject
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  filterValues:
+    sourcePath: "[id=observationsubjectid]observationsubject_filtervalues"
+    type: OBJECT_ARRAY
+    objectType: FilterValue
+    properties:
+      type:
+        sourcePath: _type
+        type: STRING
+      filterValueProperty:
+        sourcePath: "[filtervalueproperty_fk=code]observedproperty"
+        type: OBJECT
+        properties:
+          title:
+            sourcePath: symbol
+            type: STRING
+          href:
+            sourcePath: code
+            type: STRING

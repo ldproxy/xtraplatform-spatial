@@ -1,0 +1,4 @@
+- >-
+  SELECT A.id AS SKEY, A.id, A.legalavailability_fk, A.legalavailability_fk
+  FROM explorationsite A
+  ORDER BY 1

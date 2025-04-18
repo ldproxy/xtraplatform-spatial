@@ -1,0 +1,9 @@
+---
+- source: "/externalprovider{filter=type=1}"
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/externalprovider{filter=type=1}/id"
+  target: id
+  type: STRING
+  index: 0

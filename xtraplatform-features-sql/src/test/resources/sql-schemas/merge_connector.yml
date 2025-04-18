@@ -1,0 +1,35 @@
+---
+- name: eignungsflaeche
+  type: OBJECT
+  sourcePath: eignungsflaeche
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - eignungsflaeche
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: osirisobjekt
+    type: STRING
+    parentPath:
+    - eignungsflaeche
+    sourcePath: osirisobjekt
+    subDecoder: JSON
+    subDecoderPaths:
+      kennung: kennung
+      programm: programm
+    subDecoderTypes:
+      kennung:
+        type: STRING
+        inArray: false
+      programm:
+        type: STRING
+        inArray: false
+    sortKeyUnique: true
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false
