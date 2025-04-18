@@ -1,0 +1,45 @@
+---
+- name: building
+  filter:
+    args:
+    - property: oid
+    - 1
+    op: '>'
+  columns:
+  - oid
+- name: building
+  filter:
+    args:
+    - property: id
+    - 100
+    op: '>'
+  relations:
+  - name: building
+    filter:
+      args:
+      - property: oid
+      - 1
+      op: '>'
+    sourceField: id
+    target: building
+    targetField: fk_buildingpart_parent
+  columns:
+  - id
+- name: building
+  filter:
+    args:
+    - property: id
+    - 1000
+    op: '>'
+  relations:
+  - name: building
+    filter:
+      args:
+      - property: oid
+      - 1
+      op: '>'
+    sourceField: fk_buildingpart_parent
+    target: building
+    targetField: id
+  columns:
+  - id

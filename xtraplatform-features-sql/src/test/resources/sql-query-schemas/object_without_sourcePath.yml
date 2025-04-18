@@ -1,0 +1,6 @@
+---
+- name: explorationsite
+  columns:
+  - id
+  - legalavailability_fk
+  - legalavailability_fk

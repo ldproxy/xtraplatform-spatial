@@ -1,0 +1,25 @@
+---
+- source: /o42003
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /o42003/id
+  target: id
+  type: STRING
+  index: 0
+- source: "/o42003/[id=rid]o42003__p0000103000/[p0000103000=objid]o42002"
+  target: strasse
+  type: OBJECT
+  index: 0
+- source: "/o42003/[id=rid]o42003__p0000103000/[p0000103000=objid]o42002/nam"
+  target: strasse.name
+  type: STRING
+  index: 0
+- source: "/o42003/[id=rid]o42003__p0000103000/[p0000103000=objid]o42002/[id=rid]o42002__bez"
+  target: strasse.bezeichnung
+  type: VALUE_ARRAY
+  index: 0
+- source: "/o42003/[id=rid]o42003__p0000103000/[p0000103000=objid]o42002/[id=rid]o42002__bez/bez"
+  target: "strasse.bezeichnung.[]"
+  type: STRING
+  index: 0

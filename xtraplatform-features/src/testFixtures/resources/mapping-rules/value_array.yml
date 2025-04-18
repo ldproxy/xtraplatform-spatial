@@ -1,0 +1,17 @@
+---
+- source: /externalprovider
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /externalprovider/id
+  target: id
+  type: STRING
+  index: 0
+- source: "/externalprovider/[id=externalprovider_fk]externalprovider_externalprovidername"
+  target: externalprovidername
+  type: VALUE_ARRAY
+  index: 0
+- source: "/externalprovider/[id=externalprovider_fk]externalprovider_externalprovidername/externalprovidername"
+  target: "externalprovidername.[]"
+  type: STRING
+  index: 0

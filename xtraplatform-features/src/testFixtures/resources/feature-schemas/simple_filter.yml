@@ -1,0 +1,8 @@
+---
+sourcePath: "/externalprovider{filter=type=1}"
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID

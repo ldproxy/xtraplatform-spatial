@@ -1,0 +1,75 @@
+---
+- name: abschnitt
+  columns:
+  - oid
+- name: strassenbezeichnung
+  relations:
+  - name: abschnitt
+    sourceField: oid
+    target: zwischentab
+    targetField: id
+  - name: zwischentab
+    filter:
+      args:
+      - property: role
+      - zu_Strasse
+      op: =
+    sourceField: rid
+    target: strasse
+    targetField: oid
+    junction: true
+  - name: strasse
+    sourceField: oid
+    target: zwischentab
+    targetField: id
+    junction: true
+  - name: zwischentab
+    filter:
+      args:
+      - property: role
+      - hat_Strassenbezeichnung
+      op: =
+    sourceField: rid
+    target: strassenbezeichnung
+    targetField: oid
+    junction: true
+  columns:
+  - strassennummer
+  - zusatzbuchstabe
+- name: strassenklasse
+  relations:
+  - name: abschnitt
+    sourceField: oid
+    target: zwischentab
+    targetField: id
+  - name: zwischentab
+    filter:
+      args:
+      - property: role
+      - zu_Strasse
+      op: =
+    sourceField: rid
+    target: strasse
+    targetField: oid
+    junction: true
+  - name: strasse
+    sourceField: oid
+    target: zwischentab
+    targetField: id
+    junction: true
+  - name: zwischentab
+    filter:
+      args:
+      - property: role
+      - hat_Strassenbezeichnung
+      op: =
+    sourceField: rid
+    target: strassenbezeichnung
+    targetField: oid
+    junction: true
+  - name: strassenbezeichnung
+    sourceField: strassenklasse
+    target: strassenklasse
+    targetField: oid
+  columns:
+  - kennung

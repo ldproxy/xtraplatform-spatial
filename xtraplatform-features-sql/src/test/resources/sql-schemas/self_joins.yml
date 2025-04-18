@@ -1,0 +1,75 @@
+---
+- name: building
+  type: OBJECT
+  sourcePath: building
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - building
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: building
+    type: OBJECT_ARRAY
+    parentPath:
+    - building
+    sourcePath: consistsOfBuildingPart
+    properties:
+    - name: id
+      type: STRING
+      parentPath:
+      - building
+      - "[id=fk_buildingpart_parent]building"
+      sourcePath: consistsOfBuildingPart.href
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: building
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: building
+      targetField: fk_buildingpart_parent
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - building.id
+    isExpression: false
+  - name: building
+    type: OBJECT
+    parentPath:
+    - building
+    sourcePath: parent
+    properties:
+    - name: id
+      type: STRING
+      parentPath:
+      - building
+      - "[fk_buildingpart_parent=id]building"
+      sourcePath: parent.href
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_ONE
+      sourceContainer: building
+      sourceField: fk_buildingpart_parent
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: building
+      targetField: id
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - building.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false
