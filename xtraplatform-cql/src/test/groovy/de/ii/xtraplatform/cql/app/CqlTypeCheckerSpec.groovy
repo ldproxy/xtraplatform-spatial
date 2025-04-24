@@ -23,7 +23,6 @@ import de.ii.xtraplatform.cql.domain.Function
 import de.ii.xtraplatform.cql.domain.Geometry
 import de.ii.xtraplatform.cql.domain.Gte
 import de.ii.xtraplatform.cql.domain.In
-import de.ii.xtraplatform.cql.domain.Interval
 import de.ii.xtraplatform.cql.domain.IsNull
 import de.ii.xtraplatform.cql.domain.Like
 import de.ii.xtraplatform.cql.domain.Lte
@@ -53,13 +52,13 @@ class CqlTypeCheckerSpec extends Specification {
     Cql cql
 
     @Shared
-    CqlTypeChecker visitor
+    CqlTypeAndFunctionChecker visitor
 
     @Shared
-    CqlTypeChecker visitor2
+    CqlTypeAndFunctionChecker visitor2
 
     @Shared
-    CqlTypeChecker visitor3
+    CqlTypeAndFunctionChecker visitor3
 
     def setupSpec() {
         cql = new CqlImpl()
@@ -98,9 +97,9 @@ class CqlTypeCheckerSpec extends Specification {
                 "location_geometry2", "GEOMETRY",
                 "viewer_class", "VALUE_ARRAY",
         )
-        visitor = new CqlTypeChecker(propertyTypes, cql)
-        visitor2 = new CqlTypeChecker(propertyTypes2, cql)
-        visitor3 = new CqlTypeChecker(propertyTypes3, cql)
+        visitor = new CqlTypeAndFunctionChecker(propertyTypes, cql)
+        visitor2 = new CqlTypeAndFunctionChecker(propertyTypes2, cql)
+        visitor3 = new CqlTypeAndFunctionChecker(propertyTypes3, cql)
     }
 
     def 'Ignore invalid properties'() {
@@ -456,7 +455,7 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-             Eq.ofFunction(Function.of("pos", ImmutableList.of()), ScalarLiteral.of(1)).accept(visitor)
+             Eq.ofFunction(Function.of("position", ImmutableList.of()), ScalarLiteral.of("123")).accept(visitor)
 
         then:
 
@@ -486,7 +485,7 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-        boolean b = Neq.ofFunction(Function.of("filterValues.measure", ImmutableList.of()), ScalarLiteral.of(1)).accept(visitor)
+        boolean b = Neq.ofFunction(Function.of("position", ImmutableList.of()), ScalarLiteral.of("test")).accept(visitor)
 
         then:
 
