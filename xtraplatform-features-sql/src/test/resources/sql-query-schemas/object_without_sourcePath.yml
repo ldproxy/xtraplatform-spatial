@@ -1,6 +1,14 @@
 ---
 - name: explorationsite
+  pathSegment: explorationsite
   columns:
-  - id
-  - legalavailability_fk
-  - legalavailability_fk
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+  - name: legalavailability_fk
+    pathSegment: legalavailability_fk
+    type: STRING
+  - name: legalavailability_fk
+    pathSegment: legalavailability_fk
+    type: STRING

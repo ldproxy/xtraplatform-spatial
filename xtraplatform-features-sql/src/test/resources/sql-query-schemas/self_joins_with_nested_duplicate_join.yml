@@ -1,25 +1,38 @@
 ---
 - name: building
+  pathSegment: building
   columns:
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
 - name: att_string_building
+  pathSegment: "[id=fk_feature]att_string_building"
   relations:
   - name: building
+    pathSegment: building
     sourceField: id
     target: att_string_building
     targetField: fk_feature
   columns:
-  - name
+  - name: name
+    pathSegment: name
+    type: STRING
 - name: att_string_building
+  pathSegment: "[id=fk_feature]att_string_building"
   relations:
   - name: building
+    pathSegment: building
     sourceField: id
     target: building
     targetField: fk_buildingpart_parent
   - name: building
+    pathSegment: "[id=fk_buildingpart_parent]building"
     sourceField: id
     target: att_string_building
     targetField: fk_feature
     junction: true
   columns:
-  - name
+  - name: name
+    pathSegment: name
+    type: STRING

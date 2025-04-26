@@ -1,13 +1,23 @@
 ---
 - name: eignungsflaeche
+  pathSegment: eignungsflaeche
   columns:
-  - programm
+  - name: programm
+    pathSegment: programm
+    type: STRING
 - name: osirisobjekt
+  pathSegment: "[id=id]osirisobjekt"
   relations:
   - name: eignungsflaeche
+    pathSegment: eignungsflaeche
     sourceField: id
     target: osirisobjekt
     targetField: id
   columns:
-  - id
-  - kennung
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+  - name: kennung
+    pathSegment: kennung
+    type: STRING

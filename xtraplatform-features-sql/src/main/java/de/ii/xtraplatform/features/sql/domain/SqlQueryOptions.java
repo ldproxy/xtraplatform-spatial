@@ -8,10 +8,9 @@
 package de.ii.xtraplatform.features.sql.domain;
 
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
-import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SortKey.Direction;
-import de.ii.xtraplatform.features.sql.app.OnlyReturnables;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +50,7 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
     return new ImmutableSqlQueryOptions.Builder().customColumnTypes(columnTypes).build();
   }
 
-  Optional<SchemaSql> getTableSchema();
+  Optional<SqlQuerySchema> getTableSchema();
 
   Optional<String> getType();
 
@@ -80,11 +79,6 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
   }
 
   @Value.Derived
-  default Optional<SchemaSql> getTableSchemaReturnables() {
-    return getTableSchema().map(schema -> schema.accept(new OnlyReturnables()));
-  }
-
-  @Value.Derived
   default List<String> getSortKeys() {
     return Stream.concat(
             getCustomSortKeys().stream().map(SortKey::getField),
@@ -110,15 +104,15 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
   default List<Class<?>> getColumnTypes() {
     List<Class<?>> columnTypes = new ArrayList<>();
 
+    // TODO: use actual types?
     getTableSchema()
         .ifPresent(
-            attributesContainer ->
-                attributesContainer.getProperties().stream()
-                    .filter(SchemaBase::isValue)
+            table ->
+                table.getColumns().stream()
                     .forEach(
-                        attribute ->
+                        column ->
                             columnTypes.add(
-                                attribute.isSpatial() && isGeometryWkb()
+                                column.getType() == Type.GEOMETRY && isGeometryWkb()
                                     ? byte[].class
                                     : String.class)));
 

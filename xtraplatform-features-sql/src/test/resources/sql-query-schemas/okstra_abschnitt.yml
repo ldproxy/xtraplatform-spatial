@@ -1,14 +1,21 @@
 ---
 - name: abschnitt
+  pathSegment: abschnitt
   columns:
-  - oid
+  - name: oid
+    pathSegment: oid
+    type: STRING
+    role: ID
 - name: strassenbezeichnung
+  pathSegment: "[rid=oid]strassenbezeichnung"
   relations:
   - name: abschnitt
+    pathSegment: abschnitt
     sourceField: oid
     target: zwischentab
     targetField: id
   - name: zwischentab
+    pathSegment: "[oid=id]zwischentab{filter=role='zu_Strasse'}"
     filter:
       args:
       - property: role
@@ -19,11 +26,13 @@
     targetField: oid
     junction: true
   - name: strasse
+    pathSegment: "[rid=oid]strasse"
     sourceField: oid
     target: zwischentab
     targetField: id
     junction: true
   - name: zwischentab
+    pathSegment: "[oid=id]zwischentab{filter=role='hat_Strassenbezeichnung'}"
     filter:
       args:
       - property: role
@@ -34,15 +43,22 @@
     targetField: oid
     junction: true
   columns:
-  - strassennummer
-  - zusatzbuchstabe
+  - name: strassennummer
+    pathSegment: strassennummer
+    type: INTEGER
+  - name: zusatzbuchstabe
+    pathSegment: zusatzbuchstabe
+    type: STRING
 - name: strassenklasse
+  pathSegment: "[strassenklasse=oid]strassenklasse"
   relations:
   - name: abschnitt
+    pathSegment: abschnitt
     sourceField: oid
     target: zwischentab
     targetField: id
   - name: zwischentab
+    pathSegment: "[oid=id]zwischentab{filter=role='zu_Strasse'}"
     filter:
       args:
       - property: role
@@ -53,11 +69,13 @@
     targetField: oid
     junction: true
   - name: strasse
+    pathSegment: "[rid=oid]strasse"
     sourceField: oid
     target: zwischentab
     targetField: id
     junction: true
   - name: zwischentab
+    pathSegment: "[oid=id]zwischentab{filter=role='hat_Strassenbezeichnung'}"
     filter:
       args:
       - property: role
@@ -68,8 +86,11 @@
     targetField: oid
     junction: true
   - name: strassenbezeichnung
+    pathSegment: "[rid=oid]strassenbezeichnung"
     sourceField: strassenklasse
     target: strassenklasse
     targetField: oid
   columns:
-  - kennung
+  - name: kennung
+    pathSegment: kennung
+    type: STRING

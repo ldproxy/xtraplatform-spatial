@@ -8,10 +8,12 @@
 package de.ii.xtraplatform.features.sql.infra.db;
 
 import com.google.common.collect.ImmutableList;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SortKey.Direction;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import java.math.BigDecimal;
 import java.sql.Blob;
@@ -23,6 +25,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,7 +44,7 @@ class SqlRowVals implements SqlRow {
   private List<SortKey.Direction> sortKeyDirections;
   private final List<Object> values;
   private int priority;
-  private SchemaSql tableSchema;
+  private SqlQuerySchema tableSchema;
   private Optional<String> type;
   @Nullable private final Collator collator;
 
@@ -65,7 +68,7 @@ class SqlRowVals implements SqlRow {
   @Override
   public String getName() {
     if (Objects.nonNull(tableSchema)) {
-      return tableSchema.getPath().get(tableSchema.getPath().size() - 1);
+      return tableSchema.getName();
     }
     return null;
   }
@@ -112,27 +115,34 @@ class SqlRowVals implements SqlRow {
   }
 
   private boolean hasColumnSchema(int i) {
-    return Objects.nonNull(tableSchema) && tableSchema.getColumnSchemas().size() > i;
+    return Objects.nonNull(tableSchema) && tableSchema.getColumns().size() > i;
   }
 
   @Override
   public boolean isSpatialColumn(int i) {
-    return hasColumnSchema(i) && tableSchema.getColumnSchemas().get(i).isSpatial();
+    return hasColumnSchema(i) && tableSchema.getColumns().get(i).getType() == Type.GEOMETRY;
   }
 
   @Override
   public boolean isTemporalColumn(int i) {
-    return hasColumnSchema(i) && tableSchema.getColumnSchemas().get(i).isTemporal();
+    return hasColumnSchema(i)
+        && (tableSchema.getColumns().get(i).getType() == Type.DATE
+            || tableSchema.getColumns().get(i).getType() == Type.DATETIME);
   }
 
   @Override
   public boolean isSubDecoderColumn(int i) {
-    return hasColumnSchema(i) && tableSchema.getColumnSchemas().get(i).getSubDecoder().isPresent();
+    return hasColumnSchema(i)
+        && tableSchema.getColumns().get(i).getOperations().containsKey(Operation.CONNECTOR);
   }
 
   @Override
   public String getSubDecoder(int i) {
-    return isSubDecoderColumn(i) ? tableSchema.getColumnSchemas().get(i).getSubDecoder().get() : "";
+    return isSubDecoderColumn(i)
+        ? Arrays.stream(tableSchema.getColumns().get(i).getOperations().get(Operation.CONNECTOR))
+            .findFirst()
+            .orElse("")
+        : "";
   }
 
   // TODO: use result.nextObject when column type info is supported
@@ -141,8 +151,9 @@ class SqlRowVals implements SqlRow {
     List<Class<?>> columnTypes;
     int cursor = 1;
 
-    if (queryOptions.getTableSchemaReturnables().isPresent()) {
-      this.tableSchema = queryOptions.getTableSchemaReturnables().get();
+    // TODO: only returnables
+    if (queryOptions.getTableSchema().isPresent()) {
+      this.tableSchema = queryOptions.getTableSchema().get();
       this.type = queryOptions.getType();
       this.sortKeyNames = queryOptions.getSortKeys();
       this.sortKeyDirections = queryOptions.getSortDirections();

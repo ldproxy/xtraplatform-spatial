@@ -1,0 +1,20 @@
+---
+- name: o12006
+  pathSegment: o12006
+  columns:
+  - name: objid
+    pathSegment: objid
+    type: STRING
+    role: ID
+  - name: lan
+    pathSegment: lan
+    type: STRING
+  - name: rbz
+    pathSegment: rbz
+    type: STRING
+  - name: krs
+    pathSegment: krs
+    type: STRING
+  - name: gmd
+    pathSegment: gmd
+    type: STRING

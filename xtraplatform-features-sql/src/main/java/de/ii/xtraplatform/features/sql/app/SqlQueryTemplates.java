@@ -10,7 +10,7 @@ package de.ii.xtraplatform.features.sql.app;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,9 +23,7 @@ public interface SqlQueryTemplates {
 
   List<ValueQueryTemplate> getValueQueryTemplates();
 
-  List<SchemaSql> getQuerySchemas();
-
-  Optional<SchemaSql> getSortablesSchema();
+  SqlQueryMapping getMapping();
 
   @FunctionalInterface
   interface MetaQueryTemplate {
