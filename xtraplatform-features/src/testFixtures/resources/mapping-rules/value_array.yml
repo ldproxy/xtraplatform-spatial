@@ -6,6 +6,7 @@
 - source: /externalprovider/id
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/externalprovider/[id=externalprovider_fk]externalprovider_externalprovidername"
   target: externalprovidername

@@ -1,0 +1,85 @@
+---
+- name: unfaelle_point
+  pathSegment: unfaelle_point
+  columns:
+  - name: fid
+    pathSegment: fid
+    type: INTEGER
+    role: ID
+  - name: unfzeit
+    pathSegment: unfzeit
+    type: DATETIME
+    role: PRIMARY_INSTANT
+  - name: hauptunft
+    pathSegment: hauptunft
+    type: STRING
+  - name: unfart
+    pathSegment: unfart
+    type: STRING
+  - name: unfkat
+    pathSegment: unfkat
+    type: STRING
+  - name: unfkatknz
+    pathSegment: unfkatknz
+    type: STRING
+  - name: strzust1
+    pathSegment: strzust1
+    type: STRING
+  - name: strzust2
+    pathSegment: strzust2
+    type: STRING
+  - name: stat
+    pathSegment: stat
+    type: FLOAT
+  - name: fahrtri
+    pathSegment: fahrtri
+    type: STRING
+  - name: netzstand
+    pathSegment: netzstand
+    type: DATETIME
+  - name: geom
+    pathSegment: geom
+    type: GEOMETRY
+    role: PRIMARY_GEOMETRY
+- name: abschnitteaeste_line
+  pathSegment: "[abs=abs]abschnitteaeste_line"
+  relations:
+  - name: unfaelle_point
+    pathSegment: unfaelle_point
+    sourceField: abs
+    target: abschnitteaeste_line
+    targetField: abs
+  columns:
+  - name: abs
+    pathSegment: abs
+    type: STRING
+  - name: strbez
+    pathSegment: strbez
+    type: STRING
+  - name: strkl
+    pathSegment: strkl
+    type: STRING
+  - name: strnr
+    pathSegment: strnr
+    type: INTEGER
+  - name: strzus
+    pathSegment: strzus
+    type: STRING
+  - name: absnr
+    pathSegment: absnr
+    type: STRING
+  - name: absast
+    pathSegment: absast
+    type: STRING
+  - name: statanf
+    pathSegment: statanf
+    type: INTEGER
+  - name: laenge
+    pathSegment: laenge
+    type: INTEGER
+  - name: vwbez
+    pathSegment: vwbez
+    type: STRING
+  - name: vwbezknz
+    pathSegment: vwbezknz
+    type: STRING

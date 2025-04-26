@@ -16,6 +16,8 @@ import org.immutables.value.Value;
 public interface SqlQueryTable {
   String getName();
 
+  String getPathSegment();
+
   @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = DefaultsFilter.class)
   @Value.Default
   default String getSortKey() {

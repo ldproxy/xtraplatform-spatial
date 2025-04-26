@@ -1,4 +1,8 @@
 ---
 - name: externalprovider
+  pathSegment: externalprovider
   columns:
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID

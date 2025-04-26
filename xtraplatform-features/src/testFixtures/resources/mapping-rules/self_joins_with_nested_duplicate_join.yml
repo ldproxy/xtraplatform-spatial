@@ -6,6 +6,7 @@
 - source: /building/id
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/building/[id=fk_feature]att_string_building"
   target: genericAttributesString

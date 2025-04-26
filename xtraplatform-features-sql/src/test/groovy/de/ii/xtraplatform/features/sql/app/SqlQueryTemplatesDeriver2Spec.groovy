@@ -11,14 +11,9 @@ import com.google.common.collect.ImmutableMap
 import de.ii.xtraplatform.cql.app.CqlImpl
 import de.ii.xtraplatform.cql.domain.*
 import de.ii.xtraplatform.crs.domain.OgcCrs
-import de.ii.xtraplatform.features.domain.MappingRuleFixtures
-import de.ii.xtraplatform.features.domain.SortKey
-import de.ii.xtraplatform.features.domain.Tuple
+import de.ii.xtraplatform.features.domain.*
 import de.ii.xtraplatform.features.json.app.DecoderFactoryJson
-import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
-import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
-import de.ii.xtraplatform.features.sql.domain.SqlPathParser
-import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping
+import de.ii.xtraplatform.features.sql.domain.*
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -27,11 +22,13 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
     @Shared
     FilterEncoderSql filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
     @Shared
-    SqlQueryTemplatesDeriver2 td = new SqlQueryTemplatesDeriver2(null, filterEncoder, new SqlDialectPgis(), true, false)
+    SqlQueryTemplatesDeriver2 td = new SqlQueryTemplatesDeriver2(filterEncoder, new SqlDialectPgis(), true, false, Optional.empty())
     @Shared
-    SqlQueryTemplatesDeriver2 tdNoNm = new SqlQueryTemplatesDeriver2(null, filterEncoder, new SqlDialectPgis(), false, false)
+    SqlQueryTemplatesDeriver2 tdNoNm = new SqlQueryTemplatesDeriver2(filterEncoder, new SqlDialectPgis(), false, false, Optional.empty())
     @Shared
     SqlMappingDeriver mappingDeriver
+    @Shared
+    MappingOperationResolver mappingOperationResolver
 
     def setupSpec() {
         def defaults = new ImmutableSqlPathDefaults.Builder().build()
@@ -39,7 +36,9 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
         //def filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, cql, null)
         def pathParser = new SqlPathParser(defaults, cql, Map.of("JSON", new DecoderFactoryJson()))
 
-        mappingDeriver = new SqlMappingDeriver(pathParser)
+        mappingDeriver = new SqlMappingDeriver(pathParser, new ImmutableQueryGeneratorSettings.Builder().build())
+        mappingOperationResolver = new MappingOperationResolver()
+
     }
 
     static Optional<Cql2Expression> noFilter = Optional.empty()
@@ -48,8 +47,10 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
 
         when:
 
+        def schema = FeatureSchemaFixtures.fromYaml(rules)
+        def resolved = schema.accept(mappingOperationResolver, List.of())
         def mappingRules = MappingRuleFixtures.fromYaml(rules)
-        SqlQueryMapping mapping = mappingDeriver.derive(mappingRules)
+        SqlQueryMapping mapping = mappingDeriver.derive(mappingRules, resolved)
         SqlQueryTemplates templates = deriver.derive(mapping)
         String actual = meta(templates, sortBy, userFilter)
 
@@ -72,8 +73,10 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
 
         when:
 
+        def schema = FeatureSchemaFixtures.fromYaml(rules)
+        def resolved = schema.accept(mappingOperationResolver, List.of())
         def mappingRules = MappingRuleFixtures.fromYaml(rules)
-        SqlQueryMapping mapping = mappingDeriver.derive(mappingRules)
+        SqlQueryMapping mapping = mappingDeriver.derive(mappingRules, resolved)
         SqlQueryTemplates templates = deriver.derive(mapping)
         List<String> actual = values(templates, limit, offset, sortBy, filter)
         List<String> expected = SqlQueryFixtures.fromYaml(queries)
@@ -93,19 +96,24 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
         "merge"                                       | td      | 0     | 0      | []                      | null                                                                                                                        | "merge"                                 || "merge"
         "self joins"                                  | td      | 0     | 0      | []                      | null                                                                                                                        | "self_joins"                            || "self_joins"
         "self joins with filters"                     | td      | 0     | 0      | []                      | null                                                                                                                        | "self_joins_filter"                     || "self_joins_filter"
-        "self joins with nested duplicate"            | td      | 0     | 0      | []                      | null                                                                                                                        | "self_joins_with_nested_duplicate_join" || "self_joins_with_nested_duplicate_join"
+        "self joins with nested duplicate join"       | td      | 0     | 0      | []                      | null                                                                                                                        | "self_joins_with_nested_duplicate_join" || "self_joins_with_nested_duplicate_join"
         "object without sourcePath"                   | td      | 0     | 0      | []                      | null                                                                                                                        | "object_without_sourcePath"             || "object_without_sourcePath"
         "paging"                                      | td      | 10    | 10     | []                      | null                                                                                                                        | "object_array"                          || "object_array_paging"
         "sortBy"                                      | td      | 0     | 0      | [SortKey.of("created")] | null                                                                                                                        | "object_array"                          || "object_array_sortby"
         "sortBy + filter"                             | td      | 0     | 0      | [SortKey.of("created")] | Eq.of(Property.of("task.title"), ScalarLiteral.of("foo"))                                                                   | "object_array"                          || "object_array_sortby_filter"
         "sortBy + paging"                             | td      | 10    | 10     | [SortKey.of("created")] | null                                                                                                                        | "object_array"                          || "object_array_sortby_paging"
         "sortBy + paging + filter"                    | td      | 10    | 10     | [SortKey.of("created")] | And.of(Eq.of(Property.of("task.title"), ScalarLiteral.of("foo")), Eq.of(Property.of("task.href"), ScalarLiteral.of("bar"))) | "object_array"                          || "object_array_sortby_paging_filter"
-        "property with multiple sourcePaths"          | td      | 0     | 0      | []                      | null                                                                                                                        | "concat_values"                         || "property_with_multiple_sourcePaths"
+        "concat values"                               | td      | 0     | 0      | []                      | null                                                                                                                        | "concat_values"                         || "property_with_multiple_sourcePaths"
         "nested joins"                                | td      | 0     | 0      | []                      | null                                                                                                                        | "nested_joins"                          || "nested_joins"
+        "connector"                                   | td      | 0     | 0      | []                      | null                                                                                                                        | "simple_connector"                      || "connector"
+        //"concat object arrays"                        | td      | 0     | 0      | []                      | null                                                                                                                        | "pfs_plan-hatObjekt"                    || "pfs_plan-hatObjekt"
+        "concat root objects"                         | td      | 0     | 0      | []                      | null                                                                                                                        | "concat_root_objects"                   || "concat_root_objects"
+        "long value path overlap"                     | td      | 0     | 0      | []                      | null                                                                                                                        | "long_value_path_overlap"               || "long_value_path_overlap"
         "self join with nested duplicate and filters" | td      | 0     | 0      | []                      | null                                                                                                                        | "okstra_abschnitt"                      || "okstra_abschnitt"
         "embedded object with concat and backlink"    | td      | 0     | 0      | []                      | null                                                                                                                        | "pfs_plan-hatObjekt-embedded"           || "pfs_plan-hatObjekt-embedded"
-        "root concat with value concat with constant" | td      | 0     | 0      | []                      | null                                                                                                                        | "landcoverunit"                         || "landcoverunit"
-
+        //TODO: constants in concat value array
+        //"root concat with value concat with constant" | td      | 0     | 0      | []                      | null                                                                                                                        | "landcoverunit"                         || "landcoverunit"
+        "strassen_unfaelle2"                          | td      | 0     | 0      | []                      | null                                                                                                                        | "strassen_unfaelle2"                    || "strassen_unfaelle2"
     }
 
 

@@ -6,6 +6,7 @@
 - source: /pfs_plan/objid
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung"
   target: hatObjekt

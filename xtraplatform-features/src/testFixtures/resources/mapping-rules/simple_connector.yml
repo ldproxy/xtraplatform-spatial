@@ -6,6 +6,7 @@
 - source: /eignungsflaeche/id
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/eignungsflaeche/[JSON]osirisobjekt"
   target: $

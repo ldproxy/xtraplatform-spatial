@@ -6,56 +6,63 @@
 - source: /pfs_plan/id
   target: oid
   type: STRING
+  role: ID
   index: 0
-- source: /pfs_plan/constant_pfs_plan_hatObjekt_embedded_0{constant='FOO'}
+- source: "/pfs_plan/constant_pfs_plan_hatObjekt_embedded_0{constant='FOO'}"
   target: const
   type: STRING
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
   target: hatObjekt
   type: OBJECT_ARRAY
+  role: EMBEDDED_FEATURE
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id
-  target: hatObjekt.id
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id"
+  target: hatObjekt.0_id
+  type: INTEGER
+  role: ID
+  index: 0
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/constant_gehoertZuPlan_1{constant='pfs_plan'}"
+  target: hatObjekt.0_gehoertZuPlan.type
   type: STRING
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/constant_gehoertZuPlan_1{constant='pfs_plan'}
-  target: hatObjekt.gehoertZuPlan.type
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/gehoertzuplan_pfs_plan_fk"
+  target: hatObjekt.0_gehoertZuPlan.id
+  type: INTEGER
+  index: 0
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/gehoertzuplan_pfs_plan_fk"
+  target: hatObjekt.0_gehoertZuPlan.title
   type: STRING
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/gehoertzuplan_pfs_plan_fk
-  target: hatObjekt.gehoertZuPlan.id
-  type: STRING
-  index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/gehoertzuplan_pfs_plan_fk
-  target: hatObjekt.gehoertZuPlan.title
-  type: STRING
-  index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher"
   target: hatObjekt
   type: OBJECT_ARRAY
+  role: EMBEDDED_FEATURE
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/_id
-  target: hatObjekt.id
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/_id"
+  target: hatObjekt.1_id
+  type: INTEGER
+  role: ID
+  index: 0
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/constant_gehoertZuPlan_2{constant='pfs_plan'}"
+  target: hatObjekt.1_gehoertZuPlan.type
   type: STRING
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/constant_gehoertZuPlan_2{constant='pfs_plan'}
-  target: hatObjekt.gehoertZuPlan.type
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/gehoertzuplan_pfs_plan_fk"
+  target: hatObjekt.1_gehoertZuPlan.id
+  type: INTEGER
+  index: 0
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/gehoertzuplan_pfs_plan_fk"
+  target: hatObjekt.1_gehoertZuPlan.title
   type: STRING
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/gehoertzuplan_pfs_plan_fk
-  target: hatObjekt.gehoertZuPlan.id
-  type: STRING
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/[mikrorohr_fk=_id]bra_mikrorohr"
+  target: hatObjekt.1_mikrorohr
+  type: OBJECT
+  role: EMBEDDED_FEATURE
   index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/gehoertzuplan_pfs_plan_fk
-  target: hatObjekt.gehoertZuPlan.title
-  type: STRING
-  index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/[mikrorohr_fk=_id]bra_mikrorohr
-  target: hatObjekt.mikrorohr
-  type: STRING
-  index: 0
-- source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/[mikrorohr_fk=_id]bra_mikrorohr/_id
-  target: hatObjekt.mikrorohr.id
-  type: STRING
+- source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/[mikrorohr_fk=_id]bra_mikrorohr/_id"
+  target: hatObjekt.1_mikrorohr.id
+  type: INTEGER
+  role: ID
   index: 0

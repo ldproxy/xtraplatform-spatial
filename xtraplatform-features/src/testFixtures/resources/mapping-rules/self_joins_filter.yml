@@ -6,6 +6,7 @@
 - source: "/building{filter=oid>1}/oid"
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/building{filter=oid>1}/[id=fk_buildingpart_parent]building{filter=id>100}"
   target: consistsOfBuildingPart
