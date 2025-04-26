@@ -16,12 +16,14 @@ import de.ii.xtraplatform.features.domain.SortKey.Direction;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.MetaQueryTemplate;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings.NullOrder;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
-import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryTable;
 import java.sql.Timestamp;
 import java.util.List;
@@ -39,23 +41,30 @@ public class SqlQueryTemplatesDeriver2 {
   private static final String CSKEY = "CSKEY";
   private static final String TAB = "  ";
 
-  private final SchemaSql queryablesSchema;
   private final SqlDialect sqlDialect;
   private final FilterEncoderSql filterEncoder;
   private final boolean computeNumberMatched;
   private final boolean computeNumberSkipped;
+  private final String nullOrder;
 
   public SqlQueryTemplatesDeriver2(
-      SchemaSql queryablesSchema,
       FilterEncoderSql filterEncoder,
       SqlDialect sqlDialect,
       boolean computeNumberMatched,
-      boolean computeNumberSkipped) {
-    this.queryablesSchema = queryablesSchema;
+      boolean computeNumberSkipped,
+      Optional<NullOrder> nullOrder) {
     this.sqlDialect = sqlDialect;
     this.filterEncoder = filterEncoder;
     this.computeNumberMatched = computeNumberMatched;
     this.computeNumberSkipped = computeNumberSkipped;
+    this.nullOrder =
+        nullOrder
+            .map(
+                nulls ->
+                    nulls == QueryGeneratorSettings.NullOrder.FIRST
+                        ? " NULLS FIRST"
+                        : " NULLS LAST")
+            .orElse("");
   }
 
   public SqlQueryTemplates derive(SqlQueryMapping mapping) {
@@ -67,8 +76,7 @@ public class SqlQueryTemplatesDeriver2 {
     return new ImmutableSqlQueryTemplates.Builder()
         .metaQueryTemplate(createMetaQueryTemplate(mapping.getMainTable(), mapping))
         .valueQueryTemplates(valueQueryTemplates)
-        // TODO .addAllQuerySchemas(schema.getAllObjects())
-        .sortablesSchema(Optional.ofNullable(queryablesSchema))
+        .mapping(mapping)
         .build();
   }
 
@@ -195,41 +203,49 @@ public class SqlQueryTemplatesDeriver2 {
                 IntStream.range(0, schema.getColumns().size())
                     .mapToObj(
                         i -> {
+                          SqlQueryColumn column = schema.getColumns().get(i);
                           String name =
-                              getQualifiedColumn(
-                                  attributeContainerAlias, schema.getColumns().get(i));
+                              getQualifiedColumn(attributeContainerAlias, column.getName());
 
-                          if (schema.getColumnOperations().containsKey(i)) {
-                            Map<Operation, String> ops = schema.getColumnOperations().get(i);
+                          Map<Operation, String[]> ops = column.getOperations();
 
-                            if (ops.containsKey(Operation.CONSTANT)) {
-                              return "'%s' AS %s"
-                                  .formatted(
-                                      ops.get(Operation.CONSTANT), schema.getColumns().get(i));
-                            }
-                            if (ops.containsKey(Operation.EXPRESSION)) {
-                              return sqlDialect.applyToExpression(
-                                  attributeContainerAlias,
-                                  schema.getColumns().get(i),
-                                  Map.of() /*TODO*/,
-                                  ops.containsKey(Operation.WKT));
-                            }
-                            if (ops.containsKey(Operation.WKT)) {
-                              boolean isForcePolygonCCW =
-                                  ops.containsKey(Operation.FORCE_POLYGON_CCW);
-                              boolean shouldLinearizeCurves =
-                                  ops.containsKey(Operation.LINEARIZE_CURVES);
-                              return sqlDialect.applyToWkt(
-                                  name, isForcePolygonCCW, shouldLinearizeCurves);
-                            }
-                            if (ops.containsKey(Operation.DATE)) {
-                              return sqlDialect.applyToDate(
-                                  name, Optional.ofNullable(ops.get(Operation.DATE)));
-                            }
-                            if (ops.containsKey(Operation.DATETIME)) {
-                              return sqlDialect.applyToDatetime(
-                                  name, Optional.ofNullable(ops.get(Operation.DATETIME)));
-                            }
+                          if (ops.containsKey(Operation.CONSTANT)) {
+                            return "'%s' AS %s"
+                                .formatted(
+                                    column.getOperationParameter(Operation.CONSTANT, ""),
+                                    column.getName());
+                          }
+                          // TODO
+                          if (ops.containsKey(Operation.EXPRESSION)) {
+                            return sqlDialect.applyToExpression(
+                                attributeContainerAlias,
+                                column.getName(),
+                                Map.of() /*TODO*/,
+                                ops.containsKey(Operation.WKT));
+                          }
+                          if (ops.containsKey(Operation.WKT)) {
+                            boolean isForcePolygonCCW =
+                                ops.containsKey(Operation.FORCE_POLYGON_CCW);
+                            boolean shouldLinearizeCurves =
+                                ops.containsKey(Operation.LINEARIZE_CURVES);
+                            return sqlDialect.applyToWkt(
+                                name, isForcePolygonCCW, shouldLinearizeCurves);
+                          }
+                          if (ops.containsKey(Operation.WKB)) {
+                            boolean isForcePolygonCCW =
+                                ops.containsKey(Operation.FORCE_POLYGON_CCW);
+                            boolean shouldLinearizeCurves =
+                                ops.containsKey(Operation.LINEARIZE_CURVES);
+                            return sqlDialect.applyToWkb(
+                                name, isForcePolygonCCW, shouldLinearizeCurves);
+                          }
+                          if (ops.containsKey(Operation.DATE)) {
+                            return sqlDialect.applyToDate(
+                                name, column.getOperationParameter(Operation.DATE));
+                          }
+                          if (ops.containsKey(Operation.DATETIME)) {
+                            return sqlDialect.applyToDatetime(
+                                name, column.getOperationParameter(Operation.DATETIME));
                           }
                           return name;
                         }))
@@ -250,9 +266,9 @@ public class SqlQueryTemplatesDeriver2 {
                   index -> {
                     if (index < additionalSortKeys.size()
                         && additionalSortKeys.get(index).getDirection() == Direction.DESCENDING) {
-                      return sortFields.get(index) + " DESC";
+                      return sortFields.get(index) + " DESC" + nullOrder;
                     }
-                    return sortFields.get(index);
+                    return sortFields.get(index) + nullOrder;
                   })
               .filter(sortField -> sortField.startsWith("A."))
               .map(sortField -> sortField.replace("A.", aliasesNested.get(0) + "."))
@@ -280,9 +296,9 @@ public class SqlQueryTemplatesDeriver2 {
                 index -> {
                   if (index <= additionalSortKeys.size()
                       && additionalSortKeys.get(index - 1).getDirection() == Direction.DESCENDING) {
-                    return index + " DESC";
+                    return index + " DESC" + nullOrder;
                   }
-                  return String.valueOf(index);
+                  return index + nullOrder;
                 })
             .collect(Collectors.joining(","));
 
@@ -419,7 +435,12 @@ public class SqlQueryTemplatesDeriver2 {
       SortKey sortKey = sortKeys.get(i);
 
       orderBy +=
-          CSKEY + "_" + i + (sortKey.getDirection() == Direction.DESCENDING ? " DESC" : "") + ", ";
+          CSKEY
+              + "_"
+              + i
+              + (sortKey.getDirection() == Direction.DESCENDING ? " DESC" : "")
+              + nullOrder
+              + ", ";
     }
 
     orderBy += SKEY;

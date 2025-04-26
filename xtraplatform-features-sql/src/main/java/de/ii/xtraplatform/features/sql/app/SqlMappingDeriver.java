@@ -7,8 +7,18 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import static de.ii.xtraplatform.features.sql.domain.SqlQueryMapping.IN_CONNECTED_ARRAY;
+import static de.ii.xtraplatform.features.sql.domain.SqlQueryMapping.PATH_IN_CONNECTOR;
+
 import de.ii.xtraplatform.cql.domain.Operation;
+import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
+import de.ii.xtraplatform.features.domain.MappingOperationResolver;
 import de.ii.xtraplatform.features.domain.MappingRule;
+import de.ii.xtraplatform.features.domain.MappingRulesDeriver;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
+import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySchema;
@@ -16,30 +26,38 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySchema.Builder;
 import de.ii.xtraplatform.features.sql.domain.SqlPath;
 import de.ii.xtraplatform.features.sql.domain.SqlPath.JoinType;
 import de.ii.xtraplatform.features.sql.domain.SqlPathParser;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.stream.Stream;
 
 public class SqlMappingDeriver {
 
   private final SqlPathParser pathParser;
+  private final QueryGeneratorSettings queryGeneration;
 
-  public SqlMappingDeriver(SqlPathParser pathParser) {
+  public SqlMappingDeriver(SqlPathParser pathParser, QueryGeneratorSettings queryGeneration) {
     this.pathParser = pathParser;
+    this.queryGeneration = queryGeneration;
   }
 
-  public SqlQueryMapping derive(List<MappingRule> mappingRules) {
+  public SqlQueryMapping derive(List<MappingRule> mappingRules, FeatureSchema schema) {
     List<SqlQuerySchema> schemas = new ArrayList<>();
     List<List<String>> previous = new ArrayList<>();
-    ImmutableSqlQueryMapping.Builder mapping = new ImmutableSqlQueryMapping.Builder();
     List<String> seenProperties = new ArrayList<>();
+    boolean includeSchema = Objects.nonNull(schema);
     int i = 0;
+
+    ImmutableSqlQueryMapping.Builder mapping = new ImmutableSqlQueryMapping.Builder();
+
+    if (includeSchema) {
+      mapping.mainSchema(schema);
+    }
 
     while (i < mappingRules.size()) {
       MappingRule rule = mappingRules.get(i);
@@ -85,19 +103,88 @@ public class SqlMappingDeriver {
 
       for (int k = 0; k < columnRules.size(); k++) {
         MappingRule column = columnRules.get(k);
-        String propertyAccessor = getPropertyAccessor(column.getTarget());
-        if (seenProperties.contains(propertyAccessor)) {
+        if (seenProperties.contains(column.getTarget())) {
           continue;
         }
-        mapping.putValueTables(propertyAccessor, querySchema);
-        mapping.putValueColumnIndexes(propertyAccessor, k);
-        seenProperties.add(propertyAccessor);
+
+        if (column.getTarget().equals("$")) {
+          SqlQueryColumn column1 = querySchema.getColumns().get(k);
+
+          if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
+            List<FeatureSchema> connectedSchemas =
+                includeSchema
+                    ? getConnectedSchemas(schema, column1.getPathSegment(), "", false)
+                    : List.of();
+
+            for (FeatureSchema p : connectedSchemas) {
+              mapping.putValueTables(p.getFullPathAsString(), querySchema);
+              mapping.putValueColumnIndexes(p.getFullPathAsString(), k);
+              mapping.putValueSchemas(p.getFullPathAsString(), p);
+            }
+          }
+        } else {
+          mapping.putValueTables(column.getTarget(), querySchema);
+          mapping.putValueColumnIndexes(column.getTarget(), k);
+          seenProperties.add(column.getTarget());
+
+          if (includeSchema && !MappingRulesDeriver.doIgnore(column.getTarget())) {
+            mapping.putValueSchemas(
+                column.getTarget(),
+                schema.getAllNestedProperties().stream()
+                    .filter(property -> matches(column, property))
+                    .findFirst()
+                    .orElseThrow(
+                        () -> {
+                          List<FeatureSchema> allNestedProperties = schema.getAllNestedProperties();
+                          List<FeatureSchema> allNestedConcatProperties =
+                              schema.getAllNestedConcatProperties();
+                          return new IllegalStateException(
+                              "Schema not found for property: " + column.getIdentifier());
+                        }));
+          }
+        }
       }
 
       i = j;
     }
 
     return mapping.build();
+  }
+
+  private List<FeatureSchema> getConnectedSchemas(
+      FeatureSchema parent, String connector, String pathInConnector, boolean inArray) {
+    return parent.getProperties().stream()
+        .filter(
+            p ->
+                !p.getEffectiveSourcePaths().isEmpty()
+                    && (Objects.isNull(connector)
+                        || p.getEffectiveSourcePaths().get(0).startsWith(connector)))
+        .flatMap(
+            p -> {
+              String path = p.getEffectiveSourcePaths().get(0);
+
+              String newPathInConnector =
+                  pathInConnector.isEmpty()
+                      ? path.replace(connector + "/", "").replace(connector, "")
+                      : pathInConnector + "." + path;
+
+              if (p.isValue()) {
+                if (!inArray && pathInConnector.isEmpty()) {
+                  return Stream.of(p);
+                }
+
+                return Stream.of(
+                    new ImmutableFeatureSchema.Builder()
+                        .from(p)
+                        .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
+                        .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
+                        .build());
+              }
+
+              return getConnectedSchemas(p, null, newPathInConnector, inArray || p.isArray())
+                  .stream();
+            })
+        .toList();
   }
 
   private SqlQuerySchema derive(
@@ -107,10 +194,10 @@ public class SqlMappingDeriver {
     ImmutableSqlQuerySchema querySchema =
         new Builder()
             .name(sqlPath.getName())
+            .pathSegment(sqlPath.asPath())
             .sortKey(sqlPath.getSortKey())
             .filter(sqlPath.getFilter().map(expr -> (Operation<?>) expr))
-            .columns(columns.stream().map(this::getColumnName).toList())
-            .columnOperations(asMap(columns.stream().map(this::getColumnOperation).toList()))
+            .columns(columns.stream().map(this::getColumn).toList())
             .relations(getJoins(sqlPath, previous))
             .build();
 
@@ -135,6 +222,7 @@ public class SqlMappingDeriver {
         joins.add(
             new ImmutableSqlQueryJoin.Builder()
                 .name(parentTable.getName())
+                .pathSegment(parentTable.asPath())
                 .sourceField(childTable.getJoin().get().first())
                 .sortKey(parentTable.getSortKey())
                 .filter(parentTable.getFilter().map(expr -> (Operation<?>) expr))
@@ -155,38 +243,69 @@ public class SqlMappingDeriver {
     return joins;
   }
 
-  private String getColumnName(MappingRule column) {
+  private SqlQueryColumn getColumn(MappingRule column) {
     SqlPath sqlPath = pathParser.parseColumnPath(column.getSource());
-    return sqlPath.getName();
-    // return column.getPath().substring(column.getPath().lastIndexOf("/") + 1);
+
+    return new ImmutableSqlQueryColumn.Builder()
+        .name(sqlPath.getName())
+        .pathSegment(sqlPath.asPath())
+        .type(column.getType())
+        .role(column.getRole())
+        .operations(getColumnOperations(column, sqlPath))
+        .build();
   }
 
-  private Optional<Map<SqlQuerySchema.Operation, String>> getColumnOperation(MappingRule column) {
-    SqlPath sqlPath = pathParser.parseColumnPath(column.getSource());
+  private static boolean matches(MappingRule column, FeatureSchema schema) {
+
+    if (Objects.equals(column.getTarget(), schema.getFullPathAsString())) {
+      return true;
+    }
+
+    // special handling for concat/coalesce properties
+    if (!schema.getEffectiveSourcePaths().isEmpty()
+        && column.getSource().endsWith(schema.getEffectiveSourcePaths().get(0))
+        && MappingOperationResolver.isConcatPath(schema.getFullPathAsString())) {
+      return Objects.equals(
+          column.getTarget(),
+          MappingOperationResolver.cleanConcatPath(schema.getFullPathAsString()));
+    }
+
+    return false;
+  }
+
+  // TODO: other ops
+  private Map<SqlQueryColumn.Operation, String[]> getColumnOperations(
+      MappingRule column, SqlPath sqlPath) {
 
     if (sqlPath.getConstantValue().isPresent()) {
-      return Optional.of(
-          Map.of(SqlQuerySchema.Operation.CONSTANT, sqlPath.getConstantValue().get()));
-    }
-    return Optional.empty();
-  }
-
-  private static Map<Integer, Map<SqlQuerySchema.Operation, String>> asMap(
-      List<Optional<Map<SqlQuerySchema.Operation, String>>> list) {
-    Map<Integer, Map<SqlQuerySchema.Operation, String>> map = new LinkedHashMap<>();
-
-    for (int i = 0; i < list.size(); i++) {
-      Optional<Map<SqlQuerySchema.Operation, String>> optional = list.get(i);
-      if (optional.isPresent()) {
-        map.put(i, optional.get());
-      }
+      return Map.of(
+          SqlQueryColumn.Operation.CONSTANT, new String[] {sqlPath.getConstantValue().get()});
     }
 
-    return map;
-  }
+    if (sqlPath.isConnected()) {
+      return Map.of(
+          SqlQueryColumn.Operation.CONNECTOR, new String[] {sqlPath.getConnector().orElse("")});
+    }
 
-  private static String getPropertyAccessor(String propertyPath) {
-    int start = propertyPath.indexOf("/", 1) + 1;
-    return propertyPath.substring(start).replaceAll("/", ".");
+    if (column.getType() == Type.GEOMETRY) {
+      SqlQueryColumn.Operation op =
+          queryGeneration.getGeometryAsWkb()
+              ? SqlQueryColumn.Operation.WKB
+              : SqlQueryColumn.Operation.WKT;
+
+      return Map.of(op, new String[] {});
+    }
+
+    // TODO: format from mapping
+    if (column.getType() == Type.DATETIME) {
+      return Map.of(SqlQueryColumn.Operation.DATETIME, new String[] {});
+    }
+
+    // TODO: format from mapping
+    if (column.getType() == Type.DATE) {
+      return Map.of(SqlQueryColumn.Operation.DATE, new String[] {});
+    }
+
+    return Map.of();
   }
 }

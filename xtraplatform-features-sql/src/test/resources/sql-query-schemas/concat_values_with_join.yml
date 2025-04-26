@@ -1,0 +1,32 @@
+---
+- name: o12006
+  pathSegment: o12006
+  columns:
+  - name: objid
+    pathSegment: objid
+    type: STRING
+    role: ID
+  - name: lan
+    pathSegment: lan
+    type: STRING
+  - name: rbz
+    pathSegment: rbz
+    type: STRING
+  - name: krs
+    pathSegment: krs
+    type: STRING
+  - name: gmd
+    pathSegment: gmd
+    type: STRING
+- name: o12007
+  pathSegment: "[id7=id]o12007"
+  relations:
+  - name: o12006
+    pathSegment: o12006
+    sourceField: id7
+    target: o12007
+    targetField: id
+  columns:
+  - name: nam
+    pathSegment: nam
+    type: STRING

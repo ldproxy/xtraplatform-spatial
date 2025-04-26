@@ -6,6 +6,7 @@
 - source: /o12006/objid
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: /o12006
   target: component

@@ -1,9 +1,13 @@
 ---
 - name: externalprovider
+  pathSegment: "externalprovider{filter=type=1}"
   filter:
     args:
     - property: type
     - 1
     op: =
   columns:
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID

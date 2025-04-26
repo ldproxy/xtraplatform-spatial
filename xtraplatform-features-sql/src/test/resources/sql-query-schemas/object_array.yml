@@ -1,19 +1,32 @@
 ---
 - name: explorationsite
+  pathSegment: explorationsite
   columns:
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
 - name: task
+  pathSegment: "[task_fk=id]task"
   relations:
   - name: explorationsite
+    pathSegment: explorationsite
     sourceField: id
     target: explorationsite_task
     targetField: explorationsite_fk
   - name: explorationsite_task
+    pathSegment: "[id=explorationsite_fk]explorationsite_task"
     sourceField: task_fk
     target: task
     targetField: id
     junction: true
   columns:
-  - id
-  - projectname
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+  - name: projectname
+    pathSegment: projectname
+    type: STRING
+  - name: id
+    pathSegment: id
+    type: STRING

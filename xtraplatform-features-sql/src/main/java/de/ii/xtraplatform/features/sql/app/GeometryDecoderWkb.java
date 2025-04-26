@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 public class GeometryDecoderWkb {
+
   private final FeatureEventHandler<
           FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       handler;
@@ -52,7 +53,6 @@ public class GeometryDecoderWkb {
       int dimension = hasZ ? 3 : 2;
 
       if (!geometryTypeEnum.isValid()) {
-        System.out.println("Invalid geometry type: " + geometryTypeEnum);
         return;
       }
 
@@ -90,11 +90,6 @@ public class GeometryDecoderWkb {
       handler.onObjectEnd(context);
       context.setGeometryType(Optional.empty());
       context.setGeometryDimension(OptionalInt.empty());
-
-    } catch (Exception e) {
-      System.out.println("Failed to decode WKB: " + e.getMessage());
-      e.printStackTrace();
-      throw new IOException("Failed to decode WKB", e);
     }
   }
 
@@ -188,8 +183,7 @@ public class GeometryDecoderWkb {
       dis.readByte();
       int geometryType = readInt(dis, isLittleEndian);
       if (geometryType != 3 && geometryType != 1003) {
-        System.err.println("Invalid polygon geometry type: " + geometryType);
-        continue;
+        throw new IOException("Invalid polygon geometry type: " + geometryType);
       }
       handlePolygon(dis, isLittleEndian, dimension);
     }

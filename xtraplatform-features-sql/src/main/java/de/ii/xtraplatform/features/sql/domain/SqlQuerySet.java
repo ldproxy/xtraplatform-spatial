@@ -21,7 +21,7 @@ public interface SqlQuerySet {
 
   TriFunction<SqlRowMeta, Long, Long, Stream<String>> getValueQueries();
 
-  List<SchemaSql> getTableSchemas();
+  List<SqlQuerySchema> getTableSchemas();
 
   SqlQueryOptions getOptions();
 }

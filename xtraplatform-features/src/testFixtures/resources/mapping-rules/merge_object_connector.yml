@@ -6,6 +6,7 @@
 - source: /eignungsflaeche/id
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/eignungsflaeche/[JSON]osirisobjekt"
   target: osirisobjekt
@@ -14,10 +15,6 @@
 - source: "/eignungsflaeche/[JSON]osirisobjekt/kennung"
   target: osirisobjekt.kennung
   type: STRING
-  index: 0
-- source: "/eignungsflaeche/[JSON]osirisobjekt"
-  target: $
-  type: OBJECT_ARRAY
   index: 0
 - source: "/eignungsflaeche/[JSON]osirisobjekt/programm"
   target: programm

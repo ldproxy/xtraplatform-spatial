@@ -1,12 +1,20 @@
 ---
 - name: externalprovider
+  pathSegment: externalprovider
   columns:
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
 - name: externalprovider_externalprovidername
+  pathSegment: "[id=externalprovider_fk]externalprovider_externalprovidername"
   relations:
   - name: externalprovider
+    pathSegment: externalprovider
     sourceField: id
     target: externalprovider_externalprovidername
     targetField: externalprovider_fk
   columns:
-  - externalprovidername
+  - name: externalprovidername
+    pathSegment: externalprovidername
+    type: STRING

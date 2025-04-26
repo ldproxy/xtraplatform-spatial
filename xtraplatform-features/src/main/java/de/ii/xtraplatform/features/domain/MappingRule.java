@@ -10,6 +10,8 @@ package de.ii.xtraplatform.features.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
+import java.util.Optional;
+import java.util.regex.Pattern;
 import org.immutables.value.Value;
 
 @Value.Immutable(lazyhash = true)
@@ -24,6 +26,8 @@ public interface MappingRule {
 
   SchemaBase.Type getType();
 
+  Optional<SchemaBase.Role> getRole();
+
   int getIndex();
 
   @JsonIgnore
@@ -35,13 +39,15 @@ public interface MappingRule {
   @JsonIgnore
   @Value.Lazy
   default boolean hasSourceParent() {
-    return getSource().contains("/");
+    return maskPathAttributes(getSource()).contains("/");
   }
 
   @JsonIgnore
   @Value.Lazy
   default String getSourceParent() {
-    return hasSourceParent() ? getSource().substring(0, getSource().lastIndexOf("/")) : "";
+    return hasSourceParent()
+        ? getSource().substring(0, maskPathAttributes(getSource()).lastIndexOf("/"))
+        : "";
   }
 
   @JsonIgnore
@@ -62,5 +68,11 @@ public interface MappingRule {
     return getType() == Type.OBJECT_ARRAY
         || getType() == Type.OBJECT
         || getType() == Type.VALUE_ARRAY;
+  }
+
+  static String maskPathAttributes(String path) {
+    return Pattern.compile("\\{([^}]*)\\}")
+        .matcher(path)
+        .replaceAll(m -> "{" + "_".repeat(m.group(1).length()) + "}");
   }
 }

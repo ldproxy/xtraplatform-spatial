@@ -6,10 +6,7 @@
 - source: /o31001/id
   target: id
   type: STRING
-  index: 0
-- source: /o31001
-  target: geometry2D
-  type: OBJECT
+  role: ID
   index: 0
 - source: /o31001/position
   target: geometry2D.geometry

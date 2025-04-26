@@ -6,4 +6,5 @@
 - source: /externalprovider/id
   target: id
   type: STRING
+  role: ID
   index: 0

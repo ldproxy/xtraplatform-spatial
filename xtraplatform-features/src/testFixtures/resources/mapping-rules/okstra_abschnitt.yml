@@ -6,6 +6,11 @@
 - source: /abschnitt/oid
   target: oid
   type: STRING
+  role: ID
+  index: 0
+- source: "/abschnitt/[oid=id]zwischentab{filter=role='zu_Strasse'}/[rid=oid]strasse"
+  target: strasse
+  type: OBJECT
   index: 0
 - source: "/abschnitt/[oid=id]zwischentab{filter=role='zu_Strasse'}/[rid=oid]strasse/[oid=id]zwischentab{filter=role='hat_Strassenbezeichnung'}/[rid=oid]strassenbezeichnung"
   target: strasse.strassenbezeichnung
@@ -13,7 +18,7 @@
   index: 0
 - source: "/abschnitt/[oid=id]zwischentab{filter=role='zu_Strasse'}/[rid=oid]strasse/[oid=id]zwischentab{filter=role='hat_Strassenbezeichnung'}/[rid=oid]strassenbezeichnung/strassennummer"
   target: strasse.strassenbezeichnung.strassennummer
-  type: STRING
+  type: INTEGER
   index: 0
 - source: "/abschnitt/[oid=id]zwischentab{filter=role='zu_Strasse'}/[rid=oid]strasse/[oid=id]zwischentab{filter=role='hat_Strassenbezeichnung'}/[rid=oid]strassenbezeichnung/zusatzbuchstabe"
   target: strasse.strassenbezeichnung.zusatzbuchstabe

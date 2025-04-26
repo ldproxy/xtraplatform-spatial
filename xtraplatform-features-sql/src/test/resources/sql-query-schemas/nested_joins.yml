@@ -1,25 +1,40 @@
 ---
 - name: observationsubject
+  pathSegment: observationsubject
   columns:
-  - id
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
 - name: observationsubject_filtervalues
+  pathSegment: "[id=observationsubjectid]observationsubject_filtervalues"
   relations:
   - name: observationsubject
+    pathSegment: observationsubject
     sourceField: id
     target: observationsubject_filtervalues
     targetField: observationsubjectid
   columns:
-  - _type
+  - name: _type
+    pathSegment: _type
+    type: STRING
 - name: observedproperty
+  pathSegment: "[filtervalueproperty_fk=code]observedproperty"
   relations:
   - name: observationsubject
+    pathSegment: observationsubject
     sourceField: id
     target: observationsubject_filtervalues
     targetField: observationsubjectid
   - name: observationsubject_filtervalues
+    pathSegment: "[id=observationsubjectid]observationsubject_filtervalues"
     sourceField: filtervalueproperty_fk
     target: observedproperty
     targetField: code
   columns:
-  - symbol
-  - code
+  - name: symbol
+    pathSegment: symbol
+    type: STRING
+  - name: code
+    pathSegment: code
+    type: STRING

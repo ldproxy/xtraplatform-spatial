@@ -1,0 +1,23 @@
+---
+- name: o31001
+  pathSegment: o31001
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+  - name: position
+    pathSegment: position
+    type: STRING
+- name: bu2d_building__horizontalgeometryreference
+  pathSegment: "[id=id]bu2d_building__horizontalgeometryreference"
+  relations:
+  - name: o31001
+    pathSegment: o31001
+    sourceField: id
+    target: bu2d_building__horizontalgeometryreference
+    targetField: id
+  columns:
+  - name: classifier
+    pathSegment: classifier
+    type: STRING

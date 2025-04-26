@@ -6,14 +6,7 @@
 - source: "/o73005{sortKey=sch}/_id"
   target: 0_id
   type: INTEGER
-  index: 0
-- source: "/o73004{sortKey=sch}"
-  target: $
-  type: OBJECT_ARRAY
-  index: 0
-- source: "/o73004{sortKey=sch}/_id"
-  target: 1_id
-  type: INTEGER
+  role: ID
   index: 0
 - source: "/o73005{sortKey=sch}/[sch=ags]verwaltungseinheit"
   target: $
@@ -22,6 +15,16 @@
 - source: "/o73005{sortKey=sch}/[sch=ags]verwaltungseinheit/geometrie"
   target: 0_geometry
   type: GEOMETRY
+  role: PRIMARY_GEOMETRY
+  index: 0
+- source: "/o73004{sortKey=sch}"
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/o73004{sortKey=sch}/_id"
+  target: 1_id
+  type: INTEGER
+  role: ID
   index: 0
 - source: "/o73004{sortKey=sch}/[sch=ags]verwaltungseinheit"
   target: $
@@ -30,6 +33,7 @@
 - source: "/o73004{sortKey=sch}/[sch=ags]verwaltungseinheit/geometrie"
   target: 1_geometry
   type: GEOMETRY
+  role: PRIMARY_GEOMETRY
   index: 0
 - source: "/o73004{sortKey=sch}/[sch=ags]verwaltungseinheit"
   target: 1_upperLevelUnit

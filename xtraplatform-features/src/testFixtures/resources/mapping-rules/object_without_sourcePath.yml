@@ -6,10 +6,7 @@
 - source: /explorationsite/id
   target: id
   type: STRING
-  index: 0
-- source: /explorationsite
-  target: legalAvailability
-  type: OBJECT
+  role: ID
   index: 0
 - source: /explorationsite/legalavailability_fk
   target: legalAvailability.title

@@ -6,6 +6,7 @@
 - source: /observationsubject/id
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/observationsubject/[id=observationsubjectid]observationsubject_filtervalues"
   target: filterValues

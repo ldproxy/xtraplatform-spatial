@@ -16,7 +16,7 @@ import de.ii.xtraplatform.features.domain.MappingOperationResolver
 import de.ii.xtraplatform.features.domain.SortKey
 import de.ii.xtraplatform.features.domain.Tuple
 import de.ii.xtraplatform.features.json.app.DecoderFactoryJson
-import de.ii.xtraplatform.features.sql.domain.ConstantsResolver
+import de.ii.xtraplatform.features.domain.ConstantsResolver
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
 import de.ii.xtraplatform.features.sql.domain.SchemaSql
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis

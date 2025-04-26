@@ -10,9 +10,11 @@ package de.ii.xtraplatform.features.sql.domain;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -62,6 +64,28 @@ public interface SqlQueryMapping {
                     .map(index -> Tuple.of(table, index)));
   }
 
+  // TODO: multiple main tables
+  default Optional<Tuple<SqlQuerySchema, Integer>> getColumnForId() {
+    return getTables().stream()
+        .flatMap(
+            table -> {
+              for (int i = 0; i < table.getColumns().size(); i++) {
+                if (table
+                    .getColumns()
+                    .get(i)
+                    .getRole()
+                    .filter(role -> role == Role.ID)
+                    .isPresent()) {
+                  return Stream.of(Tuple.of(table, i));
+                }
+              }
+              return Stream.empty();
+            })
+        .findFirst();
+
+    // return Optional.of(Tuple.of(getMainTable(), 0));
+  }
+
   default Optional<FeatureSchema> getSchemaForObject(String propertyName) {
     // System.out.println("getObjectSchemas: " + propertyName);
     return Optional.ofNullable(getObjectSchemas().get(propertyName));
@@ -70,5 +94,16 @@ public interface SqlQueryMapping {
   default Optional<FeatureSchema> getSchemaForValue(String propertyName) {
     // System.out.println("getValueSchemas: " + propertyName);
     return Optional.ofNullable(getValueSchemas().get(propertyName));
+  }
+
+  String IN_CONNECTED_ARRAY = "IN_CONNECTED_ARRAY";
+  String PATH_IN_CONNECTOR = "PATH_IN_CONNECTOR";
+
+  default boolean isInConnectedArray(FeatureSchema schema) {
+    return Boolean.parseBoolean(schema.getAdditionalInfo().get(IN_CONNECTED_ARRAY));
+  }
+
+  default String getPathInConnector(FeatureSchema schema) {
+    return schema.getAdditionalInfo().getOrDefault(PATH_IN_CONNECTOR, schema.getName());
   }
 }

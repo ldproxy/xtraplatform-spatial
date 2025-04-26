@@ -1,0 +1,4 @@
+- >-
+  SELECT A.id AS SKEY, A.id, A.osirisobjekt
+  FROM eignungsflaeche A
+  ORDER BY 1

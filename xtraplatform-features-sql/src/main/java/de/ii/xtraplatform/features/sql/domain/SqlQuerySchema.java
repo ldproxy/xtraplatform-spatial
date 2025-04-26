@@ -10,7 +10,7 @@ package de.ii.xtraplatform.features.sql.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.immutables.value.Value;
 
@@ -23,23 +23,58 @@ public interface SqlQuerySchema extends SqlQueryTable {
 
   List<SqlQueryJoin> getRelations();
 
-  List<String> getColumns();
-
-  enum Operation {
-    WKT,
-    FORCE_POLYGON_CCW,
-    LINEARIZE_CURVES,
-    DATE,
-    DATETIME,
-    CONSTANT,
-    EXPRESSION,
-  }
-
-  Map<Integer, Map<Operation, String>> getColumnOperations();
+  List<SqlQueryColumn> getColumns();
 
   @JsonIgnore
   @Value.Lazy
   default List<SqlQueryTable> asTablePath() {
     return Stream.concat(getRelations().stream(), Stream.of(this)).toList();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default List<String> getFullPath() {
+    return Stream.concat(
+            getRelations().stream().map(SqlQueryTable::getPathSegment),
+            Stream.of(this.getPathSegment()))
+        .toList();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default String getFullPathAsString() {
+    return getFullPath().stream().collect(Collectors.joining("/", "/", ""));
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default List<String> getParentPath() {
+    return getFullPath().subList(0, getFullPath().size() - 1);
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default List<List<String>> getColumnPaths() {
+    return getColumns().stream()
+        .map(
+            column ->
+                Stream.concat(getFullPath().stream(), Stream.of(column.getPathSegment())).toList())
+        .toList();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default List<String> getColumnNames() {
+    return getColumns().stream().map(SqlQueryColumn::getName).toList();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default List<String> getSortKeys() {
+    return Stream.concat(getRelations().stream().filter(rel -> !rel.isJunction()), Stream.of(this))
+        .map(
+            sqlQueryTable ->
+                String.format("%s.%s", sqlQueryTable.getName(), sqlQueryTable.getSortKey()))
+        .toList();
   }
 }

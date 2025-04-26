@@ -13,6 +13,7 @@ import static de.ii.xtraplatform.cql.domain.ArrayFunction.A_EQUALS;
 import static de.ii.xtraplatform.cql.domain.ArrayFunction.A_OVERLAPS;
 import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATE;
+import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -56,6 +57,8 @@ import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryTable;
@@ -1285,11 +1288,6 @@ public class FilterEncoderSql {
       if (isObject) {
         return mapping
             .getSchemaForObject(propertyName)
-            /*.or(
-            () ->
-                rootSchema2.getAllObjects().stream()
-                    .filter(table -> getPropertyFromSubDecoder(table, propertyName).isPresent())
-                    .findFirst())*/
             .or(() -> allowColumnFallback ? Optional.of(mapping.getMainSchema()) : Optional.empty())
             .orElseThrow(
                 () ->
@@ -1298,11 +1296,6 @@ public class FilterEncoderSql {
       }
       return mapping
           .getSchemaForValue(propertyName)
-          /*.or(
-          () ->
-              rootSchema2.getAllObjects().stream()
-                  .filter(table -> getPropertyFromSubDecoder(table, propertyName).isPresent())
-                  .findFirst())*/
           .or(() -> allowColumnFallback ? Optional.of(mapping.getMainSchema()) : Optional.empty())
           .orElseThrow(
               () ->
@@ -1315,11 +1308,6 @@ public class FilterEncoderSql {
       if (isObject) {
         return mapping
             .getTableForObject(propertyName)
-            /*.or(
-            () ->
-                rootSchema.getAllObjects().stream()
-                    .filter(table -> getPropertyFromSubDecoder(table, propertyName).isPresent())
-                    .findFirst())*/
             .or(() -> allowColumnFallback ? Optional.of(mapping.getMainTable()) : Optional.empty())
             .map(table -> de.ii.xtraplatform.base.domain.util.Tuple.of(table, -1))
             .orElseThrow(
@@ -1329,18 +1317,13 @@ public class FilterEncoderSql {
       }
       return mapping
           .getColumnForValue(propertyName)
-          /*.or(
-          () ->
-              rootSchema.getAllObjects().stream()
-                  .filter(table -> getPropertyFromSubDecoder(table, propertyName).isPresent())
-                  .findFirst())*/
           .or(
               () ->
                   allowColumnFallback
                       ? Optional.of(
                           de.ii.xtraplatform.base.domain.util.Tuple.of(
                               mapping.getMainTable(),
-                              mapping.getMainTable().getColumns().indexOf(propertyName)))
+                              mapping.getMainTable().getColumnNames().indexOf(propertyName)))
                       : Optional.empty())
           .orElseThrow(
               () ->
@@ -1355,46 +1338,42 @@ public class FilterEncoderSql {
         String propertyName,
         String alias,
         boolean allowColumnFallback) {
-      // TODO: support nested mapping filters
-      /*if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
+      // TODO: why is this needed? what would a clean solution look like? (original: support nested
+      // mapping filters)
+      if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
           && propertyName.equals("node")) {
         return Tuple.of("_route_" + propertyName, Optional.<String>empty());
       }
       if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
           && propertyName.equals("source")) {
         return Tuple.of(String.format("%s.%s", alias, propertyName), Optional.<String>empty());
-      }*/
+      }
       return (columnIndex > -1
               ? Optional.ofNullable(table.getColumns().get(columnIndex))
-              : Optional.empty())
-          // .filter(getPropertyNameMatcher(propertyName, false))
-          // TODO
-          // .filter(column -> Objects.equals(column, propertyName))
-          // .findFirst()
+              : Optional.<SqlQueryColumn>empty())
           .map(
               column -> {
-                /*if (column.getSubDecoder().isPresent()) {
+                if (column.hasOperation(Operation.CONNECTOR)) {
                   return Tuple.of(
-                      mapToSubDecoder(alias, column, propertyName), column.getSubDecoder());
-                }*/
-                String qualifiedColumn = String.format("%s.%s", alias, column);
-                /*if (column.isTemporal()) {
-                  if (column.getType() == DATE)
-                    return Tuple.of(
-                        sqlDialect.applyToDate(qualifiedColumn, column.getFormat()),
-                        Optional.<String>empty());
+                      mapToSubDecoder(
+                          alias, column, propertyName, table.getColumnPaths().get(columnIndex)),
+                      column.getOperationParameter(Operation.CONNECTOR));
+                }
+                String qualifiedColumn = String.format("%s.%s", alias, column.getName());
+                if (column.getType() == DATE) {
                   return Tuple.of(
-                      sqlDialect.applyToDatetime(qualifiedColumn, column.getFormat()),
+                      sqlDialect.applyToDate(
+                          qualifiedColumn, column.getOperationParameter(Operation.DATE)),
                       Optional.<String>empty());
-                }*/
+                }
+                if (column.getType() == DATETIME) {
+                  return Tuple.of(
+                      sqlDialect.applyToDatetime(
+                          qualifiedColumn, column.getOperationParameter(Operation.DATETIME)),
+                      Optional.<String>empty());
+                }
                 return Tuple.of(qualifiedColumn, Optional.<String>empty());
               })
-          /*.or(
-          () -> {
-            Optional<SchemaSql> column = getPropertyFromSubDecoder(table, propertyName);
-            return column.map(
-                c -> Tuple.of(mapToSubDecoder(alias, c, propertyName), c.getSubDecoder()));
-          })*/
           .or(
               () ->
                   allowColumnFallback
@@ -1411,23 +1390,24 @@ public class FilterEncoderSql {
                       String.format("Filter is invalid. Unknown property: %s", propertyName)));
     }
 
-    private Optional<SchemaSql> getPropertyFromSubDecoder(SchemaSql schema, String propertyName) {
-      return schema.getProperties().stream()
-          .filter(p -> p.getSubDecoderPaths().containsKey(propertyName))
-          .findFirst();
-    }
+    private String mapToSubDecoder(
+        String alias, SqlQueryColumn column, String propertyName, List<String> columnPath) {
+      if (column.getOperationParameter(Operation.CONNECTOR).filter("JSON"::equals).isPresent()) {
+        FeatureSchema schema = mapping.getSchemaForValue(propertyName).orElseThrow();
+        String path = mapping.getPathInConnector(schema);
+        boolean inArray = mapping.isInConnectedArray(schema);
+        PropertyTypeInfo typeInfo =
+            PropertyTypeInfo.of(schema.getType(), schema.getValueType(), inArray);
 
-    private String mapToSubDecoder(String alias, SchemaSql column, String propertyName) {
-      if (column.getSubDecoder().filter("JSON"::equals).isPresent()) {
-        PropertyTypeInfo typeInfo = column.getSubDecoderTypes().get(propertyName);
-        return sqlDialect.applyToJsonValue(
-            alias, column.getName(), column.getSubDecoderPaths().get(propertyName), typeInfo);
+        return sqlDialect.applyToJsonValue(alias, column.getName(), path, typeInfo);
       }
 
       throw new IllegalStateException(
           String.format(
-              "Unknown Sub-Decoder '%s' in source path '%s' for property '%s'.",
-              column.getSubDecoder(), column.getFullPathAsString(), propertyName));
+              "Unknown Sub-Decoder '%s' in source path '/%s' for property '%s'.",
+              column.getOperationParameter(Operation.CONNECTOR, ""),
+              String.join("/", columnPath),
+              propertyName));
     }
 
     @Override
@@ -2365,9 +2345,9 @@ public class FilterEncoderSql {
         SqlQueryTable table = tablePath.get(i);
         if (table instanceof SqlQuerySchema) {
           SqlQuerySchema schema = (SqlQuerySchema) table;
-          if (schema.getColumns().contains(column)) {
+          if (schema.getColumnNames().contains(column)) {
             return de.ii.xtraplatform.base.domain.util.Tuple.of(
-                schema, schema.getColumns().indexOf(column));
+                schema, schema.getColumnNames().indexOf(column));
           }
         }
       }

@@ -14,6 +14,7 @@
 - source: "/eignungsflaeche/[id=id]osirisobjekt/id"
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/eignungsflaeche/[id=id]osirisobjekt/kennung"
   target: kennung

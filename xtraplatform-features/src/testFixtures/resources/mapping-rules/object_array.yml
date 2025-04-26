@@ -6,6 +6,7 @@
 - source: /explorationsite/id
   target: id
   type: STRING
+  role: ID
   index: 0
 - source: "/explorationsite/[id=explorationsite_fk]explorationsite_task/[task_fk=id]task"
   target: task
