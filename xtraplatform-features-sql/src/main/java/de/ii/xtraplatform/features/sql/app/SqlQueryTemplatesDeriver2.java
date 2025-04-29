@@ -19,7 +19,6 @@ import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings.NullOrder;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
@@ -70,6 +69,7 @@ public class SqlQueryTemplatesDeriver2 {
   public SqlQueryTemplates derive(SqlQueryMapping mapping) {
     List<ValueQueryTemplate> valueQueryTemplates =
         mapping.getTables().stream()
+            .filter(SqlQuerySchema::hasReadableColumns)
             .map(schema -> createValueQueryTemplate(schema, mapping))
             .collect(Collectors.toList());
 
@@ -200,10 +200,13 @@ public class SqlQueryTemplatesDeriver2 {
     String columns =
         Stream.concat(
                 sortFields.stream(),
-                IntStream.range(0, schema.getColumns().size())
-                    .mapToObj(
-                        i -> {
-                          SqlQueryColumn column = schema.getColumns().get(i);
+                schema.getColumns().stream()
+                    .map(
+                        column -> {
+                          if (!column.isReadable()) {
+                            return null;
+                          }
+
                           String name =
                               getQualifiedColumn(attributeContainerAlias, column.getName());
 
@@ -248,7 +251,8 @@ public class SqlQueryTemplatesDeriver2 {
                                 name, column.getOperationParameter(Operation.DATETIME));
                           }
                           return name;
-                        }))
+                        })
+                    .filter(Objects::nonNull))
             .collect(Collectors.joining(", "));
 
     String join = JoinGenerator.getJoins(schema, aliases, filterEncoder);

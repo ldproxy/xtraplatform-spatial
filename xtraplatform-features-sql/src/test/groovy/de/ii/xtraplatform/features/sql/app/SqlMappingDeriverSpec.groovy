@@ -48,6 +48,7 @@ class SqlMappingDeriverSpec extends Specification {
         casename                                      | rules                                        || schema
         "simple"                                      | "simple"                                     || "simple"
         "simple filter"                               | "simple_filter"                              || "simple_filter"
+        "simple filter scoped queryable"              | "simple_filter_scopes"                       || "simple_filter_scopes"
         "value array"                                 | "value_array"                                || "value_array"
         "object array"                                | "object_array"                               || "object_array"
         "merge"                                       | "merge"                                      || "merge"

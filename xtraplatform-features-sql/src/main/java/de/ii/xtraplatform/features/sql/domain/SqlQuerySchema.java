@@ -77,4 +77,10 @@ public interface SqlQuerySchema extends SqlQueryTable {
                 String.format("%s.%s", sqlQueryTable.getName(), sqlQueryTable.getSortKey()))
         .toList();
   }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean hasReadableColumns() {
+    return getColumns().stream().anyMatch(SqlQueryColumn::isReadable);
+  }
 }

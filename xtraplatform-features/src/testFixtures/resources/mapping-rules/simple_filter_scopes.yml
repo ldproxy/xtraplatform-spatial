@@ -1,0 +1,19 @@
+---
+- source: "/coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}"
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}/id"
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: "/coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}/[id=related_id]refs{filter=rel='texte'}"
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}/[id=related_id]refs{filter=rel='texte'}/base_id"
+  target: planid
+  type: STRING
+  scope: C
+  index: 0

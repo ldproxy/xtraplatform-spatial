@@ -6,6 +6,7 @@
     pathSegment: fid
     type: INTEGER
     role: ID
+    scope: RC
   - name: unfzeit
     pathSegment: unfzeit
     type: DATETIME
