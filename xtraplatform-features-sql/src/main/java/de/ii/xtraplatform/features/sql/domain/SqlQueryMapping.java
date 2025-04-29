@@ -7,12 +7,15 @@
  */
 package de.ii.xtraplatform.features.sql.domain;
 
+import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
+
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -57,6 +60,10 @@ public interface SqlQueryMapping {
 
   default Optional<Tuple<SqlQuerySchema, Integer>> getColumnForValue(String propertyName) {
     // System.out.println("getValueTables: " + propertyName);
+    if (Objects.equals(propertyName, ID_PLACEHOLDER)) {
+      return getColumnForId();
+    }
+
     return getTableForValue(propertyName)
         .flatMap(
             table ->
@@ -93,6 +100,10 @@ public interface SqlQueryMapping {
 
   default Optional<FeatureSchema> getSchemaForValue(String propertyName) {
     // System.out.println("getValueSchemas: " + propertyName);
+    if (Objects.equals(propertyName, ID_PLACEHOLDER)) {
+      return getMainSchema().getIdProperty();
+    }
+
     return Optional.ofNullable(getValueSchemas().get(propertyName));
   }
 
