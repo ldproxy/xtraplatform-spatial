@@ -8,11 +8,14 @@
 package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.base.domain.util.Tuple;
+import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class MappingRulesDeriver
@@ -186,6 +189,7 @@ public class MappingRulesDeriver
             .target(schema.isFeature() ? "$" : schema.getFullPathAsString())
             .type(schema.isFeature() ? Type.OBJECT_ARRAY : schema.getType())
             .role(schema.getRole())
+            .scope(toScope(schema.getExcludedScopes()))
             // TODO
             .index(0);
 
@@ -213,6 +217,28 @@ public class MappingRulesDeriver
     }
 
     return Stream.of(rule.build());
+  }
+
+  private static Optional<Scope> toScope(Set<SchemaBase.Scope> ex) {
+    if (ex.isEmpty()) {
+      return Optional.empty();
+    }
+
+    if (ex.contains(SchemaBase.Scope.RECEIVABLE)) {
+      if (ex.contains(SchemaBase.Scope.RETURNABLE)) {
+        return Optional.of(Scope.C);
+      }
+      if (ex.contains(SchemaBase.Scope.QUERYABLE) && ex.contains(SchemaBase.Scope.SORTABLE)) {
+        return Optional.of(Scope.R);
+      }
+      return Optional.of(Scope.RC);
+    }
+
+    if (ex.contains(SchemaBase.Scope.QUERYABLE) && ex.contains(SchemaBase.Scope.SORTABLE)) {
+      return Optional.of(Scope.RW);
+    }
+
+    return Optional.of(Scope.W);
   }
 
   private static final String VALUE_ARRAY_VALUE_SUFFIX = ".[]";

@@ -1,0 +1,11 @@
+- >-
+  SELECT A.id AS SKEY, A.fid, A.unfzeit::timestamp(0), A.hauptunft, A.unfart, A.unfkat, A.unfkatknz, A.strzust1, A.strzust2, A.stat, A.fahrtri, A.netzstand::timestamp(0), ST_AsText(A.geom)
+  FROM unfaelle_point A
+  WHERE (A.id IN (SELECT AA.id FROM unfaelle_point AA JOIN abschnitteaeste_line AB ON (AA.abs=AB.abs) WHERE AB.abs = 'foo'))
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.abs, B.strbez, B.strkl, B.strnr, B.strzus, B.absnr, B.absast, B.statanf, B.laenge, B.vwbez, B.vwbezknz
+  FROM unfaelle_point A
+  JOIN abschnitteaeste_line B ON (A.abs=B.abs)
+  WHERE (A.id IN (SELECT AA.id FROM unfaelle_point AA JOIN abschnitteaeste_line AB ON (AA.abs=AB.abs) WHERE AB.abs = 'foo'))
+  ORDER BY 1,2
