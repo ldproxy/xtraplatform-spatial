@@ -1,0 +1,5 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM coretable A
+  WHERE (A.id IN (SELECT AA.id FROM coretable AA WHERE AA.featuretype = 'BP_BaugebietsTeilFlaeche'))
+  ORDER BY 1

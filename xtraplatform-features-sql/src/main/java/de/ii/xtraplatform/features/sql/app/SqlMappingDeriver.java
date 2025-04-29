@@ -251,6 +251,7 @@ public class SqlMappingDeriver {
         .pathSegment(sqlPath.asPath())
         .type(column.getType())
         .role(column.getRole())
+        .scope(column.getScope())
         .operations(getColumnOperations(column, sqlPath))
         .build();
   }

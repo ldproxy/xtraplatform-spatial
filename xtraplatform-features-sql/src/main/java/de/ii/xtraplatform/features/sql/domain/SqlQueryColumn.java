@@ -7,7 +7,9 @@
  */
 package de.ii.xtraplatform.features.sql.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +43,8 @@ public interface SqlQueryColumn {
 
   Optional<SchemaBase.Role> getRole();
 
+  Optional<Scope> getScope();
+
   Map<Operation, String[]> getOperations();
 
   default boolean hasOperation(Operation operation) {
@@ -66,5 +70,14 @@ public interface SqlQueryColumn {
       return defaultValue;
     }
     return Arrays.stream(getOperations().get(operation)).findFirst().orElse(defaultValue);
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isReadable() {
+    return getScope().isEmpty()
+        || getScope().get() == Scope.R
+        || getScope().get() == Scope.RC
+        || getScope().get() == Scope.RW;
   }
 }

@@ -1461,7 +1461,7 @@ public class FilterEncoderSql {
               userFilterTable,
               encodeRelationFilter2(userFilterTable.map(SqlQuerySchema::getRelations), userFilter),
               ignoreInstanceFilter,
-              true,
+              false,
               FilterEncoderSql.this);
       if (!join.isEmpty()) join = join + " ";
 

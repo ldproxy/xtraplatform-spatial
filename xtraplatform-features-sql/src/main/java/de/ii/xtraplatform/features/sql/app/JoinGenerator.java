@@ -298,7 +298,8 @@ public class JoinGenerator {
       JoinType joinType,
       Optional<String> sqlFilter,
       Optional<String> sourceFilter) {
-    String additionalFilter = sqlFilter.map(s -> " AND (" + s + ")").orElse("");
+    String additionalFilter =
+        sqlFilter.map(s -> " AND (" + applyNestedAlias(s, targetAlias) + ")").orElse("");
     String targetTable = targetContainer;
     String type = joinType == JoinType.INNER ? "" : joinType.name() + " ";
 
@@ -320,5 +321,11 @@ public class JoinGenerator {
     return String.format(
         "%7$sJOIN %1$s %2$s ON (%4$s.%5$s=%2$s.%3$s%6$s)",
         targetTable, targetAlias, targetField, sourceAlias, sourceField, additionalFilter, type);
+  }
+
+  private static String applyNestedAlias(String filter, String alias) {
+    return alias.length() == 2
+        ? filter.replaceAll(alias.substring(1) + "\\.", alias + ".")
+        : filter;
   }
 }

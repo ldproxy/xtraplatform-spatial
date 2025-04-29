@@ -20,6 +20,15 @@ import org.immutables.value.Value;
     get = {"is*", "get*"}) // , deepImmutablesDetection = true, attributeBuilderDetection = true)
 @JsonDeserialize(builder = ImmutableMappingRule.Builder.class)
 public interface MappingRule {
+
+  enum Scope {
+    R,
+    C,
+    W,
+    RC,
+    RW
+  }
+
   String getSource();
 
   String getTarget();
@@ -27,6 +36,8 @@ public interface MappingRule {
   SchemaBase.Type getType();
 
   Optional<SchemaBase.Role> getRole();
+
+  Optional<Scope> getScope();
 
   int getIndex();
 

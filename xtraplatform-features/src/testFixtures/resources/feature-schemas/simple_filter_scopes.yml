@@ -1,0 +1,14 @@
+---
+sourcePath: /coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  planid:
+    sourcePath: "[id=related_id]refs{filter=rel='texte'}/base_id"
+    type: STRING
+    excludedScopes:
+      - RETURNABLE
+      - RECEIVABLE
