@@ -42,7 +42,7 @@ public interface SqlQueryMapping {
 
   Map<String, SqlQuerySchema> getValueTables();
 
-  Map<String, Integer> getValueColumnIndexes();
+  Map<String, SqlQueryColumn> getValueColumns();
 
   Map<String, FeatureSchema> getObjectSchemas();
 
@@ -58,7 +58,7 @@ public interface SqlQueryMapping {
     return Optional.ofNullable(getValueTables().get(propertyName));
   }
 
-  default Optional<Tuple<SqlQuerySchema, Integer>> getColumnForValue(String propertyName) {
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForValue(String propertyName) {
     // System.out.println("getValueTables: " + propertyName);
     if (Objects.equals(propertyName, ID_PLACEHOLDER)) {
       return getColumnForId();
@@ -67,12 +67,12 @@ public interface SqlQueryMapping {
     return getTableForValue(propertyName)
         .flatMap(
             table ->
-                Optional.ofNullable(getValueColumnIndexes().get(propertyName))
+                Optional.ofNullable(getValueColumns().get(propertyName))
                     .map(index -> Tuple.of(table, index)));
   }
 
   // TODO: multiple main tables
-  default Optional<Tuple<SqlQuerySchema, Integer>> getColumnForId() {
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForId() {
     return getTables().stream()
         .flatMap(
             table -> {
@@ -83,7 +83,7 @@ public interface SqlQueryMapping {
                     .getRole()
                     .filter(role -> role == Role.ID)
                     .isPresent()) {
-                  return Stream.of(Tuple.of(table, i));
+                  return Stream.of(Tuple.of(table, table.getColumns().get(i)));
                 }
               }
               return Stream.empty();
