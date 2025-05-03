@@ -29,8 +29,7 @@
     sourceField: id
     target: refs
     targetField: related_id
-  columns:
+  filterColumns:
   - name: base_id
     pathSegment: base_id
     type: STRING
-    scope: C

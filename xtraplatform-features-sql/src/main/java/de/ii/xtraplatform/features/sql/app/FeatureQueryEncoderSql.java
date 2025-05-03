@@ -7,8 +7,6 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
-import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
-
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.FeatureProviderCapabilities;
 import de.ii.xtraplatform.features.domain.FeatureProviderCapabilities.Level;
@@ -30,6 +28,7 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySet;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryBatch;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
@@ -249,10 +248,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     return sortKeys.stream()
         .map(
             sortKey -> {
-              Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, Integer>> column =
-                  Objects.equals(sortKey.getField(), ID_PLACEHOLDER)
-                      ? mapping.getColumnForId()
-                      : mapping.getColumnForValue(sortKey.getField());
+              Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
+                  column = mapping.getColumnForValue(sortKey.getField());
 
               if (column.isEmpty()) {
                 throw new IllegalArgumentException(
@@ -261,8 +258,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                         sortKey.getField()));
               }
 
-              String columnName =
-                  column.get().first().getColumns().get(column.get().second()).getName();
+              String columnName = column.get().second().getName();
 
               return ImmutableSortKey.builder().from(sortKey).field(columnName).build();
             })

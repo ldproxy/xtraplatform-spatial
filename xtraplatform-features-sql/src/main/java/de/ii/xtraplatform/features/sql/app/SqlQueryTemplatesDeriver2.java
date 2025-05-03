@@ -203,10 +203,6 @@ public class SqlQueryTemplatesDeriver2 {
                 schema.getColumns().stream()
                     .map(
                         column -> {
-                          if (!column.isReadable()) {
-                            return null;
-                          }
-
                           String name =
                               getQualifiedColumn(attributeContainerAlias, column.getName());
 
@@ -251,8 +247,7 @@ public class SqlQueryTemplatesDeriver2 {
                                 name, column.getOperationParameter(Operation.DATETIME));
                           }
                           return name;
-                        })
-                    .filter(Objects::nonNull))
+                        }))
             .collect(Collectors.joining(", "));
 
     String join = JoinGenerator.getJoins(schema, aliases, filterEncoder);
