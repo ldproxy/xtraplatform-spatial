@@ -81,6 +81,21 @@ public interface MappingRule {
         || getType() == Type.VALUE_ARRAY;
   }
 
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isReadable() {
+    return getScope().isEmpty()
+        || getScope().get() == Scope.R
+        || getScope().get() == Scope.RC
+        || getScope().get() == Scope.RW;
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isFilterOnly() {
+    return getScope().isPresent() && getScope().get() == Scope.C;
+  }
+
   static String maskPathAttributes(String path) {
     return Pattern.compile("\\{([^}]*)\\}")
         .matcher(path)

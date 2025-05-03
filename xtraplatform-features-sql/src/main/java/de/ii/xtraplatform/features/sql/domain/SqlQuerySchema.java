@@ -10,6 +10,8 @@ package de.ii.xtraplatform.features.sql.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.immutables.value.Value;
@@ -24,6 +26,8 @@ public interface SqlQuerySchema extends SqlQueryTable {
   List<SqlQueryJoin> getRelations();
 
   List<SqlQueryColumn> getColumns();
+
+  List<SqlQueryColumn> getFilterColumns();
 
   @JsonIgnore
   @Value.Lazy
@@ -55,18 +59,18 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @JsonIgnore
   @Value.Lazy
   default List<List<String>> getColumnPaths() {
-    return getColumns().stream()
-        .map(
-            column ->
-                Stream.concat(getFullPath().stream(), Stream.of(column.getPathSegment())).toList())
-        .toList();
+    return getColumns().stream().map(this::getColumnPath).toList();
   }
 
-  @JsonIgnore
+  default List<String> getColumnPath(SqlQueryColumn column) {
+    return Stream.concat(getFullPath().stream(), Stream.of(column.getPathSegment())).toList();
+  }
+
+  /*@JsonIgnore
   @Value.Lazy
   default List<String> getColumnNames() {
     return getColumns().stream().map(SqlQueryColumn::getName).toList();
-  }
+  }*/
 
   @JsonIgnore
   @Value.Lazy
@@ -81,6 +85,12 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @JsonIgnore
   @Value.Lazy
   default boolean hasReadableColumns() {
-    return getColumns().stream().anyMatch(SqlQueryColumn::isReadable);
+    return !getColumns().isEmpty();
+  }
+
+  default Optional<SqlQueryColumn> findColumn(String name) {
+    return Stream.concat(getColumns().stream(), getFilterColumns().stream())
+        .filter(column -> Objects.equals(column.getName(), name))
+        .findFirst();
   }
 }

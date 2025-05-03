@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 public class MappingRulesDeriver
@@ -133,6 +134,14 @@ public class MappingRulesDeriver
     List<Integer> spans = new ArrayList<>();
     List<Integer> cursors = new ArrayList<>();
 
+    BiConsumer<String, String> addParent =
+        (full, source) -> {
+          sorted.addAll(rulesByTable.get(full));
+          cursors.add(sorted.size());
+          parents.add(source);
+          spans.add(parents.size() - 1);
+        };
+
     for (String tableIdentifier : rulesByTable.keySet()) {
       String source = tableIdentifier.substring(0, tableIdentifier.lastIndexOf("-"));
       boolean hasParent = MappingRule.maskPathAttributes(source).indexOf("/", 1) > 1;
@@ -144,26 +153,28 @@ public class MappingRulesDeriver
             int index = cursors.get(span);
             sorted.addAll(index, rulesByTable.get(tableIdentifier));
 
-            for (int j = i; j < cursors.size(); j++) {
+            for (int j = span; j < cursors.size(); j++) {
               cursors.set(j, cursors.get(j) + rulesByTable.get(tableIdentifier).size());
             }
 
             break;
           }
-          if (source.startsWith(parents.get(i))) {
+          if (source.startsWith(parents.get(i) + "/")) {
             int span = spans.get(i);
             int index = cursors.get(span);
             sorted.addAll(index, rulesByTable.get(tableIdentifier));
-            cursors.add(span + 1, index);
+
+            cursors.add(span + 1, index + rulesByTable.get(tableIdentifier).size());
             parents.add(span + 1, source);
-            spans.set(i, span + 1);
             spans.add(span + 1, span + 1);
+
+            spans.set(i, span + 1);
             for (int j = span + 2; j < spans.size(); j++) {
               spans.set(j, spans.get(j) + 1);
             }
 
-            cursors.set(i, cursors.get(i) + rulesByTable.get(tableIdentifier).size());
-            for (int j = span + 1; j < cursors.size(); j++) {
+            cursors.set(i, index + rulesByTable.get(tableIdentifier).size());
+            for (int j = span + 2; j < cursors.size(); j++) {
               cursors.set(j, cursors.get(j) + rulesByTable.get(tableIdentifier).size());
             }
 
@@ -171,6 +182,7 @@ public class MappingRulesDeriver
           }
         }
       } else {
+        // addParent.accept(tableIdentifier, source);
         sorted.addAll(rulesByTable.get(tableIdentifier));
         cursors.add(sorted.size());
         parents.add(source);

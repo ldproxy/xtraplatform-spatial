@@ -1303,13 +1303,14 @@ public class FilterEncoderSql {
                       String.format("Filter is invalid. Unknown property: %s", propertyName)));
     }
 
-    protected de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, Integer> getTableColumn(
-        String propertyName, boolean isObject, boolean allowColumnFallback) {
+    protected de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>
+        getTableColumn(String propertyName, boolean isObject, boolean allowColumnFallback) {
       if (isObject) {
         return mapping
             .getTableForObject(propertyName)
             .or(() -> allowColumnFallback ? Optional.of(mapping.getMainTable()) : Optional.empty())
-            .map(table -> de.ii.xtraplatform.base.domain.util.Tuple.of(table, -1))
+            .map(
+                table -> de.ii.xtraplatform.base.domain.util.Tuple.of(table, (SqlQueryColumn) null))
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
@@ -1323,7 +1324,7 @@ public class FilterEncoderSql {
                       ? Optional.of(
                           de.ii.xtraplatform.base.domain.util.Tuple.of(
                               mapping.getMainTable(),
-                              mapping.getMainTable().getColumnNames().indexOf(propertyName)))
+                              mapping.getMainTable().findColumn(propertyName).orElse(null)))
                       : Optional.empty())
           .orElseThrow(
               () ->
@@ -1334,7 +1335,7 @@ public class FilterEncoderSql {
     // TODO: move to SqlQueryMapping?
     protected Tuple<String, Optional<String>> getQualifiedColumn(
         SqlQuerySchema table,
-        int columnIndex,
+        SqlQueryColumn column,
         String propertyName,
         String alias,
         boolean allowColumnFallback) {
@@ -1348,28 +1349,25 @@ public class FilterEncoderSql {
           && propertyName.equals("source")) {
         return Tuple.of(String.format("%s.%s", alias, propertyName), Optional.<String>empty());
       }
-      return (columnIndex > -1
-              ? Optional.ofNullable(table.getColumns().get(columnIndex))
-              : Optional.<SqlQueryColumn>empty())
+      return Optional.ofNullable(column)
           .map(
-              column -> {
-                if (column.hasOperation(Operation.CONNECTOR)) {
+              col -> {
+                if (col.hasOperation(Operation.CONNECTOR)) {
                   return Tuple.of(
-                      mapToSubDecoder(
-                          alias, column, propertyName, table.getColumnPaths().get(columnIndex)),
-                      column.getOperationParameter(Operation.CONNECTOR));
+                      mapToSubDecoder(alias, col, propertyName, table.getColumnPath(col)),
+                      col.getOperationParameter(Operation.CONNECTOR));
                 }
-                String qualifiedColumn = String.format("%s.%s", alias, column.getName());
-                if (column.getType() == DATE) {
+                String qualifiedColumn = String.format("%s.%s", alias, col.getName());
+                if (col.getType() == DATE) {
                   return Tuple.of(
                       sqlDialect.applyToDate(
-                          qualifiedColumn, column.getOperationParameter(Operation.DATE)),
+                          qualifiedColumn, col.getOperationParameter(Operation.DATE)),
                       Optional.<String>empty());
                 }
-                if (column.getType() == DATETIME) {
+                if (col.getType() == DATETIME) {
                   return Tuple.of(
                       sqlDialect.applyToDatetime(
-                          qualifiedColumn, column.getOperationParameter(Operation.DATETIME)),
+                          qualifiedColumn, col.getOperationParameter(Operation.DATETIME)),
                       Optional.<String>empty());
                 }
                 return Tuple.of(qualifiedColumn, Optional.<String>empty());
@@ -1415,7 +1413,7 @@ public class FilterEncoderSql {
       // strip double quotes from the property name
       String propertyName = property.getName().replaceAll("^\"|\"$", "");
       boolean allowColumnFallback = !propertyName.contains(".");
-      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, Integer> table =
+      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> table =
           getTableColumn(propertyName, false, allowColumnFallback);
 
       List<String> aliases = AliasGenerator.getAliases(table.first(), 1);
@@ -2127,7 +2125,7 @@ public class FilterEncoderSql {
       int elementCount = secondExpression.split(",").length;
 
       String propertyName = ((Property) arrayOperation.getArgs().get(notInverse ? 0 : 1)).getName();
-      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, Integer> table =
+      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> table =
           getTableColumn(propertyName, false, false);
       List<String> aliases = AliasGenerator.getAliases(table.first(), 1);
       Tuple<String, Optional<String>> qualifiedColumn =
@@ -2345,10 +2343,10 @@ public class FilterEncoderSql {
         SqlQueryTable table = tablePath.get(i);
         if (table instanceof SqlQuerySchema) {
           SqlQuerySchema schema = (SqlQuerySchema) table;
-          if (schema.getColumnNames().contains(column)) {
+          /*if (schema.getColumnNames().contains(column)) {
             return de.ii.xtraplatform.base.domain.util.Tuple.of(
                 schema, schema.getColumnNames().indexOf(column));
-          }
+          }*/
         }
       }
 

@@ -1,5 +1,5 @@
 - >-
-  SELECT A.id AS SKEY, A.fid, A.unfzeit::timestamp(0), A.hauptunft, A.unfart, A.unfkat, A.unfkatknz, A.strzust1, A.strzust2, A.stat, A.fahrtri, A.netzstand::timestamp(0), ST_AsText(A.geom)
+  SELECT A.id AS SKEY, A.fid, A.unfzeit::timestamp(0), A.hauptunft, A.unfart, A.unfkat, A.unfkatknz, A.strzust1, A.strzust2, A.stat, A.fahrtri, A.netzstand::timestamp(0), ST_AsText(ST_ForcePolygonCCW(A.geom))
   FROM unfaelle_point A
   ORDER BY 1
 - >-
