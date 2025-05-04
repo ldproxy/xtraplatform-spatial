@@ -12,6 +12,7 @@ import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,10 @@ public interface SqlQueryMapping {
 
   Map<String, SqlQueryColumn> getValueColumns();
 
+  Map<String, SqlQuerySchema> getWritableTables();
+
+  Map<String, SqlQueryColumn> getWritableColumns();
+
   Map<String, FeatureSchema> getObjectSchemas();
 
   Map<String, FeatureSchema> getValueSchemas();
@@ -54,20 +59,33 @@ public interface SqlQueryMapping {
   }
 
   default Optional<SqlQuerySchema> getTableForValue(String propertyName) {
-    // System.out.println("getValueTables: " + propertyName);
+    return getTableForValue(propertyName, MappingRule.Scope.R);
+  }
+
+  default Optional<SqlQuerySchema> getTableForValue(String propertyName, MappingRule.Scope scope) {
+    if (scope == MappingRule.Scope.W) {
+      return Optional.ofNullable(getWritableTables().get(propertyName));
+    }
+
     return Optional.ofNullable(getValueTables().get(propertyName));
   }
 
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForValue(String propertyName) {
-    // System.out.println("getValueTables: " + propertyName);
+    return getColumnForValue(propertyName, MappingRule.Scope.R);
+  }
+
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForValue(
+      String propertyName, MappingRule.Scope scope) {
     if (Objects.equals(propertyName, ID_PLACEHOLDER)) {
       return getColumnForId();
     }
 
-    return getTableForValue(propertyName)
+    return getTableForValue(propertyName, scope)
         .flatMap(
             table ->
-                Optional.ofNullable(getValueColumns().get(propertyName))
+                Optional.ofNullable(
+                        (scope == MappingRule.Scope.W ? getWritableColumns() : getValueColumns())
+                            .get(propertyName))
                     .map(index -> Tuple.of(table, index)));
   }
 

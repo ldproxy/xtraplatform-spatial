@@ -73,6 +73,7 @@ public class SqlMappingDeriver {
       int j = i + 1;
       List<MappingRule> columnRules = new ArrayList<>();
       List<MappingRule> filterColumnRules = new ArrayList<>();
+      List<MappingRule> writableColumnRules = new ArrayList<>();
 
       if (j >= mappingRules.size()) {
         break;
@@ -91,8 +92,13 @@ public class SqlMappingDeriver {
 
         if (columnRule.isFilterOnly()) {
           filterColumnRules.add(columnRule);
-        } else if (columnRule.isReadable()) {
-          columnRules.add(columnRule);
+        } else {
+          if (columnRule.isReadable()) {
+            columnRules.add(columnRule);
+          }
+          if (columnRule.isWritable()) {
+            writableColumnRules.add(columnRule);
+          }
         }
 
         j++;
@@ -111,6 +117,7 @@ public class SqlMappingDeriver {
           rule,
           columnRules,
           filterColumnRules,
+          writableColumnRules,
           previous,
           schemas,
           mapping,
@@ -128,13 +135,14 @@ public class SqlMappingDeriver {
       MappingRule tableRule,
       List<MappingRule> columnRules,
       List<MappingRule> filterColumnRules,
+      List<MappingRule> writableColumnRules,
       List<List<String>> previous,
       List<SqlQuerySchema> schemas,
       ImmutableSqlQueryMapping.Builder mapping,
       List<String> seenProperties,
       boolean includeSchema) {
     SqlQuerySchema querySchema =
-        derive(schema, tableRule, columnRules, filterColumnRules, previous);
+        derive(schema, tableRule, columnRules, filterColumnRules, writableColumnRules, previous);
 
     schemas.add(querySchema);
     previous.add(pathParser.parseTablePath(tableRule.getSource()).getFullPath());
@@ -148,7 +156,8 @@ public class SqlMappingDeriver {
       }
       SqlQueryColumn column1 = querySchema.getColumns().get(k);
 
-      addToMapping(schema, mapping, seenProperties, includeSchema, column, column1, querySchema);
+      addToMapping(
+          schema, mapping, seenProperties, includeSchema, column, column1, querySchema, false);
     }
 
     for (int k = 0; k < filterColumnRules.size(); k++) {
@@ -158,7 +167,19 @@ public class SqlMappingDeriver {
       }
       SqlQueryColumn column1 = querySchema.getFilterColumns().get(k);
 
-      addToMapping(schema, mapping, seenProperties, includeSchema, column, column1, querySchema);
+      addToMapping(
+          schema, mapping, seenProperties, includeSchema, column, column1, querySchema, false);
+    }
+
+    for (int k = 0; k < writableColumnRules.size(); k++) {
+      MappingRule column = writableColumnRules.get(k);
+      if (seenProperties.contains(column.getTarget())) {
+        continue;
+      }
+      SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
+
+      addToMapping(
+          schema, mapping, seenProperties, includeSchema, column, column1, querySchema, true);
     }
   }
 
@@ -169,7 +190,8 @@ public class SqlMappingDeriver {
       boolean includeSchema,
       MappingRule column,
       SqlQueryColumn column1,
-      SqlQuerySchema querySchema) {
+      SqlQuerySchema querySchema,
+      boolean isWritable) {
     if (column.getTarget().equals("$")) {
       if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
         List<FeatureSchema> connectedSchemas =
@@ -178,9 +200,17 @@ public class SqlMappingDeriver {
                 : List.of();
 
         for (FeatureSchema p : connectedSchemas) {
-          mapping.putValueTables(p.getFullPathAsString(), querySchema);
-          mapping.putValueColumns(p.getFullPathAsString(), column1);
-          mapping.putValueSchemas(p.getFullPathAsString(), p);
+          if (isWritable) {
+            mapping.putWritableTables(p.getFullPathAsString(), querySchema);
+            mapping.putWritableColumns(p.getFullPathAsString(), column1);
+          } else {
+            mapping.putValueTables(p.getFullPathAsString(), querySchema);
+            mapping.putValueColumns(p.getFullPathAsString(), column1);
+          }
+          if (!seenProperties.contains(p.getFullPathAsString())) {
+            mapping.putValueSchemas(p.getFullPathAsString(), p);
+          }
+          seenProperties.add(p.getFullPathAsString());
         }
       }
     } else {
@@ -200,7 +230,9 @@ public class SqlMappingDeriver {
 
         target = applyRename(column.getTarget(), propertySchema);
 
-        mapping.putValueSchemas(target, propertySchema);
+        if (!seenProperties.contains(target)) {
+          mapping.putValueSchemas(target, propertySchema);
+        }
 
         /*if (!Objects.equals(target, column.getTarget())) {
           System.out.println(
@@ -213,8 +245,13 @@ public class SqlMappingDeriver {
         }*/
       }
 
-      mapping.putValueTables(target, querySchema);
-      mapping.putValueColumns(target, column1);
+      if (isWritable) {
+        mapping.putWritableTables(target, querySchema);
+        mapping.putWritableColumns(target, column1);
+      } else {
+        mapping.putValueTables(target, querySchema);
+        mapping.putValueColumns(target, column1);
+      }
       seenProperties.add(target);
     }
   }
@@ -287,6 +324,7 @@ public class SqlMappingDeriver {
       MappingRule table,
       List<MappingRule> columns,
       List<MappingRule> filterColumnRules,
+      List<MappingRule> writableColumnRules,
       List<List<String>> previous) {
     SqlPath sqlPath = pathParser.parseFullTablePath(table.getSource());
 
@@ -299,6 +337,8 @@ public class SqlMappingDeriver {
             .columns(columns.stream().map(column -> getColumn(schema, column)).toList())
             .filterColumns(
                 filterColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
+            .writableColumns(
+                writableColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
             .relations(getJoins(sqlPath, previous))
             .build();
 

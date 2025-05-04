@@ -30,6 +30,9 @@ public interface SqlQuerySchema extends SqlQueryTable {
   List<SqlQueryColumn> getFilterColumns();
 
   @JsonIgnore
+  List<SqlQueryColumn> getWritableColumns();
+
+  @JsonIgnore
   @Value.Lazy
   default List<SqlQueryTable> asTablePath() {
     return Stream.concat(getRelations().stream(), Stream.of(this)).toList();
