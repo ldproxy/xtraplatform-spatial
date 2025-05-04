@@ -51,6 +51,7 @@ class SqlMappingDeriverSpec extends Specification {
         "simple filter scoped queryable"              | "simple_filter_scopes"                       || "simple_filter_scopes"
         "value array"                                 | "value_array"                                || "value_array"
         "object array"                                | "object_array"                               || "object_array"
+        "join with sortKey"                           | "join_sortKey"                               || "join_sortKey"
         "merge"                                       | "merge"                                      || "merge"
         "self joins"                                  | "self_joins"                                 || "self_joins"
         "self joins with filters"                     | "self_joins_filter"                          || "self_joins_filter"
