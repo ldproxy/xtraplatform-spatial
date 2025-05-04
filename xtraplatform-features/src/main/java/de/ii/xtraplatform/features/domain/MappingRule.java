@@ -96,6 +96,12 @@ public interface MappingRule {
     return getScope().isPresent() && getScope().get() == Scope.C;
   }
 
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isWritable() {
+    return getScope().isEmpty() || getScope().get() == Scope.W || getScope().get() == Scope.RW;
+  }
+
   static String maskPathAttributes(String path) {
     return Pattern.compile("\\{([^}]*)\\}")
         .matcher(path)
