@@ -165,7 +165,7 @@ public class SqlQueryTemplatesDeriver2 {
           isIdFilter
               ? sqlFilter
               : toWhereClause(
-                  aliases.get(0), schema.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
+                  aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
       Optional<String> pagingClause =
           additionalSortKeys.isEmpty() || (limit == 0 && offset == 0)
               ? Optional.empty()
@@ -489,7 +489,19 @@ public class SqlQueryTemplatesDeriver2 {
     int keyIndex = keyIndexStart;
     SqlQueryTable previousRelation = null;
 
-    for (int i = 0; i < tables.size() - 1; i++) {
+    if (!onlyRelations) {
+      // add key for value table
+      keys.add(
+          String.format(
+              tables.get(0).isSortKeyUnique()
+                  ? "%s.%s AS SKEY"
+                  : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
+              aliasesIterator.next(),
+              tables.get(0).getSortKey()));
+      keyIndex++;
+    }
+
+    for (int i = 1; i < tables.size(); i++) {
       SqlQueryTable relation = tables.get(i);
       String alias = aliasesIterator.next();
 
@@ -500,18 +512,6 @@ public class SqlQueryTemplatesDeriver2 {
       }
 
       previousRelation = relation;
-    }
-
-    if (!onlyRelations) {
-      // add key for value table
-      keys.add(
-          String.format(
-              tables.get(0).isSortKeyUnique()
-                  ? "%s.%s AS SKEY_%d"
-                  : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY_%d",
-              aliasesIterator.next(),
-              tables.get(0).getSortKey(),
-              keyIndex));
     }
 
     return keys.build();
