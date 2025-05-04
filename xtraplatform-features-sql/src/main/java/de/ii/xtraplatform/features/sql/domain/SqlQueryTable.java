@@ -24,6 +24,8 @@ public interface SqlQueryTable {
     return "id";
   }
 
+  Optional<String> getPrimaryKey();
+
   Optional<Operation<?>> getFilter();
 
   @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = DefaultsFilter.class)
