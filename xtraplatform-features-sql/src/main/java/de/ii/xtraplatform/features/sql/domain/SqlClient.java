@@ -8,8 +8,9 @@
 package de.ii.xtraplatform.features.sql.domain;
 
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.app.FeatureSql;
+import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.streams.domain.Reactive;
+import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import java.sql.Connection;
 import java.util.Collection;
 import java.util.List;
@@ -25,13 +26,10 @@ public interface SqlClient extends SqlClientBasic {
   Reactive.Source<SqlRow> getSourceStream(String query, SqlQueryOptions options);
 
   Reactive.Source<String> getMutationSource(
-      FeatureSql feature,
-      List<Function<FeatureSql, String>> mutations,
-      List<Consumer<String>> idConsumers,
-      Object executionContext);
+      List<String> statements, List<Consumer<String>> idConsumers, Object executionContext);
 
-  Reactive.Transformer<FeatureSql, String> getMutationFlow(
-      Function<FeatureSql, List<Function<FeatureSql, Tuple<String, Consumer<String>>>>> mutations,
+  Transformer<FeatureDataSql, String> getMutationFlow(
+      Function<FeatureDataSql, List<Tuple<String, Consumer<String>>>> mutations,
       Object executionContext,
       Optional<String> id);
 
