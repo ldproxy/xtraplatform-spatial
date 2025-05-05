@@ -209,6 +209,10 @@ public class SqlMappingDeriver {
       }
       SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
 
+      if (column1.hasOperation(SqlQueryColumn.Operation.CONSTANT)) {
+        continue;
+      }
+
       addToMapping(
           schema,
           mapping,

@@ -9,8 +9,10 @@ package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
@@ -102,10 +104,10 @@ public class FeatureMutationsSql {
   Tuple<String, Consumer<String>> createInstanceDelete(SqlQueryMapping mapping, String id) {
 
     String table = mapping.getMainTable().getName();
-    String idColumn =
+    SqlQueryColumn idColumn =
         mapping
             .getColumnForId()
-            .map(col -> col.second().getName())
+            .map(col -> col.second())
             .orElseThrow(
                 () ->
                     new IllegalStateException(
@@ -113,8 +115,11 @@ public class FeatureMutationsSql {
                             + mapping.getMainSchema().getName()
                             + "'."));
 
+    String idValue = idColumn.getType() == Type.STRING ? "'" + id + "'" : id;
+
     return Tuple.of(
-        String.format("DELETE FROM %s WHERE %s=%s RETURNING %2$s", table, idColumn, id),
+        String.format(
+            "DELETE FROM %s WHERE %s=%s RETURNING %2$s", table, idColumn.getName(), idValue),
         ignore -> {});
   }
 
