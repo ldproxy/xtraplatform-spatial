@@ -261,7 +261,9 @@ public class MappingRulesDeriver
       return Optional.of(Scope.RC);
     }
 
-    if (ex.contains(SchemaBase.Scope.QUERYABLE) && ex.contains(SchemaBase.Scope.SORTABLE)) {
+    if (ex.contains(SchemaBase.Scope.QUERYABLE)
+        && ex.contains(SchemaBase.Scope.SORTABLE)
+        && !ex.contains(SchemaBase.Scope.RETURNABLE)) {
       return Optional.of(Scope.RW);
     }
 
