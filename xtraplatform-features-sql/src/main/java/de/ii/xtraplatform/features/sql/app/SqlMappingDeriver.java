@@ -53,6 +53,7 @@ public class SqlMappingDeriver {
     List<SqlQuerySchema> schemas = new ArrayList<>();
     List<List<String>> previous = new ArrayList<>();
     List<String> seenProperties = new ArrayList<>();
+    List<String> seenWritableProperties = new ArrayList<>();
     boolean includeSchema = Objects.nonNull(schema);
     int i = 0;
 
@@ -122,6 +123,7 @@ public class SqlMappingDeriver {
           schemas,
           mapping,
           seenProperties,
+          seenWritableProperties,
           includeSchema);
 
       i = j;
@@ -140,6 +142,7 @@ public class SqlMappingDeriver {
       List<SqlQuerySchema> schemas,
       ImmutableSqlQueryMapping.Builder mapping,
       List<String> seenProperties,
+      List<String> seenWritableProperties,
       boolean includeSchema) {
     SqlQuerySchema querySchema =
         derive(schema, tableRule, columnRules, filterColumnRules, writableColumnRules, previous);
@@ -157,7 +160,15 @@ public class SqlMappingDeriver {
       SqlQueryColumn column1 = querySchema.getColumns().get(k);
 
       addToMapping(
-          schema, mapping, seenProperties, includeSchema, column, column1, querySchema, false);
+          schema,
+          mapping,
+          seenProperties,
+          seenWritableProperties,
+          includeSchema,
+          column,
+          column1,
+          querySchema,
+          false);
     }
 
     for (int k = 0; k < filterColumnRules.size(); k++) {
@@ -168,18 +179,34 @@ public class SqlMappingDeriver {
       SqlQueryColumn column1 = querySchema.getFilterColumns().get(k);
 
       addToMapping(
-          schema, mapping, seenProperties, includeSchema, column, column1, querySchema, false);
+          schema,
+          mapping,
+          seenProperties,
+          seenWritableProperties,
+          includeSchema,
+          column,
+          column1,
+          querySchema,
+          false);
     }
 
     for (int k = 0; k < writableColumnRules.size(); k++) {
       MappingRule column = writableColumnRules.get(k);
-      if (seenProperties.contains(column.getTarget())) {
+      if (seenWritableProperties.contains(column.getTarget())) {
         continue;
       }
       SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
 
       addToMapping(
-          schema, mapping, seenProperties, includeSchema, column, column1, querySchema, true);
+          schema,
+          mapping,
+          seenProperties,
+          seenWritableProperties,
+          includeSchema,
+          column,
+          column1,
+          querySchema,
+          true);
     }
   }
 
@@ -187,6 +214,7 @@ public class SqlMappingDeriver {
       FeatureSchema schema,
       ImmutableSqlQueryMapping.Builder mapping,
       List<String> seenProperties,
+      List<String> seenWritableProperties,
       boolean includeSchema,
       MappingRule column,
       SqlQueryColumn column1,
@@ -203,14 +231,14 @@ public class SqlMappingDeriver {
           if (isWritable) {
             mapping.putWritableTables(p.getFullPathAsString(), querySchema);
             mapping.putWritableColumns(p.getFullPathAsString(), column1);
-          } else {
-            mapping.putValueTables(p.getFullPathAsString(), querySchema);
-            mapping.putValueColumns(p.getFullPathAsString(), column1);
+            seenWritableProperties.add(p.getFullPathAsString());
           }
           if (!seenProperties.contains(p.getFullPathAsString())) {
+            mapping.putValueTables(p.getFullPathAsString(), querySchema);
+            mapping.putValueColumns(p.getFullPathAsString(), column1);
             mapping.putValueSchemas(p.getFullPathAsString(), p);
+            seenProperties.add(p.getFullPathAsString());
           }
-          seenProperties.add(p.getFullPathAsString());
         }
       }
     } else {
@@ -248,11 +276,13 @@ public class SqlMappingDeriver {
       if (isWritable) {
         mapping.putWritableTables(target, querySchema);
         mapping.putWritableColumns(target, column1);
-      } else {
+        seenWritableProperties.add(target);
+      }
+      if (!seenProperties.contains(target)) {
         mapping.putValueTables(target, querySchema);
         mapping.putValueColumns(target, column1);
+        seenProperties.add(target);
       }
-      seenProperties.add(target);
     }
   }
 
