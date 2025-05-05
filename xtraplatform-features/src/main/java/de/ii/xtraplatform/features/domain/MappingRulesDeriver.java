@@ -109,7 +109,10 @@ public class MappingRulesDeriver
                       rule.getTarget().contains(".")
                           ? rule.getTarget().substring(0, rule.getTarget().lastIndexOf("."))
                           : "$")
-                  .type(Type.OBJECT_ARRAY) // TODO: get from rule with same target if any
+                  .type(
+                      rule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
+                          ? Type.VALUE_ARRAY
+                          : Type.OBJECT_ARRAY) // TODO: get from rule with same target if any
                   .index(0)
                   .build();
 
@@ -195,38 +198,28 @@ public class MappingRulesDeriver
 
   private Stream<MappingRule> toRules(
       String parentSourcePath, String sourcePath, FeatureSchema schema) {
+    String target =
+        schema.isFeature()
+            ? "$"
+            : schema.getType() == Type.VALUE_ARRAY
+                ? schema.getFullPathAsString() + VALUE_ARRAY_VALUE_SUFFIX
+                : schema.getFullPathAsString();
+    Type type =
+        schema.isFeature()
+            ? Type.OBJECT_ARRAY
+            : schema.getType() == Type.VALUE_ARRAY
+                ? schema.getValueType().orElse(Type.STRING)
+                : schema.getType();
+
     ImmutableMappingRule.Builder rule =
         new ImmutableMappingRule.Builder()
             .source(parentSourcePath + sourcePath)
-            .target(schema.isFeature() ? "$" : schema.getFullPathAsString())
-            .type(schema.isFeature() ? Type.OBJECT_ARRAY : schema.getType())
+            .target(target)
+            .type(type)
             .role(schema.getRole())
             .scope(toScope(schema.getExcludedScopes()))
             // TODO
             .index(0);
-
-    // special case because we need valueType, otherwise it would be handled in finalize
-    if (schema.getType() == Type.VALUE_ARRAY) {
-      String tableSourcePath =
-          sourcePath.contains("/")
-              ? parentSourcePath + sourcePath.substring(0, sourcePath.lastIndexOf("/"))
-              : parentSourcePath.substring(0, parentSourcePath.lastIndexOf("/"));
-
-      MappingRule tableRule =
-          new ImmutableMappingRule.Builder()
-              .source(tableSourcePath)
-              .target(schema.getFullPathAsString())
-              .type(schema.getType())
-              .role(schema.getRole())
-              // TODO
-              .index(0)
-              .build();
-
-      rule.target(rule.build().getTarget() + VALUE_ARRAY_VALUE_SUFFIX)
-          .type(schema.getValueType().orElse(Type.STRING));
-
-      return Stream.concat(Stream.of(tableRule), Stream.of(rule.build()));
-    }
 
     return Stream.of(rule.build());
   }
