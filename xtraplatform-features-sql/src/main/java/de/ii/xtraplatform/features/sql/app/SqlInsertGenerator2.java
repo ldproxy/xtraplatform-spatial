@@ -12,11 +12,13 @@ import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
-import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlPathDefaults;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlRelation;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -26,7 +28,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -54,12 +55,19 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     return sqlOptions;
   }
 
-  public Function<FeatureSql, Tuple<String, Consumer<String>>> createInsert(
-      SchemaSql schema, List<Integer> parentRows, Optional<String> id, EpsgCrs crs) {
+  @Override
+  public Tuple<String, Consumer<String>> createInsert(
+      FeatureDataSql feature, List<Integer> parentRows, Optional<String> id, EpsgCrs crs) {
+    SqlQueryMapping mapping = feature.getMapping();
+    SqlQuerySchema mainTable = mapping.getMainTable();
 
-    Optional<SqlRelation> parentRelation = schema.getRelation().stream().findFirst();
+    Optional<SqlRelation> parentRelation =
+        Optional.empty(); // schema.getRelation().stream().findFirst();
 
-    Optional<SchemaSql> idProperty = schema.getIdProperty();
+    Optional<SqlQueryColumn> idProperty =
+        mapping
+            .getColumnForId()
+            .map(de.ii.xtraplatform.base.domain.util.Tuple::second); // schema.getIdProperty();
 
     Map<String, String> valueOverrides = new LinkedHashMap<>();
 
@@ -70,14 +78,16 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     }
 
     // TODO: id instead of primaryKey if isPresent
-    String primaryKey = schema.getPrimaryKey().orElse(sqlOptions.getPrimaryKey());
+    String primaryKey = mainTable.getPrimaryKey().orElse(sqlOptions.getPrimaryKey());
 
     Set<String> columns0 =
-        schema.getProperties().stream()
+        mainTable.getWritableColumns().stream()
             // TODO: filter out mutations.ignore=true
             // TODO: filter out primaryKey if not mutations.ignore=false
-            .filter(property -> !Objects.equals(property.getName(), primaryKey))
-            .map(SchemaBase::getName)
+            .filter(col -> !Objects.equals(col.getName(), primaryKey))
+            // TODO: in deriver
+            .filter(col -> !col.hasOperation(Operation.CONSTANT))
+            .map(SqlQueryColumn::getName)
             .collect(ImmutableSet.toImmutableSet());
 
     // TODO: add id if present
@@ -92,11 +102,11 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     // TODO: from Syntax
     List<String> columns2 =
         columns.stream()
-            .map(
-                col ->
-                    col.startsWith("ST_AsText(ST_ForcePolygonCCW(")
-                        ? col.substring("ST_AsText(ST_ForcePolygonCCW(".length(), col.length() - 2)
-                        : col)
+            /*.map(
+            col ->
+                col.startsWith("ST_AsText(ST_ForcePolygonCCW(")
+                    ? col.substring("ST_AsText(ST_ForcePolygonCCW(".length(), col.length() - 2)
+                    : col)*/
             .collect(Collectors.toList());
 
     List<String> sortKeys = new ArrayList<>();
@@ -129,7 +139,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       }
     }
 
-    String tableName = schema.getName();
+    String tableName = mainTable.getName();
     String columnNames = Joiner.on(',').skipNulls().join(columns2);
     if (!columnNames.isEmpty()) {
       columnNames = "(" + columnNames + ")";
@@ -148,58 +158,57 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
                 ? Optional.of(tableName + "." + idProperty.get().getName())
                 : Optional.of(tableName + "." + primaryKey);
 
-    return feature -> {
-      Optional<ObjectSql> currentRow =
-          schema.isFeature()
-              ? Optional.of(feature)
-              : feature.getNestedObject(schema.getFullPath(), parentRows);
+    Optional<Map<String, String>> currentRow = Optional.of(feature.getCurrentRow(mainTable));
+    /*TODO mapping.isFeature()
+    ? Optional.of(feature)
+    : feature.getNestedObject(mapping.getFullPath(), parentRows);*/
 
-      if (!currentRow.isPresent()) {
-        return Tuple.of(null, null);
-      }
-
-      // TODO: crs can be null, refactor FeatureProviderSql2.createFeatures
-      Optional<CrsTransformer> crsTransformer =
-          Objects.nonNull(crs)
-              ? crsTransformerFactory.getTransformer(crs, nativeCrs)
-              : Optional.empty();
-
-      // TODO: pass id to getValues if given
-      String values =
-          getColumnValues(
-              sortKeys,
-              columns,
-              currentRow.get().getValues(crsTransformer, nativeCrs),
-              currentRow.get().getIds(),
-              valueOverrides);
-
-      if (!values.isEmpty()) {
-        values = "VALUES (" + values + ")";
-      } else {
-        values = "DEFAULT VALUES";
-      }
-
-      String query =
-          String.format(
-              "INSERT INTO %s %s %s%s;", tableName, finalColumnNames, values, returningValue);
-
-      Consumer<String> idConsumer =
-          returningName
-              .map(name -> (Consumer<String>) returned -> feature.putChildrenIds(name, returned))
-              .orElse(returned -> {});
-
-      return Tuple.of(query, idConsumer);
-    };
-  }
-
-  public Function<FeatureSql, Tuple<String, Consumer<String>>> createJunctionInsert(
-      SchemaSql schema, List<Integer> parentRows) {
-
-    if (schema.getRelation().isEmpty() || !schema.getRelation().get(0).isM2N()) {
-      throw new IllegalArgumentException();
+    if (!currentRow.isPresent()) {
+      return Tuple.of(null, null);
     }
 
-    SqlRelation relation = schema.getRelation().get(0);
+    // TODO: crs can be null, refactor FeatureProviderSql2.createFeatures
+    Optional<CrsTransformer> crsTransformer =
+        Objects.nonNull(crs)
+            ? crsTransformerFactory.getTransformer(crs, nativeCrs)
+            : Optional.empty();
+
+    // TODO: pass id to getValues if given
+    String values =
+        getColumnValues(
+            sortKeys,
+            columns,
+            currentRow.get(), // TODO .getValues(crsTransformer, nativeCrs),
+            Map.of(), // currentRow.get().getIds(),
+            valueOverrides);
+
+    if (!values.isEmpty()) {
+      values = "VALUES (" + values + ")";
+    } else {
+      values = "DEFAULT VALUES";
+    }
+
+    String query =
+        String.format(
+            "INSERT INTO %s %s %s%s;", tableName, finalColumnNames, values, returningValue);
+
+    Consumer<String> idConsumer =
+        returningName
+            .map(name -> (Consumer<String>) returned -> feature.putChildrenIds(name, returned))
+            .orElse(returned -> {});
+
+    return Tuple.of(query, idConsumer);
+  }
+
+  @Override
+  public Tuple<String, Consumer<String>> createJunctionInsert(
+      FeatureDataSql feature, List<Integer> parentRows) {
+
+    /*TODO if (schema.getRelation().isEmpty() || !schema.getRelation().get(0).isM2N()) {
+      throw new IllegalArgumentException();
+    }*/
+
+    SqlRelation relation = null; // TODO schema.getRelation().get(0);
 
     String table = relation.getJunction().get();
     String columnNames =
@@ -210,34 +219,33 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     String targetIdColumn =
         String.format("%s.%s", relation.getTargetContainer(), relation.getTargetField());
 
-    return feature -> {
-      Optional<ObjectSql> currentRow = feature.getNestedObject(schema.getFullPath(), parentRows);
+    Optional<ObjectSql> currentRow =
+        Optional.empty(); // feature.getNestedObject(schema.getFullPath(), parentRows);
 
-      if (!currentRow.isPresent()) {
-        return Tuple.of(null, null);
-      }
-
-      Map<String, String> ids = currentRow.get().getIds();
-
-      String columnValues =
-          String.format("%s,%s", ids.get(sourceIdColumn), ids.get(targetIdColumn));
-
-      return Tuple.of(
-          String.format(
-              "INSERT INTO %s (%s) VALUES (%s) RETURNING null;", table, columnNames, columnValues),
-          id -> {});
-    };
-  }
-
-  public Function<FeatureSql, Tuple<String, Consumer<String>>> createForeignKeyUpdate(
-      SchemaSql schema, List<Integer> parentRows) {
-
-    if (schema.getRelation().isEmpty()
-        || !(schema.getRelation().get(0).isOne2One() || schema.getRelation().get(0).isOne2N())) {
-      throw new IllegalArgumentException();
+    if (!currentRow.isPresent()) {
+      return Tuple.of(null, null);
     }
 
-    SqlRelation relation = schema.getRelation().get(0);
+    Map<String, String> ids = currentRow.get().getIds();
+
+    String columnValues = String.format("%s,%s", ids.get(sourceIdColumn), ids.get(targetIdColumn));
+
+    return Tuple.of(
+        String.format(
+            "INSERT INTO %s (%s) VALUES (%s) RETURNING null;", table, columnNames, columnValues),
+        id -> {});
+  }
+
+  @Override
+  public Tuple<String, Consumer<String>> createForeignKeyUpdate(
+      FeatureDataSql feature, List<Integer> parentRows) {
+
+    /*TODO if (schema.getRelation().isEmpty()
+        || !(schema.getRelation().get(0).isOne2One() || schema.getRelation().get(0).isOne2N())) {
+      throw new IllegalArgumentException();
+    }*/
+
+    SqlRelation relation = null; // TODO schema.getRelation().get(0);
 
     String table = relation.getSourceContainer();
     String refKey = String.format("%s.%s", table, relation.getSourceSortKey().get());
@@ -245,21 +253,20 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     String columnKey =
         String.format("%s.%s", relation.getTargetContainer(), relation.getTargetField());
 
-    return feature -> {
-      Optional<ObjectSql> currentRow = feature.getNestedObject(schema.getFullPath(), parentRows);
+    Optional<ObjectSql> currentRow =
+        Optional.empty(); // TODO feature.getNestedObject(schema.getFullPath(), parentRows);
 
-      if (!currentRow.isPresent()) {
-        return Tuple.of(null, null);
-      }
+    if (!currentRow.isPresent()) {
+      return Tuple.of(null, null);
+    }
 
-      Map<String, String> ids = currentRow.get().getIds();
+    Map<String, String> ids = currentRow.get().getIds();
 
-      return Tuple.of(
-          String.format(
-              "UPDATE %s SET %s=%s WHERE id=%s RETURNING null;",
-              table, column, ids.get(columnKey), ids.get(refKey)),
-          id -> {});
-    };
+    return Tuple.of(
+        String.format(
+            "UPDATE %s SET %s=%s WHERE id=%s RETURNING null;",
+            table, column, ids.get(columnKey), ids.get(refKey)),
+        id -> {});
   }
 
   // TODO: from syntax

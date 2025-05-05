@@ -11,13 +11,14 @@ import com.google.common.collect.ImmutableList;
 import com.zaxxer.hikari.pool.ProxyConnection;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.app.FeatureSql;
+import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.streams.domain.Reactive;
+import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import io.reactivex.rxjava3.core.Flowable;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -151,25 +152,22 @@ public class SqlClientRx implements SqlClient {
 
   @Override
   public Reactive.Source<String> getMutationSource(
-      FeatureSql feature,
-      List<Function<FeatureSql, String>> toStatements,
-      List<Consumer<String>> idConsumers,
-      Object executionContext) {
-    List<Function<FeatureSql, String>> toStatementsWithLog =
-        toStatements.stream()
-            .map(
-                function ->
-                    (Function<FeatureSql, String>)
-                        featureSql -> {
-                          String statement = function.apply(featureSql);
+      List<String> statements, List<Consumer<String>> idConsumers, Object executionContext) {
+    /*List<Function<FeatureSql, String>> toStatementsWithLog =
+    statements.stream()
+        .map(
+            function ->
+                (Function<FeatureSql, String>)
+                    featureSql -> {
+                      String statement = function.apply(featureSql);
 
-                          if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-                            LOGGER.debug(MARKER.SQL, "Executing statement: {}", statement);
-                          }
+                      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
+                        LOGGER.debug(MARKER.SQL, "Executing statement: {}", statement);
+                      }
 
-                          return statement;
-                        })
-            .collect(Collectors.toList());
+                      return statement;
+                    })
+        .collect(Collectors.toList());*/
 
     int[] i = {0};
     BiFunction<ResultSet, String, String> mapper =
@@ -191,7 +189,10 @@ public class SqlClientRx implements SqlClient {
           return previousId != null ? previousId : id;
         };
 
-    String first = toStatementsWithLog.get(0).apply(feature);
+    String first = statements.get(0);
+    if (LOGGER.isDebugEnabled(MARKER.SQL)) {
+      LOGGER.debug(MARKER.SQL, "Executing statement: {}", first);
+    }
 
     Flowable<? extends Tx<?>> txFlowable =
         // TODO: when implementing crud for joins, check if bug in rxjava3-jdbc still exists:
@@ -200,7 +201,7 @@ public class SqlClientRx implements SqlClient {
 
         // for update/replace, the first statement is always delete, so we can skip the
         // returnGeneratedKeys
-        toStatements.size() == 2
+        statements.size() == 2
             ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
             : session
                 .update(first)
@@ -209,8 +210,11 @@ public class SqlClientRx implements SqlClient {
                 .get(resultSet -> mapper.apply(resultSet, null))
                 .filter(tx -> !tx.isComplete());
 
-    for (int j = 1; j < toStatementsWithLog.size(); j++) {
-      String next = toStatementsWithLog.get(j).apply(feature);
+    for (int j = 1; j < statements.size(); j++) {
+      String next = statements.get(j);
+      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
+        LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
+      }
 
       txFlowable =
           txFlowable.flatMap(
@@ -231,45 +235,34 @@ public class SqlClientRx implements SqlClient {
   }
 
   @Override
-  public Reactive.Transformer<FeatureSql, String> getMutationFlow(
-      Function<FeatureSql, List<Function<FeatureSql, Tuple<String, Consumer<String>>>>> mutations,
+  public Transformer<FeatureDataSql, String> getMutationFlow(
+      Function<FeatureDataSql, List<Tuple<String, Consumer<String>>>> mutations,
       Object executionContext,
       Optional<String> id) {
 
-    Reactive.Transformer<FeatureSql, String> toQueries =
+    Reactive.Transformer<FeatureDataSql, String> toQueries =
         Reactive.Transformer.flatMap(
             feature -> {
-              List<Function<FeatureSql, Tuple<String, Consumer<String>>>> m =
-                  mutations.apply(feature);
+              List<Tuple<String, Consumer<String>>> m = mutations.apply(feature);
 
-              List<Function<FeatureSql, String>> toStatements =
+              List<String> statements =
                   m.stream()
-                      .map(
-                          queryFunction ->
-                              Objects.isNull(queryFunction.apply(feature).first())
-                                  ? null
-                                  : (Function<FeatureSql, String>)
-                                      feature2 -> queryFunction.apply(feature2).first())
+                      .map(Tuple::first)
                       .filter(Objects::nonNull)
                       .collect(Collectors.toList());
 
               List<Consumer<String>> idConsumers =
                   m.stream()
-                      .map(
-                          queryFunction -> {
-                            // TODO
-                            Tuple<String, Consumer<String>> query = queryFunction.apply(feature);
-                            return query.second();
-                          })
+                      .map(Tuple::second)
                       .filter(Objects::nonNull)
                       .collect(Collectors.toList());
 
-              return getMutationSource(feature, toStatements, idConsumers, executionContext);
+              return getMutationSource(statements, idConsumers, executionContext);
             });
 
     if (id.isPresent()) {
       // TODO: check that feature id equals given id
-      Reactive.Transformer<FeatureSql, FeatureSql> filter =
+      Reactive.Transformer<FeatureDataSql, FeatureDataSql> filter =
           Reactive.Transformer.filter(featureSql -> true);
 
       return filter.via(toQueries);
