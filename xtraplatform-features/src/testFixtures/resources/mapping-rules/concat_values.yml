@@ -8,10 +8,6 @@
   type: STRING
   role: ID
   index: 0
-- source: /o12006
-  target: component
-  type: VALUE_ARRAY
-  index: 0
 - source: /o12006/lan
   target: "component.[]"
   type: STRING
