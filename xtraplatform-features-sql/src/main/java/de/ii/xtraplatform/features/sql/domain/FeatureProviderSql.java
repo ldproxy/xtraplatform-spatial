@@ -466,7 +466,9 @@ public class FeatureProviderSql
                 entry ->
                     Map.entry(
                         entry.getKey(),
-                        entry.getValue().accept(WITH_SCOPE_QUERIES).accept(mappingRulesDeriver)))
+                        entry
+                            .getValue() /*.accept(WITH_SCOPE_QUERIES)*/
+                            .accept(mappingRulesDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryMappings =

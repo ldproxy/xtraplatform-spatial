@@ -19,6 +19,7 @@ dependencies {
     provided project(':xtraplatform-cql')
     provided project(':xtraplatform-crs')
     provided project(':xtraplatform-features')
+    provided project(':xtraplatform-geometries')
     provided project(':xtraplatform-strings')
 
     embedded(libs.rxjava.jdbc) {
