@@ -120,7 +120,7 @@ public interface GeometryWithStringCoordinates<T>
   }
 
   @Modifiable
-  interface MultiPoint extends GeometryWithStringCoordinates<Point> {
+  interface MultiPoint extends GeometryWithStringCoordinates<List<String>> {
 
     @Derived
     @Override
@@ -130,7 +130,7 @@ public interface GeometryWithStringCoordinates<T>
 
     @Override
     default void openChild() {
-      getCoordinates().add(ModifiablePoint.create().setDimension(getDimension()));
+      getCoordinates().add(new ArrayList<>());
     }
 
     @Override
@@ -141,9 +141,9 @@ public interface GeometryWithStringCoordinates<T>
       if (getCoordinates().isEmpty()) {
         throw new IllegalStateException("No child point opened");
       }
-      Point lastPoint = getCoordinates().get(getCoordinates().size() - 1);
+      List<String> lastPoint = getCoordinates().get(getCoordinates().size() - 1);
       if (lastPoint != null) {
-        lastPoint.addCoordinate(coordinate);
+        lastPoint.add(coordinate);
       } else {
         throw new IllegalStateException("No child point opened");
       }
@@ -195,12 +195,34 @@ public interface GeometryWithStringCoordinates<T>
     }
 
     @Override
-    default void openChild() {}
+    default void openChild() {
+      if (getDepth() == 1) {
+        getCoordinates().add(ModifiablePolygon.create().setDimension(getDimension()).setDepth(1));
+      } else if (getDepth() > 1) {
+        getCoordinates().get(getCoordinates().size() - 1).openChild();
+      }
+      setDepth(getDepth() + 1);
+    }
 
     @Override
-    default void closeChild() {}
+    default void closeChild() {
+      if (getDepth() > 1) {
+        getCoordinates().get(getCoordinates().size() - 1).closeChild();
+      }
+      setDepth(getDepth() - 1);
+    }
 
     @Override
-    default void addCoordinate(String coordinate) {}
+    default void addCoordinate(String coordinate) {
+      if (getCoordinates().isEmpty()) {
+        throw new IllegalStateException("No child polygon opened");
+      }
+      Polygon lastPolygon = getCoordinates().get(getCoordinates().size() - 1);
+      if (lastPolygon != null) {
+        lastPolygon.addCoordinate(coordinate);
+      } else {
+        throw new IllegalStateException("No child polygon opened");
+      }
+    }
   }
 }

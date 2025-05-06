@@ -14,8 +14,6 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
-import de.ii.xtraplatform.features.domain.PropertyBase;
-import de.ii.xtraplatform.features.domain.PropertyBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
@@ -33,6 +31,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -55,6 +54,7 @@ public class FeatureEncoderSql
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<String> nullValue;
   private final ObjectMapper jsonMapper;
+  private final boolean trace;
 
   private ModifiableFeatureDataSql currentFeature;
   private GeometryWithStringCoordinates<?> currentGeometry;
@@ -72,6 +72,7 @@ public class FeatureEncoderSql
     this.nativeCrs = nativeCrs;
     this.nullValue = nullValue;
     this.jsonMapper = new ObjectMapper();
+    this.trace = false;
   }
 
   @Modifiable
@@ -90,13 +91,13 @@ public class FeatureEncoderSql
     currentFeature.addRow(mapping.getMainTable());
     currentGeometry = null;
     currentJson = new LinkedHashMap<>();
-    LOGGER.debug("onFeatureStart: {}", context.pathAsString());
+    if (trace) LOGGER.debug("onFeatureStart: {}", context.pathAsString());
   }
 
   @Override
   public void onFeatureEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     push(currentFeature);
-    LOGGER.debug("onFeatureEnd: {}", context.pathAsString());
+    if (trace) LOGGER.debug("onFeatureEnd: {}", context.pathAsString());
 
     if (currentJsonColumn != null) {
       try {
@@ -119,7 +120,7 @@ public class FeatureEncoderSql
                     column.first(), column.second(), "'" + mapping.getMainSchema().getName() + "'");
               },
               () -> {
-                LOGGER.warn("onValue: {} not found in mapping", "featuretype");
+                if (trace) LOGGER.warn("onValue: {} not found in mapping", "featuretype");
               });
     }
 
@@ -127,13 +128,14 @@ public class FeatureEncoderSql
         .getRows()
         .forEach(
             row -> {
-              LOGGER.debug("push: {} {}", row.first().getFullPathAsString(), row.second());
+              if (trace)
+                LOGGER.debug("push: {} {}", row.first().getFullPathAsString(), row.second());
             });
   }
 
   @Override
   public void onObjectStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), context.inGeometry());
+    if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), context.inGeometry());
 
     if (context.inGeometry() && context.geometryType().isPresent()) {
       SimpleFeatureGeometry geometryType =
@@ -154,16 +156,16 @@ public class FeatureEncoderSql
         .findFirst()
         .ifPresent(
             schema -> {
-              LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), schema);
+              if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), schema);
             });
   }
 
   @Override
   public void onObjectEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    LOGGER.debug("onObjectEnd: {} {}", context.pathAsString(), context.inGeometry());
+    if (trace) LOGGER.debug("onObjectEnd: {} {}", context.pathAsString(), context.inGeometry());
 
     if (context.inGeometry()) {
-      LOGGER.debug("geometry: {} {}", context.pathAsString(), currentGeometry);
+      if (trace) LOGGER.debug("geometry: {} {}", context.pathAsString(), currentGeometry);
 
       // TODO: this is only correct for geojson, should be handled in the decoder
       mapping
@@ -178,14 +180,15 @@ public class FeatureEncoderSql
 
                           currentFeature.addColumn(column.first(), column.second(), value);
 
-                          LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
+                          if (trace) LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
                         },
                         () -> {
-                          LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
+                          if (trace)
+                            LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
                         });
               },
               () -> {
-                LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
+                if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
               });
 
       currentGeometry = null;
@@ -194,7 +197,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    LOGGER.debug("onArrayStart: {} {}", context.pathAsString(), context.inGeometry());
+    if (trace) LOGGER.debug("onArrayStart: {} {}", context.pathAsString(), context.inGeometry());
 
     if (context.inGeometry()) {
       currentGeometry.openChild();
@@ -203,7 +206,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    LOGGER.debug("onArrayEnd: {} {}", context.pathAsString(), context.inGeometry());
+    if (trace) LOGGER.debug("onArrayEnd: {} {}", context.pathAsString(), context.inGeometry());
 
     if (context.inGeometry()) {
       currentGeometry.closeChild();
@@ -214,8 +217,9 @@ public class FeatureEncoderSql
   public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     if (context.inGeometry() && Objects.nonNull(currentGeometry)) {
       currentGeometry.addCoordinate(context.value());
-      LOGGER.debug(
-          "onValue: {} {} {}", context.pathAsString(), context.value(), context.inGeometry());
+      if (trace)
+        LOGGER.debug(
+            "onValue: {} {} {}", context.pathAsString(), context.value(), context.inGeometry());
       return;
     }
 
@@ -239,7 +243,8 @@ public class FeatureEncoderSql
 
               boolean needsQuotes =
                   column.second().getType() == SchemaBase.Type.STRING
-                      || column.second().getType() == SchemaBase.Type.DATETIME;
+                      || column.second().getType() == SchemaBase.Type.DATETIME
+                      || column.second().getType() == SchemaBase.Type.DATE;
               /* (schemaSql.getType() == SchemaBase.Type.FEATURE_REF
               && schemaSql.getValueType().orElse(SchemaBase.Type.STRING)
               == SchemaBase.Type.STRING)*/
@@ -250,16 +255,17 @@ public class FeatureEncoderSql
                       : context.value();
 
               if (column.second().getRole().isPresent()
-                  && column.second().getRole().get() == Role.ID) {
+                  && column.second().getRole().get() == Role.ID
+                  && column.second().getType() == SchemaBase.Type.STRING) {
                 value = "gen_random_uuid()";
               }
 
               currentFeature.addColumn(column.first(), column.second(), value);
 
-              LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
+              if (trace) LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
             },
             () -> {
-              LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
+              if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
             });
   }
 
@@ -322,77 +328,56 @@ public class FeatureEncoderSql
     Writer coordinatesWriter = coordinatesWriterBuilder.build();
 
     if (geometry instanceof GeometryWithStringCoordinates.Point point) {
-      for (int i = 0; i < point.getCoordinates().size(); i++) {
-        coordinatesWriter.append(point.getCoordinates().get(i));
-        if (i < point.getCoordinates().size() - 1) {
-          coordinatesWriter.append(",");
-        }
-      }
-
-      coordinatesWriter.flush();
+      toWktArray(point.getCoordinates(), coordinatesWriter);
     } else if (geometry instanceof GeometryWithStringCoordinates.LineString lineString) {
-      for (int i = 0; i < lineString.getCoordinates().size(); i++) {
-        coordinatesWriter.append(lineString.getCoordinates().get(i));
-        if (i < lineString.getCoordinates().size() - 1) {
-          coordinatesWriter.append(",");
-        }
-      }
-
-      coordinatesWriter.flush();
+      toWktArray(lineString.getCoordinates(), coordinatesWriter);
     } else if (geometry instanceof GeometryWithStringCoordinates.Polygon polygon) {
-      for (int i = 0; i < polygon.getCoordinates().size(); i++) {
+      toWktArray(polygon.getCoordinates(), coordinatesWriter, structureWriter);
+    } else if (geometry instanceof GeometryWithStringCoordinates.MultiPoint multiPoint) {
+      toWktArray(multiPoint.getCoordinates(), coordinatesWriter, structureWriter);
+    } else if (geometry instanceof GeometryWithStringCoordinates.MultiLineString multiLineString) {
+      toWktArray(multiLineString.getCoordinates(), coordinatesWriter, structureWriter);
+    } else if (geometry instanceof GeometryWithStringCoordinates.MultiPolygon multiPolygon) {
+      for (int i = 0; i < multiPolygon.getCoordinates().size(); i++) {
         structureWriter.append("(");
 
-        for (int j = 0; j < polygon.getCoordinates().get(i).size(); j++) {
-          coordinatesWriter.append(polygon.getCoordinates().get(i).get(j));
-          if (j < polygon.getCoordinates().get(i).size() - 1) {
-            coordinatesWriter.append(",");
-          }
-        }
+        toWktArray(
+            multiPolygon.getCoordinates().get(i).getCoordinates(),
+            coordinatesWriter,
+            structureWriter);
 
-        coordinatesWriter.flush();
+        coordinatesWriter = coordinatesWriterBuilder.build();
 
         structureWriter.append(")");
+        if (i < multiPolygon.getCoordinates().size() - 1) {
+          structureWriter.append(",");
+        }
       }
     }
 
     structureWriter.append(")");
   }
 
-  // TODO: test all geo types
-  private static void toWktArray(
-      PropertySql propertySql, Writer structureWriter, Builder coordinatesWriterBuilder)
+  private static void toWktArray(List<String> coordinates, Writer coordinatesWriter)
       throws IOException {
-    if (propertySql.getType() == PropertyBase.Type.ARRAY) {
+    for (int i = 0; i < coordinates.size(); i++) {
+      coordinatesWriter.append(coordinates.get(i));
+      if (i < coordinates.size() - 1) {
+        coordinatesWriter.append(",");
+      }
+    }
+
+    coordinatesWriter.flush();
+  }
+
+  private static void toWktArray(
+      List<List<String>> coordinates, Writer coordinatesWriter, Writer structureWriter)
+      throws IOException {
+    for (int i = 0; i < coordinates.size(); i++) {
       structureWriter.append("(");
-    }
 
-    if (propertySql.getType() == PropertyBase.Type.ARRAY
-        && !propertySql.getNestedProperties().isEmpty()
-        && propertySql.getNestedProperties().get(0).getType() == Type.VALUE) {
-      Writer coordinatesWriter = coordinatesWriterBuilder.build();
+      toWktArray(coordinates.get(i), coordinatesWriter);
 
-      for (int i = 0; i < propertySql.getNestedProperties().size(); i++) {
-        coordinatesWriter.append(propertySql.getNestedProperties().get(i).getValue());
-        if (i < propertySql.getNestedProperties().size() - 1) {
-          coordinatesWriter.append(",");
-        }
-      }
-
-      coordinatesWriter.flush();
-    } else {
-      for (int i = 0; i < propertySql.getNestedProperties().size(); i++) {
-        PropertySql propertySql1 = propertySql.getNestedProperties().get(i);
-        if (propertySql1.getType() == PropertyBase.Type.ARRAY) {
-          toWktArray(propertySql1, structureWriter, coordinatesWriterBuilder);
-          if (i < propertySql.getNestedProperties().size() - 1) {
-            structureWriter.append(",");
-          }
-        }
-      }
-    }
-
-    if (propertySql.getType() == PropertyBase.Type.ARRAY) {
       structureWriter.append(")");
     }
   }
