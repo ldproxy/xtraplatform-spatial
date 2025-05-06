@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import static de.ii.xtraplatform.features.domain.MappingRule.ROOT_TARGET;
 import static de.ii.xtraplatform.features.sql.domain.SqlQueryMapping.IN_CONNECTED_ARRAY;
 import static de.ii.xtraplatform.features.sql.domain.SqlQueryMapping.PATH_IN_CONNECTOR;
 
@@ -197,6 +198,11 @@ public class SqlMappingDeriver {
       }
       SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
 
+      // TODO: ignoring joins for now
+      if (!Objects.equals(ROOT_TARGET, tableRule.getTarget())) {
+        continue;
+      }
+
       if (column1.hasOperation(SqlQueryColumn.Operation.CONSTANT)) {
         continue;
       }
@@ -228,7 +234,7 @@ public class SqlMappingDeriver {
       if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
         List<FeatureSchema> connectedSchemas =
             includeSchema
-                ? getConnectedSchemas(schema, column1.getPathSegment(), "", false)
+                ? getConnectedSchemas(schema, column1.getPathSegment(), "", false, isWritable)
                 : List.of();
 
         for (FeatureSchema p : connectedSchemas) {
@@ -318,7 +324,11 @@ public class SqlMappingDeriver {
   }
 
   private List<FeatureSchema> getConnectedSchemas(
-      FeatureSchema parent, String connector, String pathInConnector, boolean inArray) {
+      FeatureSchema parent,
+      String connector,
+      String pathInConnector,
+      boolean inArray,
+      boolean isWritable) {
     return parent.getProperties().stream()
         .filter(
             p ->
@@ -347,7 +357,13 @@ public class SqlMappingDeriver {
                         .build());
               }
 
-              return getConnectedSchemas(p, null, newPathInConnector, inArray || p.isArray())
+              // TODO: ignoring objects and arrays for now
+              if (isWritable) {
+                return Stream.empty();
+              }
+
+              return getConnectedSchemas(
+                  p, null, newPathInConnector, inArray || p.isArray(), isWritable)
                   .stream();
             })
         .toList();
