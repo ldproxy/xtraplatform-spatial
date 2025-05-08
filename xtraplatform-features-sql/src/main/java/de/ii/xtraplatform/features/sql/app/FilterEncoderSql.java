@@ -109,7 +109,7 @@ public class FilterEncoderSql {
     return prepareExpression(cql.read(cqlFilter, Format.TEXT)).accept(new CqlToSql(schema));
   }
 
-  private String encodeNested(Cql2Expression cqlFilter, SchemaSql schema, boolean isUserFilter) {
+  public String encodeNested(Cql2Expression cqlFilter, SchemaSql schema, boolean isUserFilter) {
     return prepareExpression(cqlFilter).accept(new CqlToSqlNested(schema, isUserFilter));
   }
 

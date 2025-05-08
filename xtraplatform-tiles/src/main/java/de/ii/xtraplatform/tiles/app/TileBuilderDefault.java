@@ -9,8 +9,12 @@ package de.ii.xtraplatform.tiles.app;
 
 import static de.ii.xtraplatform.tiles.app.TileGeneratorFeatures.EMPTY_TILES;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
+import com.codahale.metrics.Timer.Context;
 import com.github.azahnen.dagger.annotations.AutoBind;
 import com.google.common.collect.ImmutableMap;
+import de.ii.xtraplatform.base.domain.AppConfiguration;
 import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql.Format;
@@ -43,6 +47,8 @@ import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParametersTransient;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
+import de.ii.xtraplatform.web.domain.DropwizardPlugin;
+import io.dropwizard.core.setup.Environment;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +56,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -64,7 +71,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
-public class TileBuilderDefault implements TileBuilder {
+public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileBuilderDefault.class);
 
@@ -74,11 +81,20 @@ public class TileBuilderDefault implements TileBuilder {
 
   private final CrsInfo crsInfo;
   private final Cql cql;
+  private final Map<String, Timer> timers;
+
+  private MetricRegistry metricRegistry;
 
   @Inject
   public TileBuilderDefault(CrsInfo crsInfo, Cql cql) {
     this.crsInfo = crsInfo;
     this.cql = cql;
+    this.timers = new ConcurrentHashMap<>();
+  }
+
+  @Override
+  public void init(AppConfiguration configuration, Environment environment) {
+    this.metricRegistry = environment.metrics();
   }
 
   @Override
@@ -101,52 +117,61 @@ public class TileBuilderDefault implements TileBuilder {
       FeatureProvider featureProvider,
       PropertyTransformations baseTransformations,
       List<ProfileSet> profileSets) {
-    FeatureQuery featureQuery =
-        getFeatureQuery(
-            tileQuery,
-            tileset,
-            types,
-            nativeCrs,
-            clippedBounds,
-            tileQuery.getGenerationParametersTransient(),
-            featureProvider.queries().get());
-
-    FeatureStream tileSource = featureProvider.queries().get().getFeatureStream(featureQuery);
-
-    if (tileSource == null) {
-      // no features in this tile
-      return EMPTY_TILES.get(tileQuery.getMediaType());
+    if (!timers.containsKey(featureProvider.getId())) {
+      timers.put(
+          featureProvider.getId(),
+          metricRegistry.timer(String.format("tiles.%s.generated.mvt", featureProvider.getId())));
     }
 
-    TileGenerationContext tileGenerationContext =
-        new ImmutableTileGenerationContext.Builder()
-            .parameters(tileset)
-            .coordinates(tileQuery)
-            .tileset(tileQuery.getTileset())
-            .build();
+    try (Context timed = timers.get(featureProvider.getId()).time()) {
+      FeatureQuery featureQuery =
+          getFeatureQuery(
+              tileQuery,
+              tileset,
+              types,
+              nativeCrs,
+              clippedBounds,
+              tileQuery.getGenerationParametersTransient(),
+              featureProvider.queries().get());
 
-    FeatureTokenEncoder<?> encoder =
-        ENCODERS.get(tileQuery.getMediaType()).apply(tileGenerationContext);
+      FeatureStream tileSource = featureProvider.queries().get().getFeatureStream(featureQuery);
 
-    String featureType = tileset.getFeatureType().orElse(tileset.getId());
-    FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
+      if (tileSource == null) {
+        // no features in this tile
+        return EMPTY_TILES.get(tileQuery.getMediaType());
+      }
 
-    if (Objects.isNull(schema)) {
-      throw new IllegalArgumentException(
-          String.format("Unknown feature type '%s' in tileset '%s'", featureType, tileset.getId()));
+      TileGenerationContext tileGenerationContext =
+          new ImmutableTileGenerationContext.Builder()
+              .parameters(tileset)
+              .coordinates(tileQuery)
+              .tileset(tileQuery.getTileset())
+              .build();
+
+      FeatureTokenEncoder<?> encoder =
+          ENCODERS.get(tileQuery.getMediaType()).apply(tileGenerationContext);
+
+      String featureType = tileset.getFeatureType().orElse(tileset.getId());
+      FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
+
+      if (Objects.isNull(schema)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Unknown feature type '%s' in tileset '%s'", featureType, tileset.getId()));
+      }
+
+      PropertyTransformations propertyTransformations =
+          tileQuery
+              .getGenerationParameters()
+              .flatMap(TileGenerationParameters::getPropertyTransformations)
+              .map(pt -> pt.mergeInto(baseTransformations))
+              .orElse(baseTransformations);
+
+      ResultReduced<byte[]> resultReduced =
+          generateTile(tileSource, encoder, Map.of(featureType, propertyTransformations));
+
+      return resultReduced.reduced();
     }
-
-    PropertyTransformations propertyTransformations =
-        tileQuery
-            .getGenerationParameters()
-            .flatMap(TileGenerationParameters::getPropertyTransformations)
-            .map(pt -> pt.mergeInto(baseTransformations))
-            .orElse(baseTransformations);
-
-    ResultReduced<byte[]> resultReduced =
-        generateTile(tileSource, encoder, Map.of(featureType, propertyTransformations));
-
-    return resultReduced.reduced();
   }
 
   private ResultReduced<byte[]> generateTile(
