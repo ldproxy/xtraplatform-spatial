@@ -18,6 +18,7 @@ import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql.Format;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.crs.domain.EpsgCrs.Force;
 import de.ii.xtraplatform.features.domain.ExtensionConfiguration;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
@@ -35,6 +36,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlConnector;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsPgis;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
+import de.ii.xtraplatform.tiles.app.PgisTilesConfiguration.UnsupportedMode;
 import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
@@ -57,6 +59,25 @@ import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * @title PostGIS Tiles
+ * @langEn Optimized vector tile generation using `ST_AsMVT` from PostGIS.
+ * @langDe Optimierte Generierung von Vektor-Kacheln mit `ST_AsMVT` von PostGIS.
+ * @scopeEn It is highly recommended to enable this extension for simple mappings (see limitations).
+ *     That will speed up vector tile generation roughly by a factor of 4.
+ * @scopeDe Es wird stark empfohlen, diese Erweiterung für einfache Mappings zu aktivieren (siehe
+ *     Limitierungen). Dadurch wird die Generierung von Vektor-Kacheln ca. um den Faktor 4
+ *     beschleunigt.
+ * @limitationsEn Only simple value properties are supported. That means no objects, arrays,
+ *     transformations or joins. Such properties may be excluded from the generated tiles, see
+ *     option `unsupportedProperties`. The native CRS must not have a forced axis order.
+ * @limitationsDe Es werden nur einfache Wert-Properties unterstützt. Das bedeutet keine Objekte,
+ *     Arrays, Transformationen oder Joins. Solche Properties können von den generierten Kacheln
+ *     ausgeschlossen werden, siehe die Option `unsupportedProperties`. Das native CRS darf keine
+ *     erzwungene Achsenreihenfolge haben.
+ * @ref:propertyTable {@link de.ii.xtraplatform.tiles.app.ImmutablePgisTilesConfiguration}
+ * @ref:example {@link de.ii.xtraplatform.tiles.app.PgisTilesConfiguration}
+ */
 @Singleton
 @AutoBind
 public class TileBuilderPgisAsMvt
@@ -105,7 +126,8 @@ public class TileBuilderPgisAsMvt
       FeatureProviderConnector<?, ?, ?> connector) {
     if (hook == LIFECYCLE_HOOK.STARTED
         && provider instanceof FilterEncoder
-        && isSupported(connector, provider.getData())) {
+        && isSupported(connector, provider.getData())
+        && isFeasible(provider.getData())) {
       this.sqlConnector = (SqlConnector) connector;
       this.filterEncoder = (FilterEncoder<String>) provider;
       if (!timers.containsKey(provider.getId())) {
@@ -254,14 +276,6 @@ public class TileBuilderPgisAsMvt
         segSize);
   }
 
-  private Optional<PgisTilesConfiguration> getConfiguration(
-      List<ExtensionConfiguration> extensions) {
-    return extensions.stream()
-        .filter(extension -> extension.isEnabled() && extension instanceof PgisTilesConfiguration)
-        .map(extension -> (PgisTilesConfiguration) extension)
-        .findFirst();
-  }
-
   private String filtersToSql(
       TilesetFeatures tileset, FeatureSchema schema, String tmsId, int level) {
     List<String> filters =
@@ -274,5 +288,93 @@ public class TileBuilderPgisAsMvt
     return filters.isEmpty()
         ? "TRUE"
         : filters.stream().collect(Collectors.joining(" AND ", "(", ")"));
+  }
+
+  private static Optional<PgisTilesConfiguration> getConfiguration(
+      List<ExtensionConfiguration> extensions) {
+    return extensions.stream()
+        .filter(extension -> extension.isEnabled() && extension instanceof PgisTilesConfiguration)
+        .map(extension -> (PgisTilesConfiguration) extension)
+        .findFirst();
+  }
+
+  private static boolean isFeasible(FeatureProviderDataV2 data) {
+    UnsupportedMode unsupportedMode =
+        getConfiguration(data.getExtensions()).get().getUnsupportedProperties();
+    List<String> objectOrArrayProperties =
+        data.getTypes().values().stream()
+            .flatMap(type -> type.getProperties().stream())
+            .filter(property -> property.isObject() || property.isArray())
+            .map(SchemaBase::getFullPathAsString)
+            .toList();
+    List<String> transformedValueProperties =
+        data.getTypes().values().stream()
+            .flatMap(type -> type.getProperties().stream())
+            .filter(property -> property.isValue() && !property.getTransformations().isEmpty())
+            .map(SchemaBase::getFullPathAsString)
+            .toList();
+    List<String> joinedValueProperties =
+        data.getTypes().values().stream()
+            .flatMap(type -> type.getProperties().stream())
+            .filter(
+                property ->
+                    property.isValue()
+                        && property.getSourcePath().isPresent()
+                        && property.getSourcePath().get().contains("/"))
+            .map(SchemaBase::getFullPathAsString)
+            .toList();
+    boolean hasCrsAxisSwap =
+        data.getNativeCrs().isPresent()
+            && data.getNativeCrs().get().getForceAxisOrder() != Force.NONE;
+
+    boolean isFeasible = true;
+    String skipping = unsupportedMode == UnsupportedMode.WARN ? ", skipping" : "";
+
+    if (!objectOrArrayProperties.isEmpty()) {
+      if (unsupportedMode != UnsupportedMode.IGNORE) {
+        LOGGER.warn(
+            "Optimized PostGIS MVT tile generation is not supported for object and array properties{}: {}",
+            skipping,
+            String.join(", ", objectOrArrayProperties));
+      }
+      if (unsupportedMode == UnsupportedMode.DISABLE) {
+        isFeasible = false;
+      }
+    }
+    if (!transformedValueProperties.isEmpty()) {
+      if (unsupportedMode != UnsupportedMode.IGNORE) {
+        LOGGER.warn(
+            "Optimized PostGIS MVT tile generation is not supported for transformed value properties{}: {}",
+            skipping,
+            String.join(", ", transformedValueProperties));
+      }
+      if (unsupportedMode == UnsupportedMode.DISABLE) {
+        isFeasible = false;
+      }
+    }
+    if (!joinedValueProperties.isEmpty()) {
+      if (unsupportedMode != UnsupportedMode.IGNORE) {
+        LOGGER.warn(
+            "Optimized PostGIS MVT tile generation is not supported for joined value properties{}: {}",
+            skipping,
+            String.join(", ", joinedValueProperties));
+      }
+      if (unsupportedMode == UnsupportedMode.DISABLE) {
+        isFeasible = false;
+      }
+    }
+    if (hasCrsAxisSwap) {
+      LOGGER.warn(
+          "Optimized PostGIS MVT tile generation is not supported for native CRS with forced axis: {}",
+          data.getNativeCrs().get());
+      isFeasible = false;
+    }
+
+    if (!isFeasible) {
+      LOGGER.warn("Optimized PostGIS MVT tile generation disabled");
+      return false;
+    }
+
+    return true;
   }
 }

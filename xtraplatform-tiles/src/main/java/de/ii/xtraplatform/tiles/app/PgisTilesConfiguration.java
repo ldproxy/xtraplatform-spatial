@@ -18,6 +18,7 @@ import org.immutables.value.Value;
  * ```yaml
  * - type: PGIS_TILES
  *   enabled: true
+ *   unsupportedProperties: IGNORE
  * ```
  * </code>
  */
@@ -27,10 +28,32 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutablePgisTilesConfiguration.Builder.class)
 public interface PgisTilesConfiguration extends ExtensionConfiguration {
 
+  enum UnsupportedMode {
+    DISABLE,
+    WARN,
+    IGNORE
+  }
+
   abstract class Builder extends ExtensionConfiguration.Builder {}
 
   @Override
   default Builder getBuilder() {
     return new ImmutablePgisTilesConfiguration.Builder();
+  }
+
+  /**
+   * @langEn How should the extension behave when unsupported properties are found in the
+   *     configuration. Options are `DISABLE` to disable the extension, `WARN` to log a warning and
+   *     `IGNORE` to ignore the properties.
+   * @langDe Wie soll sich die Erweiterung verhalten, wenn nicht unterstützte Properties in der
+   *     Konfiguration gefunden werden. Mögliche Werte sind `DISABLE` um die Erweiterung zu
+   *     deaktivieren, `WARN` um eine Warnung zu loggen und `IGNORE` um die Properties zu
+   *     ignorieren.
+   * @default DISABLE
+   * @since v4.4
+   */
+  @Value.Default
+  default UnsupportedMode getUnsupportedProperties() {
+    return UnsupportedMode.DISABLE;
   }
 }
