@@ -10,7 +10,7 @@ class YamlSerialization {
     //TODO: from jackson or store?
     static ObjectMapper createYamlMapper() {
         def jackson = new JacksonProvider(() -> Set.of(), false)
-        def encoder = new ValueEncodingJackson<?>(jackson, false)
+        def encoder = new ValueEncodingJackson<?>(jackson, null, false)
 
         /*def yamlFactory = new YAMLFactory()
                 .disable(YAMLGenerator.Feature.USE_NATIVE_TYPE_ID)
