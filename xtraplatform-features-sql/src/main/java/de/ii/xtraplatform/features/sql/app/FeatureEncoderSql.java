@@ -7,8 +7,6 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -18,6 +16,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
+import de.ii.xtraplatform.features.json.domain.JsonBuilder;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
@@ -53,13 +52,13 @@ public class FeatureEncoderSql
   private final EpsgCrs nativeCrs;
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<String> nullValue;
-  private final ObjectMapper jsonMapper;
+  private Map<String, JsonBuilder> jsonColumns;
   private final boolean trace;
 
   private ModifiableFeatureDataSql currentFeature;
   private GeometryWithStringCoordinates<?> currentGeometry;
-  private Map<String, Object> currentJson;
   private Tuple<SqlQuerySchema, SqlQueryColumn> currentJsonColumn;
+  private JsonBuilder currentJson;
 
   public FeatureEncoderSql(
       SqlQueryMapping mapping,
@@ -71,7 +70,7 @@ public class FeatureEncoderSql
     this.crsTransformer = crsTransformerFactory.getTransformer(inputCrs, nativeCrs);
     this.nativeCrs = nativeCrs;
     this.nullValue = nullValue;
-    this.jsonMapper = new ObjectMapper();
+    this.jsonColumns = new LinkedHashMap<>();
     this.trace = false;
   }
 
@@ -90,7 +89,7 @@ public class FeatureEncoderSql
     currentFeature = ModifiableFeatureDataSql.create().setMapping(mapping);
     currentFeature.addRow(mapping.getMainTable());
     currentGeometry = null;
-    currentJson = new LinkedHashMap<>();
+    jsonColumns.clear();
     if (trace) LOGGER.debug("onFeatureStart: {}", context.pathAsString());
   }
 
@@ -102,10 +101,8 @@ public class FeatureEncoderSql
     if (currentJsonColumn != null) {
       try {
         currentFeature.addColumn(
-            currentJsonColumn.first(),
-            currentJsonColumn.second(),
-            "'" + jsonMapper.writeValueAsString(currentJson) + "'");
-      } catch (JsonProcessingException e) {
+            currentJsonColumn.first(), currentJsonColumn.second(), "'" + currentJson.build() + "'");
+      } catch (IOException e) {
         LOGGER.error(
             "Error while serializing JSON column {}: {}",
             currentJsonColumn.second().getName(),
@@ -158,6 +155,21 @@ public class FeatureEncoderSql
             schema -> {
               if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), schema);
             });
+
+    mapping
+        .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+        .ifPresentOrElse(
+            column -> {
+              if (checkJson(column)) {
+                currentJson.openObject(context.path());
+
+                if (trace) LOGGER.debug("onObjectStart: JSON {}", context.pathAsString());
+              }
+            },
+            () -> {
+              if (trace)
+                LOGGER.warn("onObjectStart: JSON {} not found in mapping", context.pathAsString());
+            });
   }
 
   @Override
@@ -193,6 +205,21 @@ public class FeatureEncoderSql
 
       currentGeometry = null;
     }
+
+    mapping
+        .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+        .ifPresentOrElse(
+            column -> {
+              if (checkJson(column)) {
+                currentJson.closeObject(context.path());
+
+                if (trace) LOGGER.debug("onObjectEnd: JSON {}", context.pathAsString());
+              }
+            },
+            () -> {
+              if (trace)
+                LOGGER.warn("onObjectEnd: JSON {} not found in mapping", context.pathAsString());
+            });
   }
 
   @Override
@@ -202,6 +229,21 @@ public class FeatureEncoderSql
     if (context.inGeometry()) {
       currentGeometry.openChild();
     }
+
+    mapping
+        .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+        .ifPresentOrElse(
+            column -> {
+              if (checkJson(column)) {
+                currentJson.openArray(context.path());
+
+                if (trace) LOGGER.debug("onArrayStart: JSON {}", context.pathAsString());
+              }
+            },
+            () -> {
+              if (trace)
+                LOGGER.warn("onArrayStart: JSON {} not found in mapping", context.pathAsString());
+            });
   }
 
   @Override
@@ -211,6 +253,21 @@ public class FeatureEncoderSql
     if (context.inGeometry()) {
       currentGeometry.closeChild();
     }
+
+    mapping
+        .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+        .ifPresentOrElse(
+            column -> {
+              if (checkJson(column)) {
+                currentJson.closeArray(context.path());
+
+                if (trace) LOGGER.debug("onArrayEnd: JSON {}", context.pathAsString());
+              }
+            },
+            () -> {
+              if (trace)
+                LOGGER.warn("onArrayEnd: JSON {} not found in mapping", context.pathAsString());
+            });
   }
 
   @Override
@@ -229,15 +286,15 @@ public class FeatureEncoderSql
         .or(() -> "id".equals(context.pathAsString()) ? mapping.getColumnForId() : Optional.empty())
         .ifPresentOrElse(
             column -> {
-              if (column.second().hasOperation(Operation.CONNECTOR)) {
-                if (column.second().getOperationParameter(Operation.CONNECTOR, "").equals("JSON")) {
-                  if (currentJsonColumn == null) {
-                    currentJsonColumn = column;
-                    currentJson = new LinkedHashMap<>();
-                  }
-                  // TODO: sql name
-                  currentJson.put(context.pathAsString(), context.value());
-                }
+              if (checkJson(column)) {
+                String value =
+                    Objects.nonNull(context.value())
+                        ? context.value().replaceAll("'", "''")
+                        : context.value();
+                // TODO: sql name
+                currentJson.addValue(context.path(), value);
+
+                if (trace) LOGGER.debug("onValue: JSON {} {}", context.pathAsString(), value);
                 return;
               }
 
@@ -277,6 +334,21 @@ public class FeatureEncoderSql
   @Override
   public ModifiableContext<SqlQuerySchema, SqlQueryMapping> createContext() {
     return ModifiableFeatureEncoderSqlContext.create();
+  }
+
+  private boolean checkJson(Tuple<SqlQuerySchema, SqlQueryColumn> column) {
+    if (column.second().hasOperation(Operation.CONNECTOR)) {
+      if (column.second().getOperationParameter(Operation.CONNECTOR, "").equals("JSON")) {
+        if (currentJsonColumn == null) {
+          currentJsonColumn = column;
+          jsonColumns.put(currentJsonColumn.second().getPathSegment(), new JsonBuilder());
+          currentJson = jsonColumns.get(currentJsonColumn.second().getPathSegment());
+        }
+
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String toWkt(
