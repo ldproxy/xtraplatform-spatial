@@ -7,25 +7,61 @@
  */
 package de.ii.xtraplatform.geometries.domain;
 
+import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import org.immutables.value.Value;
 
-/**
- * @author fischer
- */
-public abstract class Geometry {
+public interface Geometry<T> {
 
-  protected EpsgCrs crs;
-  protected double[] coordinates;
+  SimpleFeatureGeometry getType();
 
-  public double[] getCoordinates() {
-    return coordinates;
+  List<T> getCoordinates();
+
+  @Value.Default
+  default EpsgCrs getCrs() {
+    return OgcCrs.CRS84;
   }
 
-  public EpsgCrs getCrs() {
-    return crs;
+  @Value.Default
+  default int getDimension() {
+    return 2;
   }
 
-  public void setCrs(EpsgCrs crs) {
-    this.crs = crs;
+  default String toWkt(Optional<CrsTransformer> crsTransformer, EpsgCrs crs) {
+    return "";
+  }
+
+  interface ModifiableGeometry<T> {
+
+    ModifiableGeometry<T> setCrs(EpsgCrs crs);
+
+    default ModifiableGeometry<T> setCrs(Optional<EpsgCrs> crs) {
+      crs.ifPresent(this::setCrs);
+      return this;
+    }
+
+    ModifiableGeometry<T> setDimension(int dimension);
+
+    default ModifiableGeometry<T> setDimension(OptionalInt dimension) {
+      dimension.ifPresent(this::setDimension);
+      return this;
+    }
+
+    @Value.Default
+    default int getDepth() {
+      return 0;
+    }
+
+    ModifiableGeometry<T> setDepth(int depth);
+
+    void openChild();
+
+    void closeChild();
+
+    void addCoordinate(T coordinate);
   }
 }

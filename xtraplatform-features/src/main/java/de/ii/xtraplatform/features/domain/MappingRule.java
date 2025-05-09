@@ -21,6 +21,8 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableMappingRule.Builder.class)
 public interface MappingRule {
 
+  String ROOT_TARGET = "$";
+
   enum Scope {
     R,
     C,

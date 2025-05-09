@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import static de.ii.xtraplatform.features.domain.MappingRule.ROOT_TARGET;
 import static de.ii.xtraplatform.features.sql.domain.SqlQueryMapping.IN_CONNECTED_ARRAY;
 import static de.ii.xtraplatform.features.sql.domain.SqlQueryMapping.PATH_IN_CONNECTOR;
 
@@ -197,6 +198,15 @@ public class SqlMappingDeriver {
       }
       SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
 
+      // TODO: ignoring joins for now
+      if (!Objects.equals(ROOT_TARGET, tableRule.getTarget())) {
+        continue;
+      }
+
+      if (column1.hasOperation(SqlQueryColumn.Operation.CONSTANT)) {
+        continue;
+      }
+
       addToMapping(
           schema,
           mapping,
@@ -330,21 +340,23 @@ public class SqlMappingDeriver {
                       ? path.replace(connector + "/", "").replace(connector, "")
                       : pathInConnector + "." + path;
 
-              if (p.isValue()) {
-                if (!inArray && pathInConnector.isEmpty()) {
-                  return Stream.of(p);
-                }
+              FeatureSchema schema =
+                  !inArray && pathInConnector.isEmpty()
+                      ? p
+                      : new ImmutableFeatureSchema.Builder()
+                          .from(p)
+                          .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
+                          .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
+                          .build();
 
-                return Stream.of(
-                    new ImmutableFeatureSchema.Builder()
-                        .from(p)
-                        .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
-                        .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
-                        .build());
+              if (p.isValue()) {
+                return Stream.of(schema);
               }
 
-              return getConnectedSchemas(p, null, newPathInConnector, inArray || p.isArray())
-                  .stream();
+              return Stream.concat(
+                  Stream.of(schema),
+                  getConnectedSchemas(p, null, newPathInConnector, inArray || p.isArray())
+                      .stream());
             })
         .toList();
   }

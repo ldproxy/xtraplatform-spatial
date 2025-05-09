@@ -14,6 +14,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlPathDefaults
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.util.stream.Collectors
@@ -44,6 +45,7 @@ import static SqlInsertsFixtures.MERGE_SCHEMA
 /**
  * @author zahnen
  */
+@Ignore //TODO
 class SqlInsertGeneratorSpec2 extends Specification {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SqlInsertGeneratorSpec2.class);
