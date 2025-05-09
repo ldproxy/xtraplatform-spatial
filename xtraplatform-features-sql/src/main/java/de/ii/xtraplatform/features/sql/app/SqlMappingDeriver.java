@@ -246,7 +246,7 @@ public class SqlMappingDeriver {
       if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
         List<FeatureSchema> connectedSchemas =
             includeSchema
-                ? getConnectedSchemas(schema, column1.getPathSegment(), "", false, isWritable)
+                ? getConnectedSchemas(schema, column1.getPathSegment(), "", false)
                 : List.of();
 
         for (FeatureSchema p : connectedSchemas) {
@@ -336,11 +336,7 @@ public class SqlMappingDeriver {
   }
 
   private List<FeatureSchema> getConnectedSchemas(
-      FeatureSchema parent,
-      String connector,
-      String pathInConnector,
-      boolean inArray,
-      boolean isWritable) {
+      FeatureSchema parent, String connector, String pathInConnector, boolean inArray) {
     return parent.getProperties().stream()
         .filter(
             p ->
@@ -356,27 +352,23 @@ public class SqlMappingDeriver {
                       ? path.replace(connector + "/", "").replace(connector, "")
                       : pathInConnector + "." + path;
 
+              FeatureSchema schema =
+                  !inArray && pathInConnector.isEmpty()
+                      ? p
+                      : new ImmutableFeatureSchema.Builder()
+                          .from(p)
+                          .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
+                          .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
+                          .build();
+
               if (p.isValue()) {
-                if (!inArray && pathInConnector.isEmpty()) {
-                  return Stream.of(p);
-                }
-
-                return Stream.of(
-                    new ImmutableFeatureSchema.Builder()
-                        .from(p)
-                        .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
-                        .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
-                        .build());
+                return Stream.of(schema);
               }
 
-              // TODO: ignoring objects and arrays for now
-              if (isWritable) {
-                return Stream.empty();
-              }
-
-              return getConnectedSchemas(
-                  p, null, newPathInConnector, inArray || p.isArray(), isWritable)
-                  .stream();
+              return Stream.concat(
+                  Stream.of(schema),
+                  getConnectedSchemas(p, null, newPathInConnector, inArray || p.isArray())
+                      .stream());
             })
         .toList();
   }
