@@ -18,6 +18,7 @@ import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.MetaQueryTemplate;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings.NullOrder;
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
@@ -67,16 +68,22 @@ public class SqlQueryTemplatesDeriver2 {
   }
 
   public SqlQueryTemplates derive(SqlQueryMapping mapping) {
+    SqlQueryMapping readableMapping =
+        new ImmutableSqlQueryMapping.Builder()
+            .from(mapping)
+            .tables(
+                mapping.getTables().stream().filter(SqlQuerySchema::hasReadableColumns).toList())
+            .build();
+
     List<ValueQueryTemplate> valueQueryTemplates =
-        mapping.getTables().stream()
-            .filter(SqlQuerySchema::hasReadableColumns)
+        readableMapping.getTables().stream()
             .map(schema -> createValueQueryTemplate(schema, mapping))
-            .collect(Collectors.toList());
+            .toList();
 
     return new ImmutableSqlQueryTemplates.Builder()
         .metaQueryTemplate(createMetaQueryTemplate(mapping.getMainTable(), mapping))
         .valueQueryTemplates(valueQueryTemplates)
-        .mapping(mapping)
+        .mapping(readableMapping)
         .build();
   }
 

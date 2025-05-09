@@ -68,7 +68,19 @@ public class MappingRulesDeriver
             .toList();
     List<MappingRule> rulesList =
         allPathsList.stream()
-            .flatMap(path -> toRules(path.first(), path.second(), schema))
+            .flatMap(
+                path -> {
+                  if (!parents.isEmpty()
+                      && !parents.get(parents.size() - 1).getConcat().isEmpty()
+                      && parents
+                          .get(parents.size() - 1)
+                          .getEffectiveSourcePaths()
+                          .contains(path.second())) {
+                    return Stream.empty();
+                  }
+
+                  return toRules(path.first(), path.second(), schema);
+                })
             .toList();
 
     return Stream.concat(rules, visitedProperties.stream().flatMap(List::stream)).toList();
@@ -172,11 +184,21 @@ public class MappingRulesDeriver
             spans.add(span + 1, span + 1);
 
             spans.set(i, span + 1);
+            for (int j = 0; j < i; j++) {
+              if (spans.get(j) == span) {
+                spans.set(j, span + 1);
+              }
+            }
             for (int j = span + 2; j < spans.size(); j++) {
               spans.set(j, spans.get(j) + 1);
             }
 
             cursors.set(i, index + rulesByTable.get(tableIdentifier).size());
+            for (int j = 0; j < i; j++) {
+              if (cursors.get(j) == index) {
+                cursors.set(j, index + rulesByTable.get(tableIdentifier).size());
+              }
+            }
             for (int j = span + 2; j < cursors.size(); j++) {
               cursors.set(j, cursors.get(j) + rulesByTable.get(tableIdentifier).size());
             }
