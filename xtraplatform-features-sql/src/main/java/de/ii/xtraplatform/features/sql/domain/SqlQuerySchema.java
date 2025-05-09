@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.sql.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -69,20 +70,23 @@ public interface SqlQuerySchema extends SqlQueryTable {
     return Stream.concat(getFullPath().stream(), Stream.of(column.getPathSegment())).toList();
   }
 
-  /*@JsonIgnore
-  @Value.Lazy
-  default List<String> getColumnNames() {
-    return getColumns().stream().map(SqlQueryColumn::getName).toList();
-  }*/
-
   @JsonIgnore
   @Value.Lazy
   default List<String> getSortKeys() {
-    return Stream.concat(getRelations().stream().filter(rel -> !rel.isJunction()), Stream.of(this))
-        .map(
-            sqlQueryTable ->
-                String.format("%s.%s", sqlQueryTable.getName(), sqlQueryTable.getSortKey()))
-        .toList();
+    List<String> keys = new ArrayList<>();
+    String prefix = "";
+
+    for (SqlQueryJoin join : getRelations()) {
+      prefix += join.getPathSegment();
+      if (!join.isJunction()) {
+        keys.add(String.format("%s.%s", prefix, join.getSortKey()));
+      }
+    }
+    prefix += this.getPathSegment();
+
+    keys.add(String.format("%s.%s", prefix, this.getSortKey()));
+
+    return keys;
   }
 
   @JsonIgnore
