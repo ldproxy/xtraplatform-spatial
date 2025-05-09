@@ -1,0 +1,58 @@
+---
+- name: o73005
+  pathSegment: o73005
+  sortKey: sch
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+    role: ID
+- name: verwaltungseinheit
+  pathSegment: "[sch=ags]verwaltungseinheit"
+  relations:
+  - name: o73005
+    pathSegment: o73005
+    sortKey: sch
+    sourceField: sch
+    target: verwaltungseinheit
+    targetField: ags
+  columns:
+  - name: geometrie
+    pathSegment: geometrie
+    type: GEOMETRY
+    role: PRIMARY_GEOMETRY
+- name: o73004
+  pathSegment: o73004
+  sortKey: sch
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+    role: ID
+- name: verwaltungseinheit
+  pathSegment: "[sch=ags]verwaltungseinheit"
+  relations:
+  - name: o73004
+    pathSegment: o73004
+    sortKey: sch
+    sourceField: sch
+    target: verwaltungseinheit
+    targetField: ags
+  columns:
+  - name: geometrie
+    pathSegment: geometrie
+    type: GEOMETRY
+    role: PRIMARY_GEOMETRY
+- name: verwaltungseinheit
+  pathSegment: "[sch=ags]verwaltungseinheit"
+  relations:
+  - name: o73004
+    pathSegment: o73004
+    sortKey: sch
+    sourceField: sch
+    target: verwaltungseinheit
+    targetField: ags
+  columns:
+  - name: uebergobjekt
+    pathSegment: uebergobjekt
+    type: STRING

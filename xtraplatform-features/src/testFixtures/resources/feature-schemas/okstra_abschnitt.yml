@@ -1,0 +1,27 @@
+sourcePath: /abschnitt
+properties:
+  oid:
+    sourcePath: oid
+    type: STRING
+    role: ID
+  strasse:
+    sourcePath: '[oid=id]zwischentab{filter=role=''zu_Strasse''}/[rid=oid]strasse'
+    type: OBJECT
+    properties:
+      strassenbezeichnung:
+        sourcePath: '[oid=id]zwischentab{filter=role=''hat_Strassenbezeichnung''}/[rid=oid]strassenbezeichnung'
+        type: OBJECT
+        properties:
+          strassenklasse:
+            sourcePath: '[strassenklasse=oid]strassenklasse'
+            type: OBJECT
+            properties:
+              kennung:
+                sourcePath: kennung
+                type: STRING
+          strassennummer:
+            sourcePath: strassennummer
+            type: INTEGER
+          zusatzbuchstabe:
+            sourcePath: zusatzbuchstabe
+            type: STRING

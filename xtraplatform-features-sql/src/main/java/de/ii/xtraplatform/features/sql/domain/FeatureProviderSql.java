@@ -62,6 +62,8 @@ import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMutationResult;
 import de.ii.xtraplatform.features.domain.ImmutableSubQuery;
+import de.ii.xtraplatform.features.domain.MappingRule;
+import de.ii.xtraplatform.features.domain.MappingRulesDeriver;
 import de.ii.xtraplatform.features.domain.MultiFeatureQueries;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
@@ -93,8 +95,9 @@ import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
+import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
-import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
+import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver2;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.services.domain.Scheduler;
@@ -350,6 +353,7 @@ public class FeatureProviderSql
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SchemaSql>> tableSchemasQueryables;
   private Map<String, List<SchemaSql>> tableSchemasMutations;
+  private Map<String, SqlQueryMapping> queryMappings;
   private String cronJob;
 
   @AssistedInject
@@ -446,7 +450,33 @@ public class FeatureProviderSql
         new SourceSchemaValidatorSql(validationSchemas, this::getSqlClient);
 
     this.pathParser3 = createPathParser3(getData().getSourcePathDefaults(), cql, subdecoders);
+
+    // TODO: use new derivers and schemas everywhere
     QuerySchemaDeriver querySchemaDeriver = new QuerySchemaDeriver(pathParser3);
+    MappingRulesDeriver mappingRulesDeriver = new MappingRulesDeriver();
+    SqlMappingDeriver sqlMappingDeriver =
+        new SqlMappingDeriver(pathParser3, getData().getQueryGeneration());
+
+    Map<String, List<MappingRule>> mappingRules =
+        getData().getTypes().entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        entry.getValue().accept(WITH_SCOPE_QUERIES).accept(mappingRulesDeriver)))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
+    this.queryMappings =
+        getData().getTypes().entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        sqlMappingDeriver.derive(
+                            mappingRules.get(entry.getKey()),
+                            entry.getValue() /*.accept(WITH_SCOPE_QUERIES)*/)))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
     this.tableSchemas =
         getData().getTypes().entrySet().stream()
             .map(
@@ -455,6 +485,7 @@ public class FeatureProviderSql
                         entry.getKey(),
                         entry.getValue().accept(WITH_SCOPE_RETURNABLE).accept(querySchemaDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
     this.tableSchemasQueryables =
         getData().getTypes().entrySet().stream()
             .map(
@@ -505,58 +536,27 @@ public class FeatureProviderSql
                         entry.getValue().accept(WITH_SCOPE_RECEIVABLE).accept(querySchemaDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
-    Map<String, List<SqlQueryTemplates>> allQueryTemplates =
-        tableSchemas.entrySet().stream()
+    SqlQueryTemplatesDeriver2 sqlQueryTemplatesDeriver2 =
+        new SqlQueryTemplatesDeriver2(
+            filterEncoder,
+            sqlDialect,
+            getData().getQueryGeneration().getComputeNumberMatched(),
+            true,
+            getData().getQueryGeneration().getNullOrder());
+
+    Map<String, List<SqlQueryTemplates>> allQueryTemplates2 =
+        queryMappings.entrySet().stream()
             .map(
                 entry -> {
                   final int[] i = {0};
                   return new SimpleImmutableEntry<>(
-                      entry.getKey(),
-                      entry.getValue().stream()
-                          .map(
-                              schemaSql ->
-                                  schemaSql.accept(
-                                      new SqlQueryTemplatesDeriver(
-                                          tableSchemasQueryables.get(entry.getKey()).get(i[0]++),
-                                          filterEncoder,
-                                          sqlDialect,
-                                          getData().getQueryGeneration().getComputeNumberMatched(),
-                                          true,
-                                          getData().getQueryGeneration().getNullOrder(),
-                                          getData().getQueryGeneration().getGeometryAsWkb())))
-                          .collect(Collectors.toList()));
+                      entry.getKey(), List.of(sqlQueryTemplatesDeriver2.derive(entry.getValue())));
                 })
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
-
-    Map<String, List<SqlQueryTemplates>> allQueryTemplatesMutations =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    new SimpleImmutableEntry<>(
-                        entry.getKey(),
-                        ImmutableList.of(
-                            entry
-                                .getValue()
-                                .accept(WITH_SCOPE_RECEIVABLE)
-                                .accept(querySchemaDeriver)
-                                .get(0)
-                                .accept(
-                                    new SqlQueryTemplatesDeriver(
-                                        null,
-                                        filterEncoder,
-                                        sqlDialect,
-                                        getData().getQueryGeneration().getComputeNumberMatched(),
-                                        false,
-                                        getData().getQueryGeneration().getNullOrder(),
-                                        getData().getQueryGeneration().getGeometryAsWkb())))))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =
         new FeatureQueryEncoderSql(
-            allQueryTemplates,
-            allQueryTemplatesMutations,
-            getData().getQueryGeneration(),
-            sqlDialect);
+            allQueryTemplates2, allQueryTemplates2, getData().getQueryGeneration(), sqlDialect);
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
@@ -1358,7 +1358,7 @@ public class FeatureProviderSql
       List<String> excluded,
       String pathSeparator,
       boolean cleanupKeys) {
-    Predicate<String> excludeConnectors = path -> path.matches(".*?\\[[^=\\]]+].+");
+    Predicate<String> excludeConnectors = path -> false; // path.matches(".*?\\[[^=\\]]+].+");
     OnlyQueryables queryablesSelector =
         new OnlyQueryables(included, excluded, pathSeparator, excludeConnectors, cleanupKeys);
 
@@ -1368,7 +1368,7 @@ public class FeatureProviderSql
   @Override
   public FeatureSchema getSortablesSchema(
       FeatureSchema schema, List<String> included, List<String> excluded, String pathSeparator) {
-    Predicate<String> excludeConnectors = path -> path.matches(".*?\\[[^=\\]]+].+");
+    Predicate<String> excludeConnectors = path -> false; // path.matches(".*?\\[[^=\\]]+].+");
     OnlySortables sortablesSelector =
         new OnlySortables(included, excluded, pathSeparator, excludeConnectors);
 

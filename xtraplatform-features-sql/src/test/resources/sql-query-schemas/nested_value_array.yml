@@ -1,0 +1,49 @@
+---
+- name: o42003
+  pathSegment: o42003
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+- name: o42002
+  pathSegment: "[p0000103000=objid]o42002"
+  relations:
+  - name: o42003
+    pathSegment: o42003
+    sourceField: id
+    target: o42003__p0000103000
+    targetField: rid
+  - name: o42003__p0000103000
+    pathSegment: "[id=rid]o42003__p0000103000"
+    sourceField: p0000103000
+    target: o42002
+    targetField: objid
+    junction: true
+  columns:
+  - name: nam
+    pathSegment: nam
+    type: STRING
+- name: o42002__bez
+  pathSegment: "[id=rid]o42002__bez"
+  relations:
+  - name: o42003
+    pathSegment: o42003
+    sourceField: id
+    target: o42003__p0000103000
+    targetField: rid
+  - name: o42003__p0000103000
+    pathSegment: "[id=rid]o42003__p0000103000"
+    sourceField: p0000103000
+    target: o42002
+    targetField: objid
+    junction: true
+  - name: o42002
+    pathSegment: "[p0000103000=objid]o42002"
+    sourceField: id
+    target: o42002__bez
+    targetField: rid
+  columns:
+  - name: bez
+    pathSegment: bez
+    type: STRING

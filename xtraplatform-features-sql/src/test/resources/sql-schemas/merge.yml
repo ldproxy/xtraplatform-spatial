@@ -1,0 +1,55 @@
+---
+- name: eignungsflaeche
+  type: OBJECT
+  sourcePath: eignungsflaeche
+  properties:
+  - name: programm
+    type: STRING
+    parentPath:
+    - eignungsflaeche
+    sourcePath: programm
+    sortKeyUnique: true
+    isExpression: false
+  - name: osirisobjekt
+    type: OBJECT
+    parentPath:
+    - eignungsflaeche
+    properties:
+    - name: id
+      type: STRING
+      role: ID
+      parentPath:
+      - eignungsflaeche
+      - "[id=id]osirisobjekt"
+      sourcePath: id
+      sortKey: id
+      sortKeyUnique: true
+      isExpression: false
+    - name: kennung
+      type: STRING
+      parentPath:
+      - eignungsflaeche
+      - "[id=id]osirisobjekt"
+      sourcePath: kennung
+      sortKey: id
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_ONE
+      sourceContainer: eignungsflaeche
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: osirisobjekt
+      targetField: id
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - eignungsflaeche.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

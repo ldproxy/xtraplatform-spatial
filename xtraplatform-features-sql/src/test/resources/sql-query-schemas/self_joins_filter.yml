@@ -1,0 +1,57 @@
+---
+- name: building
+  pathSegment: "building{filter=oid>1}"
+  filter:
+    args:
+    - property: oid
+    - 1
+    op: '>'
+  columns:
+  - name: oid
+    pathSegment: oid
+    type: STRING
+    role: ID
+- name: building
+  pathSegment: "[id=fk_buildingpart_parent]building{filter=id>100}"
+  filter:
+    args:
+    - property: id
+    - 100
+    op: '>'
+  relations:
+  - name: building
+    pathSegment: "building{filter=oid>1}"
+    filter:
+      args:
+      - property: oid
+      - 1
+      op: '>'
+    sourceField: id
+    target: building
+    targetField: fk_buildingpart_parent
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+- name: building
+  pathSegment: "[fk_buildingpart_parent=id]building{filter=id>1000}"
+  filter:
+    args:
+    - property: id
+    - 1000
+    op: '>'
+  relations:
+  - name: building
+    pathSegment: "building{filter=oid>1}"
+    filter:
+      args:
+      - property: oid
+      - 1
+      op: '>'
+    sourceField: fk_buildingpart_parent
+    target: building
+    targetField: id
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING

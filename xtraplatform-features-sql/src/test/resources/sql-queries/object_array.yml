@@ -1,0 +1,10 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM explorationsite A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, C.id AS SKEY_1, C.id, C.projectname, C.id
+  FROM explorationsite A
+  JOIN explorationsite_task B ON (A.id=B.explorationsite_fk)
+  JOIN task C ON (B.task_fk=C.id)
+  ORDER BY 1,2

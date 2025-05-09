@@ -1,0 +1,12 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM explorationsite A
+  WHERE (A.id >= 10 AND A.id <= 19)
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, C.id AS SKEY_1, C.id, C.projectname, C.id
+  FROM explorationsite A
+  JOIN explorationsite_task B ON (A.id=B.explorationsite_fk)
+  JOIN task C ON (B.task_fk=C.id)
+  WHERE (A.id >= 10 AND A.id <= 19)
+  ORDER BY 1,2

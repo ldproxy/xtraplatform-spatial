@@ -1,0 +1,53 @@
+---
+- name: o31001
+  type: OBJECT
+  sourcePath: building
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - o31001
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: position
+    type: STRING
+    parentPath:
+    - o31001
+    sourcePath: geometry2D.geometry
+    sortKeyUnique: true
+    isExpression: false
+  - name: bu2d_building__horizontalgeometryreference
+    type: OBJECT
+    parentPath:
+    - o31001
+    sourcePath: geometry2D.horizontalGeometryReference
+    properties:
+    - name: classifier
+      type: STRING
+      parentPath:
+      - o31001
+      - "[id=id]bu2d_building__horizontalgeometryreference"
+      sourcePath: horizontalGeometryReference.href
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_ONE
+      sourceContainer: o31001
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: bu2d_building__horizontalgeometryreference
+      targetField: id
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - o31001.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

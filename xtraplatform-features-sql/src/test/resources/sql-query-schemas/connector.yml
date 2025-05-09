@@ -1,0 +1,14 @@
+---
+- name: eignungsflaeche
+  pathSegment: eignungsflaeche
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+  - name: osirisobjekt
+    pathSegment: "[JSON]osirisobjekt"
+    type: OBJECT_ARRAY
+    operations:
+      CONNECTOR:
+      - JSON

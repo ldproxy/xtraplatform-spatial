@@ -1,0 +1,35 @@
+---
+- name: coretable
+  pathSegment: "coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}"
+  filter:
+    args:
+    - property: featuretype
+    - BP_BaugebietsTeilFlaeche
+    op: =
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+- name: refs
+  pathSegment: "[id=related_id]refs{filter=rel='texte'}"
+  filter:
+    args:
+    - property: rel
+    - texte
+    op: =
+  relations:
+  - name: coretable
+    pathSegment: "coretable{filter=featuretype='BP_BaugebietsTeilFlaeche'}"
+    filter:
+      args:
+      - property: featuretype
+      - BP_BaugebietsTeilFlaeche
+      op: =
+    sourceField: id
+    target: refs
+    targetField: related_id
+  filterColumns:
+  - name: base_id
+    pathSegment: base_id
+    type: STRING

@@ -62,7 +62,8 @@ public abstract class AbstractFeatureProvider<
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractFeatureProvider.class);
   protected static final WithScope WITH_SCOPE_RETURNABLE = new WithScope(Scope.RETURNABLE);
   protected static final WithScope WITH_SCOPE_QUERIES =
-      new WithScope(EnumSet.of(SchemaBase.Scope.QUERYABLE, SchemaBase.Scope.SORTABLE));
+      new WithScope(
+          EnumSet.of(Scope.RETURNABLE, SchemaBase.Scope.QUERYABLE, SchemaBase.Scope.SORTABLE));
   protected static final WithScope WITH_SCOPE_RECEIVABLE =
       new WithScope(SchemaBase.Scope.RECEIVABLE);
 
@@ -305,6 +306,7 @@ public abstract class AbstractFeatureProvider<
     return getData().getNativeCrs();
   }
 
+  // TODO: replace direct getTypes calls everywhere with getSchema
   @Override
   public Optional<FeatureSchema> getSchema(String type) {
     return Optional.ofNullable(getData().getTypes().get(type));

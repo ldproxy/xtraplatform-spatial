@@ -7,8 +7,6 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
-import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
-
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.FeatureProviderCapabilities;
 import de.ii.xtraplatform.features.domain.FeatureProviderCapabilities.Level;
@@ -27,11 +25,13 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGenera
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryBatch;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySet;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryBatch;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySet;
 import de.ii.xtraplatform.features.sql.domain.SqlRowMeta;
 import java.util.List;
@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -181,9 +180,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
       Query query,
       Map<String, String> additionalQueryParameters,
       boolean skipMetaQuery) {
-    SchemaSql mainTable =
-        queryTemplates.getSortablesSchema().orElse(queryTemplates.getQuerySchemas().get(0));
-    List<SortKey> sortKeys = transformSortKeys(typeQuery.getSortKeys(), mainTable);
+    List<SortKey> sortKeys =
+        transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
 
     BiFunction<Long, Long, Optional<String>> metaQuery =
         (maxLimit, skipped) ->
@@ -227,7 +225,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .valueQueries(valueQueries)
         .options(getOptions(typeQuery, query))
         .build()
-        .withTableSchemas(queryTemplates.getQuerySchemas());
+        .withTableSchemas(queryTemplates.getMapping().getTables());
   }
 
   @Override
@@ -235,11 +233,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     // TODO: either pass as parameter, or check for null here
     SqlQueryTemplates queryTemplates = allQueryTemplates.get(typeQuery.getType()).get(0);
 
-    // TODO: implement for multiple main tables
-    SchemaSql mainTable =
-        queryTemplates.getSortablesSchema().orElse(queryTemplates.getQuerySchemas().get(0));
-
-    List<SortKey> sortKeys = transformSortKeys(typeQuery.getSortKeys(), mainTable);
+    List<SortKey> sortKeys =
+        transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
 
     return new ImmutableSqlQueryOptions.Builder()
         .type(typeQuery.getType())
@@ -249,45 +244,12 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .build();
   }
 
-  private List<SortKey> transformSortKeys(List<SortKey> sortKeys, SchemaSql mainTable) {
+  private List<SortKey> transformSortKeys(List<SortKey> sortKeys, SqlQueryMapping mapping) {
     return sortKeys.stream()
         .map(
             sortKey -> {
-              // TODO: fast enough? maybe pass all typeInfos to constructor and create map?
-              Predicate<SchemaSql> propertyMatches =
-                  attribute ->
-                      (!attribute.getEffectiveSourcePaths().isEmpty()
-                              && Objects.equals(
-                                  sortKey.getField(),
-                                  String.join(".", attribute.getEffectiveSourcePaths().get(0))))
-                          || (Objects.equals(sortKey.getField(), ID_PLACEHOLDER)
-                              && attribute.isId());
-
-              Optional<String> column =
-                  mainTable.getProperties().stream()
-                      .filter(propertyMatches)
-                      .filter(attribute -> !attribute.isSpatial() && !attribute.isConstant())
-                      .findFirst()
-                      .map(SchemaBase::getName)
-                      .or(
-                          // also check for sortables in a JSON column
-                          () ->
-                              mainTable.getProperties().stream()
-                                  .filter(
-                                      p ->
-                                          (p.getSubDecoder().filter("JSON"::equals).isPresent()
-                                              && p.getSubDecoderTypes()
-                                                  .containsKey(sortKey.getField())
-                                              && typeIsSortable(
-                                                  p.getSubDecoderTypes().get(sortKey.getField()))))
-                                  .findFirst()
-                                  .map(
-                                      p -> {
-                                        PropertyTypeInfo typeInfo =
-                                            p.getSubDecoderTypes().get(sortKey.getField());
-                                        return sqlDialect.applyToJsonValue(
-                                            "", p.getName(), sortKey.getField(), typeInfo);
-                                      }));
+              Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
+                  column = mapping.getColumnForValue(sortKey.getField());
 
               if (column.isEmpty()) {
                 throw new IllegalArgumentException(
@@ -296,7 +258,9 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                         sortKey.getField()));
               }
 
-              return ImmutableSortKey.builder().from(sortKey).field(column.get()).build();
+              String columnName = column.get().second().getName();
+
+              return ImmutableSortKey.builder().from(sortKey).field(columnName).build();
             })
         .collect(ImmutableList.toImmutableList());
   }

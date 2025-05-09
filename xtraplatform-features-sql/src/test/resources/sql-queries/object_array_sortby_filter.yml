@@ -1,0 +1,12 @@
+- >-
+  SELECT A.created AS CSKEY_0, A.id AS SKEY, A.id
+  FROM explorationsite A
+  WHERE (A.id IN (SELECT AA.id FROM explorationsite AA JOIN explorationsite_task AB ON (AA.id=AB.explorationsite_fk) JOIN task AC ON (AB.task_fk=AC.id) WHERE AC.projectname = 'foo'))
+  ORDER BY 1,2
+- >-
+  SELECT A.created AS CSKEY_0, A.id AS SKEY, C.id AS SKEY_1, C.id, C.projectname, C.id
+  FROM explorationsite A
+  JOIN explorationsite_task B ON (A.id=B.explorationsite_fk)
+  JOIN task C ON (B.task_fk=C.id)
+  WHERE (A.id IN (SELECT AA.id FROM explorationsite AA JOIN explorationsite_task AB ON (AA.id=AB.explorationsite_fk) JOIN task AC ON (AB.task_fk=AC.id) WHERE AC.projectname = 'foo'))
+  ORDER BY 1,2,3

@@ -1,0 +1,71 @@
+---
+- name: explorationsite
+  type: OBJECT
+  sourcePath: explorationsite
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - explorationsite
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: task
+    type: OBJECT_ARRAY
+    parentPath:
+    - explorationsite
+    sourcePath: task
+    properties:
+    - name: id
+      type: STRING
+      parentPath:
+      - explorationsite
+      - "[id=explorationsite_fk]explorationsite_task"
+      - "[task_fk=id]task"
+      sourcePath: task.id
+      sortKeyUnique: true
+      isExpression: false
+    - name: projectname
+      type: STRING
+      parentPath:
+      - explorationsite
+      - "[id=explorationsite_fk]explorationsite_task"
+      - "[task_fk=id]task"
+      sourcePath: task.title
+      sortKeyUnique: true
+      isExpression: false
+    - name: id
+      type: STRING
+      parentPath:
+      - explorationsite
+      - "[id=explorationsite_fk]explorationsite_task"
+      - "[task_fk=id]task"
+      sourcePath: task.href
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: explorationsite
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: explorationsite_task
+      targetField: explorationsite_fk
+      joinType: INNER
+    - cardinality: ONE_2_ONE
+      sourceContainer: explorationsite_task
+      sourceField: task_fk
+      targetContainer: task
+      targetField: id
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - explorationsite.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

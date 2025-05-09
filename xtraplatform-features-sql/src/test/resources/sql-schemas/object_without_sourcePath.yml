@@ -1,0 +1,31 @@
+---
+- name: explorationsite
+  type: OBJECT
+  sourcePath: explorationsite
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - explorationsite
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: legalavailability_fk
+    type: STRING
+    parentPath:
+    - explorationsite
+    sourcePath: legalAvailability.title
+    sortKeyUnique: true
+    isExpression: false
+  - name: legalavailability_fk
+    type: STRING
+    parentPath:
+    - explorationsite
+    sourcePath: legalAvailability.href
+    sortKeyUnique: true
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

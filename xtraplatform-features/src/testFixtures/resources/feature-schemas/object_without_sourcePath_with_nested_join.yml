@@ -1,0 +1,22 @@
+---
+sourcePath: /o31001
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  geometry2D:
+    type: OBJECT
+    objectType: BuildingGeometry2D
+    properties:
+      geometry:
+        sourcePath: position
+        type: STRING
+      horizontalGeometryReference:
+        sourcePath: "[id=id]bu2d_building__horizontalgeometryreference"
+        type: OBJECT
+        properties:
+          href:
+            sourcePath: classifier
+            type: STRING

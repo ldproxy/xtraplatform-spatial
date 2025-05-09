@@ -1,0 +1,26 @@
+---
+- source: "/building{filter=oid>1}"
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/building{filter=oid>1}/oid"
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: "/building{filter=oid>1}/[id=fk_buildingpart_parent]building{filter=id>100}"
+  target: consistsOfBuildingPart
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/building{filter=oid>1}/[id=fk_buildingpart_parent]building{filter=id>100}/id"
+  target: consistsOfBuildingPart.href
+  type: STRING
+  index: 0
+- source: "/building{filter=oid>1}/[fk_buildingpart_parent=id]building{filter=id>1000}"
+  target: parent
+  type: OBJECT
+  index: 0
+- source: "/building{filter=oid>1}/[fk_buildingpart_parent=id]building{filter=id>1000}/id"
+  target: parent.href
+  type: STRING
+  index: 0

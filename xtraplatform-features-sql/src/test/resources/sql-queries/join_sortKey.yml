@@ -1,0 +1,9 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM explorationsite A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.explorationsiteid AS SKEY_1, B.chronostratigraphycodeid, B.chronostratigraphycodeid
+  FROM explorationsite A
+  JOIN explorationsite_chronostratigraphy B ON (A.id=B.explorationsiteid)
+  ORDER BY 1,2
