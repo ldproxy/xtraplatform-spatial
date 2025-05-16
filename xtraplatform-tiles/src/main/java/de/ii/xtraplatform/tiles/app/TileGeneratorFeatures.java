@@ -238,7 +238,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     }
 
     // if the tileset is sparse, check, if the tile is outside the extent of the feature data;
-    // if yes, return null
+    // if yes, return an empty tile
     if (Boolean.TRUE.equals(tileset.getSparse()) && featureProvider.extents().isAvailable()) {
       String featureType = tileset.getFeatureType().orElse(tileQuery.getTileset());
       if (featureProvider
@@ -256,9 +256,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
                   return true;
                 }
               })
-          // if the extent is empty, there are no features, so we can return null, too
+          // if the extent is empty, there are no features, so we can return an empty tile, too
           .isEmpty()) {
-        return null;
+        return EMPTY_TILES.get(tileQuery.getMediaType());
       }
     }
 
