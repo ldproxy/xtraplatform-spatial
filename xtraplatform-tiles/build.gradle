@@ -11,6 +11,7 @@ dependencies {
     provided 'de.interactive_instruments:xtraplatform-services'
     provided 'de.interactive_instruments:xtraplatform-values'
     provided 'de.interactive_instruments:xtraplatform-streams'
+    provided 'de.interactive_instruments:xtraplatform-web'
     provided 'de.interactive_instruments:xtraplatform-proj'
     provided project(':xtraplatform-cql')
     provided project(':xtraplatform-crs')
