@@ -84,9 +84,10 @@ public interface TileGenerationOptions {
   Map<String, List<LevelTransformation>> getTransformations();
 
   /**
-   * @langEn The feature profiles to be applied when generating features for the tileset.
+   * @langEn The feature profiles to be applied when generating features for the tileset. Profiles
+   *     are ignored in the optimized PostGIS MVT tile generation.
    * @langDe Die Feature-Profile, die bei der Erstellung von Features für das Tileset angewendet
-   *     werden sollen.
+   *     werden sollen. Profile werden bei der optimierten PostGIS MVT-Kachelgenerierung ignoriert.
    * @default []
    * @since v4.3
    */
