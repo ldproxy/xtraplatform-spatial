@@ -80,7 +80,7 @@ public interface TileCache {
                     .level(level)
                     .row(row)
                     .col(col)
-                    // TODO .generationParameters(tilesets.get(tileset))
+                    .generationParameters(job.getGenerationParameters())
                     .build();
 
             if (job.isReseed() || tileStore.isDirty(tile) || !tileStore.has(tile)) {

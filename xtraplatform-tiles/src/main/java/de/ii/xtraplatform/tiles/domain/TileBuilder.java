@@ -30,6 +30,7 @@ public interface TileBuilder {
       TilesetFeatures tileset,
       Set<FeatureSchema> types,
       EpsgCrs nativeCrs,
+      BoundingBox tileBounds,
       Optional<BoundingBox> clippedBounds,
       FeatureProvider featureProvider,
       PropertyTransformations baseTransformations,

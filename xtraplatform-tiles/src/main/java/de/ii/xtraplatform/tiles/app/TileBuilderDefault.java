@@ -7,8 +7,6 @@
  */
 package de.ii.xtraplatform.tiles.app;
 
-import static de.ii.xtraplatform.tiles.app.TileGeneratorFeatures.EMPTY_TILES;
-
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.codahale.metrics.Timer.Context;
@@ -113,6 +111,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
       TilesetFeatures tileset,
       Set<FeatureSchema> types,
       EpsgCrs nativeCrs,
+      BoundingBox tileBounds,
       Optional<BoundingBox> clippedBounds,
       FeatureProvider featureProvider,
       PropertyTransformations baseTransformations,
@@ -135,11 +134,6 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
               featureProvider.queries().get());
 
       FeatureStream tileSource = featureProvider.queries().get().getFeatureStream(featureQuery);
-
-      if (tileSource == null) {
-        // no features in this tile
-        return EMPTY_TILES.get(tileQuery.getMediaType());
-      }
 
       TileGenerationContext tileGenerationContext =
           new ImmutableTileGenerationContext.Builder()

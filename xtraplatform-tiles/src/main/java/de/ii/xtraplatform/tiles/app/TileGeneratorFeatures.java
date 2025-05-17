@@ -281,6 +281,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
         tileset,
         types,
         nativeCrs,
+        tileQuery.getBoundingBox(),
         clip(tileQuery.getBoundingBox(), getBounds(tileQuery)),
         featureProvider,
         baseTransformations,

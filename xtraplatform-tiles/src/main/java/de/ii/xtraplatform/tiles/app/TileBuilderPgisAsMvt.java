@@ -29,6 +29,8 @@ import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FilterEncoder;
 import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.profile.ProfileSet;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
@@ -164,6 +166,7 @@ public class TileBuilderPgisAsMvt
       TilesetFeatures tileset,
       Set<FeatureSchema> types,
       EpsgCrs nativeCrs,
+      BoundingBox tileBounds,
       Optional<BoundingBox> clippedBounds,
       FeatureProvider featureProvider,
       PropertyTransformations baseTransformations,
@@ -171,6 +174,12 @@ public class TileBuilderPgisAsMvt
     try (Context timed = timers.get(featureProvider.getId()).time()) {
       if (clippedBounds.isEmpty()) {
         return EMPTY_TILES.get(tileQuery.getMediaType());
+      }
+
+      if (!tileset.getProfiles().isEmpty() && LOGGER.isDebugEnabled()) {
+        LOGGER.debug(
+            "Tileset '{}' has profiles, but profiles are not supported by the optimized PostGIS MVT tile generation. The profiles are ignored.",
+            tileset.getId());
       }
 
       // TODO: duplicate
@@ -187,7 +196,8 @@ public class TileBuilderPgisAsMvt
           queryToSql(
               tileset,
               schema,
-              clippedBounds.get(),
+              tileBounds,
+              clippedBounds,
               nativeCrs,
               tileQuery.getTileMatrixSet(),
               tileQuery.getLevel());
@@ -206,7 +216,9 @@ public class TileBuilderPgisAsMvt
         }
       }
     } catch (Throwable e) {
-      LOGGER.error("ASMVT gen: {}", e.getMessage());
+      LOGGER.error(
+          "Error during optimized PostGIS MVT tile generation, using an empty tile: {}",
+          e.getMessage());
     }
 
     return new byte[0];
@@ -216,15 +228,18 @@ public class TileBuilderPgisAsMvt
       TilesetFeatures tileset,
       FeatureSchema schema,
       BoundingBox bbox,
+      Optional<BoundingBox> effectiveBbox,
       EpsgCrs nativeCrs,
       TileMatrixSetBase tms,
       int level) {
     String key = tileset.getId() + "_" + tms.getId() + "_" + level;
-    String envelope = envelopeToSql(bbox);
+    String tileEnvelope = envelopeToSql(bbox);
+    String effectiveEnvelope = effectiveBbox.map(this::envelopeToSql).orElse(tileEnvelope);
     EpsgCrs targetCrs = tms.getCrs();
 
     if (queryTemplates.containsKey(key)) {
-      return String.format(queryTemplates.get(key), envelope, targetCrs.getCode());
+      return String.format(
+          queryTemplates.get(key), effectiveEnvelope, tileEnvelope, targetCrs.getCode());
     }
 
     String table = schema.getSourcePath().get().substring(1);
@@ -243,23 +258,37 @@ public class TileBuilderPgisAsMvt
                         && !property.isConstant()
                         && property.getSourcePath().isPresent()
                         && !property.getSourcePath().get().contains("/"))
-            .map(property -> property.getSourcePath().get() + " AS " + property.getName())
+            .map(property -> property.getSourcePath().get() + " AS \"" + property.getName() + "\"")
             .collect(Collectors.joining(","));
+    Optional<String> idProperty =
+        schema.getProperties().stream()
+            .filter(SchemaBase::isId)
+            .filter(
+                property ->
+                    property.getSourcePath().isPresent() && Type.INTEGER.equals(property.getType()))
+            .findFirst()
+            .map(FeatureSchema::getName);
 
     String filter = filtersToSql(tileset, schema, tms.getId(), level);
 
-    String bounds = "bounds AS (SELECT %1$s AS geom, %1$s::box2d AS b2d)";
+    String bounds = "bounds AS (SELECT %1$s AS geom, %2$s::box2d AS b2d)";
     String mvtgeom =
         String.format(
-            "mvtgeom AS (SELECT ST_AsMVTGeom(ST_Transform(A.%1$s, %%2$s), bounds.b2d) AS geom, %2$s FROM %3$s A, bounds WHERE (%5$s AND ST_Intersects(A.%1$s, ST_Transform(bounds.geom, %4$s))))",
-            geomColumn, attrColumns, table, nativeCrs.getCode(), filter);
+            "mvtgeom AS (SELECT ST_AsMVTGeom(ST_Transform(A.%1$s, %%3$s), bounds.b2d, %6$d, 8) AS geom, %2$s FROM %3$s A, bounds WHERE (%5$s AND ST_Intersects(A.%1$s, ST_Transform(bounds.geom, %4$s))))",
+            geomColumn, attrColumns, table, nativeCrs.getCode(), filter, tms.getTileExtent());
 
     String template =
-        String.format("WITH\n%s,\n%s\nSELECT ST_AsMVT(mvtgeom.*) FROM mvtgeom", bounds, mvtgeom);
+        String.format(
+            "WITH\n%s,\n%s\nSELECT ST_AsMVT(mvtgeom.*, '%s', %d, 'geom'%s) FROM mvtgeom",
+            bounds,
+            mvtgeom,
+            schema.getName(),
+            tms.getTileExtent(),
+            idProperty.map(id -> ", '" + id + "'").orElse(""));
 
     queryTemplates.put(key, template);
 
-    return String.format(template, envelope, targetCrs.getCode());
+    return String.format(template, effectiveEnvelope, tileEnvelope, targetCrs.getCode());
   }
 
   // Densify the edges a little so the envelope can be safely converted to other coordinate systems.
@@ -303,32 +332,48 @@ public class TileBuilderPgisAsMvt
         getConfiguration(data.getExtensions()).get().getUnsupportedProperties();
     List<String> objectOrArrayProperties =
         data.getTypes().values().stream()
-            .flatMap(type -> type.getProperties().stream())
-            .filter(property -> property.isObject() || property.isArray())
-            .map(SchemaBase::getFullPathAsString)
+            .flatMap(
+                type ->
+                    type.getProperties().stream()
+                        .filter(
+                            property ->
+                                !property.getExcludedScopes().contains(Scope.RETURNABLE)
+                                    && (property.isObject() || property.isArray()))
+                        .map(property -> type.getName() + "." + property.getFullPathAsString()))
             .toList();
     List<String> transformedValueProperties =
         data.getTypes().values().stream()
-            .flatMap(type -> type.getProperties().stream())
-            .filter(property -> property.isValue() && !property.getTransformations().isEmpty())
-            .map(SchemaBase::getFullPathAsString)
+            .flatMap(
+                type ->
+                    type.getProperties().stream()
+                        .filter(
+                            property ->
+                                !property.getExcludedScopes().contains(Scope.RETURNABLE)
+                                    && property.isValue()
+                                    && !property.getTransformations().isEmpty())
+                        .map(property -> type.getName() + "." + property.getFullPathAsString()))
             .toList();
     List<String> joinedValueProperties =
         data.getTypes().values().stream()
-            .flatMap(type -> type.getProperties().stream())
-            .filter(
-                property ->
-                    property.isValue()
-                        && property.getSourcePath().isPresent()
-                        && property.getSourcePath().get().contains("/"))
-            .map(SchemaBase::getFullPathAsString)
+            .flatMap(
+                type ->
+                    type.getProperties().stream()
+                        .filter(
+                            property ->
+                                !property.getExcludedScopes().contains(Scope.RETURNABLE)
+                                    && property.isValue()
+                                    && property.getSourcePath().isPresent()
+                                    && property.getSourcePath().get().contains("/"))
+                        .map(property -> type.getName() + "." + property.getFullPathAsString()))
             .toList();
     boolean hasCrsAxisSwap =
         data.getNativeCrs().isPresent()
-            && data.getNativeCrs().get().getForceAxisOrder() != Force.NONE;
+            && data.getNativeCrs().get().getForceAxisOrder() == Force.LAT_LON;
 
     boolean isFeasible = true;
     String skipping = unsupportedMode == UnsupportedMode.WARN ? ", skipping" : "";
+    String skippingTransformations =
+        unsupportedMode == UnsupportedMode.WARN ? ", skipping transformations in properties" : "";
 
     if (!objectOrArrayProperties.isEmpty()) {
       if (unsupportedMode != UnsupportedMode.IGNORE) {
@@ -344,8 +389,8 @@ public class TileBuilderPgisAsMvt
     if (!transformedValueProperties.isEmpty()) {
       if (unsupportedMode != UnsupportedMode.IGNORE) {
         LOGGER.warn(
-            "Optimized PostGIS MVT tile generation is not supported for transformed value properties{}: {}",
-            skipping,
+            "Optimized PostGIS MVT tile generation is not supported for value transformations{}: {}",
+            skippingTransformations,
             String.join(", ", transformedValueProperties));
       }
       if (unsupportedMode == UnsupportedMode.DISABLE) {

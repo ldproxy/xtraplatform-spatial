@@ -13,6 +13,7 @@ import de.ii.xtraplatform.tiles.app.FeatureEncoderMVT;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSeedingJob.Builder;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.core.MediaType;
 import org.immutables.value.Value;
@@ -29,12 +30,14 @@ public interface TileSeedingJob {
       String tileMatrixSet,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
+      Optional<TileGenerationParameters> generationParameters,
       String jobSetId) {
     ImmutableTileSeedingJob details =
         new Builder()
             .tileProvider(tileProvider)
             .tileSet(tileSet)
             .tileMatrixSet(tileMatrixSet)
+            .generationParameters(generationParameters)
             .encoding(FeatureEncoderMVT.FORMAT)
             .isReseed(isReseed)
             .addAllSubMatrices(subMatrices)
@@ -68,6 +71,8 @@ public interface TileSeedingJob {
   String getTileProvider();
 
   String getTileSet();
+
+  Optional<TileGenerationParameters> getGenerationParameters();
 
   String getTileMatrixSet();
 
