@@ -39,6 +39,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlDbmsPgis;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.tiles.app.PgisTilesConfiguration.UnsupportedMode;
+import de.ii.xtraplatform.tiles.domain.LevelTransformation;
 import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
@@ -249,6 +250,15 @@ public class TileBuilderPgisAsMvt
             .findFirst()
             .flatMap(SchemaBase::getSourcePath)
             .orElseThrow();
+    List<String> properties =
+        Optional.ofNullable(tileset.getTransformations().get(tms.getId()))
+            .flatMap(
+                levelTransformations ->
+                    levelTransformations.stream()
+                        .filter(t -> t.getMax() >= level && t.getMin() <= level)
+                        .findFirst())
+            .map(LevelTransformation::getProperties)
+            .orElse(List.of());
     String attrColumns =
         schema.getProperties().stream()
             .filter(
@@ -257,7 +267,8 @@ public class TileBuilderPgisAsMvt
                         && !property.isSpatial()
                         && !property.isConstant()
                         && property.getSourcePath().isPresent()
-                        && !property.getSourcePath().get().contains("/"))
+                        && !property.getSourcePath().get().contains("/")
+                        && (properties.isEmpty() || properties.contains(property.getName())))
             .map(property -> property.getSourcePath().get() + " AS \"" + property.getName() + "\"")
             .collect(Collectors.joining(","));
     Optional<String> idProperty =
