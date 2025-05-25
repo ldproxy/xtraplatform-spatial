@@ -14,7 +14,6 @@ import de.ii.xtraplatform.base.domain.resiliency.AbstractVolatileComposed;
 import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileUnavailableException;
-import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformationException;
@@ -44,7 +43,6 @@ import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,20 +79,17 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
   private final CrsTransformerFactory crsTransformerFactory;
   private final EntityRegistry entityRegistry;
   private final TileProviderFeaturesData data;
-  private final Cql cql;
   private final Set<TileBuilder> tileBuilders;
   private final Map<String, DelayedVolatile<FeatureProvider>> featureProviders;
+  private final Map<String, TileBuilder> tileBuilderForProvider;
   private final List<ProfileSet> profileSets;
   private final boolean async;
-
-  private TileBuilder tileBuilder;
 
   public TileGeneratorFeatures(
       TileProviderFeaturesData data,
       CrsInfo crsInfo,
       CrsTransformerFactory crsTransformerFactory,
       EntityRegistry entityRegistry,
-      Cql cql,
       Set<TileBuilder> tileBuilders,
       VolatileRegistry volatileRegistry,
       boolean asyncStartup) {
@@ -103,9 +98,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     this.crsInfo = crsInfo;
     this.crsTransformerFactory = crsTransformerFactory;
     this.entityRegistry = entityRegistry;
-    this.cql = cql;
     this.tileBuilders = tileBuilders;
     this.featureProviders = new LinkedHashMap<>();
+    this.tileBuilderForProvider = new LinkedHashMap<>();
     this.profileSets = List.of(new ProfileSetRel(), new ProfileSetVal());
     this.async = asyncStartup;
 
@@ -141,18 +136,17 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
 
       featureProviders.putIfAbsent(featureProviderId, delayedVolatile);
 
+      tileBuilderForProvider.putIfAbsent(
+          featureProviderId,
+          tileBuilders.stream()
+              .filter(tb -> tb.isApplicable(featureProviderId))
+              .findFirst()
+              .orElseThrow(() -> new IllegalStateException("No applicable tile builder found")));
+
       entityRegistry
           .getEntity(FeatureProviderEntity.class, featureProviderId)
           .ifPresent(delayedVolatile::set);
     }
-
-    // TODO
-    this.tileBuilder =
-        tileBuilders.stream()
-            .sorted(Comparator.comparingInt(TileBuilder::getPriority))
-            .filter(TileBuilder::isApplicable)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("No applicable tile builder found"));
 
     onVolatileStarted();
   }
@@ -276,16 +270,18 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     PropertyTransformations baseTransformations =
         getPropertyTransformations(tileset, schema, tileQuery.getMediaType());
 
-    return tileBuilder.getMvtData(
-        tileQuery,
-        tileset,
-        types,
-        nativeCrs,
-        tileQuery.getBoundingBox(),
-        clip(tileQuery.getBoundingBox(), getBounds(tileQuery)),
-        featureProvider,
-        baseTransformations,
-        profileSets);
+    return tileBuilderForProvider
+        .get(featureProvider.getId())
+        .getMvtData(
+            tileQuery,
+            tileset,
+            types,
+            nativeCrs,
+            tileQuery.getBoundingBox(),
+            clip(tileQuery.getBoundingBox(), getBounds(tileQuery)),
+            featureProvider,
+            baseTransformations,
+            profileSets);
   }
 
   private PropertyTransformations getPropertyTransformations(

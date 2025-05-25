@@ -91,9 +91,9 @@ public class TileBuilderPgisAsMvt
   private final Cql cql;
   private final Map<String, String> queryTemplates;
   private final Map<String, Timer> timers;
+  private final Map<String, SqlConnector> sqlConnectors;
+  private final Map<String, FilterEncoder<String>> filterEncoders;
 
-  private SqlConnector sqlConnector;
-  private FilterEncoder<String> filterEncoder;
   private MetricRegistry metricRegistry;
 
   @Inject
@@ -101,6 +101,8 @@ public class TileBuilderPgisAsMvt
     this.cql = cql;
     this.queryTemplates = Collections.synchronizedMap(new HashMap<>());
     this.timers = new ConcurrentHashMap<>();
+    this.sqlConnectors = new ConcurrentHashMap<>();
+    this.filterEncoders = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -131,8 +133,12 @@ public class TileBuilderPgisAsMvt
         && provider instanceof FilterEncoder
         && isSupported(connector, provider.getData())
         && isFeasible(provider.getData())) {
-      this.sqlConnector = (SqlConnector) connector;
-      this.filterEncoder = (FilterEncoder<String>) provider;
+      if (!sqlConnectors.containsKey(provider.getId())) {
+        sqlConnectors.put(provider.getId(), (SqlConnector) connector);
+      }
+      if (!filterEncoders.containsKey(provider.getId())) {
+        filterEncoders.put(provider.getId(), (FilterEncoder<String>) provider);
+      }
       if (!timers.containsKey(provider.getId())) {
         timers.put(
             provider.getId(),
@@ -157,8 +163,8 @@ public class TileBuilderPgisAsMvt
   }
 
   @Override
-  public boolean isApplicable() {
-    return Objects.nonNull(sqlConnector);
+  public boolean isApplicable(String featureProviderId) {
+    return Objects.nonNull(sqlConnectors.get(featureProviderId));
   }
 
   @Override
@@ -195,6 +201,7 @@ public class TileBuilderPgisAsMvt
 
       String query =
           queryToSql(
+              featureProvider.getId(),
               tileset,
               schema,
               tileBounds,
@@ -205,7 +212,8 @@ public class TileBuilderPgisAsMvt
       timed.stop();
 
       Collection<SqlRow> result =
-          sqlConnector
+          sqlConnectors
+              .get(featureProvider.getId())
               .getSqlClient()
               .run(query, SqlQueryOptions.withColumnTypes(byte[].class))
               .join();
@@ -226,6 +234,7 @@ public class TileBuilderPgisAsMvt
   }
 
   private String queryToSql(
+      String providerId,
       TilesetFeatures tileset,
       FeatureSchema schema,
       BoundingBox bbox,
@@ -280,7 +289,7 @@ public class TileBuilderPgisAsMvt
             .findFirst()
             .map(FeatureSchema::getName);
 
-    String filter = filtersToSql(tileset, schema, tms.getId(), level);
+    String filter = filtersToSql(providerId, tileset, schema, tms.getId(), level);
 
     String bounds = "bounds AS (SELECT %1$s AS geom, %2$s::box2d AS b2d)";
     String mvtgeom =
@@ -317,12 +326,12 @@ public class TileBuilderPgisAsMvt
   }
 
   private String filtersToSql(
-      TilesetFeatures tileset, FeatureSchema schema, String tmsId, int level) {
+      String providerId, TilesetFeatures tileset, FeatureSchema schema, String tmsId, int level) {
     List<String> filters =
         tileset.getFilters().getOrDefault(tmsId, List.of()).stream()
             .filter(levelFilter -> levelFilter.matches(level))
             .map(filter -> cql.read(filter.getFilter(), Format.TEXT))
-            .map(filter -> filterEncoder.encode(filter, schema.getName()))
+            .map(filter -> filterEncoders.get(providerId).encode(filter, schema.getName()))
             .toList();
 
     return filters.isEmpty()

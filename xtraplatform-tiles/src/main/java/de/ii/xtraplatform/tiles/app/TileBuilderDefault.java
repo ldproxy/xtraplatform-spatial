@@ -101,7 +101,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
   }
 
   @Override
-  public boolean isApplicable() {
+  public boolean isApplicable(String featureProviderId) {
     return true;
   }
 

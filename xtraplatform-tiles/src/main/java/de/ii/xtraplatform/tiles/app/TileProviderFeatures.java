@@ -22,7 +22,6 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.blobs.domain.BlobStore;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
-import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -136,7 +135,6 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       CrsTransformerFactory crsTransformerFactory,
       EntityRegistry entityRegistry,
       AppContext appContext,
-      Cql cql,
       Set<TileBuilder> customGenerators,
       ResourceStore blobStore,
       ValueStore valueStore,
@@ -156,7 +154,6 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             crsInfo,
             crsTransformerFactory,
             entityRegistry,
-            cql,
             customGenerators,
             volatileRegistry,
             asyncStartup);

@@ -23,7 +23,7 @@ public interface TileBuilder {
 
   int getPriority();
 
-  boolean isApplicable();
+  boolean isApplicable(String featureProviderId);
 
   byte[] getMvtData(
       TileQuery tileQuery,
