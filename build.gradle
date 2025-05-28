@@ -6,7 +6,7 @@ allprojects {
     group = 'de.interactive_instruments'
 }
 
-version = '7.3.1' + versionSuffix
+version = '7.3.2' + versionSuffix
 
 //TODO
 layer {
