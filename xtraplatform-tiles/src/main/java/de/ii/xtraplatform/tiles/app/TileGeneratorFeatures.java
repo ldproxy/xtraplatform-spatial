@@ -43,6 +43,7 @@ import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,6 +140,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
       tileBuilderForProvider.putIfAbsent(
           featureProviderId,
           tileBuilders.stream()
+              .sorted(Comparator.comparingInt(TileBuilder::getPriority))
               .filter(tb -> tb.isApplicable(featureProviderId))
               .findFirst()
               .orElseThrow(() -> new IllegalStateException("No applicable tile builder found")));
