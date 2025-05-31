@@ -19,6 +19,7 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
+import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -57,6 +58,7 @@ import de.ii.xtraplatform.features.domain.FeatureTokenTransformer;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Builder;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Type;
+import de.ii.xtraplatform.features.domain.FilterEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableDatasetChange;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
@@ -325,7 +327,8 @@ public class FeatureProviderSql
         FeatureExtents,
         FeatureCrs,
         FeatureTransactions,
-        MultiFeatureQueries {
+        MultiFeatureQueries,
+        FilterEncoder<String> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderSql.class);
 
@@ -346,6 +349,7 @@ public class FeatureProviderSql
   private FeatureMutationsSql featureMutationsSql;
   private PathParserSql pathParser2;
   private SqlPathParser pathParser3;
+  private FilterEncoderSql filterEncoder;
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SchemaSql>> tableSchemasQueryables;
@@ -485,7 +489,7 @@ public class FeatureProviderSql
         Objects.nonNull(getData().getQueryGeneration())
             ? getData().getQueryGeneration().getAccentiCollation().orElse(null)
             : null;
-    FilterEncoderSql filterEncoder =
+    this.filterEncoder =
         new FilterEncoderSql(
             getData().getNativeCrs().orElse(OgcCrs.CRS84),
             sqlDialect,
@@ -1378,5 +1382,10 @@ public class FeatureProviderSql
   @Override
   public boolean supportsCql2() {
     return true;
+  }
+
+  @Override
+  public String encode(Cql2Expression cqlFilter, String featureType) {
+    return filterEncoder.encodeNested(cqlFilter, tableSchemas.get(featureType).get(0), false);
   }
 }

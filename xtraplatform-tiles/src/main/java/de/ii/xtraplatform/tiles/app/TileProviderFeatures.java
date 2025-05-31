@@ -22,7 +22,6 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.blobs.domain.BlobStore;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
-import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -48,6 +47,7 @@ import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
 import de.ii.xtraplatform.tiles.domain.MinMax;
 import de.ii.xtraplatform.tiles.domain.SeedingOptions;
 import de.ii.xtraplatform.tiles.domain.TileAccess;
+import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileCache;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
@@ -113,7 +113,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderFeatures.class);
   static final String TILES_DIR_NAME = "tiles";
 
-  private final TileGeneratorFeatures tileGenerator;
+  private final TileGenerator tileGenerator;
   private final Map<Type, Map<Storage, TileStore>> tileStores;
   private final List<TileCache> generatorCaches;
   private final List<TileCache> combinerCaches;
@@ -135,7 +135,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       CrsTransformerFactory crsTransformerFactory,
       EntityRegistry entityRegistry,
       AppContext appContext,
-      Cql cql,
+      Set<TileBuilder> customGenerators,
       ResourceStore blobStore,
       ValueStore valueStore,
       TileWalker tileWalker,
@@ -154,7 +154,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             crsInfo,
             crsTransformerFactory,
             entityRegistry,
-            cql,
+            customGenerators,
             volatileRegistry,
             asyncStartup);
     this.tileStores =
@@ -498,7 +498,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   }
 
   private static Map<String, Map<String, TileGenerationSchema>> getTileSchemas(
-      TileGeneratorFeatures tileGenerator,
+      TileGenerator tileGenerator,
       Map<String, TilesetFeatures> tilesets,
       List<String> rasterTilesets) {
     return Stream.concat(

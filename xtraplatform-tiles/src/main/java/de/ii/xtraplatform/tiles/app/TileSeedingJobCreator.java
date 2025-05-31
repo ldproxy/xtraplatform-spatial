@@ -189,6 +189,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
                               tileMatrixSet,
                               seedingJobSet.isReseed(),
                               Set.of(subMatrix),
+                              Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
                               jobSet.getId());
 
                   pushJob.accept(job2);

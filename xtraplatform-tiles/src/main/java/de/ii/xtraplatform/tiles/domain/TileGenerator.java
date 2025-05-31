@@ -7,12 +7,14 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
+import de.ii.xtraplatform.base.domain.resiliency.VolatileComposed;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
-import de.ii.xtraplatform.features.domain.FeatureStream;
+import de.ii.xtraplatform.features.domain.FeatureProvider;
+import de.ii.xtraplatform.features.domain.FeatureSchema;
 import java.util.Optional;
 import javax.ws.rs.core.MediaType;
 
-public interface TileGenerator {
+public interface TileGenerator extends ChainedTileProvider, VolatileComposed {
 
   String CAPABILITY = "generation";
 
@@ -20,10 +22,14 @@ public interface TileGenerator {
 
   byte[] generateTile(TileQuery tileQuery);
 
-  FeatureStream getTileSource(TileQuery tileQuery);
-
   // TODO: create on startup for all layers
   TileGenerationSchema getGenerationSchema(String tileset);
 
   Optional<BoundingBox> getBounds(String tilesetId);
+
+  // TODO
+  FeatureSchema getVectorSchema(String tilesetId, MediaType encoding);
+
+  // TODO
+  Optional<FeatureProvider> getFeatureProvider(String featureProviderId);
 }

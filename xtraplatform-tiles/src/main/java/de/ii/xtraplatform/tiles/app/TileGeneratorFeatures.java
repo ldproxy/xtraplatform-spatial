@@ -14,13 +14,6 @@ import de.ii.xtraplatform.base.domain.resiliency.AbstractVolatileComposed;
 import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileUnavailableException;
-import de.ii.xtraplatform.cql.domain.BooleanValue2;
-import de.ii.xtraplatform.cql.domain.Cql;
-import de.ii.xtraplatform.cql.domain.Cql.Format;
-import de.ii.xtraplatform.cql.domain.Geometry.Bbox;
-import de.ii.xtraplatform.cql.domain.Property;
-import de.ii.xtraplatform.cql.domain.SIntersects;
-import de.ii.xtraplatform.cql.domain.SpatialLiteral;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformationException;
@@ -30,13 +23,8 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProviderEntity;
-import de.ii.xtraplatform.features.domain.FeatureQueries;
-import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
-import de.ii.xtraplatform.features.domain.FeatureStream;
-import de.ii.xtraplatform.features.domain.FeatureStream.ResultReduced;
 import de.ii.xtraplatform.features.domain.FeatureTokenEncoder;
-import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.profile.ImmutableProfileTransformations;
 import de.ii.xtraplatform.features.domain.profile.ProfileSet;
@@ -46,47 +34,36 @@ import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformat
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.WithTransformationsApplied;
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
-import de.ii.xtraplatform.streams.domain.Reactive.Sink;
-import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
-import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
-import de.ii.xtraplatform.tiles.domain.ImmutableTileGenerationContext;
-import de.ii.xtraplatform.tiles.domain.LevelTransformation;
-import de.ii.xtraplatform.tiles.domain.TileCoordinates;
+import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileGenerationContext;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParametersTransient;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
 import de.ii.xtraplatform.tiles.domain.TileGenerator;
 import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
-import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletionException;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.measure.Unit;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import org.kortforsyningen.proj.Units;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TileGeneratorFeatures extends AbstractVolatileComposed
-    implements TileGenerator, ChainedTileProvider {
+public class TileGeneratorFeatures extends AbstractVolatileComposed implements TileGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileGeneratorFeatures.class);
   private static final Map<
           MediaType, Function<TileGenerationContext, ? extends FeatureTokenEncoder<?>>>
       ENCODERS = ImmutableMap.of(FeatureEncoderMVT.FORMAT, FeatureEncoderMVT::new);
-  private static final Map<MediaType, byte[]> EMPTY_TILES =
+  static final Map<MediaType, byte[]> EMPTY_TILES =
       ImmutableMap.of(FeatureEncoderMVT.FORMAT, FeatureEncoderMVT.EMPTY_TILE);
   private static final Map<MediaType, PropertyTransformations> TRANSFORMATIONS =
       ImmutableMap.of(
@@ -103,8 +80,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
   private final CrsTransformerFactory crsTransformerFactory;
   private final EntityRegistry entityRegistry;
   private final TileProviderFeaturesData data;
-  private final Cql cql;
+  private final Set<TileBuilder> tileBuilders;
   private final Map<String, DelayedVolatile<FeatureProvider>> featureProviders;
+  private final Map<String, TileBuilder> tileBuilderForProvider;
   private final List<ProfileSet> profileSets;
   private final boolean async;
 
@@ -113,7 +91,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
       CrsInfo crsInfo,
       CrsTransformerFactory crsTransformerFactory,
       EntityRegistry entityRegistry,
-      Cql cql,
+      Set<TileBuilder> tileBuilders,
       VolatileRegistry volatileRegistry,
       boolean asyncStartup) {
     super("generator", volatileRegistry, true);
@@ -121,8 +99,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
     this.crsInfo = crsInfo;
     this.crsTransformerFactory = crsTransformerFactory;
     this.entityRegistry = entityRegistry;
-    this.cql = cql;
+    this.tileBuilders = tileBuilders;
     this.featureProviders = new LinkedHashMap<>();
+    this.tileBuilderForProvider = new LinkedHashMap<>();
     this.profileSets = List.of(new ProfileSetRel(), new ProfileSetVal());
     this.async = asyncStartup;
 
@@ -158,6 +137,14 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
 
       featureProviders.putIfAbsent(featureProviderId, delayedVolatile);
 
+      tileBuilderForProvider.putIfAbsent(
+          featureProviderId,
+          tileBuilders.stream()
+              .sorted(Comparator.comparingInt(TileBuilder::getPriority))
+              .filter(tb -> tb.isApplicable(featureProviderId))
+              .findFirst()
+              .orElseThrow(() -> new IllegalStateException("No applicable tile builder found")));
+
       entityRegistry
           .getEntity(FeatureProviderEntity.class, featureProviderId)
           .ifPresent(delayedVolatile::set);
@@ -190,7 +177,8 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
                     String.format("Feature provider with id '%s' not found.", featureProviderId)));
   }
 
-  Optional<FeatureProvider> getFeatureProvider(String featureProviderId) {
+  @Override
+  public Optional<FeatureProvider> getFeatureProvider(String featureProviderId) {
     if (async) {
       DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
 
@@ -213,7 +201,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
 
   @Override
   public boolean canProvide(TileQuery tile) {
-    return ChainedTileProvider.super.canProvide(tile)
+    return TileGenerator.super.canProvide(tile)
         && data.getTilesets().get(tile.getTileset()).getCombine().isEmpty();
   }
 
@@ -234,26 +222,45 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
           String.format("Encoding not supported: %s", tileQuery.getMediaType()));
     }
 
-    FeatureStream tileSource = getTileSource(tileQuery);
-    if (tileSource == null) {
-      // no features in this tile
-      return EMPTY_TILES.get(tileQuery.getMediaType());
-    }
-
     TilesetFeatures tileset =
         data.getTilesets().get(tileQuery.getTileset()).mergeDefaults(data.getTilesetDefaults());
-
-    TileGenerationContext tileGenerationContext =
-        new ImmutableTileGenerationContext.Builder()
-            .parameters(tileset)
-            .coordinates(tileQuery)
-            .tileset(tileQuery.getTileset())
-            .build();
-
-    FeatureTokenEncoder<?> encoder =
-        ENCODERS.get(tileQuery.getMediaType()).apply(tileGenerationContext);
-
     FeatureProvider featureProvider = getFeatureProvider(tileset);
+
+    if (!featureProvider.queries().isSupported()) {
+      throw new IllegalStateException("Feature provider has no Queries support.");
+    }
+    if (!featureProvider.crs().isSupported()) {
+      throw new IllegalStateException("Feature provider has no CRS support.");
+    }
+
+    // if the tileset is sparse, check, if the tile is outside the extent of the feature data;
+    // if yes, return an empty tile
+    if (Boolean.TRUE.equals(tileset.getSparse()) && featureProvider.extents().isAvailable()) {
+      String featureType = tileset.getFeatureType().orElse(tileQuery.getTileset());
+      if (featureProvider
+          .extents()
+          .get()
+          .getSpatialExtent(featureType)
+          .filter(
+              bboxFeatures -> {
+                try {
+                  return BoundingBox.intersects(
+                      bboxFeatures,
+                      tileQuery.getBoundingBox(bboxFeatures.getEpsgCrs(), crsTransformerFactory));
+                } catch (CrsTransformationException e) {
+                  // ignore, assume there are features
+                  return true;
+                }
+              })
+          // if the extent is empty, there are no features, so we can return an empty tile, too
+          .isEmpty()) {
+        return EMPTY_TILES.get(tileQuery.getMediaType());
+      }
+    }
+
+    EpsgCrs nativeCrs = featureProvider.crs().get().getNativeCrs();
+    Set<FeatureSchema> types = featureProvider.info().getSchemas();
+
     String featureType = tileset.getFeatureType().orElse(tileset.getId());
     FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
 
@@ -262,19 +269,21 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
           String.format("Unknown feature type '%s' in tileset '%s'", featureType, tileset.getId()));
     }
 
-    final PropertyTransformations baseTransformations =
+    PropertyTransformations baseTransformations =
         getPropertyTransformations(tileset, schema, tileQuery.getMediaType());
-    PropertyTransformations propertyTransformations =
-        tileQuery
-            .getGenerationParameters()
-            .flatMap(TileGenerationParameters::getPropertyTransformations)
-            .map(pt -> pt.mergeInto(baseTransformations))
-            .orElse(baseTransformations);
 
-    ResultReduced<byte[]> resultReduced =
-        generateTile(tileSource, encoder, Map.of(featureType, propertyTransformations));
-
-    return resultReduced.reduced();
+    return tileBuilderForProvider
+        .get(featureProvider.getId())
+        .getMvtData(
+            tileQuery,
+            tileset,
+            types,
+            nativeCrs,
+            tileQuery.getBoundingBox(),
+            clip(tileQuery.getBoundingBox(), getBounds(tileQuery)),
+            featureProvider,
+            baseTransformations,
+            profileSets);
   }
 
   private PropertyTransformations getPropertyTransformations(
@@ -293,59 +302,6 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
                               profile, schema, mediaType.toString(), transformationBuilder));
             });
     return transformationBuilder.build();
-  }
-
-  @Override
-  public FeatureStream getTileSource(TileQuery tileQuery) {
-    TilesetFeatures tileset =
-        data.getTilesets().get(tileQuery.getTileset()).mergeDefaults(data.getTilesetDefaults());
-    FeatureProvider featureProvider = getFeatureProvider(tileset);
-
-    if (!featureProvider.queries().isSupported()) {
-      throw new IllegalStateException("Feature provider has no Queries support.");
-    }
-    if (!featureProvider.crs().isSupported()) {
-      throw new IllegalStateException("Feature provider has no CRS support.");
-    }
-
-    // if the tileset is sparse, check, if the tile is outside the extent of the feature data;
-    // if yes, return null
-    if (Boolean.TRUE.equals(tileset.getSparse()) && featureProvider.extents().isAvailable()) {
-      String featureType = tileset.getFeatureType().orElse(tileQuery.getTileset());
-      if (featureProvider
-          .extents()
-          .get()
-          .getSpatialExtent(featureType)
-          .filter(
-              bboxFeatures -> {
-                try {
-                  return BoundingBox.intersects(
-                      bboxFeatures,
-                      tileQuery.getBoundingBox(bboxFeatures.getEpsgCrs(), crsTransformerFactory));
-                } catch (CrsTransformationException e) {
-                  // ignore, assume there are features
-                  return true;
-                }
-              })
-          // if the extent is empty, there are no features, so we can return null, too
-          .isEmpty()) {
-        return null;
-      }
-    }
-
-    EpsgCrs nativeCrs = featureProvider.crs().get().getNativeCrs();
-    Set<FeatureSchema> types = featureProvider.info().getSchemas();
-    FeatureQuery featureQuery =
-        getFeatureQuery(
-            tileQuery,
-            tileset,
-            types,
-            nativeCrs,
-            getBounds(tileQuery),
-            tileQuery.getGenerationParametersTransient(),
-            featureProvider.queries().get());
-
-    return featureProvider.queries().get().getFeatureStream(featureQuery);
   }
 
   private Optional<BoundingBox> getBounds(TileQuery tileQuery) {
@@ -369,31 +325,6 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
                                 return clipBoundingBox;
                               }
                             }));
-  }
-
-  private ResultReduced<byte[]> generateTile(
-      FeatureStream featureStream,
-      FeatureTokenEncoder<?> encoder,
-      Map<String, PropertyTransformations> propertyTransformations) {
-
-    SinkReduced<Object, byte[]> featureSink = encoder.to(Sink.reduceByteArray());
-
-    try {
-      ResultReduced<byte[]> result =
-          featureStream.runWith(featureSink, propertyTransformations).toCompletableFuture().join();
-
-      if (!result.isSuccess()) {
-        result.getError().ifPresent(FeatureStream::processStreamError);
-      }
-
-      return result;
-
-    } catch (CompletionException e) {
-      if (e.getCause() instanceof WebApplicationException) {
-        throw (WebApplicationException) e.getCause();
-      }
-      throw new IllegalStateException("Feature stream error.", e.getCause());
-    }
   }
 
   // TODO: create on startup for all tilesets
@@ -472,112 +403,6 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed
     String featureType = tileset.getFeatureType().orElse(tileset.getId());
 
     return featureProvider.extents().get().getSpatialExtent(featureType, OgcCrs.CRS84);
-  }
-
-  private FeatureQuery getFeatureQuery(
-      TileQuery tile,
-      TilesetFeatures tileset,
-      Set<FeatureSchema> featureTypes,
-      EpsgCrs nativeCrs,
-      Optional<BoundingBox> bounds,
-      Optional<TileGenerationParametersTransient> userParameters,
-      FeatureQueries featureQueries) {
-    String featureType = tileset.getFeatureType().orElse(tileset.getId());
-    FeatureSchema featureSchema =
-        featureTypes.stream()
-            .filter(type -> Objects.equals(type.getName(), featureType))
-            .findFirst()
-            .orElse(null);
-    // TODO: validate tileset during provider startup
-    if (featureSchema == null) {
-      throw new IllegalStateException(
-          String.format(
-              "Tileset '%s' references feature type '%s', which does not exist.",
-              tileset.getId(), featureType));
-    }
-    FeatureSchema queryablesSchema =
-        featureQueries.getQueryablesSchema(featureSchema, List.of("*"), List.of(), ".", true);
-
-    ImmutableFeatureQuery.Builder queryBuilder =
-        ImmutableFeatureQuery.builder()
-            .type(featureType)
-            .limit(
-                Optional.ofNullable(tileset.getFeatureLimit())
-                    .orElse(data.getTilesetDefaults().getFeatureLimit()))
-            .offset(0)
-            .crs(tile.getTileMatrixSet().getCrs())
-            .maxAllowableOffset(getMaxAllowableOffset(tile, nativeCrs));
-
-    if (tileset.getFilters().containsKey(tile.getTileMatrixSet().getId())) {
-      tileset.getFilters().get(tile.getTileMatrixSet().getId()).stream()
-          .filter(levelFilter -> levelFilter.matches(tile.getLevel()))
-          // TODO: parse and validate filter, preferably in hydration or provider startup
-          .forEach(filter -> queryBuilder.addFilters(cql.read(filter.getFilter(), Format.TEXT)));
-    }
-
-    queryablesSchema
-        .getPrimaryGeometry()
-        .map(SchemaBase::getFullPathAsString)
-        .ifPresentOrElse(
-            spatialProperty -> {
-              clip(tile.getBoundingBox(), bounds)
-                  .ifPresentOrElse(
-                      bbox ->
-                          queryBuilder.addFilters(
-                              SIntersects.of(
-                                  Property.of(spatialProperty), SpatialLiteral.of(Bbox.of(bbox)))),
-                      () -> queryBuilder.addFilters(BooleanValue2.of(false)));
-            },
-            // TODO: validate feature schema during provider startup
-            () -> queryBuilder.addFilters(BooleanValue2.of(false)));
-
-    if (userParameters.isPresent()) {
-      userParameters.get().getLimit().ifPresent(queryBuilder::limit);
-      queryBuilder.addAllFilters(userParameters.get().getFilters());
-      if (!userParameters.get().getFields().isEmpty()) {
-        queryBuilder.addAllFields(userParameters.get().getFields());
-      }
-    }
-
-    if ((userParameters.isEmpty() || userParameters.get().getFields().isEmpty())
-        && tileset.getTransformations().containsKey(tile.getTileMatrixSet().getId())) {
-      List<String> fields =
-          tileset.getTransformations().get(tile.getTileMatrixSet().getId()).stream()
-              .filter(rule -> rule.matches(tile.getLevel()))
-              .map(LevelTransformation::getProperties)
-              .flatMap(Collection::stream)
-              .collect(Collectors.toList());
-      if (!fields.isEmpty()) {
-        Stream.concat(
-                fields.stream(),
-                queryablesSchema.getPrimaryGeometry().map(SchemaBase::getFullPathAsString).stream())
-            .distinct()
-            .forEach(queryBuilder::addFields);
-      }
-    }
-
-    return queryBuilder.build();
-  }
-
-  public double getMaxAllowableOffset(TileCoordinates tile, EpsgCrs nativeCrs) {
-    double maxAllowableOffsetTileMatrixSet =
-        tile.getTileMatrixSet()
-            .getMaxAllowableOffset(tile.getLevel(), tile.getRow(), tile.getCol());
-    Unit<?> tmsCrsUnit = crsInfo.getUnit(tile.getTileMatrixSet().getCrs());
-    Unit<?> nativeCrsUnit = crsInfo.getUnit(nativeCrs);
-    if (tmsCrsUnit.equals(nativeCrsUnit)) {
-      return maxAllowableOffsetTileMatrixSet;
-    } else if (tmsCrsUnit.equals(Units.DEGREE) && nativeCrsUnit.equals(Units.METRE)) {
-      return maxAllowableOffsetTileMatrixSet * 111333.0;
-    } else if (tmsCrsUnit.equals(Units.METRE) && nativeCrsUnit.equals(Units.DEGREE)) {
-      return maxAllowableOffsetTileMatrixSet / 111333.0;
-    }
-
-    LOGGER.warn(
-        "Tile generation: cannot convert between axis units '{}' and '{}'.",
-        tmsCrsUnit.getName(),
-        nativeCrsUnit.getName());
-    return 0;
   }
 
   /**
