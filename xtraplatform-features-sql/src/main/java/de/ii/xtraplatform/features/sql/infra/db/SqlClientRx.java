@@ -34,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.davidmoten.rxjava3.jdbc.Database;
@@ -152,7 +153,9 @@ public class SqlClientRx implements SqlClient {
 
   @Override
   public Reactive.Source<String> getMutationSource(
-      List<String> statements, List<Consumer<String>> idConsumers, Object executionContext) {
+      List<Supplier<String>> statements,
+      List<Consumer<String>> idConsumers,
+      Object executionContext) {
     /*List<Function<FeatureSql, String>> toStatementsWithLog =
     statements.stream()
         .map(
@@ -189,7 +192,7 @@ public class SqlClientRx implements SqlClient {
           return previousId != null ? previousId : id;
         };
 
-    String first = statements.get(0);
+    String first = statements.get(0).get();
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
       LOGGER.debug(MARKER.SQL, "Executing statement: {}", first);
     }
@@ -201,32 +204,34 @@ public class SqlClientRx implements SqlClient {
 
         // for update/replace, the first statement is always delete, so we can skip the
         // returnGeneratedKeys
-        statements.size() == 2
-            ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
-            : session
-                .update(first)
-                .transacted()
-                .returnGeneratedKeys()
-                .get(resultSet -> mapper.apply(resultSet, null))
-                .filter(tx -> !tx.isComplete());
+        /*statements.size() == 2
+        ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
+        :*/ session
+            .update(first)
+            .transacted()
+            .returnGeneratedKeys()
+            .get(resultSet -> mapper.apply(resultSet, null))
+            .filter(tx -> !tx.isComplete());
 
     for (int j = 1; j < statements.size(); j++) {
-      String next = statements.get(j);
-      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-        LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
-      }
-
+      int finalJ = j;
       txFlowable =
           txFlowable.flatMap(
-              tx ->
-                  tx.update(next)
-                      .returnGeneratedKeys()
-                      .get(
-                          resultSet ->
-                              mapper.apply(
-                                  resultSet,
-                                  tx.value() instanceof String ? (String) tx.value() : null))
-                      .filter(tx2 -> !tx2.isComplete()));
+              tx -> {
+                String next = statements.get(finalJ).get();
+                if (LOGGER.isDebugEnabled(MARKER.SQL)) {
+                  LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
+                }
+
+                return tx.update(next)
+                    .returnGeneratedKeys()
+                    .get(
+                        resultSet ->
+                            mapper.apply(
+                                resultSet,
+                                tx.value() instanceof String ? (String) tx.value() : null))
+                    .filter(tx2 -> !tx2.isComplete());
+              });
     }
 
     Flowable<String> flowable = txFlowable.map(tx -> (String) tx.value());
@@ -236,24 +241,33 @@ public class SqlClientRx implements SqlClient {
 
   @Override
   public Transformer<FeatureDataSql, String> getMutationFlow(
-      Function<FeatureDataSql, List<Tuple<String, Consumer<String>>>> mutations,
+      Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
       Object executionContext,
       Optional<String> id) {
 
     Reactive.Transformer<FeatureDataSql, String> toQueries =
         Reactive.Transformer.flatMap(
             feature -> {
-              List<Tuple<String, Consumer<String>>> m = mutations.apply(feature);
+              List<Supplier<Tuple<String, Consumer<String>>>> m = mutations.apply(feature);
 
-              List<String> statements =
+              List<Supplier<String>> statements =
                   m.stream()
-                      .map(Tuple::first)
+                      .map(
+                          queryFunction ->
+                              Objects.isNull(queryFunction.get().first())
+                                  ? null
+                                  : (Supplier<String>) () -> queryFunction.get().first())
                       .filter(Objects::nonNull)
                       .collect(Collectors.toList());
 
               List<Consumer<String>> idConsumers =
                   m.stream()
-                      .map(Tuple::second)
+                      .map(
+                          queryFunction -> {
+                            // TODO
+                            Tuple<String, Consumer<String>> query = queryFunction.get();
+                            return query.second();
+                          })
                       .filter(Objects::nonNull)
                       .collect(Collectors.toList());
 

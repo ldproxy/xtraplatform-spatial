@@ -13,17 +13,18 @@ import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,27 +68,38 @@ public class FeatureMutationsSql {
   }
 
   public Reactive.Source<String> getDeletionSource(SqlQueryMapping mapping, String id) {
-    Tuple<String, Consumer<String>> delete = createInstanceDelete(mapping, id);
+    Supplier<Tuple<String, Consumer<String>>> delete = createInstanceDelete(mapping, id);
 
     return sqlClient
         .get()
-        .getSourceStream(delete.first(), SqlQueryOptions.withColumnTypes(String.class))
+        .getSourceStream(delete.get().first(), SqlQueryOptions.withColumnTypes(String.class))
         .via(Transformer.map(sqlRow -> (String) sqlRow.getValues().get(0)));
   }
 
-  List<Tuple<String, Consumer<String>>> createInstanceInserts(
+  List<Supplier<Tuple<String, Consumer<String>>>> createInstanceInserts(
       FeatureDataSql feature, RowCursor rowCursor, Optional<String> id, EpsgCrs crs) {
-    Map<List<String>, List<Integer>> rowNesting = Map.of(); // TODO feature.getRowCounts();
     boolean withId = id.isPresent();
+    SqlQuerySchema mainTable = feature.getMapping().getMainTable();
 
-    Stream<Tuple<String, Consumer<String>>> instance =
+    Stream<Supplier<Tuple<String, Consumer<String>>>> instance =
         withId
             ? Stream.concat(
                 Stream.of(createInstanceDelete(feature.getMapping(), id.get())),
-                createObjectInserts(feature, rowNesting, rowCursor, id, crs).stream())
-            : createObjectInserts(feature, rowNesting, rowCursor, id, crs).stream();
+                createObjectInserts(feature, mainTable, rowCursor, id, crs).stream())
+            : createObjectInserts(feature, mainTable, rowCursor, id, crs).stream();
 
-    return instance.toList();
+    // return instance.toList();
+
+    return Stream.concat(
+            instance,
+            feature.getMapping().getTables().stream()
+                .filter(tableSchema -> !Objects.equals(tableSchema, mainTable))
+                .flatMap(
+                    tableSchema ->
+                        createObjectInserts(feature, tableSchema, rowCursor, Optional.empty(), crs)
+                            .stream()))
+        .collect(Collectors.toList());
+
     /*return Stream.concat(
         instance,
         schema.getProperties().stream()
@@ -101,7 +113,8 @@ public class FeatureMutationsSql {
   }
 
   // TODO: to InsertGenerator
-  Tuple<String, Consumer<String>> createInstanceDelete(SqlQueryMapping mapping, String id) {
+  Supplier<Tuple<String, Consumer<String>>> createInstanceDelete(
+      SqlQueryMapping mapping, String id) {
 
     String table = mapping.getMainTable().getName();
     SqlQueryColumn idColumn =
@@ -117,32 +130,25 @@ public class FeatureMutationsSql {
 
     String idValue = idColumn.getType() == Type.STRING ? "'" + id + "'" : id;
 
-    return Tuple.of(
-        String.format(
-            "DELETE FROM %s WHERE %s=%s RETURNING %2$s", table, idColumn.getName(), idValue),
-        ignore -> {});
+    return () ->
+        Tuple.of(
+            String.format(
+                "DELETE FROM %s WHERE %s=%s RETURNING %2$s", table, idColumn.getName(), idValue),
+            ignore -> {});
   }
 
-  List<Tuple<String, Consumer<String>>> createObjectInserts(
+  List<Supplier<Tuple<String, Consumer<String>>>> createObjectInserts(
       FeatureDataSql feature,
-      Map<List<String>, List<Integer>> rowNesting,
+      SqlQuerySchema schema,
       RowCursor rowCursor,
       Optional<String> id,
       EpsgCrs crs) {
-
-    SqlQuerySchema schema = feature.getMapping().getMainTable();
 
     if (schema.getRelations().isEmpty()) {
       return createAttributesInserts(schema, feature, rowCursor.get(schema.getFullPath()), id, crs);
     }
 
-    SqlQueryJoin relation = schema.getRelations().get(0);
-
-    String parentName = relation.getName();
-
-    throw new IllegalStateException("Not implemented yet");
-
-    /*if (!relation.isM2N() && !relation.isOne2N()) {
+    if (!schema.isM2N() && !schema.isOne2N()) {
       List<Integer> newParentRows =
           rowCursor.track(schema.getFullPath(), schema.getParentPath(), 0);
 
@@ -151,13 +157,14 @@ public class FeatureMutationsSql {
 
     // TODO: what are the keys?
     // TODO: err
-    if (!rowNesting.containsKey(schema.getFullPath())) {
+    if (!feature.getRowNesting().containsKey(schema.getFullPath())) {
       // throw new IllegalStateException();
       return ImmutableList.of();
     }
 
     // TODO: nested m:n test
-    List<Integer> numberOfRowsPerParentRow = rowNesting.get(schema.getFullPath()); // [1,2] | [2]
+    List<Integer> numberOfRowsPerParentRow =
+        feature.getRowNesting().get(schema.getFullPath()); // [1,2] | [2]
     int currentParentRow = rowCursor.getCurrent(schema.getParentPath()); // 0|1 | 0
     int rowCount = numberOfRowsPerParentRow.get(currentParentRow); // 1|2 | 2
 
@@ -170,36 +177,28 @@ public class FeatureMutationsSql {
               return createAttributesInserts(schema, feature, newParentRows, id, crs);
             })
         .flatMap(List::stream)
-        .collect(Collectors.toList());*/
+        .collect(Collectors.toList());
   }
 
-  List<Tuple<String, Consumer<String>>> createAttributesInserts(
+  List<Supplier<Tuple<String, Consumer<String>>>> createAttributesInserts(
       SqlQuerySchema schema,
       FeatureDataSql feature,
       List<Integer> parentRows,
       Optional<String> id,
       EpsgCrs crs) {
 
-    ImmutableList.Builder<Tuple<String, Consumer<String>>> queries = ImmutableList.builder();
+    ImmutableList.Builder<Supplier<Tuple<String, Consumer<String>>>> queries =
+        ImmutableList.builder();
 
-    queries.add(generator.createInsert(feature, parentRows, id, crs));
+    if (schema.isRoot() || !schema.isJunctionReference()) {
+      queries.add(generator.createInsert(feature, schema, parentRows, id, crs));
+    }
 
-    /*if (!schema.getRelations().isEmpty()) {
-      SqlQueryJoin relation = schema.getRelations().get(0);
-
-      if (relation.isM2N()) {
-        queries.add(generator.createJunctionInsert(feature, parentRows));
-      }
-
-      boolean isOne2OneWithForeignKey =
-          relation.isOne2One()
-              && !Objects.equals(
-                  relation.getSourceSortKey().orElse("id"), relation.getSourceField());
-
-      if (isOne2OneWithForeignKey) {
-        queries.add(generator.createForeignKeyUpdate(feature, parentRows));
-      }
-    }*/
+    if (schema.isM2N()) {
+      queries.add(generator.createJunctionInsert(feature, schema, parentRows));
+    } else if (schema.isOne2OneWithForeignKey()) {
+      // TODO queries.add(generator.createForeignKeyUpdate(feature, schema, parentRows));
+    }
 
     return queries.build();
   }

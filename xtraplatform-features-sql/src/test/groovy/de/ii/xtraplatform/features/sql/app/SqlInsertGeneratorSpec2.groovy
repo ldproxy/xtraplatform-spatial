@@ -112,7 +112,7 @@ class SqlInsertGeneratorSpec2 extends Specification {
 
         List<String> queries = Stream.of(
                 inserts.createJunctionInsert(schema, ImmutableList.of(0, 0, 0)),
-                inserts.createJunctionInsert(schema, ImmutableList.of(0, 0, 1))
+                inserts.createJunctionInsert(schema, schema, ImmutableList.of(0, 0, 1))
         )
                 .map({ query -> query.apply(MERGE_MERGE_M_2_N_FEATURE).first() })
                 .collect(Collectors.toList());
