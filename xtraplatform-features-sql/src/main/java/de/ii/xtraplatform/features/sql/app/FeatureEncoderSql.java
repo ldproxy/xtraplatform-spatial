@@ -12,6 +12,7 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
+import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.immutables.value.Value;
 import org.immutables.value.Value.Modifiable;
 import org.slf4j.Logger;
@@ -59,6 +61,7 @@ public class FeatureEncoderSql
   private GeometryWithStringCoordinates<?> currentGeometry;
   private Tuple<SqlQuerySchema, SqlQueryColumn> currentJsonColumn;
   private JsonBuilder currentJson;
+  private Consumer<String> currentJsonSetter;
 
   public FeatureEncoderSql(
       SqlQueryMapping mapping,
@@ -95,30 +98,17 @@ public class FeatureEncoderSql
 
   @Override
   public void onFeatureEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    push(currentFeature);
     if (trace) LOGGER.debug("onFeatureEnd: {}", context.pathAsString());
 
     if (currentJsonColumn != null) {
       try {
-        currentFeature.addColumn(
-            currentJsonColumn.first(), currentJsonColumn.second(), "'" + currentJson.build() + "'");
+        currentJsonSetter.accept("'" + currentJson.build() + "'");
       } catch (IOException e) {
         LOGGER.error(
             "Error while serializing JSON column {}: {}",
             currentJsonColumn.second().getName(),
             e.getMessage());
       }
-
-      mapping
-          .getColumnForValue("featuretype", MappingRule.Scope.W)
-          .ifPresentOrElse(
-              column -> {
-                currentFeature.addColumn(
-                    column.first(), column.second(), "'" + mapping.getMainSchema().getName() + "'");
-              },
-              () -> {
-                if (trace) LOGGER.warn("onValue: {} not found in mapping", "featuretype");
-              });
     }
 
     currentFeature
@@ -128,6 +118,8 @@ public class FeatureEncoderSql
               if (trace)
                 LOGGER.debug("push: {} {}", row.first().getFullPathAsString(), row.second());
             });
+
+    push(currentFeature);
   }
 
   @Override
@@ -156,20 +148,26 @@ public class FeatureEncoderSql
               if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), schema);
             });
 
-    mapping
-        .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
-        .ifPresentOrElse(
-            column -> {
-              if (checkJson(column)) {
-                currentJson.openObject(context.path());
+    Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
-                if (trace) LOGGER.debug("onObjectStart: JSON {}", context.pathAsString());
-              }
-            },
-            () -> {
-              if (trace)
-                LOGGER.warn("onObjectStart: JSON {} not found in mapping", context.pathAsString());
-            });
+    if (tableSchema.isPresent()) {
+      if (trace) LOGGER.debug("onObjectStart: table found for {}", context.pathAsString());
+
+      currentFeature.addRow(tableSchema.get());
+      return;
+    }
+
+    Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> column =
+        mapping.getColumnForValue(context.pathAsString(), Scope.W);
+
+    if (column.isPresent() && checkJson(column.get())) {
+      currentJson.openObject(context.path());
+
+      if (trace) LOGGER.debug("onObjectStart: JSON {}", context.pathAsString());
+      return;
+    }
+
+    if (trace) LOGGER.warn("onObjectStart: no table found for {}", context.pathAsString());
   }
 
   @Override
@@ -206,20 +204,26 @@ public class FeatureEncoderSql
       currentGeometry = null;
     }
 
-    mapping
-        .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
-        .ifPresentOrElse(
-            column -> {
-              if (checkJson(column)) {
-                currentJson.closeObject(context.path());
+    Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
-                if (trace) LOGGER.debug("onObjectEnd: JSON {}", context.pathAsString());
-              }
-            },
-            () -> {
-              if (trace)
-                LOGGER.warn("onObjectEnd: JSON {} not found in mapping", context.pathAsString());
-            });
+    if (tableSchema.isPresent()) {
+      if (trace) LOGGER.debug("onObjectEnd: table found for {}", context.pathAsString());
+
+      currentFeature.closeRow(tableSchema.get());
+      return;
+    }
+
+    Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> column =
+        mapping.getColumnForValue(context.pathAsString(), Scope.W);
+
+    if (column.isPresent() && checkJson(column.get())) {
+      currentJson.closeObject(context.path());
+
+      if (trace) LOGGER.debug("onObjectEnd: JSON {}", context.pathAsString());
+      return;
+    }
+
+    if (trace) LOGGER.warn("onObjectEnd: no table found for {}", context.pathAsString());
   }
 
   @Override
@@ -340,9 +344,11 @@ public class FeatureEncoderSql
     if (column.second().hasOperation(Operation.CONNECTOR)) {
       if (column.second().getOperationParameter(Operation.CONNECTOR, "").equals("JSON")) {
         if (currentJsonColumn == null) {
-          currentJsonColumn = column;
-          jsonColumns.put(currentJsonColumn.second().getPathSegment(), new JsonBuilder());
-          currentJson = jsonColumns.get(currentJsonColumn.second().getPathSegment());
+          this.currentJsonColumn = column;
+          this.jsonColumns.put(currentJsonColumn.second().getPathSegment(), new JsonBuilder());
+          this.currentJson = jsonColumns.get(currentJsonColumn.second().getPathSegment());
+          this.currentJsonSetter =
+              currentFeature.addLazyColumn(currentJsonColumn.first(), currentJsonColumn.second());
         }
 
         return true;

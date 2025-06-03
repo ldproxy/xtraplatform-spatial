@@ -65,9 +65,9 @@ public class SqlMappingDeriver {
     }
 
     while (i < mappingRules.size()) {
-      MappingRule rule = mappingRules.get(i);
+      MappingRule tableRule = mappingRules.get(i);
 
-      if (!pathParser.isTablePath(rule.getSource())) {
+      if (!pathParser.isTablePath(tableRule.getSource())) {
         i++;
         continue;
       }
@@ -81,7 +81,7 @@ public class SqlMappingDeriver {
         break;
       }
 
-      while (mappingRules.get(j).getSource().startsWith(rule.getSource())) {
+      while (mappingRules.get(j).getSource().startsWith(tableRule.getSource())) {
         MappingRule columnRule = mappingRules.get(j);
 
         if (pathParser.isTablePath(columnRule.getSource())) {
@@ -116,7 +116,7 @@ public class SqlMappingDeriver {
 
       addToMapping(
           schema,
-          rule,
+          tableRule,
           columnRules,
           filterColumnRules,
           writableColumnRules,
@@ -152,6 +152,13 @@ public class SqlMappingDeriver {
     previous.add(pathParser.parseTablePath(tableRule.getSource()).getFullPath());
     // TODO: should not contain queryables
     mapping.addTables(querySchema);
+
+    if (tableRule.isWritable()
+        && !seenWritableProperties.contains(tableRule.getTarget())
+        && !Objects.equals(tableRule.getTarget(), ROOT_TARGET)) {
+      mapping.putObjectTables(tableRule.getTarget(), querySchema);
+      seenWritableProperties.add(tableRule.getTarget());
+    }
 
     for (int k = 0; k < columnRules.size(); k++) {
       MappingRule column = columnRules.get(k);
@@ -197,11 +204,6 @@ public class SqlMappingDeriver {
         continue;
       }
       SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
-
-      // TODO: ignoring joins for now
-      if (!Objects.equals(ROOT_TARGET, tableRule.getTarget())) {
-        continue;
-      }
 
       if (column1.hasOperation(SqlQueryColumn.Operation.CONSTANT)) {
         continue;
@@ -382,6 +384,7 @@ public class SqlMappingDeriver {
             .writableColumns(
                 writableColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
             .relations(getJoins(sqlPath, previous))
+            .staticInserts(sqlPath.getStaticInserts())
             .build();
 
     return querySchema;
@@ -419,6 +422,7 @@ public class SqlMappingDeriver {
                                 tablePath ->
                                     Objects.equals(
                                         tablePath, fullPath.subList(0, fullPath.size() - 1))))
+                .staticInserts(parentTable.getStaticInserts())
                 .build());
       }
     }

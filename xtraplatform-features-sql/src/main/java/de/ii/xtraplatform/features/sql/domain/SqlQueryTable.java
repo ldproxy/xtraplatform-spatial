@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.sql.domain;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.ii.xtraplatform.cql.domain.Operation;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -27,6 +28,8 @@ public interface SqlQueryTable {
   Optional<String> getPrimaryKey();
 
   Optional<Operation<?>> getFilter();
+
+  Map<String, String> getStaticInserts();
 
   @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = DefaultsFilter.class)
   @Value.Default

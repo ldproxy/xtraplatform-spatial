@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public interface SqlClient extends SqlClientBasic {
 
@@ -26,10 +27,12 @@ public interface SqlClient extends SqlClientBasic {
   Reactive.Source<SqlRow> getSourceStream(String query, SqlQueryOptions options);
 
   Reactive.Source<String> getMutationSource(
-      List<String> statements, List<Consumer<String>> idConsumers, Object executionContext);
+      List<Supplier<String>> statements,
+      List<Consumer<String>> idConsumers,
+      Object executionContext);
 
   Transformer<FeatureDataSql, String> getMutationFlow(
-      Function<FeatureDataSql, List<Tuple<String, Consumer<String>>>> mutations,
+      Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
       Object executionContext,
       Optional<String> id);
 
