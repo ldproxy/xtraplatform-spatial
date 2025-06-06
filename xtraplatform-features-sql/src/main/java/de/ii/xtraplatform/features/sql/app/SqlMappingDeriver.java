@@ -49,7 +49,7 @@ public class SqlMappingDeriver {
     this.queryGeneration = queryGeneration;
   }
 
-  public SqlQueryMapping derive(List<MappingRule> mappingRules, FeatureSchema schema) {
+  public List<SqlQueryMapping> derive(List<MappingRule> mappingRules, FeatureSchema schema) {
     List<SqlQuerySchema> schemas = new ArrayList<>();
     List<List<String>> previous = new ArrayList<>();
     List<String> seenProperties = new ArrayList<>();
@@ -57,11 +57,8 @@ public class SqlMappingDeriver {
     boolean includeSchema = Objects.nonNull(schema);
     int i = 0;
 
-    ImmutableSqlQueryMapping.Builder mapping = new ImmutableSqlQueryMapping.Builder();
-
-    if (includeSchema) {
-      mapping.mainSchema(schema);
-    }
+    List<SqlQueryMapping> mappings = new ArrayList<>();
+    ImmutableSqlQueryMapping.Builder mapping = null;
 
     while (i < mappingRules.size()) {
       MappingRule rule = mappingRules.get(i);
@@ -69,6 +66,18 @@ public class SqlMappingDeriver {
       if (!pathParser.isTablePath(rule.getSource())) {
         i++;
         continue;
+      }
+
+      if (pathParser.isRootPath(rule.getSource())) {
+        if (Objects.nonNull(mapping)) {
+          mappings.add(mapping.build());
+        }
+
+        mapping = new ImmutableSqlQueryMapping.Builder();
+
+        if (includeSchema) {
+          mapping.mainSchema(schema);
+        }
       }
 
       int j = i + 1;
@@ -129,7 +138,11 @@ public class SqlMappingDeriver {
       i = j;
     }
 
-    return mapping.build();
+    if (Objects.nonNull(mapping)) {
+      mappings.add(mapping.build());
+    }
+
+    return mappings;
   }
 
   private void addToMapping(

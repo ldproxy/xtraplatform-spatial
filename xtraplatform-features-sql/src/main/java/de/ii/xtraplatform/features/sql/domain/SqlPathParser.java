@@ -75,7 +75,7 @@ public class SqlPathParser {
     String TABLE_PLAIN =
         String.format(
             "(?:(?:%s)%s)?%s", IDENTIFIER, Pattern.quote(Tokens.SCHEMA_SEPARATOR), IDENTIFIER);
-    String FLAGS = "(?:\\{[a-z_]+.*?(?:=(?:'.*?'|[^}]*))?\\})*";
+    String FLAGS = "(?:\\{[a-zA-Z_]+(?:=(?:'[^']*?'|[^}]*?))?\\})*";
     String SORT_KEY_FLAG = String.format("\\{sortKey=(?<%s>.+?)\\}", MatcherGroups.SORTKEY);
     String SORT_KEY_FLAG_UNIQUE =
         String.format("\\{sortKeyUnique=(?<%s>true|false)\\}", MatcherGroups.SORTKEYUNIQUE);
@@ -207,6 +207,12 @@ public class SqlPathParser {
     Matcher matcher = Patterns.ROOT_TABLE.matcher(path);
 
     return matcher.find() && matcher.start() == 0;
+  }
+
+  public boolean isRootPath(String path) {
+    Matcher matcher = Patterns.ROOT_TABLE.matcher(path);
+
+    return matcher.matches();
   }
 
   public SqlPath parseColumnPath(String path) {

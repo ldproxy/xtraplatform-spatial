@@ -33,8 +33,10 @@ class SqlMappingDeriverSpec extends Specification {
         when:
 
         def mappingRules = MappingRuleFixtures.fromYaml(rules)
-        SqlQueryMapping mapping = deriver.derive(mappingRules, null)
-        List<SqlQuerySchema> schemas = mapping.getTables()
+        List<SqlQueryMapping> mapping = deriver.derive(mappingRules, null)
+        List<SqlQuerySchema> schemas = mapping.stream()
+                .flatMap(m -> m.getTables().stream())
+                .toList()
         String actual = SqlQuerySchemaFixtures.toYamlRaw(schemas)
         String expected = SqlQuerySchemaFixtures.fromYamlRaw(schema)
 

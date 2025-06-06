@@ -357,7 +357,7 @@ public class FeatureProviderSql
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SchemaSql>> tableSchemasQueryables;
   private Map<String, List<SchemaSql>> tableSchemasMutations;
-  private Map<String, SqlQueryMapping> queryMappings;
+  private Map<String, List<SqlQueryMapping>> queryMappings;
   private String cronJob;
 
   @AssistedInject
@@ -554,7 +554,8 @@ public class FeatureProviderSql
                 entry -> {
                   final int[] i = {0};
                   return new SimpleImmutableEntry<>(
-                      entry.getKey(), List.of(sqlQueryTemplatesDeriver2.derive(entry.getValue())));
+                      entry.getKey(),
+                      entry.getValue().stream().map(sqlQueryTemplatesDeriver2::derive).toList());
                 })
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 

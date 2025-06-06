@@ -17,6 +17,8 @@ import de.ii.xtraplatform.features.sql.domain.*
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.stream.Collectors
+
 class SqlQueryTemplatesDeriver2Spec extends Specification {
 
     @Shared
@@ -50,8 +52,8 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
         def schema = FeatureSchemaFixtures.fromYaml(rules)
         def resolved = schema.accept(mappingOperationResolver, List.of())
         def mappingRules = MappingRuleFixtures.fromYaml(rules)
-        SqlQueryMapping mapping = mappingDeriver.derive(mappingRules, resolved)
-        SqlQueryTemplates templates = deriver.derive(mapping)
+        List<SqlQueryMapping> mapping = mappingDeriver.derive(mappingRules, resolved)
+        List<SqlQueryTemplates> templates = mapping.stream().map(deriver::derive).toList()
         String actual = meta(templates, sortBy, userFilter)
 
         then:
@@ -76,8 +78,8 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
         def schema = FeatureSchemaFixtures.fromYaml(rules)
         def resolved = schema.accept(mappingOperationResolver, List.of())
         def mappingRules = MappingRuleFixtures.fromYaml(rules)
-        SqlQueryMapping mapping = mappingDeriver.derive(mappingRules, resolved)
-        SqlQueryTemplates templates = deriver.derive(mapping)
+        List<SqlQueryMapping> mapping = mappingDeriver.derive(mappingRules, resolved)
+        List<SqlQueryTemplates> templates = mapping.stream().map(deriver::derive).toList()
         List<String> actual = values(templates, limit, offset, sortBy, filter)
         List<String> expected = SqlQueryFixtures.fromYaml(queries)
 
@@ -122,11 +124,11 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
     }
 
 
-    static String meta(SqlQueryTemplates templates, List<SortKey> sortBy, Optional<Cql2Expression> userFilter) {
-        return templates.getMetaQueryTemplate().generateMetaQuery(10, 10, 0, sortBy, userFilter, ImmutableMap.of(), false, true)
+    static String meta(List<SqlQueryTemplates> templates, List<SortKey> sortBy, Optional<Cql2Expression> userFilter) {
+        return templates.stream().map(t -> t.getMetaQueryTemplate().generateMetaQuery(10, 10, 0, sortBy, userFilter, ImmutableMap.of(), false, true)).collect(Collectors.joining("\n"))
     }
 
-    static List<String> values(SqlQueryTemplates templates, int limit, int offset, List<SortKey> sortBy, Cql2Expression filter) {
-        return templates.getValueQueryTemplates().collect { it.generateValueQuery(limit, offset, sortBy, Optional.ofNullable(filter), limit == 0 ? Optional.<Tuple<Object, Object>> empty() : Optional.of(Tuple.of(offset, offset + limit - 1)), ImmutableMap.of()) }
+    static List<String> values(List<SqlQueryTemplates> templates, int limit, int offset, List<SortKey> sortBy, Cql2Expression filter) {
+        return templates.stream().flatMap(t -> t.getValueQueryTemplates().collect { it.generateValueQuery(limit, offset, sortBy, Optional.ofNullable(filter), limit == 0 ? Optional.<Tuple<Object, Object>> empty() : Optional.of(Tuple.of(offset, offset + limit - 1)), ImmutableMap.of()) }.stream()).toList()
     }
 }
