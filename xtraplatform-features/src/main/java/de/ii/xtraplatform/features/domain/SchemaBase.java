@@ -505,7 +505,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default List<T> getSecondaryGeometries() {
-    return getPrimaryGeometry().stream().collect(Collectors.toList());
+    return getSecondaryGeometry().stream().collect(Collectors.toList());
   }
 
   @JsonIgnore
