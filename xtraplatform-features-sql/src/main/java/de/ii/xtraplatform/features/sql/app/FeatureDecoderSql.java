@@ -59,6 +59,7 @@ public class FeatureDecoderSql
   private GeometryDecoderWkt geometryDecoderWkt;
   private GeometryDecoderWkb geometryDecoderWkb;
   private NestingTracker nestingTracker;
+  private Map<List<String>, Integer> schemaIndexes;
 
   public FeatureDecoderSql(
       Map<String, SchemaMapping> mappings,
@@ -83,6 +84,7 @@ public class FeatureDecoderSql
         query instanceof FeatureQuery && ((FeatureQuery) query).returnsSingleFeature();
     this.subDecoderFactories = subDecoderFactories;
     this.subDecoders = new LinkedHashMap<>();
+    this.schemaIndexes = new HashMap<>();
   }
 
   @Override
@@ -106,6 +108,7 @@ public class FeatureDecoderSql
     while (nestingTracker.isNested()) {
       nestingTracker.close();
     }
+    schemaIndexes.clear();
 
     if (isAtLeastOneFeatureWritten) {
       getDownstream().onFeatureEnd(context);
@@ -176,6 +179,7 @@ public class FeatureDecoderSql
       while (nestingTracker.isNested()) {
         nestingTracker.close();
       }
+      schemaIndexes.clear();
     }
 
     if (!Objects.equals(currentId, featureId) || !Objects.equals(context.type(), featureType)) {
@@ -234,24 +238,28 @@ public class FeatureDecoderSql
     }
   }
 
-  // TODO: schemaIndex
   private void handleColumns(SqlRow sqlRow) {
-
-    Map<List<String>, Integer> schemaIndexes = new HashMap<>();
-
     for (int i = 0; i < sqlRow.getValues().size() && i < sqlRow.getColumnPaths().size(); i++) {
-      context.pathTracker().track(sqlRow.getColumnPaths().get(i));
-      if (!schemaIndexes.containsKey(sqlRow.getColumnPaths().get(i))) {
-        schemaIndexes.put(sqlRow.getColumnPaths().get(i), 0);
+      // TODO: this is a workaround, ideally the paths SchemaMapping would contain the column
+      // aliases
+      List<String> columnPath =
+          sqlRow.isSubDecoderColumn(i)
+              ? subDecoderFactories
+                  .get(sqlRow.getSubDecoder(i))
+                  .resolvePath(sqlRow.getColumnPaths().get(i))
+              : sqlRow.getColumnPaths().get(i);
+
+      context.pathTracker().track(columnPath);
+      if (!schemaIndexes.containsKey(columnPath)) {
+        schemaIndexes.put(columnPath, 0);
       } else {
-        schemaIndexes.put(
-            sqlRow.getColumnPaths().get(i), schemaIndexes.get(sqlRow.getColumnPaths().get(i)) + 1);
+        schemaIndexes.put(columnPath, schemaIndexes.get(columnPath) + 1);
       }
 
       if (sqlRow.isSpatialColumn(i)) {
         if (Objects.nonNull(sqlRow.getValues().get(i))) {
           try {
-            context.setSchemaIndex(-1);
+            context.setSchemaIndex(schemaIndexes.get(columnPath));
             if (geometryAsWkb) {
               geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i));
             } else {
@@ -264,7 +272,7 @@ public class FeatureDecoderSql
       } else {
         context.setValueType(Type.STRING);
         context.setValue((String) sqlRow.getValues().get(i));
-        context.setSchemaIndex(schemaIndexes.get(sqlRow.getColumnPaths().get(i)));
+        context.setSchemaIndex(schemaIndexes.get(columnPath));
 
         if (sqlRow.isSubDecoderColumn(i) && Objects.nonNull(context.value())) {
           String subDecoder = sqlRow.getSubDecoder(i);

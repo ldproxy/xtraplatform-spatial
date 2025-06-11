@@ -1,0 +1,17 @@
+---
+- name: externalprovider
+  type: OBJECT
+  sourcePath: externalprovider
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - externalprovider
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

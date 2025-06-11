@@ -1,0 +1,22 @@
+---
+sourcePath: /explorationsite
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  task:
+    sourcePath: "[id=explorationsite_fk]explorationsite_task/[task_fk=id]task"
+    type: OBJECT_ARRAY
+    objectType: Link
+    properties:
+      id:
+        sourcePath: id
+        type: STRING
+      title:
+        sourcePath: projectname
+        type: STRING
+      href:
+        sourcePath: id
+        type: STRING

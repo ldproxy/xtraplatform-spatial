@@ -1,0 +1,22 @@
+---
+sourcePath: /building
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  consistsOfBuildingPart:
+    sourcePath: "[id=fk_buildingpart_parent]building"
+    type: OBJECT_ARRAY
+    properties:
+      href:
+        sourcePath: id
+        type: STRING
+  parent:
+    sourcePath: "[fk_buildingpart_parent=id]building"
+    type: OBJECT
+    properties:
+      href:
+        sourcePath: id
+        type: STRING

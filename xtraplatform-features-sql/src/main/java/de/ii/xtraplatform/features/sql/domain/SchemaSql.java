@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.features.domain.SchemaBase;
@@ -21,6 +22,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable(lazyhash = true)
 @Value.Style(deepImmutablesDetection = true, builder = "new", attributeBuilderDetection = true)
+@JsonDeserialize(builder = ImmutableSchemaSql.Builder.class)
 public interface SchemaSql extends SchemaBase<SchemaSql> {
 
   List<SqlRelation> getRelation();
@@ -53,11 +55,13 @@ public interface SchemaSql extends SchemaBase<SchemaSql> {
     return false;
   }
 
+  @JsonIgnore
   @Value.Derived
   default boolean isConstant() {
     return getConstantValue().isPresent();
   }
 
+  @JsonIgnore
   @Override
   @Value.Auxiliary
   @Value.Derived
@@ -103,6 +107,7 @@ public interface SchemaSql extends SchemaBase<SchemaSql> {
     return overlap;
   }
 
+  @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
   default List<List<String>> getColumnPaths() {
@@ -112,6 +117,7 @@ public interface SchemaSql extends SchemaBase<SchemaSql> {
         .collect(ImmutableList.toImmutableList());
   }
 
+  @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
   default List<SchemaSql> getColumnSchemas() {
@@ -120,6 +126,7 @@ public interface SchemaSql extends SchemaBase<SchemaSql> {
         .collect(ImmutableList.toImmutableList());
   }
 
+  @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
   default List<String> getSortKeys() {

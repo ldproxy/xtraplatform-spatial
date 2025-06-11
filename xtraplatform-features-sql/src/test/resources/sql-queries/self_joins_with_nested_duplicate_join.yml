@@ -1,0 +1,15 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM building A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.name
+  FROM building A
+  JOIN att_string_building B ON (A.id=B.fk_feature)
+  ORDER BY 1,2
+- >-
+  SELECT A.id AS SKEY, C.id AS SKEY_1, C.name
+  FROM building A
+  JOIN building B ON (A.id=B.fk_buildingpart_parent)
+  JOIN att_string_building C ON (B.id=C.fk_feature)
+  ORDER BY 1,2

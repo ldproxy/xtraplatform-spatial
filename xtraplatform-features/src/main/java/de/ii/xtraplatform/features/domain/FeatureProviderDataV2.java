@@ -122,6 +122,11 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
   @Override
   List<ExtensionConfiguration> getExtensions();
 
+  // TODO: rename manually to getInputSchemas/getRawSchemas with @JsonProperty("types"), return new
+  // InputSchema
+  // TODO: add new method getTypes with @JsonIgnore that returns the resolved schemas
+  // TODO: in the end we need at least three schemas: input, internal, downstream
+
   /**
    * @langEn Definition of feature types. The entries have to be [schema
    *     definitions](#schema-definitions) with `type: OBJECT` and at least one property with `role:
@@ -132,6 +137,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    * @default {}
    */
   @JsonMerge
+  @JsonProperty("types")
   BuildableMap<FeatureSchema, ImmutableFeatureSchema.Builder> getTypes();
 
   /**

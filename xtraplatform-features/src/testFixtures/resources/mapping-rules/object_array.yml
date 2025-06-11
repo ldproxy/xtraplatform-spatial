@@ -1,0 +1,26 @@
+---
+- source: /explorationsite
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /explorationsite/id
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: "/explorationsite/[id=explorationsite_fk]explorationsite_task/[task_fk=id]task"
+  target: task
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/explorationsite/[id=explorationsite_fk]explorationsite_task/[task_fk=id]task/id"
+  target: task.id
+  type: STRING
+  index: 0
+- source: "/explorationsite/[id=explorationsite_fk]explorationsite_task/[task_fk=id]task/projectname"
+  target: task.title
+  type: STRING
+  index: 0
+- source: "/explorationsite/[id=explorationsite_fk]explorationsite_task/[task_fk=id]task/id"
+  target: task.href
+  type: STRING
+  index: 0

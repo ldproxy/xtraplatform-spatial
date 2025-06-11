@@ -1,0 +1,17 @@
+---
+sourcePath: /o400001
+type: OBJECT
+objectType: BR_Bodenrichtwert
+properties:
+  id:
+    sourcePath: id
+    type: INTEGER
+    role: ID
+  gemeinde_gemeindekennzeichen_gemeinde:
+    sourcePath: "[id=rid]o400001__gem/gem_1"
+    type: VALUE_ARRAY
+    valueType: STRING
+  gemeinde_bezeichnung:
+    sourcePath: "[id=rid]o400001__gem/[_ko_sch_gem=sch]o73005/bez"
+    type: VALUE_ARRAY
+    valueType: STRING

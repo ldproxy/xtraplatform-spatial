@@ -1,0 +1,77 @@
+---
+- name: o400001
+  type: OBJECT
+  sourcePath: gemeinde_bezeichnung
+  properties:
+  - name: id
+    type: INTEGER
+    role: ID
+    parentPath:
+    - o400001
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: o400001__gem
+    type: OBJECT_ARRAY
+    parentPath:
+    - o400001
+    properties:
+    - name: gem_1
+      type: STRING
+      parentPath:
+      - o400001
+      - "[id=rid]o400001__gem"
+      sourcePath: gemeinde_gemeindekennzeichen_gemeinde
+      sortKey: id
+      sortKeyUnique: true
+      isExpression: false
+    - name: o73005
+      type: OBJECT
+      parentPath:
+      - o400001
+      - "[id=rid]o400001__gem"
+      properties:
+      - name: bez
+        type: STRING
+        parentPath:
+        - o400001
+        - "[id=rid]o400001__gem"
+        - "[_ko_sch_gem=sch]o73005"
+        sourcePath: gemeinde_bezeichnung
+        sortKey: id
+        sortKeyUnique: true
+        isExpression: false
+      relation:
+      - cardinality: ONE_2_N
+        sourceContainer: o400001__gem
+        sourceField: _ko_sch_gem
+        sourcePrimaryKey: id
+        sourceSortKey: id
+        targetContainer: o73005
+        targetField: sch
+        joinType: INNER
+      primaryKey: id
+      sortKey: id
+      sortKeyUnique: true
+      parentSortKeys:
+      - o400001.id
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: o400001
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: o400001__gem
+      targetField: rid
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - o400001.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

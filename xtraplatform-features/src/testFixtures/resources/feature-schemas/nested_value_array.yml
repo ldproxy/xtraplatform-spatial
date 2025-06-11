@@ -1,0 +1,19 @@
+---
+sourcePath: /o42003
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  strasse:
+    sourcePath: "[id=rid]o42003__p0000103000/[p0000103000=objid]o42002"
+    type: OBJECT
+    properties:
+      name:
+        sourcePath: nam
+        type: STRING
+      bezeichnung:
+        sourcePath: "[id=rid]o42002__bez/bez"
+        type: VALUE_ARRAY
+        valueType: STRING

@@ -1,0 +1,11 @@
+---
+sourcePath: /eignungsflaeche
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  label:
+    sourcePath: "[EXPRESSION]{sql=CASE WHEN $T$.fsn__nen IS NOT NULL THEN $T$.fsn__zae||'/'||$T$.fsn__nen ELSE fsn__zae END}"
+    type: STRING

@@ -1,0 +1,14 @@
+---
+- source: /eignungsflaeche
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /eignungsflaeche/id
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: "/eignungsflaeche/[EXPRESSION]{sql=CASE WHEN $T$.fsn__nen IS NOT NULL THEN $T$.fsn__zae||'/'||$T$.fsn__nen ELSE fsn__zae END}"
+  target: label
+  type: STRING
+  index: 0

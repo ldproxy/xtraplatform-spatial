@@ -1,0 +1,10 @@
+---
+- source: /externalprovider
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /externalprovider/id
+  target: id
+  type: STRING
+  role: ID
+  index: 0

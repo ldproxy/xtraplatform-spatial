@@ -7,12 +7,14 @@
  */
 package de.ii.xtraplatform.features.sql.app
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.google.common.collect.ImmutableMap
 import de.ii.xtraplatform.cql.domain.Eq
 import de.ii.xtraplatform.cql.domain.Gt
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
 import de.ii.xtraplatform.features.domain.SchemaBase
 import de.ii.xtraplatform.features.domain.SchemaBase.Type
+import de.ii.xtraplatform.features.domain.YamlSerialization
 import de.ii.xtraplatform.features.sql.domain.ImmutableSchemaSql
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlRelation
 import de.ii.xtraplatform.features.sql.domain.SchemaSql
@@ -20,6 +22,30 @@ import de.ii.xtraplatform.features.sql.domain.SqlRelation
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
 
 class QuerySchemaFixtures {
+
+    static String fromYamlRaw(String name) {
+        return YamlSerialization.fromYamlRaw(name, "sql-schemas");
+    }
+
+    static String toYamlRaw(Object value) {
+        return YamlSerialization.toYamlRaw(value);
+    }
+
+    public static List<SchemaSql> fromYaml(String name) {
+        return YamlSerialization.fromYaml(
+                new TypeReference<List<ImmutableSchemaSql.Builder>>() {
+                },
+                name,
+                "sql-schemas",
+                (builderList) -> builderList.stream().map(builder -> builder.name(name).build()).toList());
+    }
+
+    public static void toYaml(List<SchemaSql> schema, String name) {
+        YamlSerialization.toYaml(
+                schema,
+                name,
+                "sql-schemas");
+    }
 
     static List<SchemaSql> SIMPLE = [
             new ImmutableSchemaSql.Builder()

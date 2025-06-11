@@ -1,0 +1,38 @@
+---
+- name: pfs_plan
+  pathSegment: pfs_plan
+  columns:
+  - name: objid
+    pathSegment: objid
+    type: STRING
+    role: ID
+- name: bst_abwasserleitung
+  pathSegment: "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung"
+  relations:
+  - name: pfs_plan
+    pathSegment: pfs_plan
+    sourceField: _id
+    target: bst_abwasserleitung
+    targetField: gehoertzuplan_pfs_plan_fk
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+  - name: name
+    pathSegment: name
+    type: STRING
+- name: bst_erdgasleitung
+  pathSegment: "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
+  relations:
+  - name: pfs_plan
+    pathSegment: pfs_plan
+    sourceField: _id
+    target: bst_erdgasleitung
+    targetField: gehoertzuplan_pfs_plan_fk
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+  - name: name
+    pathSegment: name
+    type: STRING

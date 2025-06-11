@@ -117,7 +117,7 @@ public interface FeatureEventHandler<
       }
 
       int schemaIndex = schemaIndex() > -1 ? schemaIndex() : targetSchemas.size() - 1;
-      T targetSchema = targetSchemas.get(schemaIndex);
+      T targetSchema = targetSchemas.size() > schemaIndex ? targetSchemas.get(schemaIndex) : null;
 
       return Optional.ofNullable(targetSchema);
     }

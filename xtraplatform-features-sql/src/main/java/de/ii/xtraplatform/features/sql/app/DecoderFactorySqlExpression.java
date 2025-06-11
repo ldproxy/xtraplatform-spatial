@@ -11,6 +11,11 @@ import com.github.azahnen.dagger.annotations.AutoBind;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.Decoder;
 import de.ii.xtraplatform.features.domain.DecoderFactory;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -27,8 +32,10 @@ public class DecoderFactorySqlExpression implements DecoderFactory {
       MediaType.valueOf("application/vnd.ldproxy.sql-expression");
   public static final String CONNECTOR_STRING = "EXPRESSION";
   private static final Pattern SQL_FLAG = Pattern.compile("\\{sql=(?<SQL>.+?)\\}");
+  public static final String CONNECTOR_PATH_TEMPLATE = "[EXPRESSION]{sql=%s}";
 
   private final AtomicInteger expressionCounter = new AtomicInteger(0);
+  private final Map<String, String> expressionMap = Collections.synchronizedMap(new HashMap<>());
 
   @Inject
   public DecoderFactorySqlExpression() {}
@@ -54,10 +61,34 @@ public class DecoderFactorySqlExpression implements DecoderFactory {
     Matcher matcher = SQL_FLAG.matcher(flags);
 
     if (matcher.find()) {
-      return Tuple.of(
-          String.format("SQL__%s", expressionCounter.incrementAndGet()), matcher.group("SQL"));
+      String key = String.format("SQL__%s", expressionCounter.incrementAndGet());
+      String expression = matcher.group("SQL");
+
+      expressionMap.put(key, expression);
+
+      return Tuple.of(key, expression);
     }
 
     return DecoderFactory.super.parseSourcePath(path, column, flags, connectorSpec);
+  }
+
+  @Override
+  public List<String> resolvePath(List<String> path) {
+    if (path.isEmpty()) {
+      return path;
+    }
+
+    String key = path.get(path.size() - 1).replace("[" + CONNECTOR_STRING + "]", "");
+
+    if (expressionMap.containsKey(key)) {
+      String expression = expressionMap.get(key);
+
+      List<String> newPath = new ArrayList<>(path.subList(0, path.size() - 1));
+      newPath.add(String.format(CONNECTOR_PATH_TEMPLATE, expression));
+
+      return newPath;
+    }
+
+    return path;
   }
 }

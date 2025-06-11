@@ -26,6 +26,7 @@ import java.text.Collator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Locale.Builder;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -36,10 +37,14 @@ import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 import org.postgresql.ds.PGSimpleDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
 public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterPgis.class);
 
   private final String applicationName;
   private final SqlDialect dialect;
@@ -205,13 +210,28 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
     return ImmutableDbInfoPgis.of(rs.getString(1), rs.getString(2));
   }
 
-  /* NOTE: If the db uses e.g. the DE collation and some sort key actually contains e.g. umlauts
-           this might lead to wrong results.
-           To cover such cases, the locale would need to be configurable.
-  */
   @Override
-  public Collator getRowSortingCollator() {
-    return Collator.getInstance(Locale.US);
+  public Collator getRowSortingCollator(Optional<String> defaultCollation) {
+    String languageTag = defaultCollation.orElse(Locale.US.toLanguageTag());
+
+    if (Objects.equals(languageTag, "C")) {
+      return null;
+    }
+
+    Locale locale;
+    try {
+      locale = new Builder().setLanguageTag(languageTag).build();
+    } catch (Exception e) {
+      locale = Locale.US;
+
+      LOGGER.warn(
+          "Invalid default collation '{}', falling back to '{}' for sorting: {}",
+          languageTag,
+          Locale.US.toLanguageTag(),
+          e.getMessage());
+    }
+
+    return Collator.getInstance(locale);
   }
 
   @Value.Immutable

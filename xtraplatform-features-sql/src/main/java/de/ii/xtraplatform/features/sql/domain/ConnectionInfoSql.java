@@ -14,6 +14,7 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.MergeableMapEnco
 import de.ii.xtraplatform.features.domain.ConnectionInfo;
 import de.ii.xtraplatform.features.sql.infra.db.SqlConnectorRx;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -101,6 +102,22 @@ public interface ConnectionInfoSql extends ConnectionInfo {
    */
   @Nullable
   PoolSettings getPool();
+
+  /**
+   * @langEn The default collation locale used by the database for string comparisons, e.g. `en` or
+   *     `en-US` for English. The special value `C` is allowed for the `C` or `POSIX` collation.
+   *     This will not change the database settings or the queries, but is needed for string
+   *     comparisons in the application.
+   * @langDe Die Standard Collation Locale, die von der Datenbank für Stringvergleiche verwendet
+   *     wird, z.B. `de` oder `de-DE` für Deutsch. Der spezielle Wert `C` ist für die `C`- oder
+   *     `POSIX`-Collation erlaubt. Dies ändert nicht die Datenbankeinstellungen oder die Queries,
+   *     sondern wird nur für Stringvergleiche in der Anwendung benötigt.
+   * @default en-US
+   */
+  @Value.Default
+  default Optional<String> getDefaultCollation() {
+    return Optional.of(Locale.US.toLanguageTag());
+  }
 
   /**
    * @langEn Custom options for the JDBC driver. For `PGIS`, you might pass `gssEncMode`, `ssl`,
