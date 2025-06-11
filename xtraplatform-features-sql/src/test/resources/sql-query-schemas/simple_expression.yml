@@ -1,0 +1,16 @@
+---
+- name: eignungsflaeche
+  pathSegment: eignungsflaeche
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+  - name: SQL__1
+    pathSegment: "[EXPRESSION]SQL__1"
+    type: STRING
+    operations:
+      EXPRESSION:
+      - CASE WHEN $T$.fsn__nen IS NOT NULL THEN $T$.fsn__zae||'/'||$T$.fsn__nen ELSE fsn__zae END
+      CONNECTOR:
+      - EXPRESSION

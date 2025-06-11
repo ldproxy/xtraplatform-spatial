@@ -1,0 +1,37 @@
+---
+- name: o400001
+  pathSegment: o400001
+  columns:
+  - name: id
+    pathSegment: id
+    type: INTEGER
+    role: ID
+- name: o400001__gem
+  pathSegment: "[id=rid]o400001__gem"
+  relations:
+  - name: o400001
+    pathSegment: o400001
+    sourceField: id
+    target: o400001__gem
+    targetField: rid
+  columns:
+  - name: gem_1
+    pathSegment: gem_1
+    type: STRING
+- name: o73005
+  pathSegment: "[_ko_sch_gem=sch]o73005"
+  relations:
+  - name: o400001
+    pathSegment: o400001
+    sourceField: id
+    target: o400001__gem
+    targetField: rid
+  - name: o400001__gem
+    pathSegment: "[id=rid]o400001__gem"
+    sourceField: _ko_sch_gem
+    target: o73005
+    targetField: sch
+  columns:
+  - name: bez
+    pathSegment: bez
+    type: STRING

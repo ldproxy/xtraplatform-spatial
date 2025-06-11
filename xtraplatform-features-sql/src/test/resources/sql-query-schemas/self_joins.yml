@@ -1,0 +1,32 @@
+---
+- name: building
+  pathSegment: building
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+- name: building
+  pathSegment: "[id=fk_buildingpart_parent]building"
+  relations:
+  - name: building
+    pathSegment: building
+    sourceField: id
+    target: building
+    targetField: fk_buildingpart_parent
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+- name: building
+  pathSegment: "[fk_buildingpart_parent=id]building"
+  relations:
+  - name: building
+    pathSegment: building
+    sourceField: fk_buildingpart_parent
+    target: building
+    targetField: id
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING

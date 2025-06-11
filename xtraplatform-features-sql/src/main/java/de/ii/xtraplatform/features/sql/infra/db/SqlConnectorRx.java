@@ -163,7 +163,8 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
           new SqlClientRx(
               session,
               dbmsAdapters.get(connectionInfo.getDialect()),
-              dbmsAdapters.getDialect(connectionInfo.getDialect()));
+              dbmsAdapters.getDialect(connectionInfo.getDialect()),
+              connectionInfo.getDefaultCollation());
     } catch (Throwable e) {
       this.connectionError = e;
       setMessage(e.getMessage());

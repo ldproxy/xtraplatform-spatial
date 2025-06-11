@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.gml.infra.fes;
 import de.ii.xtraplatform.features.gml.infra.req.FES;
 import de.ii.xtraplatform.features.gml.infra.req.GML;
 import de.ii.xtraplatform.features.gml.infra.xml.XMLDocument;
-import de.ii.xtraplatform.geometries.domain.Polygon;
 import java.util.List;
 import java.util.Map;
 import org.w3c.dom.Element;

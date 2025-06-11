@@ -1,0 +1,22 @@
+---
+- source: /explorationsite
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /explorationsite/id
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: "/explorationsite/[id=explorationsiteid]explorationsite_chronostratigraphy{sortKey=explorationsiteid}"
+  target: chronostratigraphy
+  type: OBJECT_ARRAY
+  index: 0
+- source: "/explorationsite/[id=explorationsiteid]explorationsite_chronostratigraphy{sortKey=explorationsiteid}/chronostratigraphycodeid"
+  target: chronostratigraphy.title
+  type: STRING
+  index: 0
+- source: "/explorationsite/[id=explorationsiteid]explorationsite_chronostratigraphy{sortKey=explorationsiteid}/chronostratigraphycodeid"
+  target: chronostratigraphy.href
+  type: STRING
+  index: 0

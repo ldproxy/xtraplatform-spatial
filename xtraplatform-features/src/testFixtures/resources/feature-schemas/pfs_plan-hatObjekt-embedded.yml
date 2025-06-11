@@ -7,6 +7,9 @@ properties:
     sourcePath: id
     type: STRING
     role: ID
+  const:
+    type: STRING
+    constantValue: FOO
   hatObjekt:
     type: OBJECT_ARRAY
     role: EMBEDDED_FEATURE
@@ -49,3 +52,13 @@ properties:
               title:
                 sourcePath: gehoertzuplan_pfs_plan_fk
                 type: STRING
+          mikrorohr:
+            sourcePath: "[mikrorohr_fk=_id]bra_mikrorohr"
+            type: OBJECT
+            role: EMBEDDED_FEATURE
+            properties:
+              id:
+                sourcePath: _id
+                role: ID
+                type: INTEGER
+

@@ -17,54 +17,19 @@ import java.util.stream.Stream;
 public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePath>
     extends SchemaVisitorTopDown<FeatureSchema, List<T>> {
 
-  static boolean endsWith(List<?> source, List<?> target) {
-    if (source.size() < target.size()) {
-      return false;
-    }
+  List<U> parseSourcePaths(FeatureSchema sourceSchema, List<List<U>> parents);
 
-    for (int i = 0; i < target.size(); i++) {
-      if (!Objects.equals(source.get(source.size() - target.size() + i), target.get(i))) {
-        return false;
-      }
-    }
+  boolean hasRootPath(FeatureSchema sourceSchema);
 
-    return true;
-  }
+  T create(
+      FeatureSchema targetSchema,
+      U path,
+      List<T> visitedProperties,
+      List<U> parentPaths,
+      List<String> fullParentPath,
+      boolean nestedArray);
 
-  static boolean intersects(List<?> source, List<?> target) {
-    if (source.isEmpty() || target.isEmpty()) {
-      return false;
-    }
-
-    int start = source.indexOf(target.get(0));
-
-    if (start == -1) {
-      return false;
-    }
-
-    for (int i = start; i < source.size(); i++) {
-      if (i - start >= target.size()) {
-        return false;
-      }
-
-      if (!Objects.equals(source.get(i), target.get(i - start))) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  static <T> List<T> interlace(List<T> source, List<T> target) {
-    List<T> shortenedSource = source;
-
-    if (intersects(source, target)) {
-      int start = source.indexOf(target.get(0));
-      shortenedSource = source.subList(0, start);
-    }
-
-    return Stream.concat(shortenedSource.stream(), target.stream()).collect(Collectors.toList());
-  }
+  List<T> merge(FeatureSchema targetSchema, List<String> parentPath, List<T> visitedProperties);
 
   @Override
   default List<T> visit(
@@ -124,17 +89,8 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
                                     ? currentPath.withoutParentIntersection(parentPath)
                                     : currentPath;
 
-                            List<String> fullParentPath = new ArrayList<>();
-                            List<U> last = new ArrayList<>();
-                            for (U path : parentPath) {
-                              U finalPath =
-                                  isInConcatNested && !last.isEmpty()
-                                      ? path.withoutParentIntersection(last)
-                                      : path;
-
-                              fullParentPath.addAll(finalPath.getFullPath());
-                              last.add(finalPath);
-                            }
+                            List<String> fullParentPath =
+                                getFullParentPath(parentPath, isInConcatNested);
                             List<String> fullPath = new ArrayList<>(fullParentPath);
                             fullPath.addAll(finalCurrentPath.getFullPath());
 
@@ -171,6 +127,8 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
                     properties.stream()
                         .filter(prop -> Objects.equals(prop.getParentPath(), fullParentPath))
                         .collect(Collectors.toList());
+
+                // this only prefixes property sourcePaths with schema.name, parentPath is ignored
                 return merge(
                     schema,
                     parentPath.isEmpty()
@@ -183,6 +141,19 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
     }
 
     throw new IllegalArgumentException();
+  }
+
+  default List<String> getFullParentPath(List<U> parentPath, boolean isInConcatNested) {
+    List<String> fullParentPath = new ArrayList<>();
+    List<U> last = new ArrayList<>();
+    for (U path : parentPath) {
+      U finalPath =
+          isInConcatNested && !last.isEmpty() ? path.withoutParentIntersection(last) : path;
+
+      fullParentPath.addAll(finalPath.getFullPath());
+      last.add(finalPath);
+    }
+    return fullParentPath;
   }
 
   default List<List<U>> getParentPaths(List<FeatureSchema> parents) {
@@ -237,17 +208,52 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
         .collect(Collectors.toList());
   }
 
-  List<U> parseSourcePaths(FeatureSchema sourceSchema, List<List<U>> parents);
+  static boolean endsWith(List<?> source, List<?> target) {
+    if (source.size() < target.size()) {
+      return false;
+    }
 
-  boolean hasRootPath(FeatureSchema sourceSchema);
+    for (int i = 0; i < target.size(); i++) {
+      if (!Objects.equals(source.get(source.size() - target.size() + i), target.get(i))) {
+        return false;
+      }
+    }
 
-  T create(
-      FeatureSchema targetSchema,
-      U path,
-      List<T> visitedProperties,
-      List<U> parentPaths,
-      List<String> fullParentPath,
-      boolean nestedArray);
+    return true;
+  }
 
-  List<T> merge(FeatureSchema targetSchema, List<String> parentPath, List<T> visitedProperties);
+  static boolean intersects(List<?> source, List<?> target) {
+    if (source.isEmpty() || target.isEmpty()) {
+      return false;
+    }
+
+    int start = source.indexOf(target.get(0));
+
+    if (start == -1) {
+      return false;
+    }
+
+    for (int i = start; i < source.size(); i++) {
+      if (i - start >= target.size()) {
+        return false;
+      }
+
+      if (!Objects.equals(source.get(i), target.get(i - start))) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  static <T> List<T> interlace(List<T> source, List<T> target) {
+    List<T> shortenedSource = source;
+
+    if (intersects(source, target)) {
+      int start = source.indexOf(target.get(0));
+      shortenedSource = source.subList(0, start);
+    }
+
+    return Stream.concat(shortenedSource.stream(), target.stream()).collect(Collectors.toList());
+  }
 }

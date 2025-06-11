@@ -1,0 +1,35 @@
+---
+- name: o41001
+  pathSegment: o41001
+  sortKey: objid
+  columns:
+  - name: objid
+    pathSegment: objid
+    type: STRING
+    role: ID
+  - name: beb
+    pathSegment: beb
+    type: STRING
+  - name: constant_href_3
+    pathSegment: constant_href_3
+    type: STRING
+    operations:
+      CONSTANT:
+      - https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/1
+- name: o41002
+  pathSegment: o41002
+  sortKey: objid
+  columns:
+  - name: objid
+    pathSegment: objid
+    type: STRING
+    role: ID
+  - name: beb
+    pathSegment: beb
+    type: STRING
+  - name: constant_href_4
+    pathSegment: constant_href_4
+    type: STRING
+    operations:
+      CONSTANT:
+      - https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/2

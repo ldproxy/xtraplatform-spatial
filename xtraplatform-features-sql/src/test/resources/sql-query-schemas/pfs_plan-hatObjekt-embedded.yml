@@ -1,0 +1,82 @@
+---
+- name: pfs_plan
+  pathSegment: pfs_plan
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+  - name: constant_pfs_plan_hatObjekt_embedded_0
+    pathSegment: constant_pfs_plan_hatObjekt_embedded_0
+    type: STRING
+    operations:
+      CONSTANT:
+      - FOO
+- name: bst_erdgasleitung
+  pathSegment: "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
+  relations:
+  - name: pfs_plan
+    pathSegment: pfs_plan
+    sourceField: _id
+    target: bst_erdgasleitung
+    targetField: gehoertzuplan_pfs_plan_fk
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+    role: ID
+  - name: constant_gehoertZuPlan_1
+    pathSegment: constant_gehoertZuPlan_1
+    type: STRING
+    operations:
+      CONSTANT:
+      - pfs_plan
+  - name: gehoertzuplan_pfs_plan_fk
+    pathSegment: gehoertzuplan_pfs_plan_fk
+    type: INTEGER
+  - name: gehoertzuplan_pfs_plan_fk
+    pathSegment: gehoertzuplan_pfs_plan_fk
+    type: STRING
+- name: bst_speicher
+  pathSegment: "[_id=gehoertzuplan_pfs_plan_fk]bst_speicher"
+  relations:
+  - name: pfs_plan
+    pathSegment: pfs_plan
+    sourceField: _id
+    target: bst_speicher
+    targetField: gehoertzuplan_pfs_plan_fk
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+    role: ID
+  - name: constant_gehoertZuPlan_2
+    pathSegment: constant_gehoertZuPlan_2
+    type: STRING
+    operations:
+      CONSTANT:
+      - pfs_plan
+  - name: gehoertzuplan_pfs_plan_fk
+    pathSegment: gehoertzuplan_pfs_plan_fk
+    type: INTEGER
+  - name: gehoertzuplan_pfs_plan_fk
+    pathSegment: gehoertzuplan_pfs_plan_fk
+    type: STRING
+- name: bra_mikrorohr
+  pathSegment: "[mikrorohr_fk=_id]bra_mikrorohr"
+  relations:
+  - name: pfs_plan
+    pathSegment: pfs_plan
+    sourceField: _id
+    target: bst_speicher
+    targetField: gehoertzuplan_pfs_plan_fk
+  - name: bst_speicher
+    pathSegment: "[_id=gehoertzuplan_pfs_plan_fk]bst_speicher"
+    sourceField: mikrorohr_fk
+    target: bra_mikrorohr
+    targetField: _id
+  columns:
+  - name: _id
+    pathSegment: _id
+    type: INTEGER
+    role: ID

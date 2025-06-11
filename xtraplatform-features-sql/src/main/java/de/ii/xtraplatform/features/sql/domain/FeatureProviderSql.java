@@ -64,6 +64,8 @@ import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMutationResult;
 import de.ii.xtraplatform.features.domain.ImmutableSubQuery;
+import de.ii.xtraplatform.features.domain.MappingRule;
+import de.ii.xtraplatform.features.domain.MappingRulesDeriver;
 import de.ii.xtraplatform.features.domain.MultiFeatureQueries;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
@@ -83,20 +85,20 @@ import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsReaderSql;
+import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.FeatureDecoderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureEncoderSql2;
+import de.ii.xtraplatform.features.sql.app.FeatureEncoderSql;
 import de.ii.xtraplatform.features.sql.app.FeatureMutationsSql;
 import de.ii.xtraplatform.features.sql.app.FeatureQueryEncoderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureSql;
 import de.ii.xtraplatform.features.sql.app.FilterEncoderSql;
-import de.ii.xtraplatform.features.sql.app.ModifiableFeatureSql;
-import de.ii.xtraplatform.features.sql.app.MutationSchemaBuilderSql;
+import de.ii.xtraplatform.features.sql.app.ModifiableFeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
+import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
-import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
+import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver2;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.services.domain.Scheduler;
@@ -354,6 +356,7 @@ public class FeatureProviderSql
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SchemaSql>> tableSchemasQueryables;
   private Map<String, List<SchemaSql>> tableSchemasMutations;
+  private Map<String, List<SqlQueryMapping>> queryMappings;
   private String cronJob;
 
   @AssistedInject
@@ -450,7 +453,35 @@ public class FeatureProviderSql
         new SourceSchemaValidatorSql(validationSchemas, this::getSqlClient);
 
     this.pathParser3 = createPathParser3(getData().getSourcePathDefaults(), cql, subdecoders);
+
+    // TODO: use new derivers and schemas everywhere
     QuerySchemaDeriver querySchemaDeriver = new QuerySchemaDeriver(pathParser3);
+    MappingRulesDeriver mappingRulesDeriver = new MappingRulesDeriver();
+    SqlMappingDeriver sqlMappingDeriver =
+        new SqlMappingDeriver(pathParser3, getData().getQueryGeneration());
+
+    Map<String, List<MappingRule>> mappingRules =
+        getData().getTypes().entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        entry
+                            .getValue() /*.accept(WITH_SCOPE_QUERIES)*/
+                            .accept(mappingRulesDeriver)))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
+    this.queryMappings =
+        getData().getTypes().entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        sqlMappingDeriver.derive(
+                            mappingRules.get(entry.getKey()),
+                            entry.getValue() /*.accept(WITH_SCOPE_QUERIES)*/)))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
     this.tableSchemas =
         getData().getTypes().entrySet().stream()
             .map(
@@ -459,6 +490,7 @@ public class FeatureProviderSql
                         entry.getKey(),
                         entry.getValue().accept(WITH_SCOPE_RETURNABLE).accept(querySchemaDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
     this.tableSchemasQueryables =
         getData().getTypes().entrySet().stream()
             .map(
@@ -509,58 +541,28 @@ public class FeatureProviderSql
                         entry.getValue().accept(WITH_SCOPE_RECEIVABLE).accept(querySchemaDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
-    Map<String, List<SqlQueryTemplates>> allQueryTemplates =
-        tableSchemas.entrySet().stream()
+    SqlQueryTemplatesDeriver2 sqlQueryTemplatesDeriver2 =
+        new SqlQueryTemplatesDeriver2(
+            filterEncoder,
+            sqlDialect,
+            getData().getQueryGeneration().getComputeNumberMatched(),
+            true,
+            getData().getQueryGeneration().getNullOrder());
+
+    Map<String, List<SqlQueryTemplates>> allQueryTemplates2 =
+        queryMappings.entrySet().stream()
             .map(
                 entry -> {
                   final int[] i = {0};
                   return new SimpleImmutableEntry<>(
                       entry.getKey(),
-                      entry.getValue().stream()
-                          .map(
-                              schemaSql ->
-                                  schemaSql.accept(
-                                      new SqlQueryTemplatesDeriver(
-                                          tableSchemasQueryables.get(entry.getKey()).get(i[0]++),
-                                          filterEncoder,
-                                          sqlDialect,
-                                          getData().getQueryGeneration().getComputeNumberMatched(),
-                                          true,
-                                          getData().getQueryGeneration().getNullOrder(),
-                                          getData().getQueryGeneration().getGeometryAsWkb())))
-                          .collect(Collectors.toList()));
+                      entry.getValue().stream().map(sqlQueryTemplatesDeriver2::derive).toList());
                 })
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
-
-    Map<String, List<SqlQueryTemplates>> allQueryTemplatesMutations =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    new SimpleImmutableEntry<>(
-                        entry.getKey(),
-                        ImmutableList.of(
-                            entry
-                                .getValue()
-                                .accept(WITH_SCOPE_RECEIVABLE)
-                                .accept(querySchemaDeriver)
-                                .get(0)
-                                .accept(
-                                    new SqlQueryTemplatesDeriver(
-                                        null,
-                                        filterEncoder,
-                                        sqlDialect,
-                                        getData().getQueryGeneration().getComputeNumberMatched(),
-                                        false,
-                                        getData().getQueryGeneration().getNullOrder(),
-                                        getData().getQueryGeneration().getGeometryAsWkb())))))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =
         new FeatureQueryEncoderSql(
-            allQueryTemplates,
-            allQueryTemplatesMutations,
-            getData().getQueryGeneration(),
-            sqlDialect);
+            allQueryTemplates2, allQueryTemplates2, getData().getQueryGeneration(), sqlDialect);
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
@@ -1116,43 +1118,16 @@ public class FeatureProviderSql
 
   @Override
   public MutationResult deleteFeature(String featureType, String id) {
-    Optional<FeatureSchema> schema = Optional.ofNullable(getData().getTypes().get(featureType));
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
 
-    if (schema.isEmpty()) {
+    if (queryMapping.isEmpty()) {
       throw new IllegalArgumentException(
           String.format("Feature type '%s' not found.", featureType));
     }
 
-    FeatureSchema migrated = schema.get(); // FeatureSchemaNamePathSwapper.migrate(schema.get());
-
-    List<SchemaSql> sqlSchema =
-        migrated
-            .accept(WITH_SCOPE_RECEIVABLE)
-            .accept(new MutationSchemaDeriver(pathParser2, pathParser3));
-
-    if (sqlSchema.isEmpty()) {
-      throw new IllegalStateException(
-          "Mutation mapping could not be derived from provider schema.");
-    }
-
-    SchemaSql mutationSchemaSql = sqlSchema.get(0).accept(new MutationSchemaBuilderSql());
-
     Reactive.Source<String> deletionSource =
-        featureMutationsSql.getDeletionSource(mutationSchemaSql, id)
-        /*.watchTermination(
-        (Function2<NotUsed, CompletionStage<Done>, CompletionStage<MutationResult>>) (notUsed, completionStage) -> completionStage
-            .handle((done, throwable) -> {
-              return ImmutableMutationResult.builder()
-                  .error(Optional.ofNullable(throwable))
-                  .build();
-            }))*/ ;
-    // RunnableGraphWrapper<MutationResult> graph = LogContextStream
-    //    .graphWithMdc(deletionSource, Sink.ignore(), Keep.left());
-
-    /*ReactiveStream<SqlRow, SqlRow, MutationResult.Builder, MutationResult> reactiveStream = ImmutableReactiveStream.<SqlRow, SqlRow, MutationResult.Builder, MutationResult>builder()
-    .source(ReactiveStream.Source.of(deletionSource))
-    .emptyResult(ImmutableMutationResult.builder())
-    .build();*/
+        featureMutationsSql.getDeletionSource(queryMapping.get().get(0), id);
 
     RunnableStream<MutationResult> deletionStream =
         deletionSource
@@ -1172,37 +1147,19 @@ public class FeatureProviderSql
       Optional<String> featureId,
       EpsgCrs crs,
       boolean partial) {
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
 
-    Optional<FeatureSchema> schema = Optional.ofNullable(getData().getTypes().get(featureType));
-
-    if (schema.isEmpty()) {
+    if (queryMapping.isEmpty()) {
       throw new IllegalArgumentException(
           String.format("Feature type '%s' not found.", featureType));
     }
 
-    List<SchemaSql> sqlSchema =
-        schema
-            .get()
-            .accept(WITH_SCOPE_RECEIVABLE)
-            .accept(new MutationSchemaDeriver(pathParser2, pathParser3));
-
-    if (sqlSchema.isEmpty()) {
-      throw new IllegalStateException(
-          "Mutation mapping could not be derived from provider schema.");
-    }
-
-    SchemaSql mutationSchemaSql = sqlSchema.get(0).accept(new MutationSchemaBuilderSql());
-
-    SchemaMappingSql mapping4 =
-        new ImmutableSchemaMappingSql.Builder()
-            .targetSchema(mutationSchemaSql)
-            .sourcePathTransformer(this::applySourcePathDefaults)
-            .build();
-
-    Transformer<FeatureSql, String> featureWriter =
+    Transformer<FeatureDataSql, String> featureWriter =
         featureId.isPresent()
-            ? featureMutationsSql.getUpdaterFlow(mutationSchemaSql, null, featureId.get(), crs)
-            : featureMutationsSql.getCreatorFlow(mutationSchemaSql, null, crs);
+            ? featureMutationsSql.getUpdaterFlow(
+                queryMapping.get().get(0), null, featureId.get(), crs)
+            : featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, crs);
 
     ImmutableMutationResult.Builder builder =
         ImmutableMutationResult.builder()
@@ -1210,22 +1167,24 @@ public class FeatureProviderSql
             .hasFeatures(false);
     FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
 
-    Source<FeatureSql> featureSqlSource =
+    Source<FeatureDataSql> featureSqlSource =
         featureTokenSource
-            .via(statsCollector)
+            // TODO: Simple .via(statsCollector)
             .via(
-                new FeatureEncoderSql2(
-                    mapping4,
+                new FeatureEncoderSql(
+                    queryMapping.get().get(0),
+                    crs,
+                    getNativeCrs(),
+                    crsTransformerFactory,
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            // TODO: support generic encoders, not only to byte[]
-            .via(Transformer.map(feature -> (FeatureSql) feature));
+            .via(Transformer.map(feature -> (FeatureDataSql) feature));
 
     if (partial) {
       featureSqlSource =
           featureSqlSource.via(
               Transformer.reduce(
-                  ModifiableFeatureSql.create(),
-                  (a, b) -> a.getProperties().isEmpty() ? b : a.patchWith(b)));
+                  ModifiableFeatureDataSql.create(),
+                  (a, b) -> a.getRows().isEmpty() ? b : a.patchWith(b)));
     }
 
     RunnableStream<MutationResult> mutationStream =
@@ -1362,7 +1321,7 @@ public class FeatureProviderSql
       List<String> excluded,
       String pathSeparator,
       boolean cleanupKeys) {
-    Predicate<String> excludeConnectors = path -> path.matches(".*?\\[[^=\\]]+].+");
+    Predicate<String> excludeConnectors = path -> false; // path.matches(".*?\\[[^=\\]]+].+");
     OnlyQueryables queryablesSelector =
         new OnlyQueryables(included, excluded, pathSeparator, excludeConnectors, cleanupKeys);
 
@@ -1372,7 +1331,7 @@ public class FeatureProviderSql
   @Override
   public FeatureSchema getSortablesSchema(
       FeatureSchema schema, List<String> included, List<String> excluded, String pathSeparator) {
-    Predicate<String> excludeConnectors = path -> path.matches(".*?\\[[^=\\]]+].+");
+    Predicate<String> excludeConnectors = path -> false; // path.matches(".*?\\[[^=\\]]+].+");
     OnlySortables sortablesSelector =
         new OnlySortables(included, excluded, pathSeparator, excludeConnectors);
 

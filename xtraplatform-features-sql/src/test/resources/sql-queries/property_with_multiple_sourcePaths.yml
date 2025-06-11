@@ -1,0 +1,4 @@
+- >-
+  SELECT A.id AS SKEY, A.objid, A.lan, A.rbz, A.krs, A.gmd
+  FROM o12006 A
+  ORDER BY 1

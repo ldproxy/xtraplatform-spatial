@@ -1,0 +1,26 @@
+---
+- source: /o400001
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /o400001/id
+  target: id
+  type: INTEGER
+  role: ID
+  index: 0
+- source: "/o400001/[id=rid]o400001__gem"
+  target: gemeinde_gemeindekennzeichen_gemeinde
+  type: VALUE_ARRAY
+  index: 0
+- source: "/o400001/[id=rid]o400001__gem/gem_1"
+  target: "gemeinde_gemeindekennzeichen_gemeinde.[]"
+  type: STRING
+  index: 0
+- source: "/o400001/[id=rid]o400001__gem/[_ko_sch_gem=sch]o73005"
+  target: gemeinde_bezeichnung
+  type: VALUE_ARRAY
+  index: 0
+- source: "/o400001/[id=rid]o400001__gem/[_ko_sch_gem=sch]o73005/bez"
+  target: "gemeinde_bezeichnung.[]"
+  type: STRING
+  index: 0

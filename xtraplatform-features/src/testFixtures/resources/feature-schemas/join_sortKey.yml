@@ -1,0 +1,18 @@
+---
+sourcePath: /explorationsite
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  chronostratigraphy:
+    sourcePath: "[id=explorationsiteid]explorationsite_chronostratigraphy{sortKey=explorationsiteid}"
+    type: OBJECT_ARRAY
+    properties:
+      title:
+        sourcePath: chronostratigraphycodeid
+        type: STRING
+      href:
+        sourcePath: chronostratigraphycodeid
+        type: STRING

@@ -1,0 +1,9 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM externalprovider A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.externalprovidername
+  FROM externalprovider A
+  JOIN externalprovider_externalprovidername B ON (A.id=B.externalprovider_fk)
+  ORDER BY 1,2

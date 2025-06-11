@@ -1,0 +1,18 @@
+---
+sourcePath: /explorationsite
+type: OBJECT
+properties:
+  id:
+    sourcePath: id
+    type: STRING
+    role: ID
+  legalAvailability:
+    type: OBJECT
+    objectType: Link
+    properties:
+      title:
+        sourcePath: legalavailability_fk
+        type: STRING
+      href:
+        sourcePath: legalavailability_fk
+        type: STRING

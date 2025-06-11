@@ -1,0 +1,55 @@
+---
+sourcePath: /pfs_plan
+type: OBJECT
+properties:
+  id:
+    sourcePath: objid
+    type: STRING
+    role: ID
+  hatObjekt:
+    sourcePaths:
+    - "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung"
+    - "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
+    type: OBJECT_ARRAY
+    transformations:
+    - {}
+    properties:
+      "0_id":
+        sourcePath: "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung/_id"
+        type: INTEGER
+        additionalInfo:
+          IS_PROPERTY: "true"
+      "0_title":
+        sourcePath: "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung/name"
+        type: STRING
+        additionalInfo:
+          IS_PROPERTY: "true"
+      "1_id":
+        sourcePath: "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id"
+        type: INTEGER
+        additionalInfo:
+          IS_PROPERTY: "true"
+      "1_title":
+        sourcePath: "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/name"
+        type: STRING
+        additionalInfo:
+          IS_PROPERTY: "true"
+    concat:
+    - sourcePath: "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung"
+      type: OBJECT_ARRAY
+      properties:
+        id:
+          sourcePath: _id
+          type: INTEGER
+        title:
+          sourcePath: name
+          type: STRING
+    - sourcePath: "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
+      type: OBJECT_ARRAY
+      properties:
+        id:
+          sourcePath: _id
+          type: INTEGER
+        title:
+          sourcePath: name
+          type: STRING

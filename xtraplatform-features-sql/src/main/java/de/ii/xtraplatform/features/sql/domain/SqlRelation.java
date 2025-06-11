@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.features.sql.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.sql.domain.SqlPath.JoinType;
@@ -15,6 +17,8 @@ import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@Value.Style(builder = "new")
+@JsonDeserialize(builder = ImmutableSqlRelation.Builder.class)
 public interface SqlRelation {
 
   enum CARDINALITY {
@@ -62,21 +66,25 @@ public interface SqlRelation {
         "when a junction is set, cardinality needs to be M_2_N, when no junction is set, cardinality is not allowed to be M_2_N");
   }
 
+  @JsonIgnore
   @Value.Lazy
   default boolean isOne2One() {
     return getCardinality() == CARDINALITY.ONE_2_ONE;
   }
 
+  @JsonIgnore
   @Value.Lazy
   default boolean isOne2N() {
     return getCardinality() == CARDINALITY.ONE_2_N;
   }
 
+  @JsonIgnore
   @Value.Lazy
   default boolean isM2N() {
     return getCardinality() == CARDINALITY.M_2_N;
   }
 
+  @JsonIgnore
   @Value.Derived
   default List<String> asPath() {
     if (isM2N()) {

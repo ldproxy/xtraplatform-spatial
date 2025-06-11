@@ -1,0 +1,5 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM externalprovider A
+  WHERE (A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.type = 1))
+  ORDER BY 1

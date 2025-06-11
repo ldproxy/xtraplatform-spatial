@@ -1,0 +1,14 @@
+- >-
+  SELECT A.id AS SKEY, A.objid
+  FROM pfs_plan A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B._id, B.name
+  FROM pfs_plan A
+  JOIN bst_abwasserleitung B ON (A._id=B.gehoertzuplan_pfs_plan_fk)
+  ORDER BY 1,2
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B._id, B.name
+  FROM pfs_plan A
+  JOIN bst_erdgasleitung B ON (A._id=B.gehoertzuplan_pfs_plan_fk)
+  ORDER BY 1,2

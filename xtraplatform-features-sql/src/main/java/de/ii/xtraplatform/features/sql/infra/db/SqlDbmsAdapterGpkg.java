@@ -219,7 +219,7 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
   }
 
   @Override
-  public Collator getRowSortingCollator() {
+  public Collator getRowSortingCollator(Optional<String> defaultCollation) {
     return null;
   }
 

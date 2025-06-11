@@ -1,0 +1,26 @@
+---
+- source: /o12006
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /o12006/objid
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: /o12006/lan
+  target: "component.[]"
+  type: STRING
+  index: 0
+- source: /o12006/rbz
+  target: "component.[]"
+  type: STRING
+  index: 0
+- source: /o12006/krs
+  target: "component.[]"
+  type: STRING
+  index: 0
+- source: /o12006/gmd
+  target: "component.[]"
+  type: STRING
+  index: 0

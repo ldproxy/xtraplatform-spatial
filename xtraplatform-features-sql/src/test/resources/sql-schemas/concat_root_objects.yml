@@ -1,0 +1,103 @@
+---
+- name: o73005
+  type: OBJECT
+  sourcePath: administrativeunit
+  properties:
+  - name: _id
+    type: INTEGER
+    role: ID
+    parentPath:
+    - o73005
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: verwaltungseinheit
+    type: OBJECT
+    parentPath:
+    - o73005
+    properties:
+    - name: geometrie
+      type: GEOMETRY
+      role: PRIMARY_GEOMETRY
+      geometryType: MULTI_POLYGON
+      parentPath:
+      - o73005
+      - "[sch=ags]verwaltungseinheit"
+      sourcePath: geometry
+      sortKey: id
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: o73005
+      sourceField: sch
+      sourcePrimaryKey: id
+      sourceSortKey: sch
+      targetContainer: verwaltungseinheit
+      targetField: ags
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - o73005.sch
+    isExpression: false
+  primaryKey: id
+  sortKey: sch
+  sortKeyUnique: true
+  isExpression: false
+- name: o73004
+  type: OBJECT
+  sourcePath: administrativeunit
+  properties:
+  - name: _id
+    type: INTEGER
+    role: ID
+    parentPath:
+    - o73004
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: verwaltungseinheit
+    type: OBJECT
+    parentPath:
+    - o73004
+    properties:
+    - name: geometrie
+      type: GEOMETRY
+      role: PRIMARY_GEOMETRY
+      geometryType: MULTI_POLYGON
+      parentPath:
+      - o73004
+      - "[sch=ags]verwaltungseinheit"
+      sourcePath: geometry
+      sortKey: id
+      sortKeyUnique: true
+      isExpression: false
+    - name: uebergobjekt
+      type: STRING
+      parentPath:
+      - o73004
+      - "[sch=ags]verwaltungseinheit"
+      sourcePath: upperLevelUnit.href
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: o73004
+      sourceField: sch
+      sourcePrimaryKey: id
+      sourceSortKey: sch
+      targetContainer: verwaltungseinheit
+      targetField: ags
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - o73004.sch
+    isExpression: false
+  primaryKey: id
+  sortKey: sch
+  sortKeyUnique: true
+  isExpression: false

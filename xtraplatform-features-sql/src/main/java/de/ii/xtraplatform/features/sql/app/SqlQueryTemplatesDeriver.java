@@ -19,6 +19,7 @@ import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.MetaQueryTemplate;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings.NullOrder;
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.sql.Timestamp;
@@ -90,8 +91,9 @@ public class SqlQueryTemplatesDeriver
     return new ImmutableSqlQueryTemplates.Builder()
         .metaQueryTemplate(createMetaQueryTemplate(schema))
         .valueQueryTemplates(valueQueryTemplates)
-        .addAllQuerySchemas(schema.getAllObjects())
-        .sortablesSchema(Optional.ofNullable(queryablesSchema))
+        // .addAllQuerySchemas(schema.getAllObjects())
+        // .sortablesSchema(Optional.ofNullable(queryablesSchema))
+        .mapping(new ImmutableSqlQueryMapping.Builder().build())
         .build();
   }
 

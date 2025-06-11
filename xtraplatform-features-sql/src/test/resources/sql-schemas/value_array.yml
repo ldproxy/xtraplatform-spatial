@@ -1,0 +1,46 @@
+---
+- name: externalprovider
+  type: OBJECT
+  sourcePath: externalprovider
+  properties:
+  - name: id
+    type: STRING
+    role: ID
+    parentPath:
+    - externalprovider
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: externalprovider_externalprovidername
+    type: OBJECT_ARRAY
+    parentPath:
+    - externalprovider
+    properties:
+    - name: externalprovidername
+      type: STRING
+      parentPath:
+      - externalprovider
+      - "[id=externalprovider_fk]externalprovider_externalprovidername"
+      sourcePath: externalprovidername
+      sortKey: id
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: externalprovider
+      sourceField: id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: externalprovider_externalprovidername
+      targetField: externalprovider_fk
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - externalprovider.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

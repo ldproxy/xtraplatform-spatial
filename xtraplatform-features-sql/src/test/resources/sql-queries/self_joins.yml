@@ -1,0 +1,14 @@
+- >-
+  SELECT A.id AS SKEY, A.id
+  FROM building A
+  ORDER BY 1
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.id
+  FROM building A
+  JOIN building B ON (A.id=B.fk_buildingpart_parent)
+  ORDER BY 1,2
+- >-
+  SELECT A.id AS SKEY, B.id AS SKEY_1, B.id
+  FROM building A
+  JOIN building B ON (A.fk_buildingpart_parent=B.id)
+  ORDER BY 1,2

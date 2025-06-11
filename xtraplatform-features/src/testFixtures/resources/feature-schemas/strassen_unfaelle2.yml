@@ -1,0 +1,95 @@
+sourcePath: /unfaelle_point
+type: OBJECT
+properties:
+  fid:
+    sourcePath: fid
+    type: INTEGER
+    role: ID
+    excludedScopes:
+      - RECEIVABLE
+  unfzeit:
+    sourcePath: unfzeit
+    type: DATETIME
+    role: PRIMARY_INSTANT
+  hauptunft:
+    sourcePath: hauptunft
+    type: STRING
+  unfart:
+    sourcePath: unfart
+    type: STRING
+  unfkat:
+    type: OBJECT
+    objectType: Unfallkategorie
+    properties:
+      bez:
+        sourcePath: unfkat
+        type: STRING
+      knz:
+        sourcePath: unfkatknz
+        type: STRING
+  strzust1:
+    sourcePath: strzust1
+    type: STRING
+  strzust2:
+    sourcePath: strzust2
+    type: STRING
+  abs:
+    sourcePath: "[abs=abs]abschnitteaeste_line"
+    type: OBJECT
+    objectType: AbschnittAst
+    properties:
+      kennung:
+        sourcePath: abs
+        type: STRING
+      strasse:
+        type: OBJECT
+        objectType: Strasse
+        properties:
+          bez:
+            sourcePath: strbez
+            type: STRING
+          klasse:
+            sourcePath: strkl
+            type: STRING
+          nummer:
+            sourcePath: strnr
+            type: INTEGER
+          zusatz:
+            sourcePath: strzus
+            type: STRING
+      absnr:
+        sourcePath: absnr
+        type: STRING
+      absast:
+        sourcePath: absast
+        type: STRING
+      statanf:
+        sourcePath: statanf
+        type: INTEGER
+      laenge_m:
+        sourcePath: laenge
+        type: INTEGER
+      vwbez:
+        type: OBJECT
+        objectType: Verwaltungsbezirk
+        properties:
+          name:
+            sourcePath: vwbez
+            type: STRING
+          knz:
+            sourcePath: vwbezknz
+            type: STRING
+  stat:
+    sourcePath: stat
+    type: FLOAT
+  fahrtri:
+    sourcePath: fahrtri
+    type: STRING
+  netzstand:
+    sourcePath: netzstand
+    type: DATETIME
+  geometry:
+    sourcePath: geom
+    type: GEOMETRY
+    role: PRIMARY_GEOMETRY
+    geometryType: POINT

@@ -1,0 +1,22 @@
+---
+- source: /o31001
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /o31001/id
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: /o31001/position
+  target: geometry2D.geometry
+  type: STRING
+  index: 0
+- source: "/o31001/[id=id]bu2d_building__horizontalgeometryreference"
+  target: geometry2D.horizontalGeometryReference
+  type: OBJECT
+  index: 0
+- source: "/o31001/[id=id]bu2d_building__horizontalgeometryreference/classifier"
+  target: geometry2D.horizontalGeometryReference.href
+  type: STRING
+  index: 0

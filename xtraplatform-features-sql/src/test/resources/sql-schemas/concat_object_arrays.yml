@@ -1,0 +1,91 @@
+---
+- name: pfs_plan
+  type: OBJECT
+  sourcePath: pfs_plan
+  properties:
+  - name: objid
+    type: STRING
+    role: ID
+    parentPath:
+    - pfs_plan
+    sourcePath: id
+    sortKeyUnique: true
+    isExpression: false
+  - name: bst_abwasserleitung
+    type: OBJECT_ARRAY
+    parentPath:
+    - pfs_plan
+    sourcePath: hatObjekt
+    properties:
+    - name: _id
+      type: INTEGER
+      parentPath:
+      - pfs_plan
+      - "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung"
+      sourcePath: hatObjekt.id
+      sortKeyUnique: true
+      isExpression: false
+    - name: name
+      type: STRING
+      parentPath:
+      - pfs_plan
+      - "[_id=gehoertzuplan_pfs_plan_fk]bst_abwasserleitung"
+      sourcePath: hatObjekt.title
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: pfs_plan
+      sourceField: _id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: bst_abwasserleitung
+      targetField: gehoertzuplan_pfs_plan_fk
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - pfs_plan.id
+    isExpression: false
+  - name: bst_erdgasleitung
+    type: OBJECT_ARRAY
+    parentPath:
+    - pfs_plan
+    sourcePath: hatObjekt
+    properties:
+    - name: _id
+      type: INTEGER
+      parentPath:
+      - pfs_plan
+      - "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
+      sourcePath: hatObjekt.id
+      sortKeyUnique: true
+      isExpression: false
+    - name: name
+      type: STRING
+      parentPath:
+      - pfs_plan
+      - "[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung"
+      sourcePath: hatObjekt.title
+      sortKeyUnique: true
+      isExpression: false
+    relation:
+    - cardinality: ONE_2_N
+      sourceContainer: pfs_plan
+      sourceField: _id
+      sourcePrimaryKey: id
+      sourceSortKey: id
+      targetContainer: bst_erdgasleitung
+      targetField: gehoertzuplan_pfs_plan_fk
+      joinType: INNER
+    primaryKey: id
+    sortKey: id
+    sortKeyUnique: true
+    parentSortKeys:
+    - pfs_plan.id
+    isExpression: false
+  primaryKey: id
+  sortKey: id
+  sortKeyUnique: true
+  isExpression: false

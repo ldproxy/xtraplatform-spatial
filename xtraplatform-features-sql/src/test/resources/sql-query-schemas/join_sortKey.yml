@@ -1,0 +1,24 @@
+---
+- name: explorationsite
+  pathSegment: explorationsite
+  columns:
+  - name: id
+    pathSegment: id
+    type: STRING
+    role: ID
+- name: explorationsite_chronostratigraphy
+  pathSegment: "[id=explorationsiteid]explorationsite_chronostratigraphy"
+  sortKey: explorationsiteid
+  relations:
+  - name: explorationsite
+    pathSegment: explorationsite
+    sourceField: id
+    target: explorationsite_chronostratigraphy
+    targetField: explorationsiteid
+  columns:
+  - name: chronostratigraphycodeid
+    pathSegment: chronostratigraphycodeid
+    type: STRING
+  - name: chronostratigraphycodeid
+    pathSegment: chronostratigraphycodeid
+    type: STRING
