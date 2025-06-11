@@ -52,11 +52,15 @@ public class SqlClientRx implements SqlClient {
   private final SqlDialect dialect;
   private final Collator collator;
 
-  public SqlClientRx(Database session, SqlDbmsAdapter dbmsAdapter, SqlDialect dialect) {
+  public SqlClientRx(
+      Database session,
+      SqlDbmsAdapter dbmsAdapter,
+      SqlDialect dialect,
+      Optional<String> defaultCollation) {
     this.session = session;
     this.dbmsAdapter = dbmsAdapter;
     this.dialect = dialect;
-    this.collator = dbmsAdapter.getRowSortingCollator();
+    this.collator = dbmsAdapter.getRowSortingCollator(defaultCollation);
   }
 
   @Override
@@ -100,7 +104,7 @@ public class SqlClientRx implements SqlClient {
                 resultSet -> {
                   SqlRow row = new SqlRowVals(collator).read(resultSet, options);
 
-                  if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 5) {
+                  if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
                     logBuffer.add(row);
                   }
 
@@ -129,7 +133,13 @@ public class SqlClientRx implements SqlClient {
                               logBuffer.get(i).getSortKeys().stream()
                                   .map(val -> Objects.nonNull(val) ? val.toString() : "null"),
                               logBuffer.get(i).getValues().stream()
-                                  .map(val -> Objects.nonNull(val) ? val.toString() : "null"))
+                                  .map(
+                                      val ->
+                                          Objects.nonNull(val)
+                                              ? val.toString().length() > 100
+                                                  ? (val.toString().substring(0, 100) + "...")
+                                                  : val.toString()
+                                              : "null"))
                           .collect(Collectors.joining(" | "));
                   LOGGER.debug(MARKER.SQL_RESULT, values);
                 }

@@ -42,7 +42,7 @@ public interface SqlDbmsAdapter {
 
   DbInfo getDbInfo(Connection connection) throws SQLException;
 
-  Collator getRowSortingCollator();
+  Collator getRowSortingCollator(Optional<String> defaultCollation);
 
   interface DbInfo {}
 
