@@ -53,7 +53,7 @@ public class FeatureTokenDecoderGeoJson
           FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       downstream;
 
-  private FeatureTokenDecoderGeoJson(Optional<String> nullValue) {
+  public FeatureTokenDecoderGeoJson(Optional<String> nullValue) {
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
