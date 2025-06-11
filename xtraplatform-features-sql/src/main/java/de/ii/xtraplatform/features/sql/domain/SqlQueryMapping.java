@@ -90,22 +90,44 @@ public interface SqlQueryMapping {
   }
 
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForId() {
+    return getColumnForRole(Role.ID);
+  }
+
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForPrimaryGeometry() {
+    return getColumnForRole(Role.PRIMARY_GEOMETRY);
+  }
+
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForRole(Role role) {
     return getTables().stream()
         .flatMap(
             table -> {
               for (int i = 0; i < table.getColumns().size(); i++) {
-                if (table
-                    .getColumns()
-                    .get(i)
-                    .getRole()
-                    .filter(role -> role == Role.ID)
-                    .isPresent()) {
+                if (table.getColumns().get(i).getRole().filter(r -> r == role).isPresent()) {
                   return Stream.of(Tuple.of(table, table.getColumns().get(i)));
                 }
               }
               return Stream.empty();
             })
         .findFirst();
+  }
+
+  default Optional<FeatureSchema> getSchemaForId() {
+    return getSchemaForRole(Role.ID);
+  }
+
+  default Optional<FeatureSchema> getSchemaForPrimaryGeometry() {
+    return getSchemaForRole(Role.PRIMARY_GEOMETRY);
+  }
+
+  default Optional<FeatureSchema> getSchemaForRole(Role role) {
+    if (role == Role.ID) {
+      return getMainSchema().getIdProperty();
+    }
+    if (role == Role.PRIMARY_GEOMETRY) {
+      return getMainSchema().getPrimaryGeometry();
+    }
+
+    return Optional.empty();
   }
 
   default Optional<FeatureSchema> getSchemaForObject(String propertyName) {

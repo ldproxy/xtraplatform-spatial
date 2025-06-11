@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import static de.ii.xtraplatform.features.domain.MappingRule.ROOT_TARGET;
+
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
@@ -20,6 +22,8 @@ import java.util.stream.Stream;
 
 public class MappingRulesDeriver
     implements SchemaVisitorWithFinalizer<FeatureSchema, List<MappingRule>, List<MappingRule>> {
+
+  private static final String VALUE_ARRAY_VALUE_SUFFIX = ".[]";
 
   @Override
   public List<MappingRule> visit(
@@ -87,7 +91,7 @@ public class MappingRulesDeriver
                   .target(
                       rule.getTarget().contains(".")
                           ? rule.getTarget().substring(0, rule.getTarget().lastIndexOf("."))
-                          : "$")
+                          : ROOT_TARGET)
                   .type(
                       rule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
                           ? Type.VALUE_ARRAY
@@ -180,7 +184,7 @@ public class MappingRulesDeriver
       String parentSourcePath, String sourcePath, FeatureSchema schema) {
     String target =
         schema.isFeature()
-            ? "$"
+            ? ROOT_TARGET
             : schema.getType() == Type.VALUE_ARRAY
                 ? schema.getFullPathAsString() + VALUE_ARRAY_VALUE_SUFFIX
                 : schema.getFullPathAsString();
@@ -218,14 +222,14 @@ public class MappingRulesDeriver
       return Optional.of(Scope.RC);
     }
 
-    if (ex.contains(SchemaBase.Scope.QUERYABLE) && ex.contains(SchemaBase.Scope.SORTABLE)) {
+    if (ex.contains(SchemaBase.Scope.QUERYABLE)
+        && ex.contains(SchemaBase.Scope.SORTABLE)
+        && !ex.contains(SchemaBase.Scope.RETURNABLE)) {
       return Optional.of(Scope.RW);
     }
 
     return Optional.of(Scope.W);
   }
-
-  private static final String VALUE_ARRAY_VALUE_SUFFIX = ".[]";
 
   public static boolean doIgnore(String path) {
     return path.endsWith(VALUE_ARRAY_VALUE_SUFFIX);

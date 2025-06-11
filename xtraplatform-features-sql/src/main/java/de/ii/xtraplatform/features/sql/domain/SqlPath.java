@@ -13,6 +13,7 @@ import de.ii.xtraplatform.features.domain.SourcePath;
 import de.ii.xtraplatform.features.domain.Tuple;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -57,6 +58,8 @@ public interface SqlPath extends SourcePath {
   Optional<String> getFilterString();
 
   Optional<String> getConstantValue();
+
+  Map<String, String> getStaticInserts();
 
   // TODO: not needed any more? should be based on primary key detection
   boolean getJunction();

@@ -85,14 +85,13 @@ import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsReaderSql;
+import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.FeatureDecoderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureEncoderSql2;
+import de.ii.xtraplatform.features.sql.app.FeatureEncoderSql;
 import de.ii.xtraplatform.features.sql.app.FeatureMutationsSql;
 import de.ii.xtraplatform.features.sql.app.FeatureQueryEncoderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureSql;
 import de.ii.xtraplatform.features.sql.app.FilterEncoderSql;
-import de.ii.xtraplatform.features.sql.app.ModifiableFeatureSql;
-import de.ii.xtraplatform.features.sql.app.MutationSchemaBuilderSql;
+import de.ii.xtraplatform.features.sql.app.ModifiableFeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
@@ -467,7 +466,9 @@ public class FeatureProviderSql
                 entry ->
                     Map.entry(
                         entry.getKey(),
-                        entry.getValue().accept(WITH_SCOPE_QUERIES).accept(mappingRulesDeriver)))
+                        entry
+                            .getValue() /*.accept(WITH_SCOPE_QUERIES)*/
+                            .accept(mappingRulesDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryMappings =
@@ -1117,43 +1118,16 @@ public class FeatureProviderSql
 
   @Override
   public MutationResult deleteFeature(String featureType, String id) {
-    Optional<FeatureSchema> schema = Optional.ofNullable(getData().getTypes().get(featureType));
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
 
-    if (schema.isEmpty()) {
+    if (queryMapping.isEmpty()) {
       throw new IllegalArgumentException(
           String.format("Feature type '%s' not found.", featureType));
     }
 
-    FeatureSchema migrated = schema.get(); // FeatureSchemaNamePathSwapper.migrate(schema.get());
-
-    List<SchemaSql> sqlSchema =
-        migrated
-            .accept(WITH_SCOPE_RECEIVABLE)
-            .accept(new MutationSchemaDeriver(pathParser2, pathParser3));
-
-    if (sqlSchema.isEmpty()) {
-      throw new IllegalStateException(
-          "Mutation mapping could not be derived from provider schema.");
-    }
-
-    SchemaSql mutationSchemaSql = sqlSchema.get(0).accept(new MutationSchemaBuilderSql());
-
     Reactive.Source<String> deletionSource =
-        featureMutationsSql.getDeletionSource(mutationSchemaSql, id)
-        /*.watchTermination(
-        (Function2<NotUsed, CompletionStage<Done>, CompletionStage<MutationResult>>) (notUsed, completionStage) -> completionStage
-            .handle((done, throwable) -> {
-              return ImmutableMutationResult.builder()
-                  .error(Optional.ofNullable(throwable))
-                  .build();
-            }))*/ ;
-    // RunnableGraphWrapper<MutationResult> graph = LogContextStream
-    //    .graphWithMdc(deletionSource, Sink.ignore(), Keep.left());
-
-    /*ReactiveStream<SqlRow, SqlRow, MutationResult.Builder, MutationResult> reactiveStream = ImmutableReactiveStream.<SqlRow, SqlRow, MutationResult.Builder, MutationResult>builder()
-    .source(ReactiveStream.Source.of(deletionSource))
-    .emptyResult(ImmutableMutationResult.builder())
-    .build();*/
+        featureMutationsSql.getDeletionSource(queryMapping.get().get(0), id);
 
     RunnableStream<MutationResult> deletionStream =
         deletionSource
@@ -1173,37 +1147,19 @@ public class FeatureProviderSql
       Optional<String> featureId,
       EpsgCrs crs,
       boolean partial) {
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
 
-    Optional<FeatureSchema> schema = Optional.ofNullable(getData().getTypes().get(featureType));
-
-    if (schema.isEmpty()) {
+    if (queryMapping.isEmpty()) {
       throw new IllegalArgumentException(
           String.format("Feature type '%s' not found.", featureType));
     }
 
-    List<SchemaSql> sqlSchema =
-        schema
-            .get()
-            .accept(WITH_SCOPE_RECEIVABLE)
-            .accept(new MutationSchemaDeriver(pathParser2, pathParser3));
-
-    if (sqlSchema.isEmpty()) {
-      throw new IllegalStateException(
-          "Mutation mapping could not be derived from provider schema.");
-    }
-
-    SchemaSql mutationSchemaSql = sqlSchema.get(0).accept(new MutationSchemaBuilderSql());
-
-    SchemaMappingSql mapping4 =
-        new ImmutableSchemaMappingSql.Builder()
-            .targetSchema(mutationSchemaSql)
-            .sourcePathTransformer(this::applySourcePathDefaults)
-            .build();
-
-    Transformer<FeatureSql, String> featureWriter =
+    Transformer<FeatureDataSql, String> featureWriter =
         featureId.isPresent()
-            ? featureMutationsSql.getUpdaterFlow(mutationSchemaSql, null, featureId.get(), crs)
-            : featureMutationsSql.getCreatorFlow(mutationSchemaSql, null, crs);
+            ? featureMutationsSql.getUpdaterFlow(
+                queryMapping.get().get(0), null, featureId.get(), crs)
+            : featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, crs);
 
     ImmutableMutationResult.Builder builder =
         ImmutableMutationResult.builder()
@@ -1211,22 +1167,24 @@ public class FeatureProviderSql
             .hasFeatures(false);
     FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
 
-    Source<FeatureSql> featureSqlSource =
+    Source<FeatureDataSql> featureSqlSource =
         featureTokenSource
-            .via(statsCollector)
+            // TODO: Simple .via(statsCollector)
             .via(
-                new FeatureEncoderSql2(
-                    mapping4,
+                new FeatureEncoderSql(
+                    queryMapping.get().get(0),
+                    crs,
+                    getNativeCrs(),
+                    crsTransformerFactory,
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            // TODO: support generic encoders, not only to byte[]
-            .via(Transformer.map(feature -> (FeatureSql) feature));
+            .via(Transformer.map(feature -> (FeatureDataSql) feature));
 
     if (partial) {
       featureSqlSource =
           featureSqlSource.via(
               Transformer.reduce(
-                  ModifiableFeatureSql.create(),
-                  (a, b) -> a.getProperties().isEmpty() ? b : a.patchWith(b)));
+                  ModifiableFeatureDataSql.create(),
+                  (a, b) -> a.getRows().isEmpty() ? b : a.patchWith(b)));
     }
 
     RunnableStream<MutationResult> mutationStream =

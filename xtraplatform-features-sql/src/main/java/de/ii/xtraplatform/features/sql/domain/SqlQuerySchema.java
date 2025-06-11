@@ -57,6 +57,11 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @JsonIgnore
   @Value.Lazy
   default List<String> getParentPath() {
+    // TODO: generalize
+    if (getRelations().size() == 2) {
+      // There is a junction table, so we return the path of the parent table
+      return getFullPath().subList(0, 1);
+    }
     return getFullPath().subList(0, getFullPath().size() - 1);
   }
 
@@ -99,5 +104,49 @@ public interface SqlQuerySchema extends SqlQueryTable {
     return Stream.concat(getColumns().stream(), getFilterColumns().stream())
         .filter(column -> Objects.equals(column.getName(), name))
         .findFirst();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isRoot() {
+    return getRelations().isEmpty();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isOne2One() {
+    return getRelations().size() == 1
+        && Objects.equals(
+            getRelations().get(0).getTargetField(), getSortKey() /*TODO getPrimaryKey()*/);
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isOne2N() {
+    return getRelations().size() == 1 && !isOne2One();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isM2N() {
+    return getRelations().size() == 2 && getRelations().get(1).isJunction();
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isJunctionReference() {
+    return isM2N() /*TODO && isFeatureReference*/;
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isOne2OneWithForeignKey() {
+    if (getRelations().size() != 1) {
+      return false;
+    }
+
+    SqlQueryJoin join = getRelations().get(0);
+
+    return !Objects.equals(join.getSortKey(), join.getSourceField());
   }
 }
