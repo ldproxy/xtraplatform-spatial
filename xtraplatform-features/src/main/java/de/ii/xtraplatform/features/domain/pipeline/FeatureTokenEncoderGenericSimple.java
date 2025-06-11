@@ -12,6 +12,5 @@ import de.ii.xtraplatform.streams.domain.Reactive.TransformerCustomFuseableIn;
 public interface FeatureTokenEncoderGenericSimple<
         T, U, V extends FeatureEventHandlerSimple.ModifiableContext<T, U>, W>
     extends TransformerCustomFuseableIn<Object, W, FeatureEventHandlerSimple<T, U, V>>,
-        // TODO: TransformerCustomSink<Object, byte[], FeatureTokenSinkReduced<?>>,
         FeatureEventHandlerSimple<T, U, V>,
         FeatureTokenContextSimple<V> {}

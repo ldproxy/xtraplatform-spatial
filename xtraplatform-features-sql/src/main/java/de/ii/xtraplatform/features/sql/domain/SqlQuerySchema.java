@@ -57,7 +57,7 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @JsonIgnore
   @Value.Lazy
   default List<String> getParentPath() {
-    // TODO
+    // TODO: generalize
     if (getRelations().size() == 2) {
       // There is a junction table, so we return the path of the parent table
       return getFullPath().subList(0, 1);

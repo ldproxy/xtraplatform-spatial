@@ -177,7 +177,6 @@ public class FeatureEncoderSql
     if (context.inGeometry()) {
       if (trace) LOGGER.debug("geometry: {} {}", context.pathAsString(), currentGeometry);
 
-      // TODO: this is only correct for geojson, should be handled in the decoder
       mapping
           .getColumnForPrimaryGeometry()
           .ifPresentOrElse(
@@ -295,7 +294,7 @@ public class FeatureEncoderSql
                     Objects.nonNull(context.value())
                         ? context.value().replaceAll("'", "''")
                         : context.value();
-                // TODO: sql name
+                // TODO: does this use the sql name or json name?
                 currentJson.addValue(context.path(), value);
 
                 if (trace) LOGGER.debug("onValue: JSON {} {}", context.pathAsString(), value);
@@ -395,7 +394,6 @@ public class FeatureEncoderSql
     return result;
   }
 
-  // TODO: test all geo types
   private static void toWktArray(
       GeometryWithStringCoordinates<?> geometry,
       Writer structureWriter,

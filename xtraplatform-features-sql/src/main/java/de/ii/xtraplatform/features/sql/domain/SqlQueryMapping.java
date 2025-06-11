@@ -97,7 +97,6 @@ public interface SqlQueryMapping {
     return getColumnForRole(Role.PRIMARY_GEOMETRY);
   }
 
-  // TODO: multiple main tables
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForRole(Role role) {
     return getTables().stream()
         .flatMap(

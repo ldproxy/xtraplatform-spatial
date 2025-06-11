@@ -14,7 +14,6 @@ import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
-import de.ii.xtraplatform.features.domain.SchemaMappingBase;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -38,7 +37,6 @@ public class FeatureTokenDecoderGeoJson
   private final JsonParser parser;
   private final ByteArrayFeeder feeder;
   private final Optional<String> nullValue;
-  private String type;
 
   private boolean started;
   private int depth = -1;
@@ -55,16 +53,7 @@ public class FeatureTokenDecoderGeoJson
           FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       downstream;
 
-  // for unit tests
-  FeatureTokenDecoderGeoJson(String type) {
-    this(Optional.empty(), type);
-  }
-
-  public FeatureTokenDecoderGeoJson(Optional<String> nullValue) {
-    this(nullValue, null);
-  }
-
-  private FeatureTokenDecoderGeoJson(Optional<String> nullValue, String type) {
+  private FeatureTokenDecoderGeoJson(Optional<String> nullValue) {
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
@@ -72,23 +61,12 @@ public class FeatureTokenDecoderGeoJson
     }
     this.feeder = (ByteArrayFeeder) parser.getNonBlockingInputFeeder();
     this.nullValue = nullValue;
-    this.type = type;
   }
 
   @Override
   protected void init() {
     this.context = createContext();
     this.downstream = new FeatureTokenBufferSimple<>(getDownstream(), context);
-
-    if (Objects.isNull(type) && Objects.nonNull(context.mapping())) {
-      SchemaMappingBase<?> mapping = context.mapping();
-      type = mapping.getTargetSchema().getSourcePath().orElse(null);
-    }
-
-    // TODO
-    if (Objects.isNull(type)) {
-      type = "default";
-    }
   }
 
   @Override
@@ -155,8 +133,7 @@ public class FeatureTokenDecoderGeoJson
             switch (currentName) {
               case "properties":
                 inProperties = true;
-                // featureDepth = depth;
-                context.pathTracker().track(/*type, */ 0);
+                context.pathTracker().track(0);
                 break;
               case "geometry":
                 context.setInGeometry(true);
@@ -164,7 +141,7 @@ public class FeatureTokenDecoderGeoJson
                 geoPath = context.path();
                 break;
               default:
-                if (inProperties /* || inGeometry*/) {
+                if (inProperties) {
                   context.pathTracker().track(currentName);
                 }
                 break;
@@ -174,7 +151,6 @@ public class FeatureTokenDecoderGeoJson
             downstream.onObjectStart(context);
             // feature in collection start
           } else if (depth == featureDepth - 2 && inFeature) {
-            // inFeature = false;
             downstream.onFeatureStart(context);
           }
 
@@ -182,7 +158,7 @@ public class FeatureTokenDecoderGeoJson
           if (Objects.nonNull(currentName) || lastNameIsArrayDepth == 0) {
             depth += 1;
             if (depth > featureDepth - 1
-                && (inProperties /*|| inGeometry*/)
+                && (inProperties)
                 && !Objects.equals(currentName, "properties")) {
               downstream.onObjectStart(context);
             }
@@ -291,7 +267,6 @@ public class FeatureTokenDecoderGeoJson
             downstream.onEnd(context);
             // end feature in collection
           } else if (depth == featureDepth - 2 && inFeature) {
-            // inFeature = false;
             downstream.onFeatureEnd(context);
           } else if (inFeature) {
             // featureConsumer.onPropertyEnd(pathTracker.asList());
@@ -341,7 +316,7 @@ public class FeatureTokenDecoderGeoJson
               && (Objects.equals(currentName, "geometry")
                   || Objects.equals(currentName, "properties"))) {
             if (Objects.equals(currentName, "properties")) {
-              context.pathTracker().track(/*type,*/ 0);
+              context.pathTracker().track(0);
             } else {
               context.pathTracker().track(currentName, 0);
             }
@@ -450,7 +425,7 @@ public class FeatureTokenDecoderGeoJson
     if (!started) {
       started = true;
       inFeature = true;
-      context.pathTracker().track(/*type, */ 0);
+      context.pathTracker().track(0);
 
       if (isCollection) {
         featureDepth = 2;

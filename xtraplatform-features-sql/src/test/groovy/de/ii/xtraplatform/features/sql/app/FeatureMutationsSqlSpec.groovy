@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.features.sql.app
 
-
 import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
 import de.ii.xtraplatform.crs.domain.OgcCrs
@@ -19,18 +18,13 @@ import spock.lang.Specification
 
 import java.util.function.Function
 
-import static SqlInsertsFixtures.FULL
-import static SqlInsertsFixtures.MAIN_M_2_N_SCHEMA
-import static SqlInsertsFixtures.MERGE_MERGE_M_2_N_SCHEMA
-import static SqlInsertsFixtures.MERGE_MERGE_ONE_2_ONE_SCHEMA
-import static SqlInsertsFixtures.MERGE_MERGE_SCHEMA
-import static SqlInsertsFixtures.MERGE_MERGE_WITH_CHILDREN
-import static SqlInsertsFixtures.MERGE_WITH_CHILDREN
+import static de.ii.xtraplatform.features.sql.app.SqlInsertsFixtures.*
 
 /**
  * @author zahnen
  */
-@Ignore //TODO
+//TODO: fix these tests
+@Ignore
 class FeatureMutationsSqlSpec extends Specification {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FeatureMutationsSqlSpec.class);

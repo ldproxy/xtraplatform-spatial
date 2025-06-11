@@ -26,8 +26,6 @@ public interface FeatureDataSql {
 
   SqlQueryMapping getMapping();
 
-  // Map<String,String> getIds();
-
   List<Tuple<SqlQuerySchema, ModifiableSqlRowData>> getRows();
 
   Map<List<String>, List<Integer>> getRowNesting();
@@ -103,7 +101,7 @@ public interface FeatureDataSql {
     return getRows().get(getStack().get(getStack().size() - 1).second().get()).second();
   }
 
-  // TODO
+  // TODO: implement PATCH
   default FeatureDataSql patchWith(FeatureDataSql partial) {
     return this;
   }
@@ -138,8 +136,7 @@ public interface FeatureDataSql {
   default Optional<SqlRowData> getRow(List<String> fullPath, List<Integer> parentRows) {
     return getRows().stream()
         .filter(row -> Objects.equals(row.first().getFullPath(), fullPath))
-        // TODO
-        .skip(parentRows.get(parentRows.size() - 1))
+        .skip(parentRows.isEmpty() ? 0 : parentRows.get(parentRows.size() - 1))
         .findFirst()
         .map(Tuple::second);
   }

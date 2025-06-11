@@ -42,9 +42,6 @@ public abstract class FeatureTokenDecoderSimple<
     boolean isTransformerFuseable =
         TranformerCustomFuseableOut.super.canFuse(transformerCustomFuseableIn);
 
-    // TODO: not required here because ModifiableContext is the base context, so enforced by
-    // FeatureTokenContext
-    // move to FeatureTokenTransformer
     if (isTransformerFuseable && transformerCustomFuseableIn instanceof FeatureTokenContext<?>) {
       if (!ModifiableContext.class.isAssignableFrom(
           ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface())) {

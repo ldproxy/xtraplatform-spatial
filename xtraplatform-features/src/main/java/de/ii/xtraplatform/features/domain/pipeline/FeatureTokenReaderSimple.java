@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.features.domain.pipeline;
 
-import de.ii.xtraplatform.features.domain.FeatureEventConsumer;
 import de.ii.xtraplatform.features.domain.FeatureTokenType;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
@@ -30,11 +29,6 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
   private V context;
   private List<String> nestingStack;
   private Map<List<String>, Integer> schemaIndexes;
-
-  // TODO
-  public FeatureTokenReaderSimple(FeatureEventConsumer eventConsumer) {
-    this.eventHandler = null;
-  }
 
   public FeatureTokenReaderSimple(FeatureEventHandlerSimple<T, U, V> eventHandler, V context) {
     this.eventHandler = eventHandler;
@@ -178,7 +172,6 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
 
   private void tryReadPath(Object context) {
     if (contextIndex == 0 && context instanceof List) {
-      // TODO: too expensive
       this.context.pathTracker().track((List<String>) context);
     }
   }

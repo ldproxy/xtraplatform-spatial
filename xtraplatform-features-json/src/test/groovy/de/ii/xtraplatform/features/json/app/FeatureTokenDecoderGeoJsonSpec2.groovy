@@ -7,12 +7,11 @@
  */
 package de.ii.xtraplatform.features.json.app
 
-
-import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple
 import de.ii.xtraplatform.features.domain.FeatureSchema
-import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple
 import de.ii.xtraplatform.features.domain.FeatureTokenFixtures
 import de.ii.xtraplatform.features.domain.SchemaMapping
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple
+import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple
 import de.ii.xtraplatform.features.json.domain.FeatureTokenDecoderGeoJson
 import de.ii.xtraplatform.streams.app.ReactiveRx
 import de.ii.xtraplatform.streams.domain.Reactive
@@ -45,7 +44,7 @@ class FeatureTokenDecoderGeoJsonSpec2 extends Specification {
     }
 
     def setup() {
-        decoder = new FeatureTokenDecoderGeoJson("biotop")
+        decoder = new FeatureTokenDecoderGeoJson(Optional.empty())
     }
 
     public <T> T runStream(Reactive.Stream<T> stream) {
