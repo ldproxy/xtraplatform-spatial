@@ -606,14 +606,16 @@ public abstract class AbstractFeatureProvider<
                 null,
                 !(query instanceof FeatureQuery) || !((FeatureQuery) query).returnsSingleFeature());
 
+    FeatureSchema schema =
+        getData()
+            .getTypes()
+            .get(query.getType())
+            .accept(withScope)
+            .accept(schemaTransformations)
+            .accept(new WithoutProperties(query.getFields(), query.skipGeometry()));
+
     return new Builder()
-        .targetSchema(
-            getData()
-                .getTypes()
-                .get(query.getType())
-                .accept(withScope)
-                .accept(schemaTransformations)
-                .accept(new WithoutProperties(query.getFields(), query.skipGeometry())))
+        .targetSchema(schema)
         .sourcePathTransformer(this::applySourcePathDefaults)
         .build();
   }

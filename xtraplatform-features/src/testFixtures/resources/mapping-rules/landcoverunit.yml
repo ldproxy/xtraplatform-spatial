@@ -8,19 +8,11 @@
   type: STRING
   role: ID
   index: 0
-- source: "/o41001{sortKey=objid}"
-  target: 0_landCoverObservation
-  type: OBJECT_ARRAY
-  index: 0
-- source: "/o41001{sortKey=objid}"
-  target: 0_landCoverObservation.class.href
-  type: VALUE_ARRAY
-  index: 0
 - source: "/o41001{sortKey=objid}/beb"
   target: "0_landCoverObservation.class.href.[]"
   type: STRING
   index: 0
-- source: "/o41001{sortKey=objid}/constant_href_0{constant='https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/1'}"
+- source: "/o41001{sortKey=objid}/constant_href_3{constant='https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/1'}"
   target: "0_landCoverObservation.class.href.[]"
   type: STRING
   index: 0
@@ -33,19 +25,11 @@
   type: STRING
   role: ID
   index: 0
-- source: "/o41002{sortKey=objid}"
-  target: 1_landCoverObservation
-  type: OBJECT_ARRAY
-  index: 0
-- source: "/o41002{sortKey=objid}"
-  target: 1_landCoverObservation.class.href
-  type: VALUE_ARRAY
-  index: 0
 - source: "/o41002{sortKey=objid}/beb"
   target: "1_landCoverObservation.class.href.[]"
   type: STRING
   index: 0
-- source: "/o41002{sortKey=objid}/constant_href_1{constant='https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/2'}"
+- source: "/o41002{sortKey=objid}/constant_href_4{constant='https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/2'}"
   target: "1_landCoverObservation.class.href.[]"
   type: STRING
   index: 0

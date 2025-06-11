@@ -36,7 +36,7 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
         def defaults = new ImmutableSqlPathDefaults.Builder().build()
         def cql = new CqlImpl()
         //def filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, cql, null)
-        def pathParser = new SqlPathParser(defaults, cql, Map.of("JSON", new DecoderFactoryJson()))
+        def pathParser = new SqlPathParser(defaults, cql, Map.of("JSON", new DecoderFactoryJson(), "EXPRESSION", new DecoderFactorySqlExpression()))
 
         mappingDeriver = new SqlMappingDeriver(pathParser, new ImmutableQueryGeneratorSettings.Builder().build())
         mappingOperationResolver = new MappingOperationResolver()
@@ -118,9 +118,10 @@ class SqlQueryTemplatesDeriver2Spec extends Specification {
         "self join with nested duplicate and filters" | td      | 0     | 0      | []                      | null                                                                                                                        | "okstra_abschnitt"                      || "okstra_abschnitt"
         "embedded object with concat and backlink"    | td      | 0     | 0      | []                      | null                                                                                                                        | "pfs_plan-hatObjekt-embedded"           || "pfs_plan-hatObjekt-embedded"
         //TODO: constants in concat value array
-        //"root concat with value concat with constant" | td      | 0     | 0      | []                      | null                                                                                                                        | "landcoverunit"                         || "landcoverunit"
+        "root concat with value concat with constant" | td      | 0     | 0      | []                      | null                                                                                                                        | "landcoverunit"                         || "landcoverunit"
         "strassen_unfaelle2"                          | td      | 0     | 0      | []                      | null                                                                                                                        | "strassen_unfaelle2"                    || "strassen_unfaelle2"
         "strassen_unfaelle2 + filter"                 | td      | 0     | 0      | []                      | Eq.of(Property.of("abs.kennung"), ScalarLiteral.of("foo"))                                                                  | "strassen_unfaelle2"                    || "strassen_unfaelle2_filter"
+        "simple"                                      | td      | 0     | 0      | []                      | null                                                                                                                        | "simple_expression"                     || "simple_expression"
     }
 
 

@@ -23,7 +23,7 @@ class SqlMappingDeriverSpec extends Specification {
         def defaults = new ImmutableSqlPathDefaults.Builder().build()
         def cql = new CqlImpl()
         //def filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, cql, null)
-        def pathParser = new SqlPathParser(defaults, cql, Map.of("JSON", new DecoderFactoryJson()))
+        def pathParser = new SqlPathParser(defaults, cql, Map.of("JSON", new DecoderFactoryJson(), "EXPRESSION", new DecoderFactorySqlExpression()))
 
         deriver = new SqlMappingDeriver(pathParser, new ImmutableQueryGeneratorSettings.Builder().build())
     }
@@ -74,8 +74,8 @@ class SqlMappingDeriverSpec extends Specification {
         "long value path overlap"                     | "long_value_path_overlap"                    || "long_value_path_overlap"
         "self join with nested duplicate and filters" | "okstra_abschnitt"                           || "okstra_abschnitt"
         "embedded object with concat and backlink"    | "pfs_plan-hatObjekt-embedded"                || "pfs_plan-hatObjekt-embedded"
-        //TODO: constants in concat value array
-        //"root concat with value concat with constant" | "landcoverunit"                         || "landcoverunit"
+        "root concat with value concat with constant" | "landcoverunit"                              || "landcoverunit"
         "strassen_unfaelle2"                          | "strassen_unfaelle2"                         || "strassen_unfaelle2"
+        "simple expression"                           | "simple_expression"                          || "simple_expression"
     }
 }

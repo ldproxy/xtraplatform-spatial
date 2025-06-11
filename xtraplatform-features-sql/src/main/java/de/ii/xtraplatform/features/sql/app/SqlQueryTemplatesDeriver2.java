@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.In;
@@ -221,12 +222,16 @@ public class SqlQueryTemplatesDeriver2 {
                                     column.getOperationParameter(Operation.CONSTANT, ""),
                                     column.getName());
                           }
-                          // TODO
                           if (ops.containsKey(Operation.EXPRESSION)) {
+                            final int[] i = {0};
                             return sqlDialect.applyToExpression(
                                 attributeContainerAlias,
                                 column.getName(),
-                                Map.of() /*TODO*/,
+                                column.getOperationParameters(Operation.EXPRESSION).stream()
+                                    .map(param -> Map.entry("" + i[0]++, param))
+                                    .collect(
+                                        ImmutableMap.toImmutableMap(
+                                            Map.Entry::getKey, Map.Entry::getValue)),
                                 ops.containsKey(Operation.WKT));
                           }
                           if (ops.containsKey(Operation.WKT)) {

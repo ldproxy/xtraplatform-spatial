@@ -465,50 +465,54 @@ public class SqlMappingDeriver {
     return false;
   }
 
-  // TODO: other ops
   private Map<SqlQueryColumn.Operation, String[]> getColumnOperations(
       MappingRule column, SqlPath sqlPath, Optional<FeatureSchema> propertySchema) {
+    Map<SqlQueryColumn.Operation, String[]> operations = new LinkedHashMap<>();
 
     if (sqlPath.getConstantValue().isPresent()) {
-      return Map.of(
+      operations.put(
           SqlQueryColumn.Operation.CONSTANT, new String[] {sqlPath.getConstantValue().get()});
     }
 
     if (sqlPath.isConnected()) {
-      return Map.of(
-          SqlQueryColumn.Operation.CONNECTOR, new String[] {sqlPath.getConnector().orElse("")});
+      String connector = sqlPath.getConnector().orElse("");
+
+      operations.put(SqlQueryColumn.Operation.CONNECTOR, new String[] {connector});
+
+      if (Objects.equals(connector, SqlQueryColumn.Operation.EXPRESSION.name())) {
+        operations.put(
+            SqlQueryColumn.Operation.EXPRESSION,
+            new String[] {sqlPath.getPathInConnector().orElse("")});
+      }
     }
 
     if (column.getType() == Type.GEOMETRY) {
-      Map<SqlQueryColumn.Operation, String[]> ops = new LinkedHashMap<>();
       SqlQueryColumn.Operation op =
           queryGeneration.getGeometryAsWkb()
               ? SqlQueryColumn.Operation.WKB
               : SqlQueryColumn.Operation.WKT;
 
-      ops.put(op, new String[] {});
+      operations.put(op, new String[] {});
 
       if (propertySchema.isPresent() && propertySchema.get().isForcePolygonCCW()) {
-        ops.put(SqlQueryColumn.Operation.FORCE_POLYGON_CCW, new String[] {});
+        operations.put(SqlQueryColumn.Operation.FORCE_POLYGON_CCW, new String[] {});
       }
 
       if (propertySchema.isPresent() && propertySchema.get().shouldLinearizeCurves()) {
-        ops.put(SqlQueryColumn.Operation.LINEARIZE_CURVES, new String[] {});
+        operations.put(SqlQueryColumn.Operation.LINEARIZE_CURVES, new String[] {});
       }
-
-      return ops;
     }
 
     // TODO: format from mapping
     if (column.getType() == Type.DATETIME) {
-      return Map.of(SqlQueryColumn.Operation.DATETIME, new String[] {});
+      operations.put(SqlQueryColumn.Operation.DATETIME, new String[] {});
     }
 
     // TODO: format from mapping
     if (column.getType() == Type.DATE) {
-      return Map.of(SqlQueryColumn.Operation.DATE, new String[] {});
+      operations.put(SqlQueryColumn.Operation.DATE, new String[] {});
     }
 
-    return Map.of();
+    return operations;
   }
 }

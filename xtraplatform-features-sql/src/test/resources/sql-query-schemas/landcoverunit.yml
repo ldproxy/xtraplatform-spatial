@@ -10,8 +10,8 @@
   - name: beb
     pathSegment: beb
     type: STRING
-  - name: constant_href_0
-    pathSegment: constant_href_0
+  - name: constant_href_3
+    pathSegment: constant_href_3
     type: STRING
     operations:
       CONSTANT:
@@ -27,8 +27,8 @@
   - name: beb
     pathSegment: beb
     type: STRING
-  - name: constant_href_1
-    pathSegment: constant_href_1
+  - name: constant_href_4
+    pathSegment: constant_href_4
     type: STRING
     operations:
       CONSTANT:

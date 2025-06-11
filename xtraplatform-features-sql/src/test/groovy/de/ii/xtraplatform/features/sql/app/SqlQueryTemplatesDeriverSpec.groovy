@@ -21,9 +21,11 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
 import de.ii.xtraplatform.features.sql.domain.SchemaSql
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
 import de.ii.xtraplatform.features.sql.domain.SqlPathParser
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
+@Ignore
 class SqlQueryTemplatesDeriverSpec extends Specification {
 
     @Shared

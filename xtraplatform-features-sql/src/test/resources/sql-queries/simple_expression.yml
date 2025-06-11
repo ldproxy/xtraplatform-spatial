@@ -1,0 +1,4 @@
+- >-
+  SELECT A.id AS SKEY, A.id, (CASE WHEN A.fsn__nen IS NOT NULL THEN A.fsn__zae||'/'||A.fsn__nen ELSE fsn__zae END) AS SQL__1
+  FROM eignungsflaeche A
+  ORDER BY 1
