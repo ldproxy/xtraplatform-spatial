@@ -89,7 +89,6 @@ public interface SqlQueryMapping {
                     .map(index -> Tuple.of(table, index)));
   }
 
-  // TODO: multiple main tables
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForId() {
     return getTables().stream()
         .flatMap(
@@ -107,17 +106,13 @@ public interface SqlQueryMapping {
               return Stream.empty();
             })
         .findFirst();
-
-    // return Optional.of(Tuple.of(getMainTable(), 0));
   }
 
   default Optional<FeatureSchema> getSchemaForObject(String propertyName) {
-    // System.out.println("getObjectSchemas: " + propertyName);
     return Optional.ofNullable(getObjectSchemas().get(propertyName));
   }
 
   default Optional<FeatureSchema> getSchemaForValue(String propertyName) {
-    // System.out.println("getValueSchemas: " + propertyName);
     if (Objects.equals(propertyName, ID_PLACEHOLDER)) {
       return getMainSchema().getIdProperty();
     }

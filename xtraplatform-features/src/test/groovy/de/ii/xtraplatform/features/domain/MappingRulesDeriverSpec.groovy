@@ -32,7 +32,6 @@ class MappingRulesDeriverSpec extends Specification {
 
         def schema = FeatureSchemaFixtures.fromYaml(source)
         def resolved = schema.accept(constantsResolver, List.of()).accept(mappingOperationResolver, List.of())
-        //FeatureSchemaFixtures.toYaml(resolved, target)
         List<MappingRule> rules = resolved.accept(deriver)
         String actual = MappingRuleFixtures.toYamlRaw(rules)
 
@@ -66,7 +65,6 @@ class MappingRulesDeriverSpec extends Specification {
         "object connector"                            | "object_connector"                           || "object_connector"
         "merge object connector"                      | "merge_object_connector"                     || "merge_object_connector"
         "concat object arrays"                        | "pfs_plan-hatObjekt-2"                       || "pfs_plan-hatObjekt"
-        //TODO: test with query templates
         "concat root objects"                         | "concat_root_objects"                        || "concat_root_objects"
         "long value path overlap"                     | "gemeinde_bezeichnung"                       || "long_value_path_overlap"
         "self join with nested duplicate and filters" | "okstra_abschnitt"                           || "okstra_abschnitt"

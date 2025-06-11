@@ -46,7 +46,6 @@ class SqlMappingDeriverSpec extends Specification {
 
         where:
 
-        //TODO: column ops
         casename                                      | rules                                        || schema
         "simple"                                      | "simple"                                     || "simple"
         "simple filter"                               | "simple_filter"                              || "simple_filter"
@@ -69,7 +68,6 @@ class SqlMappingDeriverSpec extends Specification {
         "object connector"                            | "object_connector"                           || "connector_object"
         "merge object connector"                      | "merge_object_connector"                     || "connector_object"
         "concat object arrays"                        | "pfs_plan-hatObjekt"                         || "pfs_plan-hatObjekt"
-        //TODO: test with query templates
         "concat root objects"                         | "concat_root_objects"                        || "concat_root_objects"
         "long value path overlap"                     | "long_value_path_overlap"                    || "long_value_path_overlap"
         "self join with nested duplicate and filters" | "okstra_abschnitt"                           || "okstra_abschnitt"

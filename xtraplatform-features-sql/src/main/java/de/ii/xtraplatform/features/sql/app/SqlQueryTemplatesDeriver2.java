@@ -109,7 +109,7 @@ public class SqlQueryTemplatesDeriver2 {
               : schema.getName();
       String table = String.format("%s A", tableName);
       String columns = "";
-      // TODO: in which way are they additional? why are they coming from sortables or queryables?
+
       for (int i = 0; i < additionalSortKeys.size(); i++) {
         SortKey sortKey = additionalSortKeys.get(i);
 
@@ -473,24 +473,6 @@ public class SqlQueryTemplatesDeriver2 {
     return minMaxKeys;
   }
 
-  private List<String> getSortKeys(SqlQuerySchema schema) {
-    ImmutableList.Builder<String> keys = ImmutableList.builder();
-
-    for (int i = 0; i < schema.getRelations().size() - 1; i++) {
-      if (!schema.getRelations().get(i).isJunction()) {
-        keys.add(
-            String.format(
-                "%s.%s",
-                schema.getRelations().get(i).getName(), schema.getRelations().get(i).getSortKey()));
-      }
-    }
-
-    keys.add(String.format("%s.%s", schema.getName(), schema.getSortKey()));
-
-    return keys.build();
-  }
-
-  // TODO: can we derive it from the above?
   private List<String> getSortKeys(
       List<? extends SqlQueryTable> tables,
       ListIterator<String> aliasesIterator,

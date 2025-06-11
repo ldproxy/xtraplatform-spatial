@@ -162,7 +162,6 @@ public class SqlMappingDeriver {
 
     schemas.add(querySchema);
     previous.add(pathParser.parseTablePath(tableRule.getSource()).getFullPath());
-    // TODO: should not contain queryables
     mapping.addTables(querySchema);
 
     for (int k = 0; k < columnRules.size(); k++) {
@@ -503,14 +502,20 @@ public class SqlMappingDeriver {
       }
     }
 
-    // TODO: format from mapping
     if (column.getType() == Type.DATETIME) {
-      operations.put(SqlQueryColumn.Operation.DATETIME, new String[] {});
+      String[] format =
+          propertySchema.isPresent() && propertySchema.get().getFormat().isPresent()
+              ? new String[] {propertySchema.get().getFormat().get()}
+              : new String[] {};
+      operations.put(SqlQueryColumn.Operation.DATETIME, format);
     }
 
-    // TODO: format from mapping
     if (column.getType() == Type.DATE) {
-      operations.put(SqlQueryColumn.Operation.DATE, new String[] {});
+      String[] format =
+          propertySchema.isPresent() && propertySchema.get().getFormat().isPresent()
+              ? new String[] {propertySchema.get().getFormat().get()}
+              : new String[] {};
+      operations.put(SqlQueryColumn.Operation.DATE, format);
     }
 
     return operations;

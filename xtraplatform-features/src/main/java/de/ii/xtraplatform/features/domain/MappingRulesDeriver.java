@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 public class MappingRulesDeriver
@@ -32,9 +31,7 @@ public class MappingRulesDeriver
             .flatMap(
                 parentPath ->
                     schema.getEffectiveSourcePaths().isEmpty()
-                        ? Stream
-                            .empty() // .of(Tuple.of(parentPath.substring(0, parentPath.length() -
-                        // 1), ""))
+                        ? Stream.empty()
                         : schema.getEffectiveSourcePaths().stream()
                             .map(childPath -> Tuple.of(parentPath, childPath)));
 
@@ -52,36 +49,6 @@ public class MappingRulesDeriver
 
               return toRules(path.first(), path.second(), schema);
             });
-
-    // TODO: remove
-    List<String> parentPathsList = getParentPaths(parents, "").toList();
-    List<Tuple<String, String>> allPathsList =
-        getParentPaths(parents, "")
-            .flatMap(
-                parentPath ->
-                    schema.getEffectiveSourcePaths().isEmpty()
-                        ? Stream
-                            .empty() // .of(Tuple.of(parentPath.substring(0, parentPath.length() -
-                        // 1), ""))
-                        : schema.getEffectiveSourcePaths().stream()
-                            .map(childPath -> Tuple.of(parentPath, childPath)))
-            .toList();
-    List<MappingRule> rulesList =
-        allPathsList.stream()
-            .flatMap(
-                path -> {
-                  if (!parents.isEmpty()
-                      && !parents.get(parents.size() - 1).getConcat().isEmpty()
-                      && parents
-                          .get(parents.size() - 1)
-                          .getEffectiveSourcePaths()
-                          .contains(path.second())) {
-                    return Stream.empty();
-                  }
-
-                  return toRules(path.first(), path.second(), schema);
-                })
-            .toList();
 
     return Stream.concat(rules, visitedProperties.stream().flatMap(List::stream)).toList();
   }
@@ -124,7 +91,7 @@ public class MappingRulesDeriver
                   .type(
                       rule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
                           ? Type.VALUE_ARRAY
-                          : Type.OBJECT_ARRAY) // TODO: get from rule with same target if any
+                          : Type.OBJECT_ARRAY)
                   .index(0)
                   .build();
 
@@ -148,14 +115,6 @@ public class MappingRulesDeriver
     List<String> parents = new ArrayList<>();
     List<Integer> spans = new ArrayList<>();
     List<Integer> cursors = new ArrayList<>();
-
-    BiConsumer<String, String> addParent =
-        (full, source) -> {
-          sorted.addAll(rulesByTable.get(full));
-          cursors.add(sorted.size());
-          parents.add(source);
-          spans.add(parents.size() - 1);
-        };
 
     for (String tableIdentifier : rulesByTable.keySet()) {
       String source = tableIdentifier.substring(0, tableIdentifier.lastIndexOf("-"));
@@ -207,7 +166,6 @@ public class MappingRulesDeriver
           }
         }
       } else {
-        // addParent.accept(tableIdentifier, source);
         sorted.addAll(rulesByTable.get(tableIdentifier));
         cursors.add(sorted.size());
         parents.add(source);
@@ -240,7 +198,6 @@ public class MappingRulesDeriver
             .type(type)
             .role(schema.getRole())
             .scope(toScope(schema.getExcludedScopes()))
-            // TODO
             .index(0);
 
     return Stream.of(rule.build());
