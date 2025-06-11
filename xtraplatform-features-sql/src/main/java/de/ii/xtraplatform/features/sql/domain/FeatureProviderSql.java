@@ -1118,7 +1118,8 @@ public class FeatureProviderSql
 
   @Override
   public MutationResult deleteFeature(String featureType, String id) {
-    Optional<SqlQueryMapping> queryMapping = Optional.ofNullable(queryMappings.get(featureType));
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
 
     if (queryMapping.isEmpty()) {
       throw new IllegalArgumentException(
@@ -1126,7 +1127,7 @@ public class FeatureProviderSql
     }
 
     Reactive.Source<String> deletionSource =
-        featureMutationsSql.getDeletionSource(queryMapping.get(), id);
+        featureMutationsSql.getDeletionSource(queryMapping.get().get(0), id);
 
     RunnableStream<MutationResult> deletionStream =
         deletionSource
@@ -1146,7 +1147,8 @@ public class FeatureProviderSql
       Optional<String> featureId,
       EpsgCrs crs,
       boolean partial) {
-    Optional<SqlQueryMapping> queryMapping = Optional.ofNullable(queryMappings.get(featureType));
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
 
     if (queryMapping.isEmpty()) {
       throw new IllegalArgumentException(
@@ -1155,8 +1157,9 @@ public class FeatureProviderSql
 
     Transformer<FeatureDataSql, String> featureWriter =
         featureId.isPresent()
-            ? featureMutationsSql.getUpdaterFlow(queryMapping.get(), null, featureId.get(), crs)
-            : featureMutationsSql.getCreatorFlow(queryMapping.get(), null, crs);
+            ? featureMutationsSql.getUpdaterFlow(
+                queryMapping.get().get(0), null, featureId.get(), crs)
+            : featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, crs);
 
     ImmutableMutationResult.Builder builder =
         ImmutableMutationResult.builder()
@@ -1169,7 +1172,7 @@ public class FeatureProviderSql
             // TODO: Simple .via(statsCollector)
             .via(
                 new FeatureEncoderSql(
-                    queryMapping.get(),
+                    queryMapping.get().get(0),
                     crs,
                     getNativeCrs(),
                     crsTransformerFactory,

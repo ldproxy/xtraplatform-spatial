@@ -62,9 +62,9 @@ public class SqlMappingDeriver {
     ImmutableSqlQueryMapping.Builder mapping = null;
 
     while (i < mappingRules.size()) {
-      MappingRule tableRule = mappingRules.get(i);
+      MappingRule rule = mappingRules.get(i);
 
-      if (!pathParser.isTablePath(tableRule.getSource())) {
+      if (!pathParser.isTablePath(rule.getSource())) {
         i++;
         continue;
       }
@@ -90,7 +90,7 @@ public class SqlMappingDeriver {
         break;
       }
 
-      while (mappingRules.get(j).getSource().startsWith(tableRule.getSource())) {
+      while (mappingRules.get(j).getSource().startsWith(rule.getSource())) {
         MappingRule columnRule = mappingRules.get(j);
 
         if (pathParser.isTablePath(columnRule.getSource())) {
@@ -125,7 +125,7 @@ public class SqlMappingDeriver {
 
       addToMapping(
           schema,
-          tableRule,
+          rule,
           columnRules,
           filterColumnRules,
           writableColumnRules,
