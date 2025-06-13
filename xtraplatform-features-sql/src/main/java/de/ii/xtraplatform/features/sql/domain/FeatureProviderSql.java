@@ -78,9 +78,6 @@ import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
-import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
-import de.ii.xtraplatform.features.domain.transform.PropertyTransformationsCollector;
-import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
 import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
@@ -98,7 +95,7 @@ import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
 import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
-import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver2;
+import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.services.domain.Scheduler;
@@ -347,15 +344,13 @@ public class FeatureProviderSql
   private final Scheduler scheduler;
 
   private FeatureQueryEncoderSql queryTransformer;
-  private AggregateStatsReader<SchemaSql> aggregateStatsReader;
+  private AggregateStatsReader<SqlQueryMapping> aggregateStatsReader;
   private FeatureMutationsSql featureMutationsSql;
   private PathParserSql pathParser2;
   private SqlPathParser pathParser3;
   private FilterEncoderSql filterEncoder;
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
-  private Map<String, List<SchemaSql>> tableSchemasQueryables;
-  private Map<String, List<SchemaSql>> tableSchemasMutations;
   private Map<String, List<SqlQueryMapping>> queryMappings;
   private String cronJob;
 
@@ -454,61 +449,7 @@ public class FeatureProviderSql
 
     this.pathParser3 = createPathParser3(getData().getSourcePathDefaults(), cql, subdecoders);
 
-    // TODO: use new derivers and schemas everywhere
-    QuerySchemaDeriver querySchemaDeriver = new QuerySchemaDeriver(pathParser3);
-    MappingRulesDeriver mappingRulesDeriver = new MappingRulesDeriver();
-    SqlMappingDeriver sqlMappingDeriver =
-        new SqlMappingDeriver(pathParser3, getData().getQueryGeneration());
-
-    Map<String, List<MappingRule>> mappingRules =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    Map.entry(
-                        entry.getKey(),
-                        entry
-                            .getValue() /*.accept(WITH_SCOPE_QUERIES)*/
-                            .accept(mappingRulesDeriver)))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
-
-    this.queryMappings =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    Map.entry(
-                        entry.getKey(),
-                        sqlMappingDeriver.derive(
-                            mappingRules.get(entry.getKey()),
-                            entry.getValue() /*.accept(WITH_SCOPE_QUERIES)*/)))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
-
-    this.tableSchemas =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    Map.entry(
-                        entry.getKey(),
-                        entry.getValue().accept(WITH_SCOPE_RETURNABLE).accept(querySchemaDeriver)))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
-
-    this.tableSchemasQueryables =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry -> {
-                  PropertyTransformations propertyTransformations =
-                      entry.getValue().accept(new PropertyTransformationsCollector());
-                  SchemaTransformerChain schemaTransformations =
-                      propertyTransformations.getSchemaTransformations(null, false);
-
-                  return Map.entry(
-                      entry.getKey(),
-                      entry
-                          .getValue()
-                          .accept(schemaTransformations)
-                          .accept(WITH_SCOPE_QUERIES)
-                          .accept(querySchemaDeriver));
-                })
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    this.queryMappings = generateSqlQueryMappings();
 
     boolean success = super.onStartup();
 
@@ -532,37 +473,28 @@ public class FeatureProviderSql
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
-    this.tableSchemasMutations =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    new SimpleImmutableEntry<>(
-                        entry.getKey(),
-                        entry.getValue().accept(WITH_SCOPE_RECEIVABLE).accept(querySchemaDeriver)))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
-
-    SqlQueryTemplatesDeriver2 sqlQueryTemplatesDeriver2 =
-        new SqlQueryTemplatesDeriver2(
+    SqlQueryTemplatesDeriver sqlQueryTemplatesDeriver =
+        new SqlQueryTemplatesDeriver(
             filterEncoder,
             sqlDialect,
             getData().getQueryGeneration().getComputeNumberMatched(),
             true,
             getData().getQueryGeneration().getNullOrder());
 
-    Map<String, List<SqlQueryTemplates>> allQueryTemplates2 =
+    Map<String, List<SqlQueryTemplates>> allQueryTemplates =
         queryMappings.entrySet().stream()
             .map(
                 entry -> {
                   final int[] i = {0};
                   return new SimpleImmutableEntry<>(
                       entry.getKey(),
-                      entry.getValue().stream().map(sqlQueryTemplatesDeriver2::derive).toList());
+                      entry.getValue().stream().map(sqlQueryTemplatesDeriver::derive).toList());
                 })
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =
         new FeatureQueryEncoderSql(
-            allQueryTemplates2, allQueryTemplates2, getData().getQueryGeneration(), sqlDialect);
+            allQueryTemplates, allQueryTemplates, getData().getQueryGeneration(), sqlDialect);
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
@@ -704,16 +636,10 @@ public class FeatureProviderSql
     return runnerCapacity;
   }
 
-  private List<SchemaSql> getAllSourceSchemas() {
-    return getSourceSchemas().values().stream()
-        .flatMap(Collection::stream)
-        .collect(Collectors.toList());
-  }
-
   private int getMaxQueries() {
-    return getSourceSchemas().values().stream()
+    return this.queryMappings.values().stream()
         .flatMap(Collection::stream)
-        .mapToInt(s -> s.getAllObjects().size())
+        .mapToInt(s -> s.getTables().size())
         .max()
         .orElse(1);
   }
@@ -775,8 +701,23 @@ public class FeatureProviderSql
     return Optional.empty();
   }
 
+  // TODO: migrate types validation from SchemaSql to SqlQueryMapping
+  // for now SchemaSql is generated lazily when validation is enabled
+  // and getSourceSchemas() is called from AbstractFeatureProvider
+  @Override
   public Map<String, List<SchemaSql>> getSourceSchemas() {
-    return tableSchemas;
+    QuerySchemaDeriver querySchemaDeriver = new QuerySchemaDeriver(pathParser3);
+
+    this.tableSchemas =
+        getData().getTypes().entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        entry.getValue().accept(WITH_SCOPE_RETURNABLE).accept(querySchemaDeriver)))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
+    return this.tableSchemas;
   }
 
   @Override
@@ -819,25 +760,31 @@ public class FeatureProviderSql
     if (query instanceof FeatureQuery) {
       FeatureQuery featureQuery = (FeatureQuery) query;
 
-      List<SchemaSql> schemas =
-          featureQuery.getSchemaScope() == SchemaBase.Scope.RETURNABLE
-              ? tableSchemas.get(featureQuery.getType())
-              : tableSchemasMutations.get(featureQuery.getType());
+      List<SqlQueryMapping> sqlQueryMappings = queryMappings.get(featureQuery.getType());
 
       return new FeatureDecoderSql(
-          mappings, schemas, query, subdecoders, getData().getQueryGeneration().getGeometryAsWkb());
+          mappings,
+          sqlQueryMappings,
+          query,
+          subdecoders,
+          getData().getQueryGeneration().getGeometryAsWkb());
     }
 
     if (query instanceof MultiFeatureQuery) {
       MultiFeatureQuery multiFeatureQuery = (MultiFeatureQuery) query;
 
-      List<SchemaSql> schemas =
+      List<SqlQueryMapping> sqlQueryMappings =
           multiFeatureQuery.getQueries().stream()
-              .flatMap(typeQuery -> tableSchemas.get(typeQuery.getType()).stream())
+              .flatMap(typeQuery -> queryMappings.get(typeQuery.getType()).stream())
               .collect(Collectors.toList());
+      ;
 
       return new FeatureDecoderSql(
-          mappings, schemas, query, subdecoders, getData().getQueryGeneration().getGeometryAsWkb());
+          mappings,
+          sqlQueryMappings,
+          query,
+          subdecoders,
+          getData().getQueryGeneration().getGeometryAsWkb());
     }
 
     throw new IllegalArgumentException();
@@ -899,7 +846,7 @@ public class FeatureProviderSql
 
   @Override
   public long getFeatureCount(String typeName) {
-    if (!getSourceSchemas().containsKey(typeName)) {
+    if (!queryMappings.containsKey(typeName)) {
       return -1;
     }
 
@@ -919,7 +866,7 @@ public class FeatureProviderSql
     }
 
     try {
-      Stream<Long> countGraph = aggregateStatsReader.getCount(getSourceSchemas().get(typeName));
+      Stream<Long> countGraph = aggregateStatsReader.getCount(queryMappings.get(typeName));
 
       Long count =
           countGraph
@@ -945,7 +892,7 @@ public class FeatureProviderSql
 
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
-    if (!getSourceSchemas().containsKey(typeName)) {
+    if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
     }
 
@@ -977,7 +924,7 @@ public class FeatureProviderSql
 
     try {
       Stream<Optional<BoundingBox>> extentGraph =
-          aggregateStatsReader.getSpatialExtent(getSourceSchemas().get(typeName), is3dSupported());
+          aggregateStatsReader.getSpatialExtent(queryMappings.get(typeName), is3dSupported());
 
       Optional<BoundingBox> extent =
           extentGraph
@@ -1020,7 +967,7 @@ public class FeatureProviderSql
 
   @Override
   public Optional<Interval> getTemporalExtent(String typeName) {
-    if (!getSourceSchemas().containsKey(typeName)) {
+    if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
     }
 
@@ -1075,7 +1022,7 @@ public class FeatureProviderSql
 
     try {
       Stream<Optional<Interval>> extentGraph =
-          aggregateStatsReader.getTemporalExtent(getSourceSchemas().get(typeName));
+          aggregateStatsReader.getTemporalExtent(queryMappings.get(typeName));
 
       Optional<Interval> extent =
           extentGraph
@@ -1097,6 +1044,51 @@ public class FeatureProviderSql
     }
 
     return Optional.empty();
+  }
+
+  // TODO: cache deser does not work, because the the feature schemas have no name
+  // (and there are no map keys to get them from)
+  // so to implement this we need the split between cfg and internal schemas
+  private Map<String, List<SqlQueryMapping>> generateSqlQueryMappings() {
+    String[] cacheKey = {"schema", "sql"};
+    String cacheValidator = getData().getStableHash();
+
+    /*if (cache.hasValid(cacheValidator, cacheKey)) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Using cached sql schemas");
+      }
+
+      return cache
+          .get(cacheValidator, new TypeReference<Map<String, List<SqlQueryMapping>>>() {}, cacheKey)
+          .orElse(Map.of());
+    }
+
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Computing sql schemas");
+    }*/
+
+    MappingRulesDeriver mappingRulesDeriver = new MappingRulesDeriver();
+    SqlMappingDeriver sqlMappingDeriver =
+        new SqlMappingDeriver(pathParser3, getData().getQueryGeneration());
+    // LOGGER.debug("BEFORE Derive MappingRules");
+    Map<String, List<MappingRule>> mappingRules =
+        getData().getTypes().entrySet().stream()
+            .map(entry -> Map.entry(entry.getKey(), entry.getValue().accept(mappingRulesDeriver)))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    // LOGGER.debug("AFTER Derive MappingRules");
+    Map<String, List<SqlQueryMapping>> mappings =
+        getData().getTypes().entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        sqlMappingDeriver.derive(
+                            mappingRules.get(entry.getKey()), entry.getValue())))
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    // LOGGER.debug("AFTER Derive SqlQueryMapping");
+    // cache.put(cacheValidator, mappings, cacheKey);
+
+    return mappings;
   }
 
   @Override
@@ -1345,6 +1337,6 @@ public class FeatureProviderSql
 
   @Override
   public String encode(Cql2Expression cqlFilter, String featureType) {
-    return filterEncoder.encodeNested(cqlFilter, tableSchemas.get(featureType).get(0), false);
+    return filterEncoder.encodeNested(cqlFilter, queryMappings.get(featureType).get(0), false);
   }
 }

@@ -17,10 +17,10 @@ import de.ii.xtraplatform.features.domain.FeatureStoreMultiplicityTracker;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
 import de.ii.xtraplatform.features.domain.NestingTracker;
 import de.ii.xtraplatform.features.domain.Query;
-import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.features.sql.domain.SqlRowMeta;
 import java.io.IOException;
@@ -30,7 +30,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +62,7 @@ public class FeatureDecoderSql
 
   public FeatureDecoderSql(
       Map<String, SchemaMapping> mappings,
-      List<SchemaSql> tableSchemas,
+      List<SqlQueryMapping> sqlQueryMappings,
       Query query,
       Map<String, DecoderFactory> subDecoderFactories,
       boolean geometryAsWkb) {
@@ -72,13 +71,14 @@ public class FeatureDecoderSql
     this.geometryAsWkb = geometryAsWkb;
 
     this.mainTablePaths =
-        tableSchemas.stream().map(SchemaBase::getFullPath).collect(Collectors.toList());
+        sqlQueryMappings.stream().map(s -> s.getMainTable().getFullPath()).toList();
     List<List<String>> multiTables =
-        tableSchemas.stream()
-            .flatMap(s -> s.getAllObjects().stream())
-            .filter(schema -> !schema.getRelation().isEmpty())
-            .map(SchemaBase::getFullPath)
-            .collect(Collectors.toList());
+        sqlQueryMappings.stream()
+            .flatMap(s -> s.getTables().stream())
+            .filter(schema -> !schema.isRoot())
+            .map(SqlQuerySchema::getFullPath)
+            .distinct()
+            .toList();
     this.multiplicityTracker = new SqlMultiplicityTracker(multiTables);
     this.isSingleFeature =
         query instanceof FeatureQuery && ((FeatureQuery) query).returnsSingleFeature();
