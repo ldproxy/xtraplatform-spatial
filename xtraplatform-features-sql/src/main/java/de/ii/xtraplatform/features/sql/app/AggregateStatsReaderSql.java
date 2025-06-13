@@ -21,6 +21,7 @@ import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -32,16 +33,19 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
   private final AggregateStatsQueryGenerator queryGenerator;
   private final SqlDialect sqlDialect;
   private final EpsgCrs crs;
+  private final ZoneId timeZone;
 
   public AggregateStatsReaderSql(
       Supplier<SqlClient> sqlClient,
       AggregateStatsQueryGenerator queryGenerator,
       SqlDialect sqlDialect,
-      EpsgCrs crs) {
+      EpsgCrs crs,
+      ZoneId timeZone) {
     this.sqlClient = sqlClient;
     this.queryGenerator = queryGenerator;
     this.sqlDialect = sqlDialect;
     this.crs = crs;
+    this.timeZone = timeZone;
   }
 
   @Override
@@ -138,7 +142,9 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
             Transformer.map(
                 sqlRow ->
                     sqlDialect.parseTemporalExtent(
-                        (String) sqlRow.getValues().get(0), (String) sqlRow.getValues().get(1))))
+                        (String) sqlRow.getValues().get(0),
+                        (String) sqlRow.getValues().get(1),
+                        timeZone)))
         .to(
             Reactive.Sink.reduce(
                 Optional.empty(),

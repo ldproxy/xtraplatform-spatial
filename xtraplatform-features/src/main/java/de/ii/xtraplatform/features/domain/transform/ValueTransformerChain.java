@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -31,7 +30,7 @@ public class ValueTransformerChain
       Map<String, List<PropertyTransformation>> allTransformations,
       SchemaMapping schemaMapping,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone,
+      ZoneId defaultTimeZone,
       Function<String, String> substitutionLookup) {
     this.transformers =
         allTransformations.entrySet().stream()
@@ -118,7 +117,7 @@ public class ValueTransformerChain
       String path,
       List<PropertyTransformation> propertyTransformations,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone,
+      ZoneId defaultTimeZone,
       Function<String, String> substitutionLookup) {
     List<FeaturePropertyValueTransformer> transformers = new ArrayList<>();
 
@@ -184,7 +183,7 @@ public class ValueTransformerChain
       List<String> propertyPaths,
       List<PropertyTransformation> propertyTransformation,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone,
+      ZoneId defaultTimeZone,
       Function<String, String> substitutionLookup) {
     return propertyPaths.stream()
         .map(

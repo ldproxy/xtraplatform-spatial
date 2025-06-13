@@ -16,6 +16,7 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -87,7 +88,7 @@ public interface SqlDialect {
 
   Optional<BoundingBox> parseExtent(String extent, EpsgCrs crs);
 
-  Optional<Interval> parseTemporalExtent(String start, String end);
+  Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone);
 
   String escapeString(String value);
 

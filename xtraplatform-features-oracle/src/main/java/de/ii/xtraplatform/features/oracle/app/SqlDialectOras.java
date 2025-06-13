@@ -17,6 +17,7 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGenera
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -86,7 +87,7 @@ public class SqlDialectOras implements SqlDialect {
   }
 
   @Override
-  public Optional<Interval> parseTemporalExtent(String start, String end) {
+  public Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone) {
     if (Objects.isNull(start)) {
       return Optional.empty();
     }

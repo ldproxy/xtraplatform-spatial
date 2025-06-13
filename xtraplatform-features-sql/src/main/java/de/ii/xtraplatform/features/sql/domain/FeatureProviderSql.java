@@ -106,6 +106,7 @@ import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
+import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -501,7 +502,8 @@ public class FeatureProviderSql
             this::getSqlClient,
             queryGeneratorSql,
             sqlDialect,
-            getData().getNativeCrs().orElse(OgcCrs.CRS84));
+            getData().getNativeCrs().orElse(OgcCrs.CRS84),
+            getData().getNativeTimeZone().orElse(ZoneId.of("UTC")));
     this.featureMutationsSql =
         new FeatureMutationsSql(
             this::getSqlClient,

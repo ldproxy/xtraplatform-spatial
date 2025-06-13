@@ -21,10 +21,11 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
+import de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerDateFormat;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -102,7 +103,7 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public Optional<BoundingBox> parseExtent(String extent, EpsgCrs crs) {
-    if (Objects.isNull(extent)) {
+    if (Objects.isNull(extent) || Objects.isNull(crs)) {
       return Optional.empty();
     }
 
@@ -132,19 +133,23 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
-  public Optional<Interval> parseTemporalExtent(String start, String end) {
+  public Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone) {
     if (Objects.isNull(start)) {
       return Optional.empty();
     }
-    DateTimeFormatter parser =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]")
-            .withZone(ZoneOffset.UTC);
-    Instant parsedStart = parser.parse(start, Instant::from);
+
+    Instant parsedStart = parseInstant(start, timeZone);
     if (Objects.isNull(end)) {
       return Optional.of(Interval.of(parsedStart, Instant.MAX));
     }
-    Instant parsedEnd = parser.parse(end, Instant::from);
+    Instant parsedEnd = parseInstant(end, timeZone);
     return Optional.of(Interval.of(parsedStart, parsedEnd));
+  }
+
+  public static Instant parseInstant(String input, ZoneId timeZone) {
+    ZonedDateTime zdt = FeaturePropertyTransformerDateFormat.parse(input, timeZone);
+
+    return zdt.toInstant();
   }
 
   @Override
