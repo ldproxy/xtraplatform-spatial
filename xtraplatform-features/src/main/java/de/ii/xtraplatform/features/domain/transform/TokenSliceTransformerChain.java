@@ -46,7 +46,7 @@ public class TokenSliceTransformerChain
       SchemaMapping schemaMapping,
       Function<String, String> substitutionLookup,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      ZoneId defaultTimeZone) {
     this.schemaMapping = schemaMapping;
     this.transformers =
         allTransformations.entrySet().stream()
@@ -276,7 +276,7 @@ public class TokenSliceTransformerChain
       List<PropertyTransformation> propertyTransformations,
       Function<String, String> substitutionLookup,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      ZoneId defaultTimeZone) {
     List<FeaturePropertyTokenSliceTransformer> transformers = new ArrayList<>();
 
     propertyTransformations.forEach(
@@ -415,7 +415,7 @@ public class TokenSliceTransformerChain
       List<PropertyTransformation> propertyTransformation,
       Function<String, String> substitutionLookup,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      ZoneId defaultTimeZone) {
     return propertyPaths.stream()
         .map(
             propertyPath ->
@@ -436,7 +436,7 @@ public class TokenSliceTransformerChain
       boolean isObject,
       Function<String, String> substitutionLookup,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      ZoneId defaultTimeZone) {
     if (isObject || Objects.isNull(schemaMapping)) {
       return List.of();
     }

@@ -13,10 +13,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.List;
-import java.util.Optional;
 import org.immutables.value.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,30 +41,18 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
     return ImmutableList.of(SchemaBase.Type.DATETIME);
   }
 
-  Optional<ZoneId> getDefaultTimeZone();
+  ZoneId getDefaultTimeZone();
 
   @Override
   default String transform(String currentPropertyPath, String input) {
     // TODO: variable fractions
     try {
-      DateTimeFormatter parser =
-          DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]");
       DateTimeFormatter formatter = DateTimeFormatter.ofPattern(getParameter());
-      TemporalAccessor ta =
-          parser.parseBest(input, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
-      if (ta instanceof OffsetDateTime) {
-        ta = ((OffsetDateTime) ta).atZoneSameInstant(UTC);
-      } else if (ta instanceof LocalDateTime) {
-        ta = ((LocalDateTime) ta).atZone(getDefaultTimeZone().orElse(UTC)).withZoneSameInstant(UTC);
-      } else if (ta instanceof LocalDate && isDateTimeFormat(getParameter())) {
-        ta =
-            ((LocalDate) ta)
-                .atStartOfDay(getDefaultTimeZone().orElse(UTC))
-                .withZoneSameInstant(UTC);
-      }
 
-      return formatter.format(ta);
-    } catch (Exception e) {
+      ZonedDateTime zdt = parse(input, getDefaultTimeZone());
+
+      return formatter.format(zdt);
+    } catch (Throwable e) {
       LOGGER.warn(
           "{} transformation for property '{}' with value '{}' failed: {}",
           getType(),
@@ -76,7 +64,22 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
     return input;
   }
 
-  static boolean isDateTimeFormat(String format) {
-    return ImmutableList.of("H", "h", "m", "S", "s").stream().anyMatch(format::contains);
+  static ZonedDateTime parse(String input, ZoneId defaultTimeZone) {
+    DateTimeFormatter parser =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]");
+
+    TemporalAccessor ta =
+        parser.parseBest(input, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
+
+    if (ta instanceof OffsetDateTime) {
+      return ((OffsetDateTime) ta).atZoneSameInstant(UTC);
+    } else if (ta instanceof LocalDateTime) {
+      return ((LocalDateTime) ta).atZone(defaultTimeZone).withZoneSameInstant(UTC);
+    } else if (ta instanceof LocalDate) {
+      return ((LocalDate) ta).atStartOfDay(UTC);
+    }
+
+    throw new IllegalArgumentException(
+        String.format("Input '%s' could not be parsed as a date/time value", input));
   }
 }

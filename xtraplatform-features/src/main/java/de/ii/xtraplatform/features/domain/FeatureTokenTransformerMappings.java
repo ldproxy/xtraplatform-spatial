@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +35,7 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
 
   private final Map<String, PropertyTransformations> propertyTransformations;
   private final Map<String, Codelist> codelists;
-  private final Optional<ZoneId> nativeTimeZone;
+  private final ZoneId nativeTimeZone;
   private Map<String, SchemaTransformerChain> schemaTransformerChains;
   private Map<String, TokenSliceTransformerChain> sliceTransformerChains;
   private Map<String, TransformerChain<String, FeaturePropertyValueTransformer>>
@@ -50,7 +49,7 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public FeatureTokenTransformerMappings(
       Map<String, PropertyTransformations> propertyTransformations,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> nativeTimeZone) {
+      ZoneId nativeTimeZone) {
     this.propertyTransformations = propertyTransformations;
     this.codelists = codelists;
     this.nativeTimeZone = nativeTimeZone;

@@ -7,11 +7,13 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
-import com.google.common.collect.ImmutableList;
-import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,64 +30,62 @@ public class AggregateStatsQueryGenerator {
     this.filterEncoder = filterEncoder;
   }
 
-  public String getCountQuery(SchemaSql sourceSchema) {
+  public String getCountQuery(SqlQueryMapping mapping) {
+    SqlQuerySchema sourceSchema = mapping.getMainTable();
 
     List<String> aliases = AliasGenerator.getAliases(sourceSchema);
 
     String mainTable = String.format("%s %s", sourceSchema.getName(), aliases.get(0));
 
-    Optional<String> filter = getFilter(sourceSchema);
+    Optional<String> filter = getFilter(mapping, sourceSchema);
     String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
 
     return String.format("SELECT COUNT(*) FROM %s%s", mainTable, where);
   }
 
-  public String getSpatialExtentQuery(SchemaSql mainSchema, SchemaSql spatialSchema, boolean is3d) {
+  public String getSpatialExtentQuery(
+      SqlQueryMapping mapping, SqlQuerySchema spatial, SqlQueryColumn spatialColumn, boolean is3d) {
+    SqlQuerySchema mainSchema = mapping.getMainTable();
 
-    List<String> aliases = AliasGenerator.getAliases(spatialSchema);
+    List<String> aliases = AliasGenerator.getAliases(spatial);
     String spatialAlias = aliases.get(aliases.size() - 1);
 
     String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
 
     String column =
-        spatialSchema
-            .getPrimaryGeometry()
-            .map(
-                attribute ->
-                    sqlDialect.applyToExtent(
-                        getQualifiedColumn(spatialAlias, attribute.getPath().get(0)), is3d))
-            .get();
+        SqlQueryColumnOperations.getQualifiedColumnResolved(
+            spatialAlias, spatialColumn, sqlDialect);
+    if (column.contains(" AS ") && !column.endsWith(")")) {
+      column = column.substring(0, column.indexOf(" AS "));
+    }
 
-    String join =
-        JoinGenerator.getJoins(spatialSchema, ImmutableList.of(mainSchema), aliases, filterEncoder);
+    String columnExtent = sqlDialect.applyToExtent(column, is3d);
 
-    Optional<String> filter = getFilter(mainSchema);
+    String join = JoinGenerator.getJoins(spatial, aliases, filterEncoder);
+
+    Optional<String> filter = getFilter(mapping, mainSchema);
     String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
 
     return String.format(
-        "SELECT %s FROM %s%s%s%s", column, mainTable, join.isEmpty() ? "" : " ", join, where);
+        "SELECT %s FROM %s%s%s%s", columnExtent, mainTable, join.isEmpty() ? "" : " ", join, where);
   }
 
-  public String getTemporalExtentQuery(SchemaSql mainSchema, SchemaSql temporalSchema) {
-    List<String> aliases = AliasGenerator.getAliases(temporalSchema);
+  public String getTemporalExtentQuery(
+      SqlQueryMapping mapping, SqlQuerySchema instant, SqlQueryColumn instantColumn) {
+    SqlQuerySchema mainSchema = mapping.getMainTable();
+
+    List<String> aliases = AliasGenerator.getAliases(instant);
     String temporalAlias = aliases.get(aliases.size() - 1);
 
     String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
+
     String column =
-        temporalSchema
-            .getPrimaryInstant()
-            .map(
-                attribute ->
-                    sqlDialect.applyToDatetime(
-                        getQualifiedColumn(temporalAlias, attribute.getName()),
-                        attribute.getFormat()))
-            .get();
+        SqlQueryColumnOperations.getQualifiedColumnResolved(
+            temporalAlias, instantColumn, sqlDialect);
 
-    String join =
-        JoinGenerator.getJoins(
-            temporalSchema, ImmutableList.of(mainSchema), aliases, filterEncoder);
+    String join = JoinGenerator.getJoins(instant, aliases, filterEncoder);
 
-    Optional<String> filter = getFilter(mainSchema);
+    Optional<String> filter = getFilter(mapping, mainSchema);
     String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
 
     return String.format(
@@ -94,87 +94,74 @@ public class AggregateStatsQueryGenerator {
   }
 
   public String getTemporalExtentQuery(
-      SchemaSql mainSchema, SchemaSql startSchema, SchemaSql endSchema) {
-    if (startSchema.equals(endSchema)) {
-      List<String> aliases = AliasGenerator.getAliases(startSchema);
+      SqlQueryMapping mapping,
+      SqlQuerySchema intervalStart,
+      SqlQueryColumn intervalStartColumn,
+      SqlQuerySchema intervalEnd,
+      SqlQueryColumn intervalEndColumn) {
+    SqlQuerySchema mainSchema = mapping.getMainTable();
+
+    if (Objects.equals(intervalStart, intervalEnd)) {
+      List<String> aliases = AliasGenerator.getAliases(intervalStart);
       String temporalAlias = aliases.get(aliases.size() - 1);
 
       String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
-      Optional<Tuple<SchemaSql, SchemaSql>> primaryInterval = startSchema.getPrimaryInterval();
-      String startColumn =
-          primaryInterval
-              .map(
-                  attributes ->
-                      sqlDialect.applyToDatetime(
-                          getQualifiedColumn(temporalAlias, attributes.first().getName()),
-                          attributes.first().getFormat()))
-              .get();
-      String endColumn =
-          primaryInterval
-              .map(
-                  attributes ->
-                      sqlDialect.applyToDatetime(
-                          getQualifiedColumn(temporalAlias, attributes.second().getName()),
-                          attributes.second().getFormat()))
-              .get();
-      String join =
-          JoinGenerator.getJoins(startSchema, ImmutableList.of(mainSchema), aliases, filterEncoder);
 
-      Optional<String> filter = getFilter(mainSchema);
+      String columnStart =
+          SqlQueryColumnOperations.getQualifiedColumnResolved(
+              temporalAlias, intervalStartColumn, sqlDialect);
+
+      String columnEnd =
+          SqlQueryColumnOperations.getQualifiedColumnResolved(
+              temporalAlias, intervalEndColumn, sqlDialect);
+
+      String join = JoinGenerator.getJoins(intervalStart, aliases, filterEncoder);
+
+      Optional<String> filter = getFilter(mapping, mainSchema);
       String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
 
       return String.format(
           "SELECT MIN(%s), MAX(%s) FROM %s%s%s%s",
-          startColumn, endColumn, mainTable, join.isEmpty() ? "" : " ", join, where);
+          columnStart, columnEnd, mainTable, join.isEmpty() ? "" : " ", join, where);
 
     } else {
-      List<String> startAliases = AliasGenerator.getAliases(startSchema);
+      List<String> startAliases = AliasGenerator.getAliases(intervalStart);
       String startAlias = startAliases.get(startAliases.size() - 1);
-      List<String> endAliases = AliasGenerator.getAliases(endSchema);
+      List<String> endAliases = AliasGenerator.getAliases(intervalEnd);
       String endAlias = endAliases.get(endAliases.size() - 1);
 
       String mainTable = String.format("%s %s", mainSchema.getName(), startAliases.get(0));
 
-      Optional<Tuple<SchemaSql, SchemaSql>> primaryInterval = startSchema.getPrimaryInterval();
-      String startColumn =
-          primaryInterval
-              .map(
-                  attributes ->
-                      sqlDialect.applyToDatetime(
-                          getQualifiedColumn(startAlias, attributes.first().getName()),
-                          attributes.first().getFormat()))
-              .get();
-      String endColumn =
-          primaryInterval
-              .map(
-                  attributes ->
-                      sqlDialect.applyToDatetime(
-                          getQualifiedColumn(endAlias, attributes.second().getName()),
-                          attributes.second().getFormat()))
-              .get();
+      String columnStart =
+          SqlQueryColumnOperations.getQualifiedColumnResolved(
+              startAlias, intervalStartColumn, sqlDialect);
 
-      String startJoin =
-          JoinGenerator.getJoins(
-              startSchema, ImmutableList.of(mainSchema), startAliases, filterEncoder);
+      String columnEnd =
+          SqlQueryColumnOperations.getQualifiedColumnResolved(
+              endAlias, intervalEndColumn, sqlDialect);
+
+      String startJoin = JoinGenerator.getJoins(intervalStart, startAliases, filterEncoder);
       String startTableWithJoins =
-          String.format("%s%s%s", mainSchema, startJoin.isEmpty() ? "" : " ", startJoin);
-      String endJoin =
-          JoinGenerator.getJoins(
-              endSchema, ImmutableList.of(mainSchema), endAliases, filterEncoder);
+          String.format("%s%s%s", mainTable, startJoin.isEmpty() ? "" : " ", startJoin);
+      String endJoin = JoinGenerator.getJoins(intervalEnd, endAliases, filterEncoder);
       String endTableWithJoins =
           String.format("%s%s%s", mainTable, endJoin.isEmpty() ? "" : " ", endJoin);
 
-      Optional<String> filter = getFilter(mainSchema);
+      Optional<String> filter = getFilter(mapping, mainSchema);
       String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
 
       return String.format(
           "SELECT * FROM (SELECT MIN(%s) FROM %s%s) AS A, (SELECT MAX(%s) from %s%s) AS B;",
-          startColumn, startTableWithJoins, where, endColumn, endTableWithJoins, where);
+          columnStart, startTableWithJoins, where, columnEnd, endTableWithJoins, where);
     }
   }
 
   private Optional<String> getFilter(SchemaSql schemaSql) {
     return schemaSql.getFilter().map(cql -> filterEncoder.encode(cql, schemaSql));
+  }
+
+  private Optional<String> getFilter(SqlQueryMapping mapping, SqlQuerySchema schemaSql) {
+    return schemaSql.getFilter().map(cql -> filterEncoder.encode(cql, mapping));
   }
 
   private String getQualifiedColumn(String table, String column) {

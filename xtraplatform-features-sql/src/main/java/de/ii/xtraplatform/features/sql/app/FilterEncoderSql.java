@@ -124,6 +124,12 @@ public class FilterEncoderSql {
     return prepareExpression(cqlFilter).accept(new CqlToSqlNested(schema, isUserFilter));
   }
 
+  public String encodeNested(
+      Cql2Expression cqlFilter, SqlQueryMapping mapping, boolean isUserFilter) {
+    return prepareExpression(cqlFilter)
+        .accept(new CqlToSqlNested2(mapping, mapping.getMainTable().asTablePath(), isUserFilter));
+  }
+
   private String encodeNested(
       SqlQueryMapping mapping,
       Cql2Expression cqlFilter,

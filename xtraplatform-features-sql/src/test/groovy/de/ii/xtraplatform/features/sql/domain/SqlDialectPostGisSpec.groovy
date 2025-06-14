@@ -15,6 +15,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import java.time.DateTimeException
+import java.time.ZoneId
 
 class SqlDialectPostGisSpec extends Specification {
 
@@ -29,7 +30,7 @@ class SqlDialectPostGisSpec extends Specification {
             String start = "2008-05-21 13:21:48"
             String end = "2015-12-21 22:17:56"
         when:
-            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, end)
+            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, end, ZoneId.of("UTC"))
         then:
             interval.get().toString() == "2008-05-21T13:21:48Z/2015-12-21T22:17:56Z"
     }
@@ -38,7 +39,7 @@ class SqlDialectPostGisSpec extends Specification {
         given:
             String end = "2015-12-21 22:17:56"
         when:
-            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(null, end)
+            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(null, end, ZoneId.of("UTC"))
         then:
             interval.isEmpty()
     }
@@ -47,14 +48,14 @@ class SqlDialectPostGisSpec extends Specification {
         given:
             String start = "2008-05-21 13:21:48"
         when:
-            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, null)
+            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, null, ZoneId.of("UTC"))
         then:
             interval.get().isUnboundedEnd()
     }
 
     def 'Temporal extent start and end are null'() {
         when:
-            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(null, null)
+            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(null, null, ZoneId.of("UTC"))
         then:
             interval.isEmpty()
     }
@@ -64,7 +65,7 @@ class SqlDialectPostGisSpec extends Specification {
             String end = "2008-05-21 13:21:48"
             String start = "2015-12-21 22:17:56"
         when:
-            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, end)
+            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, end, ZoneId.of("UTC"))
         then:
             thrown(DateTimeException)
     }
@@ -74,7 +75,7 @@ class SqlDialectPostGisSpec extends Specification {
             String end = "2008-05-21"
             String start = "2015-12-21"
         when:
-            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, end)
+            Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(start, end, ZoneId.of("UTC"))
         then:
             thrown(DateTimeException)
     }
@@ -111,7 +112,6 @@ class SqlDialectPostGisSpec extends Specification {
         extent.isPresent() == false
     }
 
-    @Ignore
     def 'Spatial extent and CRS are null'() {
         when:
             Optional<BoundingBox> extent = sqlDialectPostGis.parseExtent(null, null)
@@ -119,7 +119,6 @@ class SqlDialectPostGisSpec extends Specification {
             extent.isEmpty()
     }
 
-    @Ignore
     def 'Spatial extent is present, CRS is null'() {
         given:
             String bbox = "BOX(2.336059,50.664734,7.304131,55.433815)"
@@ -129,7 +128,6 @@ class SqlDialectPostGisSpec extends Specification {
             extent.isEmpty()
     }
 
-    @Ignore
     def 'Spatial extent is null, CRS is present'() {
         given:
             EpsgCrs crs = EpsgCrs.of(4326)

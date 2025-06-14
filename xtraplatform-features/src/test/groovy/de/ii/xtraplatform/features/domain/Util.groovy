@@ -5,6 +5,7 @@ import de.ii.xtraplatform.features.domain.transform.PropertyTransformation
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations
 import de.ii.xtraplatform.features.domain.transform.TokenSliceTransformerChain
 
+import java.time.ZoneId
 import java.util.function.Function
 
 class Util {
@@ -38,7 +39,7 @@ class Util {
             Map<String, List<PropertyTransformation>> getTransformations() {
                 return transformations;
             }
-        }], Map.of(), Optional.empty())
+        }], Map.of(), ZoneId.of("UTC"))
 
         mapper.init(token -> target.add(token))
 
@@ -46,7 +47,7 @@ class Util {
     }
 
     static TokenSliceTransformerChain createSliceTransformerChain(FeatureSchema schema, Map<String, List<PropertyTransformation>> transformations = Map.of()) {
-        return new TokenSliceTransformerChain(transformations, SchemaMapping.of(schema), Function.identity(), Map.of(), Optional.empty())
+        return new TokenSliceTransformerChain(transformations, SchemaMapping.of(schema), Function.identity(), Map.of(), ZoneId.of("UTC"))
     }
 
     static FeatureEventBuffer<

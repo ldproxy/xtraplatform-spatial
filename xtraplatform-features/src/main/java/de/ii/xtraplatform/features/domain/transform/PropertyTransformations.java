@@ -16,7 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -83,9 +82,7 @@ public interface PropertyTransformations {
 
       @Override
       public TransformerChain<String, FeaturePropertyValueTransformer> getValueTransformations(
-          SchemaMapping schemaMapping,
-          Map<String, Codelist> codelists,
-          Optional<ZoneId> defaultTimeZone) {
+          SchemaMapping schemaMapping, Map<String, Codelist> codelists, ZoneId defaultTimeZone) {
         return PropertyTransformations.super.getValueTransformations(
             schemaMapping, codelists, defaultTimeZone, substitutions::get);
       }
@@ -94,7 +91,7 @@ public interface PropertyTransformations {
       public TransformerChain<String, FeaturePropertyValueTransformer> getValueTransformations(
           SchemaMapping schemaMapping,
           Map<String, Codelist> codelists,
-          Optional<ZoneId> defaultTimeZone,
+          ZoneId defaultTimeZone,
           Function<String, String> substitutionLookup) {
         return PropertyTransformations.super.getValueTransformations(
             schemaMapping,
@@ -108,9 +105,7 @@ public interface PropertyTransformations {
 
       @Override
       public TokenSliceTransformerChain getTokenSliceTransformations(
-          SchemaMapping schemaMapping,
-          Map<String, Codelist> codelists,
-          Optional<ZoneId> defaultTimeZone) {
+          SchemaMapping schemaMapping, Map<String, Codelist> codelists, ZoneId defaultTimeZone) {
         return PropertyTransformations.super.getTokenSliceTransformations(
             schemaMapping, substitutions::get, codelists, defaultTimeZone);
       }
@@ -120,7 +115,7 @@ public interface PropertyTransformations {
           SchemaMapping schemaMapping,
           Function<String, String> substitutionLookup,
           Map<String, Codelist> codelists,
-          Optional<ZoneId> defaultTimeZone) {
+          ZoneId defaultTimeZone) {
         return PropertyTransformations.super.getTokenSliceTransformations(
             schemaMapping,
             key ->
@@ -144,9 +139,7 @@ public interface PropertyTransformations {
   }
 
   default TokenSliceTransformerChain getTokenSliceTransformations(
-      SchemaMapping schemaMapping,
-      Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      SchemaMapping schemaMapping, Map<String, Codelist> codelists, ZoneId defaultTimeZone) {
     return new TokenSliceTransformerChain(
         getTransformations(), schemaMapping, key -> null, codelists, defaultTimeZone);
   }
@@ -155,22 +148,20 @@ public interface PropertyTransformations {
       SchemaMapping schemaMapping,
       Function<String, String> substitutionLookup,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      ZoneId defaultTimeZone) {
     return new TokenSliceTransformerChain(
         getTransformations(), schemaMapping, substitutionLookup, codelists, defaultTimeZone);
   }
 
   default TransformerChain<String, FeaturePropertyValueTransformer> getValueTransformations(
-      SchemaMapping schemaMapping,
-      Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone) {
+      SchemaMapping schemaMapping, Map<String, Codelist> codelists, ZoneId defaultTimeZone) {
     return getValueTransformations(schemaMapping, codelists, defaultTimeZone, key -> null);
   }
 
   default TransformerChain<String, FeaturePropertyValueTransformer> getValueTransformations(
       SchemaMapping schemaMapping,
       Map<String, Codelist> codelists,
-      Optional<ZoneId> defaultTimeZone,
+      ZoneId defaultTimeZone,
       Function<String, String> substitutionLookup) {
     return new ValueTransformerChain(
         getTransformations(), schemaMapping, codelists, defaultTimeZone, substitutionLookup);

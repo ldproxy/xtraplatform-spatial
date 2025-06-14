@@ -13,6 +13,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaVisitorTopDown;
+import java.time.ZoneId;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,7 +74,7 @@ public class WithTransformationsApplied
         propertyTransformations.getSchemaTransformations(null, true);
 
     TokenSliceTransformerChain sliceTransformations =
-        propertyTransformations.getTokenSliceTransformations(null, Map.of(), Optional.empty());
+        propertyTransformations.getTokenSliceTransformations(null, Map.of(), ZoneId.of("UTC"));
 
     return schema.accept(schemaTransformations).accept(sliceTransformations);
   }

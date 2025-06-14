@@ -14,6 +14,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -78,7 +79,7 @@ public class SqlDialectGpkg implements SqlDialect {
   }
 
   @Override
-  public Optional<Interval> parseTemporalExtent(String start, String end) {
+  public Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone) {
     if (Objects.isNull(start)) {
       return Optional.empty();
     }

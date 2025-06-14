@@ -7,11 +7,10 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.In;
-import de.ii.xtraplatform.features.domain.SchemaBase;
-import de.ii.xtraplatform.features.domain.SchemaVisitorWithFinalizer;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SortKey.Direction;
 import de.ii.xtraplatform.features.domain.Tuple;
@@ -20,10 +19,12 @@ import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates.ValueQueryTemplate;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings.NullOrder;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryMapping;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryTable;
 import java.sql.Timestamp;
-import java.util.Collection;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -33,30 +34,24 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-public class SqlQueryTemplatesDeriver
-    implements SchemaVisitorWithFinalizer<SchemaSql, List<ValueQueryTemplate>, SqlQueryTemplates> {
+public class SqlQueryTemplatesDeriver {
 
   private static final String SKEY = "SKEY";
   private static final String CSKEY = "CSKEY";
   private static final String TAB = "  ";
 
-  private final SchemaSql queryablesSchema;
   private final SqlDialect sqlDialect;
   private final FilterEncoderSql filterEncoder;
   private final boolean computeNumberMatched;
   private final boolean computeNumberSkipped;
   private final String nullOrder;
-  private final boolean geometryAsWkb;
 
   public SqlQueryTemplatesDeriver(
-      SchemaSql queryablesSchema,
       FilterEncoderSql filterEncoder,
       SqlDialect sqlDialect,
       boolean computeNumberMatched,
       boolean computeNumberSkipped,
-      Optional<NullOrder> nullOrder,
-      boolean geometryAsWkb) {
-    this.queryablesSchema = queryablesSchema;
+      Optional<NullOrder> nullOrder) {
     this.sqlDialect = sqlDialect;
     this.filterEncoder = filterEncoder;
     this.computeNumberMatched = computeNumberMatched;
@@ -69,35 +64,29 @@ public class SqlQueryTemplatesDeriver
                         ? " NULLS FIRST"
                         : " NULLS LAST")
             .orElse("");
-    this.geometryAsWkb = geometryAsWkb;
   }
 
-  @Override
-  public List<ValueQueryTemplate> visit(
-      SchemaSql schema, List<SchemaSql> parents, List<List<ValueQueryTemplate>> visitedProperties) {
+  public SqlQueryTemplates derive(SqlQueryMapping mapping) {
+    SqlQueryMapping readableMapping =
+        new ImmutableSqlQueryMapping.Builder()
+            .from(mapping)
+            .tables(
+                mapping.getTables().stream().filter(SqlQuerySchema::hasReadableColumns).toList())
+            .build();
 
-    Stream<ValueQueryTemplate> current =
-        schema.isObject() && schema.getProperties().stream().anyMatch(SchemaBase::isValue)
-            ? Stream.of(createValueQueryTemplate(schema, parents))
-            : Stream.empty();
+    List<ValueQueryTemplate> valueQueryTemplates =
+        readableMapping.getTables().stream()
+            .map(schema -> createValueQueryTemplate(schema, mapping))
+            .toList();
 
-    return Stream.concat(current, visitedProperties.stream().flatMap(Collection::stream))
-        .collect(Collectors.toList());
-  }
-
-  @Override
-  public SqlQueryTemplates finalize(
-      SchemaSql schema, List<ValueQueryTemplate> valueQueryTemplates) {
     return new ImmutableSqlQueryTemplates.Builder()
-        .metaQueryTemplate(createMetaQueryTemplate(schema))
+        .metaQueryTemplate(createMetaQueryTemplate(mapping.getMainTable(), mapping))
         .valueQueryTemplates(valueQueryTemplates)
-        // .addAllQuerySchemas(schema.getAllObjects())
-        // .sortablesSchema(Optional.ofNullable(queryablesSchema))
-        .mapping(new ImmutableSqlQueryMapping.Builder().build())
+        .mapping(readableMapping)
         .build();
   }
 
-  MetaQueryTemplate createMetaQueryTemplate(SchemaSql schema) {
+  MetaQueryTemplate createMetaQueryTemplate(SqlQuerySchema schema, SqlQueryMapping mapping) {
     return (limit,
         offset,
         skipOffset,
@@ -109,7 +98,7 @@ public class SqlQueryTemplatesDeriver
       String limitAndOffsetSql = sqlDialect.applyToLimitAndOffset(limit, offset);
       String skipOffsetSql = skipOffset > 0 ? sqlDialect.applyToOffset(skipOffset) : "";
       String asIds = sqlDialect.applyToAsIds();
-      Optional<String> filter = getFilter(schema, cqlFilter);
+      Optional<String> filter = getFilter(schema, mapping, cqlFilter);
       String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
 
       String tableName =
@@ -118,12 +107,13 @@ public class SqlQueryTemplatesDeriver
               : schema.getName();
       String table = String.format("%s A", tableName);
       String columns = "";
+
       for (int i = 0; i < additionalSortKeys.size(); i++) {
         SortKey sortKey = additionalSortKeys.get(i);
 
         columns += getSortColumn("A", sortKey, i) + ", ";
       }
-      columns += String.format("A.%s AS " + SKEY, schema.getSortKey().get());
+      columns += String.format("A.%s AS " + SKEY, schema.getSortKey());
       String orderBy = getOrderBy(additionalSortKeys);
       String minMaxColumns = getMinMaxColumns(additionalSortKeys);
 
@@ -141,7 +131,7 @@ public class SqlQueryTemplatesDeriver
           computeNumberMatched
               ? String.format(
                   "SELECT count(*) AS numberMatched FROM (SELECT A.%2$s AS %4$s FROM %1$s A%3$s ORDER BY 1)%5$s",
-                  tableName, schema.getSortKey().get(), where, SKEY, asIds)
+                  tableName, schema.getSortKey(), where, SKEY, asIds)
               : sqlDialect.applyToNoTable(
                   String.format("SELECT %s AS numberMatched", sqlDialect.castToBigInt(-1)));
 
@@ -165,7 +155,7 @@ public class SqlQueryTemplatesDeriver
         : String.format("%s.%s AS CSKEY_%d", alias, sortKey.getField(), i);
   }
 
-  ValueQueryTemplate createValueQueryTemplate(SchemaSql schema, List<SchemaSql> parents) {
+  ValueQueryTemplate createValueQueryTemplate(SqlQuerySchema schema, SqlQueryMapping mapping) {
     return (limit, offset, additionalSortKeys, filter, minMaxKeys, virtualTables) -> {
       boolean isIdFilter =
           filter
@@ -174,17 +164,14 @@ public class SqlQueryTemplatesDeriver
               .isPresent();
       List<String> aliases = AliasGenerator.getAliases(schema);
 
-      SchemaSql rootSchema = parents.isEmpty() ? schema : parents.get(0);
-      Optional<String> sqlFilter = getFilter(rootSchema, filter);
+      SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
+
+      Optional<String> sqlFilter = getFilter(main, mapping, filter);
       Optional<String> whereClause =
           isIdFilter
               ? sqlFilter
               : toWhereClause(
-                  aliases.get(0),
-                  rootSchema.getSortKey().get(),
-                  additionalSortKeys,
-                  minMaxKeys,
-                  sqlFilter);
+                  aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
       Optional<String> pagingClause =
           additionalSortKeys.isEmpty() || (limit == 0 && offset == 0)
               ? Optional.empty()
@@ -194,71 +181,39 @@ public class SqlQueryTemplatesDeriver
                       limit > 0 ? sqlDialect.applyToLimit(limit) : "",
                       offset > 0 ? sqlDialect.applyToOffset(offset) : ""));
 
-      return getTableQuery(
-          schema, whereClause, pagingClause, additionalSortKeys, parents, virtualTables);
+      return getTableQuery(schema, whereClause, pagingClause, additionalSortKeys, virtualTables);
     };
   }
 
   private String getTableQuery(
-      SchemaSql schema,
+      SqlQuerySchema schema,
       Optional<String> whereClause,
       Optional<String> pagingClause,
       List<SortKey> additionalSortKeys,
-      List<SchemaSql> parents,
       Map<String, String> virtualTables) {
-    List<String> aliases = AliasGenerator.getAliases(parents, schema);
+    SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
+    List<String> aliases = AliasGenerator.getAliases(schema);
     String attributeContainerAlias = aliases.get(aliases.size() - 1);
 
-    String mainTableName = parents.isEmpty() ? schema.getName() : parents.get(0).getName();
+    String mainTableName = main.getName();
     if (virtualTables.containsKey(mainTableName)) {
       mainTableName = virtualTables.get(mainTableName);
     }
-    String mainTableSortKey =
-        parents.isEmpty() ? schema.getSortKey().get() : parents.get(0).getSortKey().get();
+    String mainTableSortKey = main.getSortKey();
     String mainTable = String.format("%s %s", mainTableName, aliases.get(0));
-    List<String> sortFields = getSortFields(schema, parents, aliases, additionalSortKeys);
+    List<String> sortFields = getSortFields(schema, aliases, additionalSortKeys);
 
     String columns =
         Stream.concat(
                 sortFields.stream(),
-                schema.accept(new OnlyReturnables()).getProperties().stream()
-                    .filter(SchemaBase::isValue)
+                schema.getColumns().stream()
                     .map(
-                        column -> {
-                          String name =
-                              column.isConstant()
-                                  ? "'"
-                                      + column.getConstantValue().get()
-                                      + "'"
-                                      + " AS "
-                                      + column.getName()
-                                  : getQualifiedColumn(attributeContainerAlias, column.getName());
-                          if (column.isExpression()) {
-                            return sqlDialect.applyToExpression(
-                                attributeContainerAlias,
-                                column.getName(),
-                                column.getSubDecoderPaths(),
-                                column.isSpatial());
-                          }
-                          if (column.isSpatial() && geometryAsWkb) {
-                            return sqlDialect.applyToWkb(
-                                name, column.isForcePolygonCCW(), column.shouldLinearizeCurves());
-                          } else if (column.isSpatial()) {
-                            return sqlDialect.applyToWkt(
-                                name, column.isForcePolygonCCW(), column.shouldLinearizeCurves());
-                          }
-                          if (column.isTemporal()) {
-                            if (column.getType() == SchemaBase.Type.DATE) {
-                              return sqlDialect.applyToDate(name, column.getFormat());
-                            }
-                            return sqlDialect.applyToDatetime(name, column.getFormat());
-                          }
-
-                          return name;
-                        }))
+                        column ->
+                            SqlQueryColumnOperations.getQualifiedColumnResolved(
+                                attributeContainerAlias, column, sqlDialect)))
             .collect(Collectors.joining(", "));
 
-    String join = JoinGenerator.getJoins(schema, parents, aliases, filterEncoder);
+    String join = JoinGenerator.getJoins(schema, aliases, filterEncoder);
 
     String where = whereClause.map(w -> " WHERE " + w).orElse("");
     String paging = pagingClause.filter(p -> join.isEmpty()).orElse("");
@@ -375,33 +330,23 @@ public class SqlQueryTemplatesDeriver
   }
 
   private List<String> getSortFields(
-      SchemaSql schema,
-      List<SchemaSql> parents,
-      List<String> aliases,
-      List<SortKey> additionalSortKeys) {
+      SqlQuerySchema schema, List<String> aliases, List<SortKey> additionalSortKeys) {
 
     final int[] i = {0};
     final int[] j = {0};
     Stream<String> customSortKeys =
         additionalSortKeys.stream().map(sortKey -> getSortColumn(aliases.get(0), sortKey, i[0]++));
 
-    if (!schema.getRelation().isEmpty() || !parents.isEmpty()) {
+    if (!schema.getRelations().isEmpty()) {
       ListIterator<String> aliasesIterator = aliases.listIterator();
 
-      List<String> parentSortKeys =
-          parents.stream()
-              .flatMap(
-                  parent -> {
-                    List<String> keys = parent.getSortKeys(aliasesIterator, true, j[0]);
-                    j[0] += keys.size();
-                    return keys.stream();
-                  })
-              .collect(Collectors.toList());
+      List<String> parentSortKeys = List.of();
 
       return Stream.of(
               customSortKeys,
               parentSortKeys.stream(),
-              schema.getSortKeys(aliasesIterator, false, parentSortKeys.size()).stream())
+              getSortKeys(schema.asTablePath(), aliasesIterator, false, parentSortKeys.size())
+                  .stream())
           .flatMap(s -> s)
           .collect(Collectors.toList());
     } else {
@@ -409,41 +354,32 @@ public class SqlQueryTemplatesDeriver
               customSortKeys,
               Stream.of(
                   String.format(
-                      schema.getSortKeyUnique()
+                      schema.isSortKeyUnique()
                           ? "%s.%s AS SKEY"
                           : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
                       aliases.get(0),
-                      schema.getSortKey().get())))
+                      schema.getSortKey())))
           .collect(Collectors.toList());
     }
   }
 
-  private String getQualifiedColumn(String table, String column) {
-    return column.contains("(")
-        ? column.replaceAll("((?:\\w+\\()+)(\\w+)((?:\\))+)", "$1" + table + ".$2$3 AS $2")
-        : String.format("%s.%s", table, column);
-  }
-
-  private Optional<String> getFilter(SchemaSql schema, Optional<Cql2Expression> userFilter) {
+  private Optional<String> getFilter(
+      SqlQueryTable schema, SqlQueryMapping mapping, Optional<Cql2Expression> userFilter) {
     if (schema.getFilter().isEmpty() && userFilter.isEmpty()) {
       return Optional.empty();
     }
-    SchemaSql queryables = Objects.requireNonNullElse(queryablesSchema, schema);
 
-    if (schema.getFilter().isPresent() && schema.getRelation().isEmpty() && userFilter.isEmpty()) {
-      return Optional.of(filterEncoder.encode(schema.getFilter().get(), queryables));
+    if (schema.getFilter().isPresent() && userFilter.isEmpty()) {
+      return Optional.of(filterEncoder.encode(schema.getFilter().get(), mapping));
     }
-    if (schema.getFilter().isEmpty() && schema.getRelation().isEmpty() && userFilter.isPresent()) {
-      return Optional.of(filterEncoder.encode(userFilter.get(), queryables));
+    if (schema.getFilter().isEmpty() && userFilter.isPresent()) {
+      return Optional.of(filterEncoder.encode(userFilter.get(), mapping));
     }
-    if (schema.getFilter().isPresent()
-        && schema.getRelation().isEmpty()
-        && userFilter.isPresent()) {
+    if (schema.getFilter().isPresent() && userFilter.isPresent()) {
       Cql2Expression mergedFilter = And.of(schema.getFilter().get(), userFilter.get());
 
-      return Optional.of(filterEncoder.encode(mergedFilter, queryables));
+      return Optional.of(filterEncoder.encode(mergedFilter, mapping));
     }
-    // TODO what to do, if schema.getRelation().isPresent() ?
 
     return Optional.empty();
   }
@@ -480,5 +416,43 @@ public class SqlQueryTemplatesDeriver
     }
 
     return minMaxKeys;
+  }
+
+  private List<String> getSortKeys(
+      List<? extends SqlQueryTable> tables,
+      ListIterator<String> aliasesIterator,
+      boolean onlyRelations,
+      int keyIndexStart) {
+    ImmutableList.Builder<String> keys = ImmutableList.builder();
+
+    int keyIndex = keyIndexStart;
+    SqlQueryTable previousRelation = null;
+
+    if (!onlyRelations) {
+      // add key for value table
+      keys.add(
+          String.format(
+              tables.get(0).isSortKeyUnique()
+                  ? "%s.%s AS SKEY"
+                  : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
+              aliasesIterator.next(),
+              tables.get(0).getSortKey()));
+      keyIndex++;
+    }
+
+    for (int i = 1; i < tables.size(); i++) {
+      SqlQueryTable relation = tables.get(i);
+      String alias = aliasesIterator.next();
+
+      if (!(relation instanceof SqlQueryJoin) || !((SqlQueryJoin) relation).isJunction()) {
+        String suffix = keyIndex > 0 ? "_" + keyIndex : "";
+        keys.add(String.format("%s.%s AS SKEY%s", alias, relation.getSortKey(), suffix));
+        keyIndex++;
+      }
+
+      previousRelation = relation;
+    }
+
+    return keys.build();
   }
 }

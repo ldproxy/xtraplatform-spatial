@@ -97,6 +97,18 @@ public interface SqlQueryMapping {
     return getColumnForRole(Role.PRIMARY_GEOMETRY);
   }
 
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForPrimaryInstant() {
+    return getColumnForRole(Role.PRIMARY_INSTANT);
+  }
+
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForPrimaryIntervalStart() {
+    return getColumnForRole(Role.PRIMARY_INTERVAL_START);
+  }
+
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForPrimaryIntervalEnd() {
+    return getColumnForRole(Role.PRIMARY_INTERVAL_END);
+  }
+
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForRole(Role role) {
     return getTables().stream()
         .flatMap(

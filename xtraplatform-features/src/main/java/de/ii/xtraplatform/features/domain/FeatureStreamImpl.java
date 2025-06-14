@@ -25,6 +25,7 @@ import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
+import java.time.ZoneId;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
@@ -212,7 +213,7 @@ public class FeatureStreamImpl implements FeatureStream {
       Map<String, PropertyTransformations> propertyTransformations) {
     FeatureTokenTransformerMappings schemaMapper =
         new FeatureTokenTransformerMappings(
-            propertyTransformations, codelists, data.getNativeTimeZone());
+            propertyTransformations, codelists, data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
 
     Optional<CrsTransformer> crsTransformer =
         query

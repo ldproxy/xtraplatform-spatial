@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import org.threeten.extra.Interval;
 
-public interface AggregateStatsReader<T extends SchemaBase<T>> {
+public interface AggregateStatsReader<T> {
 
   Stream<Long> getCount(List<T> sourceSchemas);
 

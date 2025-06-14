@@ -7,42 +7,49 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.AggregateStatsReader;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
+import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.threeten.extra.Interval;
 
-public class AggregateStatsReaderSql implements AggregateStatsReader<SchemaSql> {
+public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMapping> {
 
   private final Supplier<SqlClient> sqlClient;
   private final AggregateStatsQueryGenerator queryGenerator;
   private final SqlDialect sqlDialect;
   private final EpsgCrs crs;
+  private final ZoneId timeZone;
 
   public AggregateStatsReaderSql(
       Supplier<SqlClient> sqlClient,
       AggregateStatsQueryGenerator queryGenerator,
       SqlDialect sqlDialect,
-      EpsgCrs crs) {
+      EpsgCrs crs,
+      ZoneId timeZone) {
     this.sqlClient = sqlClient;
     this.queryGenerator = queryGenerator;
     this.sqlDialect = sqlDialect;
     this.crs = crs;
+    this.timeZone = timeZone;
   }
 
   @Override
-  public Stream<Long> getCount(List<SchemaSql> sourceSchemas) {
+  public Stream<Long> getCount(List<SqlQueryMapping> sourceSchemas) {
     return Reactive.Source.iterable(sourceSchemas)
         .via(
             Reactive.Transformer.flatMap(
@@ -57,12 +64,13 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SchemaSql> 
 
   @Override
   public Stream<Optional<BoundingBox>> getSpatialExtent(
-      List<SchemaSql> sourceSchemas, boolean is3d) {
+      List<SqlQueryMapping> sourceSchemas, boolean is3d) {
     return Source.iterable(sourceSchemas)
         .via(
             Transformer.flatMap(
-                main -> {
-                  Optional<SchemaSql> spatial = main.getPrimaryGeometryParent();
+                mapping -> {
+                  Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> spatial =
+                      mapping.getColumnForPrimaryGeometry();
 
                   if (spatial.isEmpty()) {
                     return Source.empty();
@@ -71,7 +79,8 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SchemaSql> 
                   return sqlClient
                       .get()
                       .getSourceStream(
-                          queryGenerator.getSpatialExtentQuery(main, spatial.get(), is3d),
+                          queryGenerator.getSpatialExtentQuery(
+                              mapping, spatial.get().first(), spatial.get().second(), is3d),
                           SqlQueryOptions.single());
                 }))
         .via(
@@ -93,29 +102,37 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SchemaSql> 
   }
 
   @Override
-  public Stream<Optional<Interval>> getTemporalExtent(List<SchemaSql> sourceSchemas) {
+  public Stream<Optional<Interval>> getTemporalExtent(List<SqlQueryMapping> sourceSchemas) {
     return Source.iterable(sourceSchemas)
         .via(
             Transformer.flatMap(
-                main -> {
-                  if (main.getPrimaryInstantParent().isPresent()) {
+                mapping -> {
+                  Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> instant =
+                      mapping.getColumnForPrimaryInstant();
+
+                  if (instant.isPresent()) {
                     return sqlClient
                         .get()
                         .getSourceStream(
                             queryGenerator.getTemporalExtentQuery(
-                                main, main.getPrimaryInstantParent().get()),
+                                mapping, instant.get().first(), instant.get().second()),
                             SqlQueryOptions.tuple());
                   }
+                  Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> intervalStart =
+                      mapping.getColumnForPrimaryIntervalStart();
+                  Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> intervalEnd =
+                      mapping.getColumnForPrimaryIntervalEnd();
 
-                  if (main.getPrimaryIntervalStartParent().isPresent()
-                      && main.getPrimaryIntervalEndParent().isPresent()) {
+                  if (intervalStart.isPresent() && intervalEnd.isPresent()) {
                     return sqlClient
                         .get()
                         .getSourceStream(
                             queryGenerator.getTemporalExtentQuery(
-                                main,
-                                main.getPrimaryIntervalStartParent().get(),
-                                main.getPrimaryIntervalEndParent().get()),
+                                mapping,
+                                intervalStart.get().first(),
+                                intervalStart.get().second(),
+                                intervalEnd.get().first(),
+                                intervalEnd.get().second()),
                             SqlQueryOptions.tuple());
                   }
 
@@ -125,7 +142,9 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SchemaSql> 
             Transformer.map(
                 sqlRow ->
                     sqlDialect.parseTemporalExtent(
-                        (String) sqlRow.getValues().get(0), (String) sqlRow.getValues().get(1))))
+                        (String) sqlRow.getValues().get(0),
+                        (String) sqlRow.getValues().get(1),
+                        timeZone)))
         .to(
             Reactive.Sink.reduce(
                 Optional.empty(),
