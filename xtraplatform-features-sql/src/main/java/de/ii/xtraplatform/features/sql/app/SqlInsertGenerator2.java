@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
-import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase;
@@ -86,15 +85,15 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
 
     Set<String> columns0 =
         schema.getWritableColumns().stream()
-            // TODO: filter out mutations.ignore=true
-            // TODO: filter out primaryKey if not mutations.ignore=false
-            .filter(col -> !Objects.equals(col.getName(), primaryKey))
+            .filter(
+                col ->
+                    !Objects.equals(col.getName(), primaryKey)
+                        || schema.getStaticInserts().containsKey(primaryKey))
             // TODO: in deriver
             .filter(col -> !col.hasOperation(Operation.CONSTANT))
             .map(SqlQueryColumn::getName)
             .collect(ImmutableSet.toImmutableSet());
 
-    // TODO: add id if present
     Set<String> columns =
         idProperty.isPresent() && id.isPresent()
             ? ImmutableSet.<String>builder()
@@ -103,13 +102,9 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
                 .build()
             : columns0;
 
-    // TODO: from Syntax
     List<String> columns2 =
-        Stream.concat(columns.stream() /*.map(
-            col ->
-                col.startsWith("ST_AsText(ST_ForcePolygonCCW(")
-                    ? col.substring("ST_AsText(ST_ForcePolygonCCW(".length(), col.length() - 2)
-                    : col)*/, schema.getStaticInserts().keySet().stream())
+        Stream.concat(columns.stream(), schema.getStaticInserts().keySet().stream())
+            .distinct()
             .collect(Collectors.toList());
 
     List<String> sortKeys = new ArrayList<>();
@@ -169,20 +164,12 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       return () -> Tuple.of(null, null);
     }
 
-    // TODO: crs can be null, refactor FeatureProviderSql2.createFeatures
-    Optional<CrsTransformer> crsTransformer =
-        Objects.nonNull(crs)
-            ? crsTransformerFactory.getTransformer(crs, nativeCrs)
-            : Optional.empty();
-
     return () -> {
-
-      // TODO: pass id to getValues if given
       String values =
           getColumnValues(
               sortKeys,
-              columns,
-              currentRow.get().getValues(), // TODO .getValues(crsTransformer, nativeCrs),
+              columns2,
+              currentRow.get().getValues(),
               currentRow.get().getIds(),
               parentRow.isPresent() ? parentRow.get().getIds() : Map.of(),
               valueOverrides,
@@ -307,7 +294,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
   // TODO: separate column and id column names
   String getColumnValues(
       List<String> idKeys,
-      Set<String> columnNames,
+      List<String> columnNames,
       Map<String, String> values,
       Map<String, String> ids,
       Map<String, String> parentIds,
@@ -315,24 +302,25 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       Map<String, String> staticInserts) {
 
     return Stream.concat(
-            Stream.concat(
-                idKeys.stream()
-                    .map(key -> parentIds.containsKey(key) ? parentIds.get(key) : ids.get(key)),
-                columnNames.stream()
-                    .map(
-                        name -> {
-                          // TODO: value transformer?
-                          if (name.startsWith("ST_AsText(ST_ForcePolygonCCW(")) {
-                            return String.format(
-                                "ST_ForcePolygonCW(ST_GeomFromText(%s,25832))",
-                                values.get(name)); // TODO srid from config
-                          }
-                          if (valueOverrides.containsKey(name)) {
-                            return valueOverrides.get(name);
-                          }
-                          return values.get(name);
-                        })),
-            staticInserts.values().stream())
+            idKeys.stream()
+                .map(key -> parentIds.containsKey(key) ? parentIds.get(key) : ids.get(key)),
+            columnNames.stream()
+                .map(
+                    name -> {
+                      // TODO: value transformer?
+                      if (name.startsWith("ST_AsText(ST_ForcePolygonCCW(")) {
+                        return String.format(
+                            "ST_ForcePolygonCW(ST_GeomFromText(%s,25832))",
+                            values.get(name)); // TODO srid from config
+                      }
+                      if (valueOverrides.containsKey(name)) {
+                        return valueOverrides.get(name);
+                      }
+                      if (staticInserts.containsKey(name)) {
+                        return staticInserts.get(name);
+                      }
+                      return values.get(name);
+                    }))
         .collect(Collectors.joining(","));
   }
 }

@@ -14,7 +14,6 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase;
-import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
 import de.ii.xtraplatform.features.json.domain.JsonBuilder;
@@ -318,12 +317,6 @@ public class FeatureEncoderSql
                   needsQuotes && Objects.nonNull(context.value())
                       ? String.format("'%s'", context.value().replaceAll("'", "''"))
                       : context.value();
-
-              if (column.second().getRole().isPresent()
-                  && column.second().getRole().get() == Role.ID
-                  && column.second().getType() == SchemaBase.Type.STRING) {
-                value = "gen_random_uuid()";
-              }
 
               currentFeature.addColumn(column.first(), column.second(), value);
 
