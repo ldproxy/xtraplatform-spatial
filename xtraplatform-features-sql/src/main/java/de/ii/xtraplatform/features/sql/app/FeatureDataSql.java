@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import de.ii.xtraplatform.base.domain.util.Tuple;
+import de.ii.xtraplatform.features.domain.FeatureTransactions;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
@@ -20,9 +21,13 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.immutables.value.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Value.Modifiable
 public interface FeatureDataSql {
+
+  Logger LOGGER = LoggerFactory.getLogger(FeatureDataSql.class);
 
   SqlQueryMapping getMapping();
 
@@ -101,8 +106,51 @@ public interface FeatureDataSql {
     return getRows().get(getStack().get(getStack().size() - 1).second().get()).second();
   }
 
-  // TODO: implement PATCH
+  // NOTE: json columns work using special handling in the encoder, the patch is applied to original
   default FeatureDataSql patchWith(FeatureDataSql partial) {
+    // joins not supported yet
+    if (getRows().size() == 1 && partial.getRows().size() == 1) {
+      ModifiableFeatureDataSql merged = ModifiableFeatureDataSql.create().from(this);
+
+      for (Tuple<SqlQuerySchema, ModifiableSqlRowData> row : partial.getRows()) {
+        Optional<Tuple<SqlQuerySchema, ModifiableSqlRowData>> original =
+            merged.getRows().stream()
+                .filter(o -> Objects.equals(o.first().getFullPath(), row.first().getFullPath()))
+                .findFirst();
+
+        if (original.isEmpty()) {
+          continue;
+        }
+
+        Map<String, String> originalValues = original.get().second().getValues();
+        Map<String, String> patchValues = row.second().getValues();
+
+        for (String prop : patchValues.keySet()) {
+          Optional<SqlQueryColumn> column = row.first().findColumn(prop);
+
+          if (column.isEmpty()) {
+            continue; // skip if column does not exist in the schema
+          }
+
+          String newValue = patchValues.get(prop);
+
+          if (Objects.equals(newValue, FeatureTransactions.PATCH_NULL_VALUE)
+              || Objects.equals(newValue, "'" + FeatureTransactions.PATCH_NULL_VALUE + "'")) {
+            originalValues.remove(prop);
+            continue;
+          }
+
+          originalValues.put(prop, newValue);
+        }
+      }
+
+      return merged;
+    }
+
+    LOGGER.warn(
+        "Patch is not supported for type '{}': the mapping contains joins",
+        getMapping().getMainSchema().getName());
+
     return this;
   }
 

@@ -55,6 +55,7 @@ public class FeatureEncoderSql
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<String> nullValue;
   private Map<String, JsonBuilder> jsonColumns;
+  private final boolean isPatch;
   private final boolean trace;
 
   private ModifiableFeatureDataSql currentFeature;
@@ -74,6 +75,7 @@ public class FeatureEncoderSql
     this.nativeCrs = nativeCrs;
     this.nullValue = nullValue;
     this.jsonColumns = new LinkedHashMap<>();
+    this.isPatch = nullValue.isPresent();
     this.trace = false;
   }
 
@@ -92,7 +94,10 @@ public class FeatureEncoderSql
     currentFeature = ModifiableFeatureDataSql.create().setMapping(mapping);
     currentFeature.addRow(mapping.getMainTable());
     currentGeometry = null;
-    jsonColumns.clear();
+    if (!isPatch) {
+      currentJsonColumn = null;
+      jsonColumns.clear();
+    }
     if (trace) LOGGER.debug("onFeatureStart: {}", context.pathAsString());
   }
 
