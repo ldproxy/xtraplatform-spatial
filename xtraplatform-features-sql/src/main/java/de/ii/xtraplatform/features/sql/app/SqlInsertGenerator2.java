@@ -102,10 +102,11 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
                 .build()
             : columns0;
 
-    List<String> columns2 =
+    Set<String> columns1 =
         Stream.concat(columns.stream(), schema.getStaticInserts().keySet().stream())
-            .distinct()
-            .collect(Collectors.toList());
+            .collect(Collectors.toSet());
+
+    List<String> columns2 = new ArrayList<>(columns1);
 
     List<String> sortKeys = new ArrayList<>();
 
@@ -143,13 +144,13 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
         " RETURNING "
             + (parentRelation.isPresent() && schema.isOne2N()
                 ? " null"
-                : idProperty.isPresent() ? idProperty.get().getName() : primaryKey);
+                : /*idProperty.isPresent() ? idProperty.get().getName() :*/ primaryKey);
     Optional<String> returningName =
         parentRelation.isPresent() && schema.isOne2N()
             ? Optional.empty()
-            : idProperty.isPresent()
-                ? Optional.of(tableName + "." + idProperty.get().getName())
-                : Optional.of(tableName + "." + primaryKey);
+            : /*idProperty.isPresent()
+              ? Optional.of(tableName + "." + idProperty.get().getName())
+              :*/ Optional.of(tableName + "." + primaryKey);
     boolean returningNeedsQuotes =
         idProperty.isPresent()
             && (idProperty.get().getType() == SchemaBase.Type.STRING
@@ -168,7 +169,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       String values =
           getColumnValues(
               sortKeys,
-              columns2,
+              columns1,
               currentRow.get().getValues(),
               currentRow.get().getIds(),
               parentRow.isPresent() ? parentRow.get().getIds() : Map.of(),
@@ -267,34 +268,39 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       throw new IllegalArgumentException();
     }*/
 
-    SqlQueryJoin relation = schema.getRelations().get(0);
+    List<SqlQueryJoin> joins = schema.getRelations();
 
-    String table = relation.getName();
-    String refKey = String.format("%s.%s", table, relation.getSourceField());
-    String column = relation.getSourceField();
-    String columnKey = String.format("%s.%s", relation.getTarget(), relation.getTargetField());
+    String table = joins.get(0).getName();
+    String column = joins.get(0).getSourceField();
+    String columnKey = joins.get(0).getTargetField();
+    String idColumn = schema.getSortKey(); // TODO: primary key
+    String idKey = String.format("%s.%s", table, joins.get(0).getSortKey()); // TODO: primary key
 
+    Optional<SqlRowData> parentRow =
+        feature.getRow(schema.getParentPath(), parentRows.subList(0, 1));
     Optional<SqlRowData> currentRow = feature.getRow(schema.getFullPath(), parentRows);
 
     if (currentRow.isEmpty() || currentRow.get().isEmpty()) {
       return () -> Tuple.of(null, null);
     }
 
-    Map<String, String> ids = currentRow.get().getIds();
+    return () -> {
+      Map<String, String> parentIds = parentRow.isPresent() ? parentRow.get().getIds() : Map.of();
+      Map<String, String> values = currentRow.get().getValues();
 
-    return () ->
-        Tuple.of(
-            String.format(
-                "UPDATE %s SET %s=%s WHERE id=%s RETURNING null;",
-                table, column, ids.get(columnKey), ids.get(refKey)),
-            id -> {});
+      return Tuple.of(
+          String.format(
+              "UPDATE %s SET %s=%s WHERE %s=%s RETURNING null;",
+              table, column, values.get(columnKey), idColumn, parentIds.get(idKey)),
+          id -> {});
+    };
   }
 
   // TODO: from syntax
   // TODO: separate column and id column names
   String getColumnValues(
       List<String> idKeys,
-      List<String> columnNames,
+      Set<String> columnNames,
       Map<String, String> values,
       Map<String, String> ids,
       Map<String, String> parentIds,

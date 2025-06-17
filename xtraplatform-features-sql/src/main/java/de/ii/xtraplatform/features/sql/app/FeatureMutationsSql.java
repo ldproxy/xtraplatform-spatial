@@ -12,6 +12,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
+import de.ii.xtraplatform.features.sql.domain.SqlPathDefaults;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
@@ -35,10 +36,15 @@ public class FeatureMutationsSql {
 
   private final Supplier<SqlClient> sqlClient;
   private final FeatureStoreInsertGenerator generator;
+  private final SqlPathDefaults sqlPathDefaults;
 
-  public FeatureMutationsSql(Supplier<SqlClient> sqlClient, FeatureStoreInsertGenerator generator) {
+  public FeatureMutationsSql(
+      Supplier<SqlClient> sqlClient,
+      FeatureStoreInsertGenerator generator,
+      SqlPathDefaults sqlPathDefaults) {
     this.sqlClient = sqlClient;
     this.generator = generator;
+    this.sqlPathDefaults = sqlPathDefaults;
   }
 
   public Reactive.Transformer<FeatureDataSql, String> getCreatorFlow(
@@ -46,11 +52,15 @@ public class FeatureMutationsSql {
 
     RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
 
+    String primaryKey =
+        schema.getMainTable().getPrimaryKey().orElse(sqlPathDefaults.getPrimaryKey());
+
     return sqlClient
         .get()
         .getMutationFlow(
             feature -> createInstanceInserts(feature, rowCursor, Optional.empty(), crs),
             executionContext,
+            primaryKey,
             Optional.empty());
   }
 
@@ -59,11 +69,15 @@ public class FeatureMutationsSql {
 
     RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
 
+    String primaryKey =
+        schema.getMainTable().getPrimaryKey().orElse(sqlPathDefaults.getPrimaryKey());
+
     return sqlClient
         .get()
         .getMutationFlow(
             feature -> createInstanceInserts(feature, rowCursor, Optional.of(id), crs),
             executionContext,
+            primaryKey,
             Optional.of(id));
   }
 
@@ -190,14 +204,14 @@ public class FeatureMutationsSql {
     ImmutableList.Builder<Supplier<Tuple<String, Consumer<String>>>> queries =
         ImmutableList.builder();
 
-    if (schema.isRoot() || !schema.isJunctionReference()) {
+    if (schema.isRoot() || (!schema.isJunctionReference() && !schema.isOne2One())) {
       queries.add(generator.createInsert(feature, schema, parentRows, id, crs));
     }
 
     if (schema.isM2N()) {
       queries.add(generator.createJunctionInsert(feature, schema, parentRows));
-    } else if (schema.isOne2OneWithForeignKey()) {
-      // TODO queries.add(generator.createForeignKeyUpdate(feature, schema, parentRows));
+    } else if (schema.isOne2One() /*WithForeignKey()*/) {
+      queries.add(generator.createForeignKeyUpdate(feature, schema, parentRows));
     }
 
     return queries.build();
