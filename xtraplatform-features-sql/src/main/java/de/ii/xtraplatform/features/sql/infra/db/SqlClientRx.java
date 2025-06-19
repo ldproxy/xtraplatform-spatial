@@ -199,15 +199,7 @@ public class SqlClientRx implements SqlClient {
     }
 
     Flowable<? extends Tx<?>> txFlowable =
-        // TODO: when implementing crud for joins, check if bug in rxjava3-jdbc still exists:
-        //  when using returnGeneratedKeys, TransactedConnection.commit is called too often,
-        //  therefore close is never called because counter < 0
-
-        // for update/replace, the first statement is always delete, so we can skip the
-        // returnGeneratedKeys
-        /*statements.size() == 2
-        ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
-        :*/ session
+        session
             .update(first)
             .transacted()
             .returnGeneratedKeys()
