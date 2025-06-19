@@ -198,6 +198,9 @@ import org.threeten.extra.Interval;
  *     NOT NULL AND anzahl>0}`
  *     <p>A non-default sort key can be set by adding `{sortKey=columnName}` after the table name.
  *     If that sort key is not unique, add `{sortKeyUnique=false}`.
+ *     <p>Additional columns for CRUD inserts can be set by adding `{inserts=columnName=value}`
+ *     after the table name. The value may be a constant or a function, for example
+ *     `{inserts=id=gen_random_uuid()&featuretype='type1'}`.
  *     <p>All table and column names must be unquoted identifiers.
  *     <p>Arbitrary SQL expressions for values are supported, for example to apply function calls.
  *     As an example, this `[EXPRESSION]{sql=$T$.length+55.5}` (instead of just `length`) would add
@@ -247,6 +250,9 @@ import org.threeten.extra.Interval;
  *     `{sortKeyUnique=false}` hinzugefügt werden.
  *     <p>Ein vom Standard abweichender `primaryKey` kann durch den Zusatz von
  *     `{primaryKey=Spaltenname}` nach dem Tabellennamen angegeben werden.
+ *     <p>Zusätzliche Spalten für CRUD Inserts können durch den Zusatz `{inserts=Spaltenname=Wert}`
+ *     nach dem Tabellennamen angegeben werden. Der Wert kann eine Konstante oder eine Funktion
+ *     sein, z.B. `{inserts=id=gen_random_uuid()&featuretype='type1'}`.
  *     <p>Alle Tabellen- und Spaltennamen müssen "unquoted Identifier" sein.
  *     <p>Beliebige SQL-Ausdrücke für Werte sind möglich, z.B. um Funktionsaufrufe anzuwenden. So
  *     würde z.B. dieser Ausdruck `[EXPRESSION]{sql=$T$.length+55.5}` (anstatt nur `length`) einen
