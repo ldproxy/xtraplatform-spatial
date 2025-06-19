@@ -397,6 +397,7 @@ public class SqlMappingDeriver {
                 writableColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
             .relations(getJoins(sqlPath, previous))
             .staticInserts(sqlPath.getStaticInserts())
+            .role(table.getRole())
             .build();
 
     return querySchema;

@@ -240,7 +240,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
               ? parentIds.get(sourceIdColumn)
               : ids.get(sourceIdColumn);
       String targetId =
-          schema.isJunctionReference()
+          schema.isReference()
               ? currentRow.get().getValues().get(joins.get(1).getTargetField())
               : ids.get(targetIdColumn);
 

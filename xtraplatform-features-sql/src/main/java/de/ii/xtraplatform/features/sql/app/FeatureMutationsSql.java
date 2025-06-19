@@ -204,13 +204,13 @@ public class FeatureMutationsSql {
     ImmutableList.Builder<Supplier<Tuple<String, Consumer<String>>>> queries =
         ImmutableList.builder();
 
-    if (schema.isRoot() || (!schema.isJunctionReference() && !schema.isOne2One())) {
+    if (schema.isRoot() || !schema.isReference() || (schema.isReference() && schema.isOne2N())) {
       queries.add(generator.createInsert(feature, schema, parentRows, id, crs));
     }
 
     if (schema.isM2N()) {
       queries.add(generator.createJunctionInsert(feature, schema, parentRows));
-    } else if (schema.isOne2One() /*WithForeignKey()*/) {
+    } else if (schema.isOne2One() && schema.isReference()) {
       queries.add(generator.createForeignKeyUpdate(feature, schema, parentRows));
     }
 
