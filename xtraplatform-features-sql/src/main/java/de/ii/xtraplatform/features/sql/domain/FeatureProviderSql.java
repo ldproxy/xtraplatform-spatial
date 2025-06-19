@@ -1171,6 +1171,7 @@ public class FeatureProviderSql
                     crs,
                     getNativeCrs(),
                     crsTransformerFactory,
+                    getData().getNativeTimeZone(),
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
             .via(Transformer.map(feature -> (FeatureDataSql) feature));
 

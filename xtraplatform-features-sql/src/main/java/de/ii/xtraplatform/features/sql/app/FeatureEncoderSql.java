@@ -14,6 +14,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
 import de.ii.xtraplatform.features.json.domain.JsonBuilder;
@@ -29,6 +30,10 @@ import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +57,7 @@ public class FeatureEncoderSql
   private final SqlQueryMapping mapping;
   private final EpsgCrs nativeCrs;
   private final Optional<CrsTransformer> crsTransformer;
+  private final Optional<ZoneId> timeZone;
   private final Optional<String> nullValue;
   private Map<String, JsonBuilder> jsonColumns;
   private final boolean isPatch;
@@ -68,10 +74,12 @@ public class FeatureEncoderSql
       EpsgCrs inputCrs,
       EpsgCrs nativeCrs,
       CrsTransformerFactory crsTransformerFactory,
+      Optional<ZoneId> timeZone,
       Optional<String> nullValue) {
     this.mapping = mapping;
     this.crsTransformer = crsTransformerFactory.getTransformer(inputCrs, nativeCrs);
     this.nativeCrs = nativeCrs;
+    this.timeZone = timeZone;
     this.nullValue = nullValue;
     this.jsonColumns = new LinkedHashMap<>();
     this.isPatch = nullValue.isPresent();
@@ -293,11 +301,16 @@ public class FeatureEncoderSql
         .or(() -> "id".equals(context.pathAsString()) ? mapping.getColumnForId() : Optional.empty())
         .ifPresentOrElse(
             column -> {
+              String value = context.value();
+
+              if (timeZone.isPresent()
+                  && column.second().getType() == Type.DATETIME
+                  && Objects.nonNull(value)) {
+                value = toTimeZone(context.pathAsString(), value, timeZone.get(), trace);
+              }
+
               if (checkJson(column)) {
-                String value =
-                    Objects.nonNull(context.value())
-                        ? context.value().replaceAll("'", "''")
-                        : context.value();
+                value = Objects.nonNull(value) ? value.replaceAll("'", "''") : value;
                 // TODO: does this use the sql name or json name?
                 currentJson.addValue(context.path(), value);
 
@@ -313,10 +326,10 @@ public class FeatureEncoderSql
               && schemaSql.getValueType().orElse(SchemaBase.Type.STRING)
               == SchemaBase.Type.STRING)*/
 
-              String value =
-                  needsQuotes && Objects.nonNull(context.value())
-                      ? String.format("'%s'", context.value().replaceAll("'", "''"))
-                      : context.value();
+              value =
+                  needsQuotes && Objects.nonNull(value)
+                      ? String.format("'%s'", value.replaceAll("'", "''"))
+                      : value;
 
               currentFeature.addColumn(column.first(), column.second(), value);
 
@@ -352,6 +365,31 @@ public class FeatureEncoderSql
       }
     }
     return false;
+  }
+
+  private static String toTimeZone(String path, String value, ZoneId timeZone, boolean trace) {
+    try {
+      DateTimeFormatter parser = DateTimeFormatter.ISO_DATE_TIME;
+
+      LocalDateTime ta = parser.parse(value, LocalDateTime::from);
+
+      ZonedDateTime instant = ta.atZone(ZoneId.of("UTC")).withZoneSameInstant(timeZone);
+
+      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+      String newValue = formatter.format(instant) + "Z";
+
+      if (trace) {
+        LOGGER.debug(
+            "onValue: {} transformed datetime value from '{}' to '{}'", path, value, newValue);
+      }
+
+      return newValue;
+    } catch (Throwable e) {
+      LOGGER.warn("Error while parsing datetime value for {}: {}", path, e.getMessage());
+    }
+
+    return value;
   }
 
   private static String toWkt(
