@@ -11,7 +11,6 @@ import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransf
 import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerDateFormat.DATE_FORMAT;
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.base.domain.ETag;
 import de.ii.xtraplatform.codelists.domain.Codelist;
@@ -26,7 +25,6 @@ import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import java.time.ZoneId;
-import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -281,11 +279,11 @@ public class FeatureStreamImpl implements FeatureStream {
 
     if (typeQuery instanceof FeatureQuery
         && ((FeatureQuery) typeQuery).getSchemaScope() == SchemaBase.Scope.RECEIVABLE) {
-      return () -> getProviderTransformationsMutations(featureSchema);
+      return () -> getProviderTransformations(featureSchema, SchemaBase.Scope.RECEIVABLE);
     }
 
     PropertyTransformations providerTransformations =
-        () -> getProviderTransformations(featureSchema);
+        () -> getProviderTransformations(featureSchema, SchemaBase.Scope.RETURNABLE);
 
     PropertyTransformations merged =
         propertyTransformations
@@ -336,58 +334,44 @@ public class FeatureStreamImpl implements FeatureStream {
   }
 
   private Map<String, List<PropertyTransformation>> getProviderTransformations(
-      FeatureSchema featureSchema) {
+      FeatureSchema featureSchema, SchemaBase.Scope scope) {
     return featureSchema
-        .accept(AbstractFeatureProvider.WITH_SCOPE_RETURNABLE)
+        .accept(
+            scope == SchemaBase.Scope.RECEIVABLE
+                ? AbstractFeatureProvider.WITH_SCOPE_RECEIVABLE
+                : AbstractFeatureProvider.WITH_SCOPE_RETURNABLE)
         .accept(
             (schema, visitedProperties) ->
                 java.util.stream.Stream.concat(
-                        schema.getTransformations().isEmpty()
-                            ? schema.isTemporal()
-                                ? java.util.stream.Stream.of(
-                                    new AbstractMap.SimpleImmutableEntry<
-                                        String, List<PropertyTransformation>>(
-                                        String.join(".", schema.getFullPath()),
-                                        ImmutableList.of(
-                                            new ImmutablePropertyTransformation.Builder()
-                                                .dateFormat(
-                                                    schema.getType() == SchemaBase.Type.DATETIME
-                                                        ? DATETIME_FORMAT
-                                                        : DATE_FORMAT)
-                                                .build())))
-                                : java.util.stream.Stream.empty()
-                            : java.util.stream.Stream.of(
-                                new AbstractMap.SimpleImmutableEntry<
-                                    String, List<PropertyTransformation>>(
-                                    schema.getFullPath().isEmpty()
-                                        ? WILDCARD
-                                        : String.join(".", schema.getFullPath()),
-                                    schema.getTransformations())),
+                        getProviderTransformationsForProperty(schema, scope),
                         visitedProperties.stream().flatMap(m -> m.entrySet().stream()))
                     .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
   }
 
-  private Map<String, List<PropertyTransformation>> getProviderTransformationsMutations(
-      FeatureSchema featureSchema) {
-    return featureSchema
-        .accept(AbstractFeatureProvider.WITH_SCOPE_RECEIVABLE)
-        .accept(
-            (schema, visitedProperties) ->
-                java.util.stream.Stream.concat(
-                        schema.isTemporal()
-                            ? java.util.stream.Stream.of(
-                                new AbstractMap.SimpleImmutableEntry<
-                                    String, List<PropertyTransformation>>(
-                                    String.join(".", schema.getFullPath()),
-                                    ImmutableList.of(
-                                        new ImmutablePropertyTransformation.Builder()
-                                            .dateFormat(
-                                                schema.getType() == SchemaBase.Type.DATETIME
-                                                    ? DATETIME_FORMAT
-                                                    : DATE_FORMAT)
-                                            .build())))
-                            : java.util.stream.Stream.empty(),
-                        visitedProperties.stream().flatMap(m -> m.entrySet().stream()))
-                    .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
+  private java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
+      getProviderTransformationsForProperty(FeatureSchema schema, SchemaBase.Scope scope) {
+    if (schema.getTransformations().isEmpty()) {
+      if (schema.isTemporal()) {
+        return java.util.stream.Stream.of(
+            Map.entry(
+                schema.getFullPathAsString(),
+                List.of(
+                    new ImmutablePropertyTransformation.Builder()
+                        .dateFormat(
+                            schema.getType() == SchemaBase.Type.DATETIME
+                                ? DATETIME_FORMAT
+                                : DATE_FORMAT)
+                        .build())));
+      }
+      return java.util.stream.Stream.empty();
+    }
+
+    return java.util.stream.Stream.of(
+        Map.entry(
+            schema.getFullPath().isEmpty() ? WILDCARD : schema.getFullPathAsString(),
+            schema.getTransformations().stream()
+                // TODO: mark transformations with scope?
+                .filter(pt -> scope != SchemaBase.Scope.RECEIVABLE || pt.getWrap().isPresent())
+                .toList()));
   }
 }

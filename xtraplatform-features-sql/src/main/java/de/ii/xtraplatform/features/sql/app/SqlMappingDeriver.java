@@ -217,11 +217,6 @@ public class SqlMappingDeriver {
       }
       SqlQueryColumn column1 = querySchema.getWritableColumns().get(k);
 
-      // ignoring joins for now
-      if (!Objects.equals(ROOT_TARGET, tableRule.getTarget())) {
-        continue;
-      }
-
       if (column1.hasOperation(SqlQueryColumn.Operation.CONSTANT)) {
         continue;
       }
@@ -402,6 +397,7 @@ public class SqlMappingDeriver {
                 writableColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
             .relations(getJoins(sqlPath, previous))
             .staticInserts(sqlPath.getStaticInserts())
+            .role(table.getRole())
             .build();
 
     return querySchema;

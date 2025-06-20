@@ -23,9 +23,9 @@ public interface SqlPathDefaults {
 
   /**
    * @langEn The default column that is used for join analysis if no differing primary key is set in
-   *     the [sourcePath](#path-syntax).
+   *     the [sourcePath](#path-syntax). Only relevant for CRUD.
    * @langDe Die Standard-Spalte die zur Analyse von Joins verwendet wird, wenn keine abweichende
-   *     Spalte in `sourcePath` gesetzt wird.
+   *     Spalte in `sourcePath` gesetzt wird. Nur relevant für CRUD.
    * @default `id`
    */
   @Value.Default

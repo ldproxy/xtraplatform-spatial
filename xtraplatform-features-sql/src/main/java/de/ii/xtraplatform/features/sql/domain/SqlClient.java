@@ -29,11 +29,13 @@ public interface SqlClient extends SqlClientBasic {
   Reactive.Source<String> getMutationSource(
       List<Supplier<String>> statements,
       List<Consumer<String>> idConsumers,
-      Object executionContext);
+      Object executionContext,
+      Optional<String> featureId);
 
   Transformer<FeatureDataSql, String> getMutationFlow(
       Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
       Object executionContext,
+      String primaryKey,
       Optional<String> id);
 
   List<String> getNotifications(Connection connection);

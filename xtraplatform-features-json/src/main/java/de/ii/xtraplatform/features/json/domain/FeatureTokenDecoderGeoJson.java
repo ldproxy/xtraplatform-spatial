@@ -389,7 +389,7 @@ public class FeatureTokenDecoderGeoJson
             downstream.onValue(context);
 
             // feature id
-            if (Objects.equals(currentName, "id")) {
+            if (Objects.equals(context.pathAsString(), "id")) {
               context.pathTracker().track(0);
             }
             // why reset depth?
