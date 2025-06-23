@@ -197,9 +197,16 @@ public class FeatureDecoderSql
       this.currentId = featureId;
     }
 
-    handleNesting(sqlRow, multiplicityTracker.getMultiplicitiesForPath(sqlRow.getPath()));
+    List<Integer> multiplicitiesForPath =
+        multiplicityTracker.getMultiplicitiesForPath(sqlRow.getPath());
 
-    handleColumns(sqlRow);
+    handleNesting(sqlRow, multiplicitiesForPath);
+
+    boolean isFirstRowForPath =
+        multiplicitiesForPath.isEmpty()
+            || multiplicitiesForPath.get(multiplicitiesForPath.size() - 1) == 1;
+
+    handleColumns(sqlRow, isFirstRowForPath);
 
     if (!isAtLeastOneFeatureWritten) {
       this.isAtLeastOneFeatureWritten = true;
@@ -238,7 +245,7 @@ public class FeatureDecoderSql
     }
   }
 
-  private void handleColumns(SqlRow sqlRow) {
+  private void handleColumns(SqlRow sqlRow, boolean isFirstRowForPath) {
     for (int i = 0; i < sqlRow.getValues().size() && i < sqlRow.getColumnPaths().size(); i++) {
       // TODO: this is a workaround, ideally the paths SchemaMapping would contain the column
       // aliases
@@ -252,7 +259,7 @@ public class FeatureDecoderSql
       context.pathTracker().track(columnPath);
       if (!schemaIndexes.containsKey(columnPath)) {
         schemaIndexes.put(columnPath, 0);
-      } else {
+      } else if (isFirstRowForPath) {
         schemaIndexes.put(columnPath, schemaIndexes.get(columnPath) + 1);
       }
 
