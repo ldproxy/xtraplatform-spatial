@@ -155,7 +155,8 @@ public class SqlClientRx implements SqlClient {
   public Reactive.Source<String> getMutationSource(
       List<Supplier<String>> statements,
       List<Consumer<String>> idConsumers,
-      Object executionContext) {
+      Object executionContext,
+      Optional<String> featureId) {
     /*List<Function<FeatureSql, String>> toStatementsWithLog =
     statements.stream()
         .map(
@@ -198,15 +199,7 @@ public class SqlClientRx implements SqlClient {
     }
 
     Flowable<? extends Tx<?>> txFlowable =
-        // TODO: when implementing crud for joins, check if bug in rxjava3-jdbc still exists:
-        //  when using returnGeneratedKeys, TransactedConnection.commit is called too often,
-        //  therefore close is never called because counter < 0
-
-        // for update/replace, the first statement is always delete, so we can skip the
-        // returnGeneratedKeys
-        /*statements.size() == 2
-        ? session.update(first).transacted().tx().filter(tx -> !tx.isComplete())
-        :*/ session
+        session
             .update(first)
             .transacted()
             .returnGeneratedKeys()
@@ -234,7 +227,7 @@ public class SqlClientRx implements SqlClient {
               });
     }
 
-    Flowable<String> flowable = txFlowable.map(tx -> (String) tx.value());
+    Flowable<String> flowable = txFlowable.map(tx -> featureId.orElse((String) tx.value()));
 
     return Reactive.Source.publisher(flowable);
   }
@@ -243,6 +236,7 @@ public class SqlClientRx implements SqlClient {
   public Transformer<FeatureDataSql, String> getMutationFlow(
       Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
       Object executionContext,
+      String primaryKey,
       Optional<String> id) {
 
     Reactive.Transformer<FeatureDataSql, String> toQueries =
@@ -271,7 +265,32 @@ public class SqlClientRx implements SqlClient {
                       .filter(Objects::nonNull)
                       .collect(Collectors.toList());
 
-              return getMutationSource(statements, idConsumers, executionContext);
+              Optional<String> featureId =
+                  feature
+                      .getMapping()
+                      .getColumnForId()
+                      .flatMap(
+                          idCol -> {
+                            if (!Objects.equals(primaryKey, idCol.second().getName())
+                                && feature
+                                    .getRows()
+                                    .get(0)
+                                    .first()
+                                    .getFullPath()
+                                    .equals(idCol.first().getFullPath())) {
+                              return Optional.ofNullable(
+                                  feature
+                                      .getRows()
+                                      .get(0)
+                                      .second()
+                                      .getValues()
+                                      .get(idCol.second().getName()));
+                            }
+                            return Optional.empty();
+                          })
+                      .map(SqlClientRx::unquote);
+
+              return getMutationSource(statements, idConsumers, executionContext, featureId);
             });
 
     if (id.isPresent()) {
@@ -283,6 +302,13 @@ public class SqlClientRx implements SqlClient {
     }
 
     return toQueries;
+  }
+
+  private static String unquote(String value) {
+    if (value.startsWith("'") && value.endsWith("'")) {
+      return value.substring(1, value.length() - 1);
+    }
+    return value;
   }
 
   @Override

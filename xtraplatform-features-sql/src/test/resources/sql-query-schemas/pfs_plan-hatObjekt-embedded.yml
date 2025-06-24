@@ -37,6 +37,7 @@
   - name: gehoertzuplan_pfs_plan_fk
     pathSegment: gehoertzuplan_pfs_plan_fk
     type: STRING
+  role: EMBEDDED_FEATURE
 - name: bst_speicher
   pathSegment: "[_id=gehoertzuplan_pfs_plan_fk]bst_speicher"
   relations:
@@ -62,6 +63,7 @@
   - name: gehoertzuplan_pfs_plan_fk
     pathSegment: gehoertzuplan_pfs_plan_fk
     type: STRING
+  role: EMBEDDED_FEATURE
 - name: bra_mikrorohr
   pathSegment: "[mikrorohr_fk=_id]bra_mikrorohr"
   relations:
@@ -80,3 +82,4 @@
     pathSegment: _id
     type: INTEGER
     role: ID
+  role: EMBEDDED_FEATURE

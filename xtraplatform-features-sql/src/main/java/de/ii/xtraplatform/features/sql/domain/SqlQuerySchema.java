@@ -9,6 +9,8 @@ package de.ii.xtraplatform.features.sql.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +34,8 @@ public interface SqlQuerySchema extends SqlQueryTable {
 
   @JsonIgnore
   List<SqlQueryColumn> getWritableColumns();
+
+  Optional<SchemaBase.Role> getRole();
 
   @JsonIgnore
   @Value.Lazy
@@ -134,8 +138,8 @@ public interface SqlQuerySchema extends SqlQueryTable {
 
   @JsonIgnore
   @Value.Lazy
-  default boolean isJunctionReference() {
-    return isM2N() /*TODO && isFeatureReference*/;
+  default boolean isReference() {
+    return getRole().isPresent() && getRole().get() == Role.FEATURE_REF;
   }
 
   @JsonIgnore

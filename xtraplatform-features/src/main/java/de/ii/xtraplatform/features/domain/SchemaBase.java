@@ -40,7 +40,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     PRIMARY_INTERVAL_START,
     PRIMARY_INTERVAL_END,
     SECONDARY_GEOMETRY,
-    EMBEDDED_FEATURE
+    EMBEDDED_FEATURE,
+    FEATURE_REF
   }
 
   enum Type {

@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
-import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase;
@@ -86,15 +85,15 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
 
     Set<String> columns0 =
         schema.getWritableColumns().stream()
-            // TODO: filter out mutations.ignore=true
-            // TODO: filter out primaryKey if not mutations.ignore=false
-            .filter(col -> !Objects.equals(col.getName(), primaryKey))
+            .filter(
+                col ->
+                    !Objects.equals(col.getName(), primaryKey)
+                        || schema.getStaticInserts().containsKey(primaryKey))
             // TODO: in deriver
             .filter(col -> !col.hasOperation(Operation.CONSTANT))
             .map(SqlQueryColumn::getName)
             .collect(ImmutableSet.toImmutableSet());
 
-    // TODO: add id if present
     Set<String> columns =
         idProperty.isPresent() && id.isPresent()
             ? ImmutableSet.<String>builder()
@@ -103,14 +102,11 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
                 .build()
             : columns0;
 
-    // TODO: from Syntax
-    List<String> columns2 =
-        Stream.concat(columns.stream() /*.map(
-            col ->
-                col.startsWith("ST_AsText(ST_ForcePolygonCCW(")
-                    ? col.substring("ST_AsText(ST_ForcePolygonCCW(".length(), col.length() - 2)
-                    : col)*/, schema.getStaticInserts().keySet().stream())
-            .collect(Collectors.toList());
+    Set<String> columns1 =
+        Stream.concat(columns.stream(), schema.getStaticInserts().keySet().stream())
+            .collect(Collectors.toSet());
+
+    List<String> columns2 = new ArrayList<>(columns1);
 
     List<String> sortKeys = new ArrayList<>();
 
@@ -148,13 +144,13 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
         " RETURNING "
             + (parentRelation.isPresent() && schema.isOne2N()
                 ? " null"
-                : idProperty.isPresent() ? idProperty.get().getName() : primaryKey);
+                : /*idProperty.isPresent() ? idProperty.get().getName() :*/ primaryKey);
     Optional<String> returningName =
         parentRelation.isPresent() && schema.isOne2N()
             ? Optional.empty()
-            : idProperty.isPresent()
-                ? Optional.of(tableName + "." + idProperty.get().getName())
-                : Optional.of(tableName + "." + primaryKey);
+            : /*idProperty.isPresent()
+              ? Optional.of(tableName + "." + idProperty.get().getName())
+              :*/ Optional.of(tableName + "." + primaryKey);
     boolean returningNeedsQuotes =
         idProperty.isPresent()
             && (idProperty.get().getType() == SchemaBase.Type.STRING
@@ -169,20 +165,12 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       return () -> Tuple.of(null, null);
     }
 
-    // TODO: crs can be null, refactor FeatureProviderSql2.createFeatures
-    Optional<CrsTransformer> crsTransformer =
-        Objects.nonNull(crs)
-            ? crsTransformerFactory.getTransformer(crs, nativeCrs)
-            : Optional.empty();
-
     return () -> {
-
-      // TODO: pass id to getValues if given
       String values =
           getColumnValues(
               sortKeys,
-              columns,
-              currentRow.get().getValues(), // TODO .getValues(crsTransformer, nativeCrs),
+              columns1,
+              currentRow.get().getValues(),
               currentRow.get().getIds(),
               parentRow.isPresent() ? parentRow.get().getIds() : Map.of(),
               valueOverrides,
@@ -252,7 +240,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
               ? parentIds.get(sourceIdColumn)
               : ids.get(sourceIdColumn);
       String targetId =
-          schema.isJunctionReference()
+          schema.isReference()
               ? currentRow.get().getValues().get(joins.get(1).getTargetField())
               : ids.get(targetIdColumn);
 
@@ -280,27 +268,32 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       throw new IllegalArgumentException();
     }*/
 
-    SqlQueryJoin relation = schema.getRelations().get(0);
+    List<SqlQueryJoin> joins = schema.getRelations();
 
-    String table = relation.getName();
-    String refKey = String.format("%s.%s", table, relation.getSourceField());
-    String column = relation.getSourceField();
-    String columnKey = String.format("%s.%s", relation.getTarget(), relation.getTargetField());
+    String table = joins.get(0).getName();
+    String column = joins.get(0).getSourceField();
+    String columnKey = joins.get(0).getTargetField();
+    String idColumn = schema.getSortKey(); // TODO: primary key
+    String idKey = String.format("%s.%s", table, joins.get(0).getSortKey()); // TODO: primary key
 
+    Optional<SqlRowData> parentRow =
+        feature.getRow(schema.getParentPath(), parentRows.subList(0, 1));
     Optional<SqlRowData> currentRow = feature.getRow(schema.getFullPath(), parentRows);
 
     if (currentRow.isEmpty() || currentRow.get().isEmpty()) {
       return () -> Tuple.of(null, null);
     }
 
-    Map<String, String> ids = currentRow.get().getIds();
+    return () -> {
+      Map<String, String> parentIds = parentRow.isPresent() ? parentRow.get().getIds() : Map.of();
+      Map<String, String> values = currentRow.get().getValues();
 
-    return () ->
-        Tuple.of(
-            String.format(
-                "UPDATE %s SET %s=%s WHERE id=%s RETURNING null;",
-                table, column, ids.get(columnKey), ids.get(refKey)),
-            id -> {});
+      return Tuple.of(
+          String.format(
+              "UPDATE %s SET %s=%s WHERE %s=%s RETURNING null;",
+              table, column, values.get(columnKey), idColumn, parentIds.get(idKey)),
+          id -> {});
+    };
   }
 
   // TODO: from syntax
@@ -315,24 +308,25 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
       Map<String, String> staticInserts) {
 
     return Stream.concat(
-            Stream.concat(
-                idKeys.stream()
-                    .map(key -> parentIds.containsKey(key) ? parentIds.get(key) : ids.get(key)),
-                columnNames.stream()
-                    .map(
-                        name -> {
-                          // TODO: value transformer?
-                          if (name.startsWith("ST_AsText(ST_ForcePolygonCCW(")) {
-                            return String.format(
-                                "ST_ForcePolygonCW(ST_GeomFromText(%s,25832))",
-                                values.get(name)); // TODO srid from config
-                          }
-                          if (valueOverrides.containsKey(name)) {
-                            return valueOverrides.get(name);
-                          }
-                          return values.get(name);
-                        })),
-            staticInserts.values().stream())
+            idKeys.stream()
+                .map(key -> parentIds.containsKey(key) ? parentIds.get(key) : ids.get(key)),
+            columnNames.stream()
+                .map(
+                    name -> {
+                      // TODO: value transformer?
+                      if (name.startsWith("ST_AsText(ST_ForcePolygonCCW(")) {
+                        return String.format(
+                            "ST_ForcePolygonCW(ST_GeomFromText(%s,25832))",
+                            values.get(name)); // TODO srid from config
+                      }
+                      if (valueOverrides.containsKey(name)) {
+                        return valueOverrides.get(name);
+                      }
+                      if (staticInserts.containsKey(name)) {
+                        return staticInserts.get(name);
+                      }
+                      return values.get(name);
+                    }))
         .collect(Collectors.joining(","));
   }
 }

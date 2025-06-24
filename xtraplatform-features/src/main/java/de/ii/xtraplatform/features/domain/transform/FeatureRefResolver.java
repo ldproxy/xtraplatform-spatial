@@ -11,6 +11,7 @@ import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema.Builder;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.TypesResolver;
@@ -382,6 +383,7 @@ public class FeatureRefResolver implements TypesResolver {
           .from(schema)
           .type(schema.isArray() ? Type.OBJECT_ARRAY : Type.OBJECT)
           .valueType(Optional.empty())
+          .role(Role.FEATURE_REF)
           .build();
     }
 
@@ -401,6 +403,7 @@ public class FeatureRefResolver implements TypesResolver {
               .from(schema)
               .type(schema.isArray() ? Type.OBJECT_ARRAY : Type.OBJECT)
               .valueType(Optional.empty())
+              .role(Role.FEATURE_REF)
               .sourcePath(objectSourcePath);
 
       if (objectSourcePath.isPresent() && isConnected(objectSourcePath.get())) {
@@ -561,6 +564,7 @@ public class FeatureRefResolver implements TypesResolver {
         .from(schema)
         .type(schema.isArray() ? Type.OBJECT_ARRAY : Type.OBJECT)
         .refType(refType.orElse(REF_TYPE_DYNAMIC))
+        .role(Role.FEATURE_REF)
         .propertyMap(asMap(newVisitedProperties.stream()))
         .transformations(newTransformations)
         .build();
