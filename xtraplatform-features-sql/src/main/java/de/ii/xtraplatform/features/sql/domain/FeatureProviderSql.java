@@ -341,8 +341,6 @@ public class FeatureProviderSql
   public static final String ENTITY_SUB_TYPE = "feature/sql";
   public static final String PROVIDER_SUB_TYPE = "SQL";
 
-  private final CrsTransformerFactory crsTransformerFactory;
-  private final CrsInfo crsInfo;
   private final Cql cql;
   private final SqlDbmsAdapters dbmsAdapters;
   private final Map<String, DecoderFactory> subdecoders;
@@ -412,13 +410,12 @@ public class FeatureProviderSql
         connectorFactory,
         reactive,
         crsTransformerFactory,
+        crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
         data,
         volatileRegistry);
 
-    this.crsTransformerFactory = crsTransformerFactory;
-    this.crsInfo = crsInfo;
     this.cql = cql;
     this.dbmsAdapters = dbmsAdapters;
     this.cache = cache.withPrefix(getEntityType(), getId());
@@ -1277,10 +1274,13 @@ public class FeatureProviderSql
 
     Query query2 = preprocessQuery(query);
 
+    boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
+
     return new FeatureStreamImpl(
         query2,
         getData(),
         crsTransformerFactory,
+        nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
         !query.hitsOnly());

@@ -127,7 +127,6 @@ public class FeatureProviderWfs
   public static final String PROVIDER_SUB_TYPE = "WFS";
   private static final MediaType MEDIA_TYPE = new MediaType("application", "gml+xml");
 
-  private final CrsTransformerFactory crsTransformerFactory;
   private final Cql cql;
 
   private FeatureQueryEncoderWfs queryTransformer;
@@ -137,6 +136,7 @@ public class FeatureProviderWfs
   @AssistedInject
   public FeatureProviderWfs(
       CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
       Cql cql,
       ConnectorFactory connectorFactory,
       Reactive reactive,
@@ -148,12 +148,12 @@ public class FeatureProviderWfs
         connectorFactory,
         reactive,
         crsTransformerFactory,
+        crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
         data,
         volatileRegistry);
 
-    this.crsTransformerFactory = crsTransformerFactory;
     this.cql = cql;
   }
 
@@ -368,7 +368,14 @@ public class FeatureProviderWfs
 
   @Override
   public FeatureStream getFeatureStreamPassThrough(FeatureQuery query) {
+    boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
     return new FeatureStreamImpl(
-        query, getData(), crsTransformerFactory, getCodelists(), this::runQuery, false);
+        query,
+        getData(),
+        crsTransformerFactory,
+        nativeCrsIs3d,
+        getCodelists(),
+        this::runQuery,
+        false);
   }
 }

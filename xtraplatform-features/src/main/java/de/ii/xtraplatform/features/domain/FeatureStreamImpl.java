@@ -39,6 +39,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final Query query;
   private final FeatureProviderDataV2 data;
   private final CrsTransformerFactory crsTransformerFactory;
+  private final boolean nativeCrsIs3d;
   private final Map<String, Codelist> codelists;
   private final QueryRunner runner;
   private final boolean doTransform;
@@ -52,12 +53,14 @@ public class FeatureStreamImpl implements FeatureStream {
       Query query,
       FeatureProviderDataV2 data,
       CrsTransformerFactory crsTransformerFactory,
+      boolean nativeCrsIs3d,
       Map<String, Codelist> codelists,
       QueryRunner runner,
       boolean doTransform) {
     this.query = query;
     this.data = data;
     this.crsTransformerFactory = crsTransformerFactory;
+    this.nativeCrsIs3d = nativeCrsIs3d;
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
@@ -227,7 +230,8 @@ public class FeatureStreamImpl implements FeatureStream {
             .flatMap(
                 targetCrs ->
                     crsTransformerFactory.getTransformer(
-                        data.getNativeCrs().orElse(OgcCrs.CRS84), OgcCrs.CRS84));
+                        data.getNativeCrs().orElse(OgcCrs.CRS84),
+                        nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
     FeatureTokenTransformerCoordinates valueMapper =
         new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
 
