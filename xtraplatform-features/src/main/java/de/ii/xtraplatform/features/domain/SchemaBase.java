@@ -424,6 +424,20 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
+  default Optional<T> getEmbeddedPrimaryInstant() {
+    return getAllNestedProperties().stream()
+        .filter(SchemaBase::isEmbeddedPrimaryInstant)
+        .findFirst()
+        .or(
+            () ->
+                getEmbeddedPrimaryInterval().isEmpty()
+                    ? getProperties().stream().filter(SchemaBase::isTemporal).findFirst()
+                    : Optional.empty());
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
   default List<T> getPrimaryInstants() {
     return getPrimaryInstant().stream().collect(Collectors.toList());
   }
@@ -437,8 +451,26 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     Optional<T> end =
         getAllNestedProperties().stream().filter(SchemaBase::isPrimaryIntervalEnd).findFirst();
 
-    return start.isPresent() && end.isPresent()
-        ? Optional.of(Tuple.of(start.get(), end.get()))
+    return start.isPresent() || end.isPresent()
+        ? Optional.of(Tuple.of(start.orElse(null), end.orElse(null)))
+        : Optional.empty();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default Optional<Tuple<T, T>> getEmbeddedPrimaryInterval() {
+    Optional<T> start =
+        getAllNestedProperties().stream()
+            .filter(SchemaBase::isEmbeddedPrimaryIntervalStart)
+            .findFirst();
+    Optional<T> end =
+        getAllNestedProperties().stream()
+            .filter(SchemaBase::isEmbeddedPrimaryIntervalEnd)
+            .findFirst();
+
+    return start.isPresent() || end.isPresent()
+        ? Optional.of(Tuple.of(start.orElse(null), end.orElse(null)))
         : Optional.empty();
   }
 
@@ -498,8 +530,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default boolean hasEmbeddedFeature() {
-    return getAllNestedProperties().stream()
-        .anyMatch(s -> s.getRole().filter(r -> r == Role.EMBEDDED_FEATURE).isPresent());
+    return getAllNestedProperties().stream().anyMatch(SchemaBase::isEmbeddedFeature);
   }
 
   @JsonIgnore
@@ -572,6 +603,13 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Auxiliary
   default boolean isFeature() {
     return isObject() && getParentPath().isEmpty();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isEmbeddedFeature() {
+    return isObject() && getRole().filter(r -> r == Role.EMBEDDED_FEATURE).isPresent();
   }
 
   @JsonIgnore
@@ -654,6 +692,27 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Auxiliary
   default boolean isPrimaryIntervalEnd() {
     return getRole().filter(role -> role == Role.PRIMARY_INTERVAL_END).isPresent();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isEmbeddedPrimaryInstant() {
+    return getEmbeddedRole().filter(role -> role == Role.PRIMARY_INSTANT).isPresent();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isEmbeddedPrimaryIntervalStart() {
+    return getEmbeddedRole().filter(role -> role == Role.PRIMARY_INTERVAL_START).isPresent();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isEmbeddedPrimaryIntervalEnd() {
+    return getEmbeddedRole().filter(role -> role == Role.PRIMARY_INTERVAL_END).isPresent();
   }
 
   @JsonIgnore

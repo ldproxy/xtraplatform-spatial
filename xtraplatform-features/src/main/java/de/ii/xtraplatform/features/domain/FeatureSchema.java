@@ -845,8 +845,9 @@ public interface FeatureSchema
         && getPrimaryInterval()
             .filter(
                 interval ->
-                    interval.first().isPrimaryIntervalStart()
-                        && interval.second().isPrimaryIntervalEnd())
+                    (Objects.isNull(interval.first()) || interval.first().isPrimaryIntervalStart())
+                        && (Objects.isNull(interval.second())
+                            || interval.second().isPrimaryIntervalEnd()))
             .isEmpty()) {
       Tuple<FeatureSchema, FeatureSchema> primaryInterval = getPrimaryInterval().get();
       ImmutableFeatureSchema.Builder builder =
@@ -856,6 +857,7 @@ public interface FeatureSchema
           .forEach(
               (name, property) -> {
                 if (property.isTemporal()
+                    && Objects.nonNull(primaryInterval.first())
                     && Objects.equals(property.getName(), primaryInterval.first().getName())) {
                   builder.putPropertyMap(
                       name,
@@ -864,6 +866,7 @@ public interface FeatureSchema
                           .role(Role.PRIMARY_INTERVAL_START)
                           .build());
                 } else if (property.isTemporal()
+                    && Objects.nonNull(primaryInterval.second())
                     && Objects.equals(property.getName(), primaryInterval.second().getName())) {
                   builder.putPropertyMap(
                       name,
