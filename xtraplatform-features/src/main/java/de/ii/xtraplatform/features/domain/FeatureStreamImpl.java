@@ -220,8 +220,16 @@ public class FeatureStreamImpl implements FeatureStream {
                 targetCrs ->
                     crsTransformerFactory.getTransformer(
                         data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
+
+    Optional<CrsTransformer> crsTransformerWgs84 =
+        query
+            .getCrs()
+            .flatMap(
+                targetCrs ->
+                    crsTransformerFactory.getTransformer(
+                        data.getNativeCrs().orElse(OgcCrs.CRS84), OgcCrs.CRS84));
     FeatureTokenTransformerCoordinates valueMapper =
-        new FeatureTokenTransformerCoordinates(crsTransformer);
+        new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
 
     FeatureTokenTransformerRemoveEmptyOptionals cleaner =
         new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);

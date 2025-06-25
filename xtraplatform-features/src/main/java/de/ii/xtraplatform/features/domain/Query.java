@@ -29,6 +29,11 @@ public interface Query {
   }
 
   @Value.Default
+  default List<Integer> getWgs84GeometryPrecision() {
+    return ImmutableList.of(0, 0, 0);
+  }
+
+  @Value.Default
   default int getLimit() {
     return 0;
   }
