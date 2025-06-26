@@ -22,7 +22,6 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEnco
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -774,112 +773,6 @@ public interface FeatureSchema
                     getName());
               });
     }
-  }
-
-  @Value.Check
-  default FeatureSchema primaryGeometry() {
-    if (isFeature()
-        && getPrimaryGeometry().isPresent()
-        && getPrimaryGeometry().filter(FeatureSchema::isPrimaryGeometry).isEmpty()) {
-      FeatureSchema primaryGeometry = getPrimaryGeometry().get();
-      ImmutableFeatureSchema.Builder builder =
-          new ImmutableFeatureSchema.Builder().from(this).propertyMap(new HashMap<>());
-
-      getPropertyMap()
-          .forEach(
-              (name, property) -> {
-                if (property.isSpatial()
-                    && Objects.equals(property.getName(), primaryGeometry.getName())) {
-                  builder.putPropertyMap(
-                      name,
-                      new ImmutableFeatureSchema.Builder()
-                          .from(property)
-                          .role(Role.PRIMARY_GEOMETRY)
-                          .build());
-                } else {
-                  builder.putPropertyMap(name, property);
-                }
-              });
-
-      return builder.build();
-    }
-
-    return this;
-  }
-
-  @Value.Check
-  default FeatureSchema primaryInstant() {
-    if (isFeature()
-        && getPrimaryInstant().isPresent()
-        && getPrimaryInstant().filter(FeatureSchema::isPrimaryInstant).isEmpty()) {
-      FeatureSchema primaryInstant = getPrimaryInstant().get();
-      ImmutableFeatureSchema.Builder builder =
-          new ImmutableFeatureSchema.Builder().from(this).propertyMap(new HashMap<>());
-
-      getPropertyMap()
-          .forEach(
-              (name, property) -> {
-                if (property.isTemporal()
-                    && Objects.equals(property.getName(), primaryInstant.getName())) {
-                  builder.putPropertyMap(
-                      name,
-                      new ImmutableFeatureSchema.Builder()
-                          .from(property)
-                          .role(Role.PRIMARY_INSTANT)
-                          .build());
-                } else {
-                  builder.putPropertyMap(name, property);
-                }
-              });
-
-      return builder.build();
-    }
-
-    return this;
-  }
-
-  @Value.Check
-  default FeatureSchema primaryInterval() {
-    if (isFeature()
-        && getPrimaryInterval().isPresent()
-        && getPrimaryInterval()
-            .filter(
-                interval ->
-                    interval.first().isPrimaryIntervalStart()
-                        && interval.second().isPrimaryIntervalEnd())
-            .isEmpty()) {
-      Tuple<FeatureSchema, FeatureSchema> primaryInterval = getPrimaryInterval().get();
-      ImmutableFeatureSchema.Builder builder =
-          new ImmutableFeatureSchema.Builder().from(this).propertyMap(new HashMap<>());
-
-      getPropertyMap()
-          .forEach(
-              (name, property) -> {
-                if (property.isTemporal()
-                    && Objects.equals(property.getName(), primaryInterval.first().getName())) {
-                  builder.putPropertyMap(
-                      name,
-                      new ImmutableFeatureSchema.Builder()
-                          .from(property)
-                          .role(Role.PRIMARY_INTERVAL_START)
-                          .build());
-                } else if (property.isTemporal()
-                    && Objects.equals(property.getName(), primaryInterval.second().getName())) {
-                  builder.putPropertyMap(
-                      name,
-                      new ImmutableFeatureSchema.Builder()
-                          .from(property)
-                          .role(Role.PRIMARY_INTERVAL_END)
-                          .build());
-                } else {
-                  builder.putPropertyMap(name, property);
-                }
-              });
-
-      return builder.build();
-    }
-
-    return this;
   }
 
   @Value.Check
