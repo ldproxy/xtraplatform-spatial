@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.features.app;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import de.ii.xtraplatform.features.domain.DatasetChange;
 import de.ii.xtraplatform.features.domain.DatasetChangeListener;
 import de.ii.xtraplatform.features.domain.FeatureChange;
@@ -14,6 +16,9 @@ import de.ii.xtraplatform.features.domain.FeatureChangeListener;
 import de.ii.xtraplatform.features.domain.FeatureChanges;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,10 +26,17 @@ public class FeatureChangeHandlerImpl implements FeatureChanges {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureChangeHandlerImpl.class);
 
+  private final ExecutorService executor;
   private final List<DatasetChangeListener> datasetListeners;
   private final List<FeatureChangeListener> featureListeners;
 
   public FeatureChangeHandlerImpl() {
+    ThreadPoolExecutor threadPoolExecutor =
+        (ThreadPoolExecutor)
+            Executors.newFixedThreadPool(
+                1, new ThreadFactoryBuilder().setNameFormat("feature.changes-%d").build());
+
+    this.executor = MoreExecutors.getExitingExecutorService(threadPoolExecutor);
     this.datasetListeners = new CopyOnWriteArrayList<>();
     this.featureListeners = new CopyOnWriteArrayList<>();
   }
@@ -51,23 +63,26 @@ public class FeatureChangeHandlerImpl implements FeatureChanges {
 
   @Override
   public void handle(DatasetChange change) {
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Handling dataset change: {}", change);
-    }
-
-    datasetListeners.forEach(
-        listener -> {
+    executor.submit(
+        () -> {
           if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug(
-                "Notifying dataset change listener: {}", listener.getClass().getSimpleName());
+            LOGGER.debug("Handling dataset change: {}", change);
           }
 
-          listener.onDatasetChange(change);
+          datasetListeners.forEach(
+              listener -> {
+                if (LOGGER.isDebugEnabled()) {
+                  LOGGER.debug(
+                      "Notifying dataset change listener: {}", listener.getClass().getSimpleName());
+                }
+
+                listener.onDatasetChange(change);
+              });
         });
   }
 
   @Override
   public void handle(FeatureChange change) {
-    featureListeners.forEach(listener -> listener.onFeatureChange(change));
+    executor.submit(() -> featureListeners.forEach(listener -> listener.onFeatureChange(change)));
   }
 }
