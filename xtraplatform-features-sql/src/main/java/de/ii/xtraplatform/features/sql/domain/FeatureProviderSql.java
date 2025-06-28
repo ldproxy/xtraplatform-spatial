@@ -995,11 +995,13 @@ public class FeatureProviderSql
             .ifPresent(
                 temporalProperties ->
                     LOGGER.debug(
-                        "Using cached temporal extent for '{}.{}' and '{}.{}'",
-                        typeName,
-                        temporalProperties.first().getName(),
-                        typeName,
-                        temporalProperties.second().getName()));
+                        "Using cached temporal extent for '{}' and '{}'",
+                        temporalProperties.first() != null
+                            ? typeName + "." + temporalProperties.first().getName()
+                            : "..",
+                        temporalProperties.second() != null
+                            ? typeName + "." + temporalProperties.second().getName()
+                            : ".."));
       }
 
       return cache.get(cacheValidator, Interval.class, cacheKey);
@@ -1019,11 +1021,13 @@ public class FeatureProviderSql
           .ifPresent(
               temporalProperties ->
                   LOGGER.debug(
-                      "Computing temporal extent for '{}.{}' and '{}.{}'",
-                      typeName,
-                      temporalProperties.first().getName(),
-                      typeName,
-                      temporalProperties.second().getName()));
+                      "Computing temporal extent for '{}' and '{}'",
+                      temporalProperties.first() != null
+                          ? typeName + "." + temporalProperties.first().getName()
+                          : "..",
+                      temporalProperties.second() != null
+                          ? typeName + "." + temporalProperties.second().getName()
+                          : ".."));
     }
 
     try {
