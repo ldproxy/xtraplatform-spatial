@@ -28,6 +28,7 @@ import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
 import de.ii.xtraplatform.features.domain.SchemaReferenceResolver;
 import de.ii.xtraplatform.features.domain.TypesResolver;
+import de.ii.xtraplatform.features.domain.transform.DefaultRolesResolver;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefEmbedder;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
 import de.ii.xtraplatform.features.domain.transform.ImplicitMappingResolver;
@@ -199,7 +200,8 @@ public class FeatureProviderSqlFactory
               new ImplicitMappingResolver(),
               new ConstantsResolver(),
               new LabelTemplateResolver(data.getLabelTemplate()),
-              new MappingOperationResolver());
+              new MappingOperationResolver(),
+              new DefaultRolesResolver());
 
       for (TypesResolver resolver : resolvers) {
         data = applyTypesResolver(data, resolver);
