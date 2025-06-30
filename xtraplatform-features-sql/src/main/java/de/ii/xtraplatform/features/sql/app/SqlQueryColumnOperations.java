@@ -8,6 +8,8 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
@@ -70,5 +72,24 @@ public interface SqlQueryColumnOperations {
       return sqlDialect.applyToDatetime(name, column.getOperationParameter(Operation.DATETIME));
     }
     return name;
+  }
+
+  static SqlQueryColumn dateToDatetime(SqlQueryColumn column) {
+    if (!column.getOperations().containsKey(Operation.DATE)) {
+      return column;
+    }
+    Builder<Operation, String[]> ops =
+        ImmutableMap.<Operation, String[]>builder()
+            .put(
+                Operation.DATETIME,
+                column.getOperationParameters(Operation.DATE).toArray(new String[0]));
+
+    for (Map.Entry<Operation, String[]> entry : column.getOperations().entrySet()) {
+      if (entry.getKey() != Operation.DATE) {
+        ops.put(entry);
+      }
+    }
+
+    return new ImmutableSqlQueryColumn.Builder().from(column).operations(ops.build()).build();
   }
 }

@@ -79,9 +79,11 @@ public class AggregateStatsQueryGenerator {
 
     String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
 
+    SqlQueryColumn instantColumnDatetime = SqlQueryColumnOperations.dateToDatetime(instantColumn);
+
     String column =
         SqlQueryColumnOperations.getQualifiedColumnResolved(
-            temporalAlias, instantColumn, sqlDialect);
+            temporalAlias, instantColumnDatetime, sqlDialect);
 
     String join = JoinGenerator.getJoins(instant, aliases, filterEncoder);
 
@@ -107,13 +109,18 @@ public class AggregateStatsQueryGenerator {
 
       String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
 
+      SqlQueryColumn intervalStartColumnColumnDatetime =
+          SqlQueryColumnOperations.dateToDatetime(intervalStartColumn);
+      SqlQueryColumn intervalEndColumnDatetime =
+          SqlQueryColumnOperations.dateToDatetime(intervalEndColumn);
+
       String columnStart =
           SqlQueryColumnOperations.getQualifiedColumnResolved(
-              temporalAlias, intervalStartColumn, sqlDialect);
+              temporalAlias, intervalStartColumnColumnDatetime, sqlDialect);
 
       String columnEnd =
           SqlQueryColumnOperations.getQualifiedColumnResolved(
-              temporalAlias, intervalEndColumn, sqlDialect);
+              temporalAlias, intervalEndColumnDatetime, sqlDialect);
 
       String join = JoinGenerator.getJoins(intervalStart, aliases, filterEncoder);
 
