@@ -18,11 +18,14 @@ import java.util.Optional;
 public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer {
 
   private final Optional<CrsTransformer> crsTransformer;
+  private final Optional<CrsTransformer> crsTransformerWgs84;
   private ImmutableCoordinatesTransformer.Builder coordinatesTransformerBuilder;
   private int targetDimension;
 
-  public FeatureTokenTransformerCoordinates(Optional<CrsTransformer> crsTransformer) {
+  public FeatureTokenTransformerCoordinates(
+      Optional<CrsTransformer> crsTransformer, Optional<CrsTransformer> crsTransformerWgs84) {
     this.crsTransformer = crsTransformer;
+    this.crsTransformerWgs84 = crsTransformerWgs84;
   }
 
   @Override
@@ -31,8 +34,16 @@ public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer 
         || context.geometryType().isPresent()) {
       this.coordinatesTransformerBuilder = ImmutableCoordinatesTransformer.builder();
 
-      if (crsTransformer.isPresent()) {
-        coordinatesTransformerBuilder.crsTransformer(crsTransformer.get());
+      // A SECONDARY_GEOMETRY is always forced to WGS84 longitude/latitude, not the target CRS
+      boolean isSecondaryGeometryForceWgs84 =
+          context.schema().filter(SchemaBase::isSecondaryGeometry).isPresent();
+
+      if (isSecondaryGeometryForceWgs84) {
+        crsTransformerWgs84.ifPresent(
+            transformer -> coordinatesTransformerBuilder.crsTransformer(transformer));
+      } else {
+        crsTransformer.ifPresent(
+            transformer -> coordinatesTransformerBuilder.crsTransformer(transformer));
       }
 
       int fallbackDimension = context.geometryDimension().orElse(2);
@@ -43,7 +54,7 @@ public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer 
       coordinatesTransformerBuilder.sourceDimension(sourceDimension);
       coordinatesTransformerBuilder.targetDimension(targetDimension);
 
-      if (context.query().getMaxAllowableOffset() > 0) {
+      if (!isSecondaryGeometryForceWgs84 && context.query().getMaxAllowableOffset() > 0) {
         int minPoints =
             context.geometryType().get() == SimpleFeatureGeometry.MULTI_POLYGON
                     || context.geometryType().get() == SimpleFeatureGeometry.POLYGON
@@ -59,7 +70,11 @@ public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer 
         coordinatesTransformerBuilder.isSwapXY(true);
       }*/
 
-      if (context.query().getGeometryPrecision().get(0) > 0) {
+      if (isSecondaryGeometryForceWgs84) {
+        if (context.query().getWgs84GeometryPrecision().get(0) > 0) {
+          coordinatesTransformerBuilder.precision(context.query().getWgs84GeometryPrecision());
+        }
+      } else if (context.query().getGeometryPrecision().get(0) > 0) {
         coordinatesTransformerBuilder.precision(context.query().getGeometryPrecision());
       }
 

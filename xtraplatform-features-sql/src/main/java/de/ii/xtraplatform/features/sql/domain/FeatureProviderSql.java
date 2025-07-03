@@ -341,8 +341,6 @@ public class FeatureProviderSql
   public static final String ENTITY_SUB_TYPE = "feature/sql";
   public static final String PROVIDER_SUB_TYPE = "SQL";
 
-  private final CrsTransformerFactory crsTransformerFactory;
-  private final CrsInfo crsInfo;
   private final Cql cql;
   private final SqlDbmsAdapters dbmsAdapters;
   private final Map<String, DecoderFactory> subdecoders;
@@ -412,13 +410,12 @@ public class FeatureProviderSql
         connectorFactory,
         reactive,
         crsTransformerFactory,
+        crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
         data,
         volatileRegistry);
 
-    this.crsTransformerFactory = crsTransformerFactory;
-    this.crsInfo = crsInfo;
     this.cql = cql;
     this.dbmsAdapters = dbmsAdapters;
     this.cache = cache.withPrefix(getEntityType(), getId());
@@ -998,11 +995,13 @@ public class FeatureProviderSql
             .ifPresent(
                 temporalProperties ->
                     LOGGER.debug(
-                        "Using cached temporal extent for '{}.{}' and '{}.{}'",
-                        typeName,
-                        temporalProperties.first().getName(),
-                        typeName,
-                        temporalProperties.second().getName()));
+                        "Using cached temporal extent for '{}' and '{}'",
+                        temporalProperties.first() != null
+                            ? typeName + "." + temporalProperties.first().getName()
+                            : "..",
+                        temporalProperties.second() != null
+                            ? typeName + "." + temporalProperties.second().getName()
+                            : ".."));
       }
 
       return cache.get(cacheValidator, Interval.class, cacheKey);
@@ -1022,11 +1021,13 @@ public class FeatureProviderSql
           .ifPresent(
               temporalProperties ->
                   LOGGER.debug(
-                      "Computing temporal extent for '{}.{}' and '{}.{}'",
-                      typeName,
-                      temporalProperties.first().getName(),
-                      typeName,
-                      temporalProperties.second().getName()));
+                      "Computing temporal extent for '{}' and '{}'",
+                      temporalProperties.first() != null
+                          ? typeName + "." + temporalProperties.first().getName()
+                          : "..",
+                      temporalProperties.second() != null
+                          ? typeName + "." + temporalProperties.second().getName()
+                          : ".."));
     }
 
     try {
@@ -1277,10 +1278,13 @@ public class FeatureProviderSql
 
     Query query2 = preprocessQuery(query);
 
+    boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
+
     return new FeatureStreamImpl(
         query2,
         getData(),
         crsTransformerFactory,
+        nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
         !query.hitsOnly());
