@@ -16,8 +16,7 @@ public enum GeoJsonGeometryType {
   MULTI_LINE_STRING("MultiLineString", SimpleFeatureGeometry.MULTI_LINE_STRING),
   POLYGON("Polygon", SimpleFeatureGeometry.POLYGON),
   MULTI_POLYGON("MultiPolygon", SimpleFeatureGeometry.MULTI_POLYGON),
-  GEOMETRY_COLLECTION("GeometryCollection", SimpleFeatureGeometry.NONE),
-  GENERIC("", SimpleFeatureGeometry.NONE),
+  GEOMETRY_COLLECTION("GeometryCollection", SimpleFeatureGeometry.GEOMETRY_COLLECTION),
   NONE("", SimpleFeatureGeometry.NONE);
 
   private String stringRepresentation;
@@ -59,5 +58,9 @@ public enum GeoJsonGeometryType {
 
   public boolean isValid() {
     return this != NONE;
+  }
+
+  public boolean isSupported() {
+    return isValid() && this != GEOMETRY_COLLECTION;
   }
 }
