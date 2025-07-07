@@ -480,8 +480,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
         getAllNestedFeatureProperties().stream()
             .filter(SchemaBase::isPrimaryIntervalEnd)
             .findFirst();
-    return start.isPresent() || end.isPresent()
-        ? Optional.of(Tuple.of(start.orElse(null), end.orElse(null)))
+    return start.isPresent() && end.isPresent()
+        ? Optional.of(Tuple.of(start.get(), end.get()))
         : Optional.empty();
   }
 
