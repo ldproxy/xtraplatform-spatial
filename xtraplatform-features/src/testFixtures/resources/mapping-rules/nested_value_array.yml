@@ -21,6 +21,6 @@
   type: VALUE_ARRAY
   index: 0
 - source: "/o42003/[id=rid]o42003__p0000103000/[p0000103000=objid]o42002/[id=rid]o42002__bez/bez"
-  target: "strasse.bezeichnung.[]"
+  target: strasse.bezeichnung
   type: STRING
   index: 0

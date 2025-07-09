@@ -13,6 +13,6 @@
   type: VALUE_ARRAY
   index: 0
 - source: "/externalprovider/[id=externalprovider_fk]externalprovider_externalprovidername/externalprovidername"
-  target: "externalprovidername.[]"
+  target: externalprovidername
   type: STRING
   index: 0

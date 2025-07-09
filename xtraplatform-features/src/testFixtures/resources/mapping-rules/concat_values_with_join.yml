@@ -9,19 +9,19 @@
   role: ID
   index: 0
 - source: /o12006/lan
-  target: "component.[]"
+  target: component
   type: STRING
   index: 0
 - source: /o12006/rbz
-  target: "component.[]"
+  target: component
   type: STRING
   index: 0
 - source: /o12006/krs
-  target: "component.[]"
+  target: component
   type: STRING
   index: 0
 - source: /o12006/gmd
-  target: "component.[]"
+  target: component
   type: STRING
   index: 0
 - source: "/o12006/[id7=id]o12007"
@@ -29,6 +29,6 @@
   type: VALUE_ARRAY
   index: 0
 - source: "/o12006/[id7=id]o12007/nam"
-  target: "component.[]"
+  target: component
   type: STRING
   index: 0
