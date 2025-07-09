@@ -16,14 +16,18 @@ public interface OgcCrs {
   EpsgCrs CRS84 = EpsgCrs.of(4326, Force.LON_LAT);
 
   String CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84";
-  String CRS84_CURIE = "[OGC:CRS84]";
+  String CRS84_URI_NEW = "http://www.opengis.net/def/crs/OGC/0/CRS84";
+  String CRS84_CURIE = "OGC:CRS84";
 
   EpsgCrs CRS84h = EpsgCrs.of(4979, Force.LON_LAT);
 
   String CRS84h_URI = "http://www.opengis.net/def/crs/OGC/0/CRS84h";
-  String CRS84h_CURIE = "[OGC:CRS84h]";
+  String CRS84h_CURIE = "OGC:CRS84h";
 
   static Optional<EpsgCrs> fromString(String prefixedCode) {
+    if (Objects.equals(prefixedCode, CRS84_URI_NEW)) {
+      return Optional.of(CRS84);
+    }
     if (Objects.equals(prefixedCode, CRS84_URI)) {
       return Optional.of(CRS84);
     }
