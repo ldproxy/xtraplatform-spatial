@@ -983,6 +983,20 @@ public interface FeatureSchema
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
+  @Override
+  default List<FeatureSchema> getAllNestedFeatureProperties() {
+    return Stream.concat(
+            getProperties().stream()
+                .filter(t -> !t.isEmbeddedFeature())
+                .flatMap(
+                    t -> Stream.concat(Stream.of(t), t.getAllNestedFeatureProperties().stream())),
+            getMerge().stream().flatMap(t -> t.getAllNestedProperties().stream()))
+        .collect(Collectors.toList());
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
   default List<PartialObjectSchema> getAllNestedPartials() {
     return getMerge().stream()
         .flatMap(
