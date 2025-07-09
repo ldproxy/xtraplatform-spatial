@@ -64,13 +64,14 @@ public class MappingRulesDeriver
     for (MappingRule rule : mappingRules) {
       // tables
       if (rule.isObjectOrArray()) {
+        MappingRule cleanRule = cleanup(rule);
         // distinct
         if (rulesByTable.containsKey(rule.getIdentifier())
-            && rulesByTable.get(rule.getIdentifier()).contains(rule)) {
+            && rulesByTable.get(rule.getIdentifier()).contains(cleanRule)) {
           continue;
         }
 
-        rulesByTable.put(rule.getIdentifier(), new ArrayList<>(List.of(rule)));
+        rulesByTable.put(rule.getIdentifier(), new ArrayList<>(List.of(cleanRule)));
 
         continue;
       }
@@ -99,7 +100,7 @@ public class MappingRulesDeriver
                   .index(0)
                   .build();
 
-          rulesByTable.put(tableIdentifier, new ArrayList<>(List.of(tableRule, rule)));
+          rulesByTable.put(tableIdentifier, new ArrayList<>(List.of(tableRule, cleanup(rule))));
 
           continue;
         }
@@ -108,10 +109,21 @@ public class MappingRulesDeriver
         tableIdentifier = matchingTables.get(matchingTables.size() - 1);
       }
 
-      rulesByTable.get(tableIdentifier).add(rule);
+      rulesByTable.get(tableIdentifier).add(cleanup(rule));
     }
 
     return sorted(rulesByTable);
+  }
+
+  private static MappingRule cleanup(MappingRule rule) {
+    if (rule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)) {
+      return new ImmutableMappingRule.Builder()
+          .from(rule)
+          .target(
+              rule.getTarget().substring(0, rule.getTarget().lastIndexOf(VALUE_ARRAY_VALUE_SUFFIX)))
+          .build();
+    }
+    return rule;
   }
 
   private static List<MappingRule> sorted(Map<String, List<MappingRule>> rulesByTable) {
@@ -229,10 +241,6 @@ public class MappingRulesDeriver
     }
 
     return Optional.of(Scope.W);
-  }
-
-  public static boolean doIgnore(String path) {
-    return path.endsWith(VALUE_ARRAY_VALUE_SUFFIX);
   }
 
   private Stream<String> getParentPaths(List<FeatureSchema> parents, String prefix) {

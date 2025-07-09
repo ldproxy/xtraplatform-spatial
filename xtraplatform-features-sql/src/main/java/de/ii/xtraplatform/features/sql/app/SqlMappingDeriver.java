@@ -16,7 +16,6 @@ import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.MappingOperationResolver;
 import de.ii.xtraplatform.features.domain.MappingRule;
-import de.ii.xtraplatform.features.domain.MappingRulesDeriver;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
@@ -267,10 +266,9 @@ public class SqlMappingDeriver {
       }
     } else {
       String target = column.getTarget();
-      boolean handleSchema = includeSchema && !MappingRulesDeriver.doIgnore(column.getTarget());
       FeatureSchema propertySchema = null;
 
-      if (handleSchema) {
+      if (includeSchema) {
         propertySchema =
             schema.getAllNestedProperties().stream()
                 .filter(property -> matches(column, property))
