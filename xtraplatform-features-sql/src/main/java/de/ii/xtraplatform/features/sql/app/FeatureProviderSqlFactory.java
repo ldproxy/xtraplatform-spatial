@@ -200,8 +200,8 @@ public class FeatureProviderSqlFactory
               new ImplicitMappingResolver(),
               new ConstantsResolver(),
               new LabelTemplateResolver(data.getLabelTemplate()),
-              new MappingOperationResolver(),
-              new DefaultRolesResolver());
+              new DefaultRolesResolver(),
+              new MappingOperationResolver());
 
       for (TypesResolver resolver : resolvers) {
         data = applyTypesResolver(data, resolver);

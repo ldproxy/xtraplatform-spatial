@@ -9,11 +9,11 @@
   role: ID
   index: 0
 - source: "/o41001{sortKey=objid}/beb"
-  target: "0_landCoverObservation.class.href.[]"
+  target: 0_landCoverObservation.class.href
   type: STRING
   index: 0
 - source: "/o41001{sortKey=objid}/constant_href_3{constant='https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/1'}"
-  target: "0_landCoverObservation.class.href.[]"
+  target: 0_landCoverObservation.class.href
   type: STRING
   index: 0
 - source: "/o41002{sortKey=objid}"
@@ -26,10 +26,10 @@
   role: ID
   index: 0
 - source: "/o41002{sortKey=objid}/beb"
-  target: "1_landCoverObservation.class.href.[]"
+  target: 1_landCoverObservation.class.href
   type: STRING
   index: 0
 - source: "/o41002{sortKey=objid}/constant_href_4{constant='https://registry.gdi-de.org/codelist/de.adv-online.inspire/LandCoverClassValue/2'}"
-  target: "1_landCoverObservation.class.href.[]"
+  target: 1_landCoverObservation.class.href
   type: STRING
   index: 0

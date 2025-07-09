@@ -281,6 +281,17 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
+  default List<T> getAllNestedFeatureProperties() {
+    // exclude properties from embedded features
+    return getProperties().stream()
+        .filter(t -> !t.isEmbeddedFeature())
+        .flatMap(t -> Stream.concat(Stream.of(t), t.getAllNestedFeatureProperties().stream()))
+        .collect(Collectors.toList());
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
   default List<T> getAllObjects() {
     return Stream.concat(
             Stream.of((T) this),
@@ -297,7 +308,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream().filter(SchemaBase::isId).findFirst();
+    return getAllNestedFeatureProperties().stream().filter(SchemaBase::isId).findFirst();
   }
 
   @JsonIgnore
@@ -326,7 +337,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream()
+    return getAllNestedFeatureProperties().stream()
         .filter(SchemaBase::isPrimaryGeometry)
         .findFirst()
         .or(() -> getProperties().stream().filter(SchemaBase::isSpatial).findFirst());
@@ -351,7 +362,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isEmbeddedFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream()
+    return getAllNestedFeatureProperties().stream()
         .filter(SchemaBase::isEmbeddedPrimaryGeometry)
         .findFirst()
         .or(() -> getProperties().stream().filter(SchemaBase::isSpatial).findFirst());
@@ -420,7 +431,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream()
+    return getAllNestedFeatureProperties().stream()
         .filter(SchemaBase::isPrimaryInstant)
         .findFirst()
         .or(
@@ -449,7 +460,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isEmbeddedFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream()
+    return getAllNestedFeatureProperties().stream()
         .filter(SchemaBase::isEmbeddedPrimaryInstant)
         .findFirst()
         .or(
@@ -475,11 +486,15 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     }
 
     Optional<T> start =
-        getAllNestedProperties().stream().filter(SchemaBase::isPrimaryIntervalStart).findFirst();
+        getAllNestedFeatureProperties().stream()
+            .filter(SchemaBase::isPrimaryIntervalStart)
+            .findFirst();
     Optional<T> end =
-        getAllNestedProperties().stream().filter(SchemaBase::isPrimaryIntervalEnd).findFirst();
-    return start.isPresent() || end.isPresent()
-        ? Optional.of(Tuple.of(start.orElse(null), end.orElse(null)))
+        getAllNestedFeatureProperties().stream()
+            .filter(SchemaBase::isPrimaryIntervalEnd)
+            .findFirst();
+    return start.isPresent() && end.isPresent()
+        ? Optional.of(Tuple.of(start.get(), end.get()))
         : Optional.empty();
   }
 
@@ -491,11 +506,11 @@ public interface SchemaBase<T extends SchemaBase<T>> {
       return Optional.empty();
     }
     Optional<T> start =
-        getAllNestedProperties().stream()
+        getAllNestedFeatureProperties().stream()
             .filter(SchemaBase::isEmbeddedPrimaryIntervalStart)
             .findFirst();
     Optional<T> end =
-        getAllNestedProperties().stream()
+        getAllNestedFeatureProperties().stream()
             .filter(SchemaBase::isEmbeddedPrimaryIntervalEnd)
             .findFirst();
 
@@ -544,7 +559,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream().filter(SchemaBase::isSecondaryGeometry).findFirst();
+    return getAllNestedFeatureProperties().stream()
+        .filter(SchemaBase::isSecondaryGeometry)
+        .findFirst();
   }
 
   @JsonIgnore
@@ -566,7 +583,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     if (!isEmbeddedFeature()) {
       return Optional.empty();
     }
-    return getAllNestedProperties().stream()
+    return getAllNestedFeatureProperties().stream()
         .filter(SchemaBase::isEmbeddedSecondaryGeometry)
         .findFirst();
   }
