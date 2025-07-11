@@ -10,11 +10,13 @@ package de.ii.xtraplatform.features.sql.app;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +56,7 @@ public class AggregateStatsQueryGenerator {
 
     String column =
         SqlQueryColumnOperations.getQualifiedColumnResolved(
-            spatialAlias, spatialColumn, sqlDialect);
+            spatialAlias, spatialColumn, sqlDialect, Set.of(Operation.WKB, Operation.WKT));
     if (column.contains(" AS ") && !column.endsWith(")")) {
       column = column.substring(0, column.indexOf(" AS "));
     }
