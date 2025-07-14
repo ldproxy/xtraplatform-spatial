@@ -114,6 +114,9 @@ public interface EpsgCrs {
   @JsonIgnore
   @Value.Lazy
   default String toUrnString() {
+    if (Objects.equals(this, OgcCrs.CRS84) || Objects.equals(this, OgcCrs.CRS84h)) {
+      return String.format("urn:ogc:def:crs:OGC::%d", getCode());
+    }
     return String.format("urn:ogc:def:crs:EPSG::%d", getCode());
   }
 
@@ -122,7 +125,7 @@ public interface EpsgCrs {
   default List<String> toUrnStrings() {
     return getVerticalCode().isPresent()
         ? List.of(
-            toUriString(), String.format("urn:ogc:def:crs:EPSG::%d", getVerticalCode().getAsInt()))
+            toUrnString(), String.format("urn:ogc:def:crs:EPSG::%d", getVerticalCode().getAsInt()))
         : List.of(toUrnString());
   }
 
@@ -136,6 +139,14 @@ public interface EpsgCrs {
       return OgcCrs.CRS84h_URI;
     }
     return String.format("http://www.opengis.net/def/crs/EPSG/0/%d", getCode());
+  }
+
+  @JsonIgnore
+  @Value.Lazy
+  default Optional<String> toAlternativeUriString() {
+    return Objects.equals(this, OgcCrs.CRS84)
+        ? Optional.of(OgcCrs.CRS84_URI_NEW)
+        : Optional.empty();
   }
 
   @JsonIgnore
