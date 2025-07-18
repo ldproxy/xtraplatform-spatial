@@ -16,3 +16,9 @@ dependencies {
     provided project(':xtraplatform-features')
     provided project(':xtraplatform-features-sql')
 }
+
+moduleInfo {
+    requires = [
+            'java.security.jgss', // required by oracle driver
+    ]
+}
