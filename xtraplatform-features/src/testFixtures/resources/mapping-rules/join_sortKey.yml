@@ -19,4 +19,4 @@
 - source: "/explorationsite/[id=explorationsiteid]explorationsite_chronostratigraphy{sortKey=explorationsiteid}/chronostratigraphycodeid"
   target: chronostratigraphy.href
   type: STRING
-  index: 0
+  index: 1

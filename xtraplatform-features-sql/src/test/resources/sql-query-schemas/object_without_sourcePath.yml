@@ -12,3 +12,4 @@
   - name: legalavailability_fk
     pathSegment: legalavailability_fk
     type: STRING
+    schemaIndex: 1

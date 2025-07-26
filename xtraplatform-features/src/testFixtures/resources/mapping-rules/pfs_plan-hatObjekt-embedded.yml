@@ -33,7 +33,7 @@
 - source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/gehoertzuplan_pfs_plan_fk"
   target: hatObjekt.0_gehoertZuPlan.title
   type: STRING
-  index: 0
+  index: 1
 - source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher"
   target: hatObjekt
   type: OBJECT_ARRAY
@@ -55,7 +55,7 @@
 - source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/gehoertzuplan_pfs_plan_fk"
   target: hatObjekt.1_gehoertZuPlan.title
   type: STRING
-  index: 0
+  index: 1
 - source: "/pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/[mikrorohr_fk=_id]bra_mikrorohr"
   target: hatObjekt.1_mikrorohr
   type: OBJECT
