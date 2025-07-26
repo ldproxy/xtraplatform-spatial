@@ -13,6 +13,7 @@ import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ public class MappingRulesDeriver
   @Override
   public List<MappingRule> finalize(FeatureSchema featureSchema, List<MappingRule> mappingRules) {
     Map<String, List<MappingRule>> rulesByTable = new LinkedHashMap<>();
+    Map<String, Integer> schemaIndexes = new HashMap<>();
 
     for (MappingRule rule : mappingRules) {
       // tables
@@ -76,13 +78,28 @@ public class MappingRulesDeriver
         continue;
       }
 
+      if (!schemaIndexes.containsKey(rule.getSource())) {
+        schemaIndexes.put(rule.getSource(), 0);
+      } else {
+        schemaIndexes.put(rule.getSource(), schemaIndexes.get(rule.getSource()) + 1);
+      }
+
+      if (schemaIndexes.get(rule.getSource()) > 0) {
+        rule =
+            new ImmutableMappingRule.Builder()
+                .from(rule)
+                .index(schemaIndexes.get(rule.getSource()))
+                .build();
+      }
+
       String tableIdentifier = rule.getIdentifierParent();
 
       // implicit tables
       if (rule.hasSourceParent() && !rulesByTable.containsKey(tableIdentifier)) {
+        MappingRule finalRule = rule;
         List<String> matchingTables =
             rulesByTable.keySet().stream()
-                .filter(id -> id.startsWith(rule.getSourceParent() + "-"))
+                .filter(id -> id.startsWith(finalRule.getSourceParent() + "-"))
                 .toList();
 
         if (matchingTables.isEmpty()) {

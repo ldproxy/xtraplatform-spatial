@@ -7,11 +7,14 @@
  */
 package de.ii.xtraplatform.features.sql.domain;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryTable.DefaultsFilter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -43,6 +46,9 @@ public interface SqlQueryColumn {
 
   Map<Operation, String[]> getOperations();
 
+  @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = DefaultsFilter.class)
+  int getSchemaIndex();
+
   default boolean hasOperation(Operation operation) {
     return getOperations().containsKey(operation);
   }
@@ -66,5 +72,12 @@ public interface SqlQueryColumn {
       return defaultValue;
     }
     return Arrays.stream(getOperations().get(operation)).findFirst().orElse(defaultValue);
+  }
+
+  class DefaultsFilter {
+    @Override
+    public boolean equals(Object value) {
+      return Objects.equals(value, 0);
+    }
   }
 }

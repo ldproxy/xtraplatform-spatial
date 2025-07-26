@@ -202,11 +202,7 @@ public class FeatureDecoderSql
 
     handleNesting(sqlRow, multiplicitiesForPath);
 
-    boolean isFirstRowForPath =
-        multiplicitiesForPath.isEmpty()
-            || multiplicitiesForPath.get(multiplicitiesForPath.size() - 1) == 1;
-
-    handleColumns(sqlRow, isFirstRowForPath);
+    handleColumns(sqlRow);
 
     if (!isAtLeastOneFeatureWritten) {
       this.isAtLeastOneFeatureWritten = true;
@@ -245,7 +241,7 @@ public class FeatureDecoderSql
     }
   }
 
-  private void handleColumns(SqlRow sqlRow, boolean isFirstRowForPath) {
+  private void handleColumns(SqlRow sqlRow) {
     for (int i = 0; i < sqlRow.getValues().size() && i < sqlRow.getColumnPaths().size(); i++) {
       // TODO: this is a workaround, ideally the paths SchemaMapping would contain the column
       // aliases
@@ -257,16 +253,11 @@ public class FeatureDecoderSql
               : sqlRow.getColumnPaths().get(i);
 
       context.pathTracker().track(columnPath);
-      if (!schemaIndexes.containsKey(columnPath)) {
-        schemaIndexes.put(columnPath, 0);
-      } else if (isFirstRowForPath) {
-        schemaIndexes.put(columnPath, schemaIndexes.get(columnPath) + 1);
-      }
 
       if (sqlRow.isSpatialColumn(i)) {
         if (Objects.nonNull(sqlRow.getValues().get(i))) {
           try {
-            context.setSchemaIndex(schemaIndexes.get(columnPath));
+            context.setSchemaIndex(sqlRow.getSchemaIndex(i));
             if (geometryAsWkb) {
               geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i));
             } else {
@@ -279,7 +270,7 @@ public class FeatureDecoderSql
       } else {
         context.setValueType(Type.STRING);
         context.setValue((String) sqlRow.getValues().get(i));
-        context.setSchemaIndex(schemaIndexes.get(columnPath));
+        context.setSchemaIndex(sqlRow.getSchemaIndex(i));
 
         if (sqlRow.isSubDecoderColumn(i) && Objects.nonNull(context.value())) {
           String subDecoder = sqlRow.getSubDecoder(i);
