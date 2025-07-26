@@ -22,3 +22,4 @@
   - name: chronostratigraphycodeid
     pathSegment: chronostratigraphycodeid
     type: STRING
+    schemaIndex: 1

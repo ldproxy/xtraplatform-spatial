@@ -458,6 +458,7 @@ public class SqlMappingDeriver {
         .type(column.getType())
         .role(column.getRole())
         .operations(getColumnOperations(column, sqlPath, propertySchema))
+        .schemaIndex(column.getIndex())
         .build();
   }
 

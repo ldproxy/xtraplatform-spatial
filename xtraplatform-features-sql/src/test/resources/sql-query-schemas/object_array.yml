@@ -30,3 +30,4 @@
   - name: id
     pathSegment: id
     type: STRING
+    schemaIndex: 1
