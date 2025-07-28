@@ -63,6 +63,10 @@ public interface SqlRow extends Comparable<SqlRow> {
     return "";
   }
 
+  default int getSchemaIndex(int i) {
+    return 0;
+  }
+
   @Override
   default int compareTo(SqlRow sqlRow) {
     return 0;

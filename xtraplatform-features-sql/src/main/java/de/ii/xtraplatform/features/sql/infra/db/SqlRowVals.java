@@ -145,6 +145,14 @@ class SqlRowVals implements SqlRow {
         : "";
   }
 
+  @Override
+  public int getSchemaIndex(int i) {
+    if (!hasColumnSchema(i)) {
+      return 0;
+    }
+    return tableSchema.getColumns().get(i).getSchemaIndex();
+  }
+
   // TODO: use result.nextObject when column type info is supported
   SqlRow read(ResultSet result, SqlQueryOptions queryOptions) {
     this.priority = queryOptions.getContainerPriority();

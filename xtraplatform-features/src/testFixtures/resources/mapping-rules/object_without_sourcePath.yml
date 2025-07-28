@@ -15,4 +15,4 @@
 - source: /explorationsite/legalavailability_fk
   target: legalAvailability.href
   type: STRING
-  index: 0
+  index: 1

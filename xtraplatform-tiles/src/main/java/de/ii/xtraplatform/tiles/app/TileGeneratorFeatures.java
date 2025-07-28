@@ -102,13 +102,14 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     this.async = asyncStartup;
 
     if (async) {
-      init(volatileRegistry);
+      initAsync(volatileRegistry);
     } else {
       setState(State.AVAILABLE);
+      init();
     }
   }
 
-  private void init(VolatileRegistry volatileRegistry) {
+  private void initAsync(VolatileRegistry volatileRegistry) {
     onVolatileStart();
 
     for (TilesetFeatures tileset : data.getTilesets().values()) {
@@ -133,6 +134,24 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
 
       featureProviders.putIfAbsent(featureProviderId, delayedVolatile);
 
+      entityRegistry
+          .getEntity(FeatureProviderEntity.class, featureProviderId)
+          .ifPresent(delayedVolatile::set);
+    }
+
+    init();
+
+    onVolatileStarted();
+  }
+
+  private void init() {
+    for (TilesetFeatures tileset : data.getTilesets().values()) {
+      String featureProviderId =
+          tileset
+              .mergeDefaults(data.getTilesetDefaults())
+              .getFeatureProvider()
+              .orElse(TileProviderFeatures.clean(data.getId()));
+
       tileBuilderForProvider.putIfAbsent(
           featureProviderId,
           tileBuilders.stream()
@@ -140,13 +159,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
               .filter(tb -> tb.isApplicable(featureProviderId))
               .findFirst()
               .orElseThrow(() -> new IllegalStateException("No applicable tile builder found")));
-
-      entityRegistry
-          .getEntity(FeatureProviderEntity.class, featureProviderId)
-          .ifPresent(delayedVolatile::set);
     }
-
-    onVolatileStarted();
   }
 
   private FeatureProvider getFeatureProvider(TilesetFeatures tileset) {

@@ -23,4 +23,4 @@
 - source: "/explorationsite/[id=explorationsite_fk]explorationsite_task/[task_fk=id]task/id"
   target: task.href
   type: STRING
-  index: 0
+  index: 1
