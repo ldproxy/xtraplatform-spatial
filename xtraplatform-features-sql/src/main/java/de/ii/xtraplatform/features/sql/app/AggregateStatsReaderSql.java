@@ -70,7 +70,7 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
             Transformer.flatMap(
                 mapping -> {
                   Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> spatial =
-                      mapping.getColumnForPrimaryGeometry();
+                      mapping.getColumnForFilterGeometry();
 
                   if (spatial.isEmpty()) {
                     return Source.empty();
