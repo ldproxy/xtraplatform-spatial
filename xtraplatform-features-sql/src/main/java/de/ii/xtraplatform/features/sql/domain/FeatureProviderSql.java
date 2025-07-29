@@ -1167,7 +1167,6 @@ public class FeatureProviderSql
         ImmutableMutationResult.builder()
             .type(featureId.isPresent() ? partial ? Type.UPDATE : Type.REPLACE : Type.CREATE)
             .hasFeatures(false);
-    FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
 
     Source<FeatureDataSql> featureSqlSource =
         featureTokenSource

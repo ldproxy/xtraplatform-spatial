@@ -7,6 +7,9 @@
  */
 package de.ii.xtraplatform.geometries.domain
 
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableSimplifyLine
+import de.ii.xtraplatform.geometries.domain.transform.SimplifyLine
 import spock.lang.Specification
 
 class SimplifyLineSpec extends Specification {
@@ -15,18 +18,18 @@ class SimplifyLineSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(next, 1.0, 0)
+        CoordinatesTransformation next = Mock()
+        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(Optional.of(next), 1.0)
         double[] coordinates = [10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0]
         int dimension = 2
 
         when:
 
-        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension)
+        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
 
         then:
 
-        1 * next.onCoordinates([10.0, 10.0, 13.0, 10.0], 4, dimension)
+        1 * next.onCoordinates([10.0, 10.0, 13.0, 10.0], 4, 2, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
         0 * _
     }
 
@@ -34,18 +37,18 @@ class SimplifyLineSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(next, 1.0, 0)
+        CoordinatesTransformation next = Mock()
+        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(Optional.of(next), 1.0)
         double[] coordinates = [10.0, 10.0, 10.0, 11.0, 11.0, 10.0, 12.0, 9.0, 10.0, 13.0, 10.0, 10.0]
         int dimension = 3
 
         when:
 
-        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension)
+        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
 
         then:
 
-        1 * next.onCoordinates([10.0, 10.0, 10.0, 13.0, 10.0, 10.0], 6, dimension)
+        1 * next.onCoordinates([10.0, 10.0, 10.0, 13.0, 10.0, 10.0], 6, 3, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
         0 * _
     }
 
@@ -53,18 +56,18 @@ class SimplifyLineSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(next, 0.99, 0)
+        CoordinatesTransformation next = Mock()
+        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(Optional.of(next), 0.99)
         double[] coordinates = [10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0]
         int dimension = 2
 
         when:
 
-        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension)
+        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
 
         then:
 
-        1 * next.onCoordinates(coordinates, coordinates.length, dimension)
+        1 * next.onCoordinates(coordinates, 8, 2, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
         0 * _
     }
 
@@ -72,18 +75,18 @@ class SimplifyLineSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(next, 1.35, 3)
+        CoordinatesTransformation next = Mock()
+        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(Optional.of(next), 1.35)
         double[] coordinates = [10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0]
         int dimension = 2
 
         when:
 
-        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension)
+        simplifyLine.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(3))
 
         then:
 
-        1 * next.onCoordinates([10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0], 8, dimension)
+        1 * next.onCoordinates([10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0], 8, 2, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(3))
         0 * _
     }
 }

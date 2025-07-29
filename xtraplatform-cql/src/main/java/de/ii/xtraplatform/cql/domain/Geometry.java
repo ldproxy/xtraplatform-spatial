@@ -50,6 +50,8 @@ import org.immutables.value.Value;
 @JsonSerialize(using = Geometry.Serializer.class)
 public interface Geometry<T> extends CqlNode {
 
+  // TODO migrate to new Geometry interface
+
   enum Type {
     Point,
     LineString,

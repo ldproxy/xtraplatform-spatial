@@ -7,24 +7,26 @@
  */
 package de.ii.xtraplatform.features.json.domain;
 
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 
 public enum GeoJsonGeometryType {
-  POINT("Point", SimpleFeatureGeometry.POINT),
-  MULTI_POINT("MultiPoint", SimpleFeatureGeometry.MULTI_POINT),
-  LINE_STRING("LineString", SimpleFeatureGeometry.LINE_STRING),
-  MULTI_LINE_STRING("MultiLineString", SimpleFeatureGeometry.MULTI_LINE_STRING),
-  POLYGON("Polygon", SimpleFeatureGeometry.POLYGON),
-  MULTI_POLYGON("MultiPolygon", SimpleFeatureGeometry.MULTI_POLYGON),
-  GEOMETRY_COLLECTION("GeometryCollection", SimpleFeatureGeometry.GEOMETRY_COLLECTION),
-  NONE("", SimpleFeatureGeometry.NONE);
+  POINT("Point", GeometryType.POINT),
+  MULTI_POINT("MultiPoint", GeometryType.MULTI_POINT),
+  LINE_STRING("LineString", GeometryType.LINE_STRING),
+  MULTI_LINE_STRING("MultiLineString", GeometryType.MULTI_LINE_STRING),
+  POLYGON("Polygon", GeometryType.POLYGON),
+  MULTI_POLYGON("MultiPolygon", GeometryType.MULTI_POLYGON),
+  MULTI_POLYGON2("MultiPolygon", GeometryType.POLYHEDRAL_SURFACE),
+  GEOMETRY_COLLECTION("GeometryCollection", GeometryType.GEOMETRY_COLLECTION),
+  NONE("", GeometryType.ANY);
 
-  private String stringRepresentation;
-  private SimpleFeatureGeometry sfType;
+  private final String stringRepresentation;
+  private final GeometryType geometryType;
 
-  GeoJsonGeometryType(String stringRepresentation, SimpleFeatureGeometry sfType) {
+  GeoJsonGeometryType(String stringRepresentation, GeometryType geometryType) {
     this.stringRepresentation = stringRepresentation;
-    this.sfType = sfType;
+    this.geometryType = geometryType;
   }
 
   @Override
@@ -32,8 +34,8 @@ public enum GeoJsonGeometryType {
     return stringRepresentation;
   }
 
-  public SimpleFeatureGeometry toSimpleFeatureGeometry() {
-    return sfType;
+  public GeometryType toGeometryType() {
+    return geometryType;
   }
 
   public static GeoJsonGeometryType forString(String type) {
@@ -46,9 +48,9 @@ public enum GeoJsonGeometryType {
     return NONE;
   }
 
-  public static GeoJsonGeometryType forSimpleFeatureType(SimpleFeatureGeometry type) {
+  public static GeoJsonGeometryType forGeometry(Geometry<?> geometry) {
     for (GeoJsonGeometryType geoJsonType : GeoJsonGeometryType.values()) {
-      if (geoJsonType.sfType.equals(type)) {
+      if (geoJsonType.geometryType != null && geoJsonType.geometryType.equals(geometry.getType())) {
         return geoJsonType;
       }
     }
@@ -61,6 +63,6 @@ public enum GeoJsonGeometryType {
   }
 
   public boolean isSupported() {
-    return isValid() && this != GEOMETRY_COLLECTION;
+    return isValid();
   }
 }

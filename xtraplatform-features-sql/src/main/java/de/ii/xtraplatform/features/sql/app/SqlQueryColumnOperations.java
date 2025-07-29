@@ -28,14 +28,15 @@ public interface SqlQueryColumnOperations {
 
   static String getQualifiedColumnResolved(
       String tableAlias, SqlQueryColumn column, SqlDialect sqlDialect) {
-    return getQualifiedColumnResolved(tableAlias, column, sqlDialect, Set.of());
+    return getQualifiedColumnResolved(tableAlias, column, sqlDialect, Set.of(), false);
   }
 
   static String getQualifiedColumnResolved(
       String tableAlias,
       SqlQueryColumn column,
       SqlDialect sqlDialect,
-      Set<Operation> excludeOperations) {
+      Set<Operation> excludeOperations,
+      boolean forceLinearizeCurves) {
     String name = getQualifiedColumn(tableAlias, column);
 
     Map<Operation, String[]> ops = column.getOperations();
@@ -57,12 +58,14 @@ public interface SqlQueryColumnOperations {
     }
     if (ops.containsKey(Operation.WKT) && !excludeOperations.contains(Operation.WKT)) {
       boolean isForcePolygonCCW = ops.containsKey(Operation.FORCE_POLYGON_CCW);
-      boolean shouldLinearizeCurves = ops.containsKey(Operation.LINEARIZE_CURVES);
+      boolean shouldLinearizeCurves =
+          ops.containsKey(Operation.LINEARIZE_CURVES) || forceLinearizeCurves;
       return sqlDialect.applyToWkt(name, isForcePolygonCCW, shouldLinearizeCurves);
     }
     if (ops.containsKey(Operation.WKB) && !excludeOperations.contains(Operation.WKB)) {
       boolean isForcePolygonCCW = ops.containsKey(Operation.FORCE_POLYGON_CCW);
-      boolean shouldLinearizeCurves = ops.containsKey(Operation.LINEARIZE_CURVES);
+      boolean shouldLinearizeCurves =
+          ops.containsKey(Operation.LINEARIZE_CURVES) || forceLinearizeCurves;
       return sqlDialect.applyToWkb(name, isForcePolygonCCW, shouldLinearizeCurves);
     }
     if (ops.containsKey(Operation.DATE) && !excludeOperations.contains(Operation.DATE)) {

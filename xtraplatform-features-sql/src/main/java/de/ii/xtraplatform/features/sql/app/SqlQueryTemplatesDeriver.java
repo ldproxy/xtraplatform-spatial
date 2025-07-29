@@ -30,6 +30,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -156,7 +157,13 @@ public class SqlQueryTemplatesDeriver {
   }
 
   ValueQueryTemplate createValueQueryTemplate(SqlQuerySchema schema, SqlQueryMapping mapping) {
-    return (limit, offset, additionalSortKeys, filter, minMaxKeys, virtualTables) -> {
+    return (limit,
+        offset,
+        additionalSortKeys,
+        filter,
+        forceSimpleFeatures,
+        minMaxKeys,
+        virtualTables) -> {
       boolean isIdFilter =
           filter
               .filter(
@@ -181,7 +188,13 @@ public class SqlQueryTemplatesDeriver {
                       limit > 0 ? sqlDialect.applyToLimit(limit) : "",
                       offset > 0 ? sqlDialect.applyToOffset(offset) : ""));
 
-      return getTableQuery(schema, whereClause, pagingClause, additionalSortKeys, virtualTables);
+      return getTableQuery(
+          schema,
+          whereClause,
+          pagingClause,
+          additionalSortKeys,
+          virtualTables,
+          forceSimpleFeatures);
     };
   }
 
@@ -190,7 +203,8 @@ public class SqlQueryTemplatesDeriver {
       Optional<String> whereClause,
       Optional<String> pagingClause,
       List<SortKey> additionalSortKeys,
-      Map<String, String> virtualTables) {
+      Map<String, String> virtualTables,
+      boolean forceSimpleFeatures) {
     SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
     List<String> aliases = AliasGenerator.getAliases(schema);
     String attributeContainerAlias = aliases.get(aliases.size() - 1);
@@ -210,7 +224,11 @@ public class SqlQueryTemplatesDeriver {
                     .map(
                         column ->
                             SqlQueryColumnOperations.getQualifiedColumnResolved(
-                                attributeContainerAlias, column, sqlDialect)))
+                                attributeContainerAlias,
+                                column,
+                                sqlDialect,
+                                Set.of(),
+                                forceSimpleFeatures)))
             .collect(Collectors.joining(", "));
 
     String join = JoinGenerator.getJoins(schema, aliases, filterEncoder);

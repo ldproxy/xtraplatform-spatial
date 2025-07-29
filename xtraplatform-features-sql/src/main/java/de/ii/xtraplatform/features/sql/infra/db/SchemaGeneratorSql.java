@@ -14,10 +14,10 @@ import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
 import de.ii.xtraplatform.features.domain.SchemaGenerator;
-import de.ii.xtraplatform.features.sql.app.SimpleFeatureGeometryFromToWkt;
 import de.ii.xtraplatform.features.sql.domain.SqlClientBasic;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter.GeoInfo;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WktWkbGeometryType;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -204,8 +204,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
               }
 
               featureProperty.geometryType(
-                  SimpleFeatureGeometryFromToWkt.fromString(geometryInfo.getType())
-                      .toSimpleFeatureGeometry());
+                  WktWkbGeometryType.valueOf(geometryInfo.getType()).toGeometryType());
             }
             featureType.putPropertyMap(column.getName(), featureProperty.build());
           }
@@ -276,8 +275,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
           }
 
           featureProperty.geometryType(
-              SimpleFeatureGeometryFromToWkt.fromString(geometryInfo.getType())
-                  .toSimpleFeatureGeometry());
+              WktWkbGeometryType.valueOf(geometryInfo.getType()).toGeometryType());
         }
         featureType.putPropertyMap(column.getName(), featureProperty.build());
       }
@@ -296,25 +294,23 @@ public class SchemaGeneratorSql implements SchemaGenerator {
 
   private SchemaBase.Type getFeaturePropertyType(ColumnDataType columnDataType) {
     // TODO: pass GeoInfo to determine geo columns
-    if (SimpleFeatureGeometryFromToWkt.fromString(columnDataType.getName())
-        != SimpleFeatureGeometryFromToWkt.NONE) {
-      return SchemaBase.Type.GEOMETRY;
+    try {
+      if ("GEOMETRY".equals(columnDataType.getName())
+          || WktWkbGeometryType.valueOf(columnDataType.getName()) != WktWkbGeometryType.NONE) {
+        return SchemaBase.Type.GEOMETRY;
+      }
+    } catch (Exception ignore) {
+      // ignore, not a geometry
     }
 
-    switch (columnDataType.getJavaSqlType().getJavaSqlTypeGroup()) {
-      case bit:
-        return SchemaBase.Type.BOOLEAN;
-      case character:
-        return SchemaBase.Type.STRING;
-      case integer:
-        return SchemaBase.Type.INTEGER;
-      case real:
-        return SchemaBase.Type.FLOAT;
-      case temporal:
-        return SchemaBase.Type.DATETIME;
-      default:
-        return SchemaBase.Type.UNKNOWN;
-    }
+    return switch (columnDataType.getJavaSqlType().getJavaSqlTypeGroup()) {
+      case bit -> SchemaBase.Type.BOOLEAN;
+      case character -> SchemaBase.Type.STRING;
+      case integer -> SchemaBase.Type.INTEGER;
+      case real -> SchemaBase.Type.FLOAT;
+      case temporal -> SchemaBase.Type.DATETIME;
+      default -> SchemaBase.Type.UNKNOWN;
+    };
   }
 
   @Override

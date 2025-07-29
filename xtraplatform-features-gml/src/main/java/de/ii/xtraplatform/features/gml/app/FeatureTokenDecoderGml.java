@@ -19,12 +19,11 @@ import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.gml.domain.GmlGeometryType;
 import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import javax.xml.namespace.QName;
@@ -66,7 +65,7 @@ public class FeatureTokenDecoderGml
   private boolean inFeature = false;
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
   private FeatureSchema currentGeometrySchema;
-  private SimpleFeatureGeometry currentGeometryType;
+  private GeometryType currentGeometryType;
 
   public FeatureTokenDecoderGml(
       Map<String, String> namespaces,
@@ -83,7 +82,7 @@ public class FeatureTokenDecoderGml
     this.buffer = new StringBuilder();
     this.multiplicityTracker = new GmlMultiplicityTracker();
     this.currentGeometrySchema = null;
-    this.currentGeometryType = SimpleFeatureGeometry.NONE;
+    this.currentGeometryType = GeometryType.ANY;
     this.passThrough = passThrough;
 
     try {
@@ -91,6 +90,9 @@ public class FeatureTokenDecoderGml
     } catch (XMLStreamException e) {
       throw new IllegalStateException("Could not create GML decoder: " + e.getMessage());
     }
+
+    // TODO migrate GML decoder, re-enable unit tests
+    throw new IllegalStateException("The GML decoder has not been migrated yet.");
   }
 
   @Override
@@ -238,7 +240,7 @@ public class FeatureTokenDecoderGml
             if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
               if (Objects.isNull(currentGeometrySchema)) {
                 this.currentGeometrySchema = context.schema().get();
-                context.setInGeometry(true);
+                // TODO context.setInGeometry(true);
               }
               onGeometryPart(parser.getLocalName(), depth - featureDepth == 2);
             } else if (context.schema().filter(FeatureSchema::isObject).isPresent()) {
@@ -255,7 +257,7 @@ public class FeatureTokenDecoderGml
 
           if (inFeature
               && depth > featureDepth + 1
-              && !context.inGeometry()
+              // TODO && !context.inGeometry()
               && context.schema().filter(FeatureSchema::isObject).isPresent()) {
             context
                 .additionalInfo()
@@ -296,10 +298,12 @@ public class FeatureTokenDecoderGml
                 onGeometryPartEnd(parser.getLocalName(), depth - featureDepth == 2);
               } else {
                 this.currentGeometrySchema = null;
-                this.currentGeometryType = SimpleFeatureGeometry.NONE;
+                this.currentGeometryType = GeometryType.ANY;
+                /*  TODO
                 context.setInGeometry(false);
                 context.setGeometryType(Optional.empty());
                 context.setGeometryDimension(OptionalInt.empty());
+                 */
 
                 getDownstream().onObjectEnd(context);
               }
@@ -362,12 +366,12 @@ public class FeatureTokenDecoderGml
       return;
     }
 
-    if (currentGeometryType == SimpleFeatureGeometry.NONE) {
-      final SimpleFeatureGeometry geometryType =
+    if (currentGeometryType == GeometryType.ANY) {
+      final GeometryType geometryType =
           GmlGeometryType.fromString(localName).toSimpleFeatureGeometry();
-      if (geometryType.isValid()) {
+      if (!geometryType.isAbstract()) {
         this.currentGeometryType = geometryType;
-        context.setGeometryType(currentGeometryType);
+        // TODO context.setGeometryType(currentGeometryType);
 
         OptionalInt dimension = OptionalInt.empty();
         if (context.additionalInfo().containsKey("srsDimension")) {
@@ -378,8 +382,10 @@ public class FeatureTokenDecoderGml
             // ignore
           }
         }
+        /* TODO
         context.setGeometryDimension(dimension);
         context.setInGeometry(true);
+         */
 
         List<String> path = context.pathTracker().asList();
 

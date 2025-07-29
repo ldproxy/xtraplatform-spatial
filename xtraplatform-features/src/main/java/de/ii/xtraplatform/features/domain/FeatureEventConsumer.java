@@ -7,9 +7,8 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
-import java.util.Optional;
 import java.util.OptionalLong;
 
 public interface FeatureEventConsumer {
@@ -22,13 +21,15 @@ public interface FeatureEventConsumer {
 
   void onFeatureEnd();
 
-  void onObjectStart(List<String> path, Optional<SimpleFeatureGeometry> geometryType);
+  void onObjectStart(List<String> path);
 
   void onObjectEnd();
 
   void onArrayStart(List<String> path);
 
   void onArrayEnd();
+
+  void onGeometry(List<String> path, Geometry<?> geometry);
 
   void onValue(List<String> path, String value, SchemaBase.Type valueType);
 }

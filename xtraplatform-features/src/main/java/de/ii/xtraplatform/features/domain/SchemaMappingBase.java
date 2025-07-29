@@ -12,7 +12,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -295,7 +295,7 @@ public interface SchemaMappingBase<T extends SchemaBase<T>> {
     return parents;
   }
 
-  T schemaWithGeometryType(T schema, SimpleFeatureGeometry geometryType);
+  T schemaWithGeometryType(T schema, GeometryType geometryType);
 
   default Optional<String> getPathSeparator() {
     return Optional.empty();

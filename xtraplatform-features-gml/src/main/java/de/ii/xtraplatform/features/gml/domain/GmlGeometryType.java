@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.features.gml.domain;
 
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 
 public enum GmlGeometryType {
   GEOMETRY("GeometryPropertyType"),
@@ -62,49 +62,16 @@ public enum GmlGeometryType {
     return false;
   }
 
-  public SimpleFeatureGeometry toSimpleFeatureGeometry() {
-    SimpleFeatureGeometry simpleFeatureGeometry = SimpleFeatureGeometry.NONE;
-
-    switch (this) {
-      case GEOMETRY:
-      case ABSTRACT_GEOMETRY:
-        simpleFeatureGeometry = SimpleFeatureGeometry.ANY;
-        break;
-      case POINT:
-        simpleFeatureGeometry = SimpleFeatureGeometry.POINT;
-        break;
-      case MULTI_POINT:
-        simpleFeatureGeometry = SimpleFeatureGeometry.MULTI_POINT;
-        break;
-      case LINE_STRING:
-        simpleFeatureGeometry = SimpleFeatureGeometry.LINE_STRING;
-        break;
-      case MULTI_LINESTRING:
-        simpleFeatureGeometry = SimpleFeatureGeometry.MULTI_LINE_STRING;
-        break;
-      case CURVE:
-        simpleFeatureGeometry = SimpleFeatureGeometry.LINE_STRING;
-        break;
-      case MULTI_CURVE:
-        simpleFeatureGeometry = SimpleFeatureGeometry.MULTI_LINE_STRING;
-        break;
-      case SURFACE:
-        simpleFeatureGeometry = SimpleFeatureGeometry.POLYGON;
-        break;
-      case MULTI_SURFACE:
-        simpleFeatureGeometry = SimpleFeatureGeometry.MULTI_POLYGON;
-        break;
-      case POLYGON:
-        simpleFeatureGeometry = SimpleFeatureGeometry.POLYGON;
-        break;
-      case MULTI_POLYGON:
-        simpleFeatureGeometry = SimpleFeatureGeometry.MULTI_POLYGON;
-        break;
-      case SOLID:
-        break;
-    }
-
-    return simpleFeatureGeometry;
+  public GeometryType toSimpleFeatureGeometry() {
+    return switch (this) {
+      case POINT -> GeometryType.POINT;
+      case MULTI_POINT -> GeometryType.MULTI_POINT;
+      case LINE_STRING, CURVE -> GeometryType.LINE_STRING;
+      case MULTI_LINESTRING, MULTI_CURVE -> GeometryType.MULTI_LINE_STRING;
+      case SURFACE, POLYGON -> GeometryType.POLYGON;
+      case MULTI_SURFACE, MULTI_POLYGON -> GeometryType.MULTI_POLYGON;
+      default -> GeometryType.ANY;
+    };
   }
 
   public boolean isValid() {

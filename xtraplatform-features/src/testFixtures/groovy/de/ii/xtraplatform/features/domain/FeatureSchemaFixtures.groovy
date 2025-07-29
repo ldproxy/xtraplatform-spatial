@@ -9,7 +9,7 @@ package de.ii.xtraplatform.features.domain
 
 
 import de.ii.xtraplatform.features.domain.SchemaBase.Type
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+import de.ii.xtraplatform.geometries.domain.GeometryType
 
 class FeatureSchemaFixtures {
 
@@ -484,7 +484,7 @@ class FeatureSchemaFixtures {
                             .putProperties2("geometry", new ImmutableFeatureSchema.Builder()
                                     .sourcePath("[sch=ags]verwaltungseinheit/geometrie")
                                     .type(Type.GEOMETRY)
-                                    .geometryType(SimpleFeatureGeometry.MULTI_POLYGON)
+                                    .geometryType(GeometryType.MULTI_POLYGON)
                                     .role(SchemaBase.Role.PRIMARY_GEOMETRY))
                             .build(),
                     new ImmutableFeatureSchema.Builder()
@@ -497,7 +497,7 @@ class FeatureSchemaFixtures {
                             .putProperties2("geometry", new ImmutableFeatureSchema.Builder()
                                     .sourcePath("[sch=ags]verwaltungseinheit/geometrie")
                                     .type(Type.GEOMETRY)
-                                    .geometryType(SimpleFeatureGeometry.MULTI_POLYGON)
+                                    .geometryType(GeometryType.MULTI_POLYGON)
                                     .role(SchemaBase.Role.PRIMARY_GEOMETRY))
                             .putProperties2("upperLevelUnit", new ImmutableFeatureSchema.Builder()
                                     .type(Type.OBJECT)
