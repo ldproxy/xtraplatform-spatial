@@ -387,6 +387,7 @@ public class SqlMappingDeriver {
             .name(sqlPath.getName())
             .pathSegment(sqlPath.asPath())
             .sortKey(sqlPath.getSortKey())
+            .primaryKey(sqlPath.getPrimaryKey())
             .filter(sqlPath.getFilter().map(expr -> (Operation<?>) expr))
             .columns(columns.stream().map(column -> getColumn(schema, column)).toList())
             .filterColumns(
