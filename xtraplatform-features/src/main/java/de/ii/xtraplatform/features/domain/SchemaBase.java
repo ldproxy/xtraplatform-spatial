@@ -40,6 +40,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     PRIMARY_INTERVAL_START,
     PRIMARY_INTERVAL_END,
     SECONDARY_GEOMETRY,
+    FILTER_GEOMETRY,
     EMBEDDED_FEATURE,
     FEATURE_REF
   }
@@ -584,6 +585,19 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
+  default Optional<T> getFilterGeometry() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
+    return getAllNestedFeatureProperties().stream()
+        .filter(SchemaBase::isFilterGeometry)
+        .findFirst()
+        .or(this::getPrimaryGeometry);
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
   default List<String> getFullPath() {
     return new ImmutableList.Builder<String>().addAll(getParentPath()).addAll(getPath()).build();
   }
@@ -761,6 +775,13 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Auxiliary
   default boolean isSecondaryGeometry() {
     return getRole().filter(role -> role == Role.SECONDARY_GEOMETRY).isPresent();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isFilterGeometry() {
+    return getRole().filter(role -> role == Role.FILTER_GEOMETRY).isPresent();
   }
 
   @JsonIgnore

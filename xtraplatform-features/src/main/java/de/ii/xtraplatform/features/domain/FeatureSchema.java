@@ -141,10 +141,11 @@ public interface FeatureSchema
    *     specified at the property of an object that contains the name of a subobject type. If an
    *     object type has multiple geometry properties, then specify `PRIMARY_GEOMETRY` at the
    *     property to be used for `bbox` queries and to be encoded in data formats with exactly one
-   *     or a singled out geometry (e.g. in GeoJSON `geometry`). If an object type has multiple
-   *     temporal properties, then `PRIMARY_INSTANT` should be specified at the property to be used
-   *     for `datetime` queries, provided that a time instant describes the temporal extent of the
-   *     features. If, on the other hand, the temporal extent is a time interval, then
+   *     or a singled out geometry (e.g. in GeoJSON `geometry`). If `FILTER_GEOMETRY` is specified
+   *     for another geometry, that geometry is used for `bbox` queries. If an object type has
+   *     multiple temporal properties, then `PRIMARY_INSTANT` should be specified at the property to
+   *     be used for `datetime` queries, provided that a time instant describes the temporal extent
+   *     of the features. If, on the other hand, the temporal extent is a time interval, then
    *     `PRIMARY_INTERVAL_START` and `PRIMARY_INTERVAL_END` should be specified at the respective
    *     temporal properties.
    * @langDe Kennzeichnet besondere Bedeutungen der Eigenschaft. `ID` ist bei der Eigenschaft eines
@@ -155,12 +156,13 @@ public interface FeatureSchema
    *     Unterobjektart enthält. Hat eine Objektart mehrere Geometrieeigenschaften, dann ist
    *     `PRIMARY_GEOMETRY` bei der Eigenschaft anzugeben, die für `bbox`-Abfragen verwendet werden
    *     soll und die in Datenformaten mit genau einer oder einer herausgehobenen Geometrie (z.B. in
-   *     GeoJSON `geometry`) kodiert werden soll. Hat eine Objektart mehrere zeitliche
-   *     Eigenschaften, dann sollte `PRIMARY_INSTANT` bei der Eigenschaft angegeben werden, die für
-   *     `datetime`-Abfragen verwendet werden soll, sofern ein Zeitpunkt die zeitliche Ausdehnung
-   *     der Features beschreibt. Ist die zeitliche Ausdehnung hingegen ein Zeitintervall, dann sind
-   *     `PRIMARY_INTERVAL_START` und `PRIMARY_INTERVAL_END` bei den jeweiligen zeitlichen
-   *     Eigenschaften anzugeben.
+   *     GeoJSON `geometry`) kodiert werden soll. Wenn `FILTER_GEOMETRY` für eine andere Geometrie
+   *     angegeben wird, dann wird diese Geometrie für `bbox`-Abfragen genutzt. Hat eine Objektart
+   *     mehrere zeitliche Eigenschaften, dann sollte `PRIMARY_INSTANT` bei der Eigenschaft
+   *     angegeben werden, die für `datetime`-Abfragen verwendet werden soll, sofern ein Zeitpunkt
+   *     die zeitliche Ausdehnung der Features beschreibt. Ist die zeitliche Ausdehnung hingegen ein
+   *     Zeitintervall, dann sind `PRIMARY_INTERVAL_START` und `PRIMARY_INTERVAL_END` bei den
+   *     jeweiligen zeitlichen Eigenschaften anzugeben.
    * @default null
    */
   @Override

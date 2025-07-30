@@ -27,7 +27,8 @@ public class WithoutProperties implements SchemaVisitorTopDown<FeatureSchema, Fe
   public FeatureSchema visit(
       FeatureSchema schema, List<FeatureSchema> parents, List<FeatureSchema> visitedProperties) {
 
-    if (schema.isPrimaryGeometry() && skipGeometry) {
+    if ((schema.isPrimaryGeometry() || schema.isSecondaryGeometry() || schema.isFilterGeometry())
+        && skipGeometry) {
       return null;
     }
 

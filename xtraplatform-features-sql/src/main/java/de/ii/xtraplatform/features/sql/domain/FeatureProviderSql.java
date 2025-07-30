@@ -911,7 +911,7 @@ public class FeatureProviderSql
     if (cache.hasValid(cacheValidator, cacheKey)) {
       if (LOGGER.isDebugEnabled()) {
         Optional.ofNullable(getData().getTypes().get(typeName))
-            .flatMap(SchemaBase::getPrimaryGeometry)
+            .flatMap(SchemaBase::getFilterGeometry)
             .map(SchemaBase::getName)
             .ifPresent(
                 spatialProperty ->
@@ -924,7 +924,7 @@ public class FeatureProviderSql
 
     if (LOGGER.isDebugEnabled()) {
       Optional.ofNullable(getData().getTypes().get(typeName))
-          .flatMap(SchemaBase::getPrimaryGeometry)
+          .flatMap(SchemaBase::getFilterGeometry)
           .map(SchemaBase::getName)
           .ifPresent(
               spatialProperty ->
