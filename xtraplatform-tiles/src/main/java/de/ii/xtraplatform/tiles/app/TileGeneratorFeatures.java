@@ -27,9 +27,7 @@ import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureTokenEncoder;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.profile.ImmutableProfileTransformations;
-import de.ii.xtraplatform.features.domain.profile.ProfileSet;
-import de.ii.xtraplatform.features.domain.profile.ProfileSetRel;
-import de.ii.xtraplatform.features.domain.profile.ProfileSetVal;
+import de.ii.xtraplatform.features.domain.profile.ProfileTransformations;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.WithTransformationsApplied;
@@ -83,7 +81,6 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
   private final Set<TileBuilder> tileBuilders;
   private final Map<String, DelayedVolatile<FeatureProvider>> featureProviders;
   private final Map<String, TileBuilder> tileBuilderForProvider;
-  private final List<ProfileSet> profileSets;
   private final boolean async;
 
   public TileGeneratorFeatures(
@@ -102,7 +99,6 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     this.tileBuilders = tileBuilders;
     this.featureProviders = new LinkedHashMap<>();
     this.tileBuilderForProvider = new LinkedHashMap<>();
-    this.profileSets = List.of(new ProfileSetRel(), new ProfileSetVal());
     this.async = asyncStartup;
 
     if (async) {
@@ -295,8 +291,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
             tileQuery.getBoundingBox(),
             clip(tileQuery.getBoundingBox(), getBounds(tileQuery)),
             featureProvider,
-            baseTransformations,
-            profileSets);
+            baseTransformations);
   }
 
   private PropertyTransformations getPropertyTransformations(
@@ -306,14 +301,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     tileset
         .getProfiles()
         .forEach(
-            profile -> {
-              profileSets.stream()
-                  .filter(p -> profile.startsWith(p.getPrefix()))
-                  .forEach(
-                      p ->
-                          p.addPropertyTransformations(
-                              profile, schema, mediaType.toString(), transformationBuilder));
-            });
+            profileId ->
+                ProfileTransformations.addPredefined(
+                    profileId, schema, mediaType.toString(), transformationBuilder));
     return transformationBuilder.build();
   }
 

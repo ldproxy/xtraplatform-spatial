@@ -32,7 +32,6 @@ import de.ii.xtraplatform.features.domain.FeatureStream.ResultReduced;
 import de.ii.xtraplatform.features.domain.FeatureTokenEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase;
-import de.ii.xtraplatform.features.domain.profile.ProfileSet;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
@@ -114,8 +113,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
       BoundingBox tileBounds,
       Optional<BoundingBox> clippedBounds,
       FeatureProvider featureProvider,
-      PropertyTransformations baseTransformations,
-      List<ProfileSet> profileSets) {
+      PropertyTransformations baseTransformations) {
     if (!timers.containsKey(featureProvider.getId())) {
       timers.put(
           featureProvider.getId(),
