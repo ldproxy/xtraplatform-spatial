@@ -52,8 +52,7 @@ public class FeatureMutationsSql {
 
     RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
 
-    String primaryKey =
-        schema.getMainTable().getPrimaryKey().orElse(sqlPathDefaults.getPrimaryKey());
+    String primaryKey = schema.getMainTable().getPrimaryKey();
 
     return sqlClient
         .get()
@@ -69,8 +68,7 @@ public class FeatureMutationsSql {
 
     RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
 
-    String primaryKey =
-        schema.getMainTable().getPrimaryKey().orElse(sqlPathDefaults.getPrimaryKey());
+    String primaryKey = schema.getMainTable().getPrimaryKey();
 
     return sqlClient
         .get()

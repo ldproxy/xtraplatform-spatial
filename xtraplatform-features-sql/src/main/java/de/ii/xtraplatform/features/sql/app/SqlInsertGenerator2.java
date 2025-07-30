@@ -81,7 +81,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     }
 
     // TODO: id instead of primaryKey if isPresent
-    String primaryKey = schema.getPrimaryKey().orElse(sqlOptions.getPrimaryKey());
+    String primaryKey = schema.getPrimaryKey();
 
     Set<String> columns0 =
         schema.getWritableColumns().stream()
