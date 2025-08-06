@@ -22,6 +22,13 @@ public interface MultiSurface extends AbstractGeometryCollection<Surface<?>> {
 
   static MultiSurface of(List<Surface<?>> surfaces) {
     return ImmutableMultiSurface.builder()
+        .crs(
+            surfaces.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(surfaces.stream().filter(ls -> !ls.isEmpty()).toList())
         .build();
   }

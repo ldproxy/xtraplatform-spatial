@@ -22,6 +22,13 @@ public interface MultiPoint extends AbstractGeometryCollection<Point> {
 
   static MultiPoint of(List<Point> points) {
     return ImmutableMultiPoint.builder()
+        .crs(
+            points.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(points.stream().filter(pt -> !pt.isEmpty()).toList())
         .build();
   }

@@ -22,6 +22,13 @@ public interface CurvePolygon extends SingleSurface<Curve<?>> {
 
   static CurvePolygon of(List<Curve<?>> rings) {
     return ImmutableCurvePolygon.builder()
+        .crs(
+            rings.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(rings.stream().filter(ls -> !ls.isEmpty()).toList())
         .build();
   }

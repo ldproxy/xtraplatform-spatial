@@ -22,6 +22,13 @@ public interface MultiCurve extends AbstractGeometryCollection<Curve<?>> {
 
   static MultiCurve of(List<Curve<?>> curves) {
     return ImmutableMultiCurve.builder()
+        .crs(
+            curves.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(curves.stream().filter(ls -> !ls.isEmpty()).toList())
         .build();
   }

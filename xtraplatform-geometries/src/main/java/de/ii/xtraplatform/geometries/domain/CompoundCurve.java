@@ -23,6 +23,13 @@ public interface CompoundCurve extends Curve<List<SingleCurve>>, CompositeGeomet
 
   static CompoundCurve of(List<SingleCurve> curves) {
     return ImmutableCompoundCurve.builder()
+        .crs(
+            curves.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(curves.stream().filter(ls -> !ls.isEmpty()).toList())
         .build();
   }

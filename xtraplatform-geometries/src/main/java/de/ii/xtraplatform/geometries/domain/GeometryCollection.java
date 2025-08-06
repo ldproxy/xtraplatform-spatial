@@ -22,6 +22,13 @@ public interface GeometryCollection extends AbstractGeometryCollection<Geometry<
 
   static GeometryCollection of(List<Geometry<?>> geometries) {
     return ImmutableGeometryCollection.builder()
+        .crs(
+            geometries.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(geometries.stream().filter(g -> !g.isEmpty()).toList())
         .build();
   }

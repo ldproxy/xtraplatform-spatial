@@ -26,6 +26,13 @@ public interface PolyhedralSurface extends Surface<List<Polygon>>, CompositeGeom
 
   static PolyhedralSurface of(List<Polygon> polygons, boolean closed) {
     return ImmutablePolyhedralSurface.builder()
+        .crs(
+            polygons.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(polygons.stream().filter(ls -> !ls.isEmpty()).toList())
         .isClosed(closed)
         .build();

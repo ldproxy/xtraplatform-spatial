@@ -22,6 +22,13 @@ public interface MultiLineString extends AbstractGeometryCollection<LineString> 
 
   static MultiLineString of(List<LineString> lineStrings) {
     return ImmutableMultiLineString.builder()
+        .crs(
+            lineStrings.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(lineStrings.stream().filter(ls -> !ls.isEmpty()).toList())
         .build();
   }

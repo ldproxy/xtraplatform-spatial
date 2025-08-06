@@ -22,6 +22,13 @@ public interface MultiPolygon extends AbstractGeometryCollection<Polygon> {
 
   static MultiPolygon of(List<Polygon> polygons) {
     return ImmutableMultiPolygon.builder()
+        .crs(
+            polygons.stream()
+                .filter(g -> !g.isEmpty())
+                .map(Geometry::getCrs)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst())
         .value(polygons.stream().filter(ls -> !ls.isEmpty()).toList())
         .build();
   }
