@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.common.io.Resources
+import de.ii.xtraplatform.crs.domain.EpsgCrs
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.geometries.domain.GeometryType
 import de.ii.xtraplatform.geometries.domain.Axes
@@ -139,33 +140,19 @@ class FeatureTokenFixtures {
             ["bag:pand", "gml:@id"],
             "pand.4bad2970-2214-486c-a475-a04300136d94",
             Type.STRING,
-            FeatureTokenType.OBJECT,
+            FeatureTokenType.GEOMETRY,
             ["bag:pand", "bag:geom"],
-            GeometryType.POLYGON,
-            FeatureTokenType.ARRAY,
-            ["bag:pand", "bag:geom", "gml:Polygon"],
-            FeatureTokenType.VALUE,
-            ["bag:pand", "bag:geom", "gml:Polygon", "gml:exterior", "gml:LinearRing", "gml:posList"],
-            "\n" +
-                    "                206476.339000 475299.692000 206475.466000 475298.741000 206465.324000 475308.48000\n" +
-                    "                206456.806000 475208.767000 206469.818000 475286.826000 206468.873000 475285.762000\n" +
-                    "                206470.851000 475284.005000 206471.768000 475285.037000 206471.924000 475285.206000\n" +
-                    "                206473.055000 475285.251000 206473.224000 475285.096000 206474.219000 475284.173000\n" +
-                    "                206475.856000 475285.939000 206474.852000 475286.870000 206481.919000 475294.571000\n" +
-                    "                206476.339000 475299.692000\n" +
-                    "              ",
-            Type.STRING,
-            FeatureTokenType.VALUE,
-            ["bag:pand", "bag:geom", "gml:Polygon", "gml:interior", "gml:LinearRing", "gml:posList"],
-            "\n" +
-                    "                206475.281000 475298.053000 206477.379000 475296.023000 206474.715000 475293.270000\n" +
-                    "                206472.617000 475295.300000 206475.281000 475298.053000\n" +
-                    "              ",
-            Type.STRING,
-            FeatureTokenType.ARRAY_END,
-            ["bag:pand", "bag:geom", "gml:Polygon"],
-            FeatureTokenType.OBJECT_END,
-            ["bag:pand", "bag:geom"],
+            Polygon.of(List.of(PositionList.of(Axes.XY, new double[]{
+                    206476.339000, 475299.692000, 206475.466000, 475298.741000, 206465.324000, 475308.48000,
+                    206456.806000, 475208.767000, 206469.818000, 475286.826000, 206468.873000, 475285.762000,
+                    206470.851000, 475284.005000, 206471.768000, 475285.037000, 206471.924000, 475285.206000,
+                    206473.055000, 475285.251000, 206473.224000, 475285.096000, 206474.219000, 475284.173000,
+                    206475.856000, 475285.939000, 206474.852000, 475286.870000, 206481.919000, 475294.571000,
+                    206476.339000, 475299.692000
+            }), PositionList.of(Axes.XY, new double[]{
+                    206475.281000, 475298.053000, 206477.379000, 475296.023000, 206474.715000, 475293.270000,
+                    206472.617000, 475295.300000, 206475.281000, 475298.053000
+            })), Optional.of(EpsgCrs.of(28992))),
             FeatureTokenType.VALUE,
             ["bag:pand", "bag:identificatie"],
             "0150100000004952",

@@ -10,21 +10,20 @@ package de.ii.xtraplatform.features.gml.app;
 import com.fasterxml.aalto.AsyncByteArrayFeeder;
 import com.fasterxml.aalto.AsyncXMLStreamReader;
 import com.fasterxml.aalto.stax.InputFactoryImpl;
-import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
-import de.ii.xtraplatform.features.gml.domain.GmlGeometryType;
+import de.ii.xtraplatform.features.gml.domain.GeometryDecoderGml;
 import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
-import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalInt;
+import java.util.Optional;
 import java.util.OptionalLong;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLStreamConstants;
@@ -37,17 +36,6 @@ public class FeatureTokenDecoderGml
     extends FeatureTokenDecoder<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>> {
 
-  static final List<String> GEOMETRY_PARTS =
-      new ImmutableList.Builder<String>()
-          .add("exterior")
-          .add("interior")
-          .add("outerBoundaryIs")
-          .add("innerBoundaryIs")
-          .add("pointMember")
-          .build();
-  static final List<String> GEOMETRY_COORDINATES =
-      new ImmutableList.Builder<String>().add("posList").add("pos").add("coordinates").build();
-
   private final AsyncXMLStreamReader<AsyncByteArrayFeeder> parser;
 
   private final XMLNamespaceNormalizer namespaceNormalizer;
@@ -58,14 +46,14 @@ public class FeatureTokenDecoderGml
   private final StringBuilder buffer;
   private final GmlMultiplicityTracker multiplicityTracker;
   private final boolean passThrough;
+  private final GeometryDecoderGml geometryDecoder;
 
   private boolean isBuffering;
   private int depth = 0;
   private int featureDepth = 0;
   private boolean inFeature = false;
+  private boolean inGeometry = false;
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
-  private FeatureSchema currentGeometrySchema;
-  private GeometryType currentGeometryType;
 
   public FeatureTokenDecoderGml(
       Map<String, String> namespaces,
@@ -81,18 +69,14 @@ public class FeatureTokenDecoderGml
     this.featureTypes = featureTypes;
     this.buffer = new StringBuilder();
     this.multiplicityTracker = new GmlMultiplicityTracker();
-    this.currentGeometrySchema = null;
-    this.currentGeometryType = GeometryType.ANY;
     this.passThrough = passThrough;
+    this.geometryDecoder = new GeometryDecoderGml();
 
     try {
       this.parser = new InputFactoryImpl().createAsyncFor(new byte[0]);
     } catch (XMLStreamException e) {
       throw new IllegalStateException("Could not create GML decoder: " + e.getMessage());
     }
-
-    // TODO migrate GML decoder, re-enable unit tests
-    throw new IllegalStateException("The GML decoder has not been migrated yet.");
   }
 
   @Override
@@ -135,6 +119,7 @@ public class FeatureTokenDecoderGml
   }
 
   // TODO: single feature or collection
+  // TODO: should get default CRS from gml:Envelope
   protected boolean advanceParser() {
 
     boolean feedMeMore = false;
@@ -158,6 +143,19 @@ public class FeatureTokenDecoderGml
           break;
 
         case XMLStreamConstants.START_ELEMENT:
+          if (geometryDecoder.isWaitingForInput()) {
+            // continue decoding the geometry
+            Optional<Geometry<?>> optGeometry =
+                geometryDecoder.continueDecoding(parser, parser.getLocalName(), null);
+            if (optGeometry.isPresent()) {
+              context.setGeometry(optGeometry.get());
+              getDownstream().onGeometry(context);
+            } else {
+              // Still waiting for more input to decode the geometry
+              break;
+            }
+            break;
+          }
           if (depth == 0) {
             OptionalLong numberMatched;
             OptionalLong numberReturned;
@@ -238,11 +236,16 @@ public class FeatureTokenDecoderGml
                 multiplicityTracker.getMultiplicitiesForPath(context.pathTracker().asList()));
 
             if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
-              if (Objects.isNull(currentGeometrySchema)) {
-                this.currentGeometrySchema = context.schema().get();
-                // TODO context.setInGeometry(true);
+              this.inGeometry = true;
+              Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser);
+              // Was the geometry decoded completely? If not, the rest will be buffered before
+              // decoding is continued...
+              if (optGeometry.isPresent()) {
+                context.setGeometry(optGeometry.get());
+                getDownstream().onGeometry(context);
+              } else {
+                feedMeMore = true;
               }
-              onGeometryPart(parser.getLocalName(), depth - featureDepth == 2);
             } else if (context.schema().filter(FeatureSchema::isObject).isPresent()) {
               if (context.schema().filter(FeatureSchema::isArray).isPresent()
                   && context.index() == 1) {
@@ -257,7 +260,7 @@ public class FeatureTokenDecoderGml
 
           if (inFeature
               && depth > featureDepth + 1
-              // TODO && !context.inGeometry()
+              && !inGeometry
               && context.schema().filter(FeatureSchema::isObject).isPresent()) {
             context
                 .additionalInfo()
@@ -278,11 +281,31 @@ public class FeatureTokenDecoderGml
         case XMLStreamConstants.END_ELEMENT:
           if (isBuffering) {
             this.isBuffering = false;
-            if (buffer.length() > 0) {
+            if (geometryDecoder.isWaitingForInput()) {
+              // continue decoding the geometry with the new buffered input
+              Optional<Geometry<?>> optGeometry =
+                  geometryDecoder.continueDecoding(
+                      parser, parser.getLocalName(), buffer.toString());
+              buffer.setLength(0);
+              if (optGeometry.isPresent()) {
+                context.setGeometry(optGeometry.get());
+                getDownstream().onGeometry(context);
+              }
+              break;
+            } else if (!buffer.isEmpty()) {
               context.setValue(buffer.toString());
               getDownstream().onValue(context);
               buffer.setLength(0);
             }
+          } else if (geometryDecoder.isWaitingForInput()) {
+            // continue decoding the geometry
+            Optional<Geometry<?>> optGeometry =
+                geometryDecoder.continueDecoding(parser, parser.getLocalName(), "");
+            if (optGeometry.isPresent()) {
+              context.setGeometry(optGeometry.get());
+              getDownstream().onGeometry(context);
+            }
+            break;
           }
 
           depth -= 1;
@@ -294,19 +317,7 @@ public class FeatureTokenDecoderGml
             multiplicityTracker.reset();
           } else if (inFeature) {
             if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
-              if (Objects.nonNull(currentGeometrySchema) && (depth - featureDepth) > 1) {
-                onGeometryPartEnd(parser.getLocalName(), depth - featureDepth == 2);
-              } else {
-                this.currentGeometrySchema = null;
-                this.currentGeometryType = GeometryType.ANY;
-                /*  TODO
-                context.setInGeometry(false);
-                context.setGeometryType(Optional.empty());
-                context.setGeometryDimension(OptionalInt.empty());
-                 */
-
-                getDownstream().onObjectEnd(context);
-              }
+              this.inGeometry = false;
             } else if (context.schema().filter(FeatureSchema::isObject).isPresent()) {
               getDownstream().onObjectEnd(context);
             } else if (passThrough) {
@@ -352,89 +363,5 @@ public class FeatureTokenDecoderGml
   boolean matchesFeatureType(final String localName) {
     return featureTypes.stream()
         .anyMatch(featureType -> featureType.getLocalPart().equals(localName));
-  }
-
-  QName getMatchingFeatureType(final String localName) {
-    return featureTypes.stream()
-        .filter(featureType -> featureType.getLocalPart().equals(localName))
-        .findFirst()
-        .orElse(null);
-  }
-
-  private void onGeometryPart(final String localName, boolean startOfGeometry) throws Exception {
-    if (Objects.isNull(currentGeometrySchema)) {
-      return;
-    }
-
-    if (currentGeometryType == GeometryType.ANY) {
-      final GeometryType geometryType =
-          GmlGeometryType.fromString(localName).toSimpleFeatureGeometry();
-      if (!geometryType.isAbstract()) {
-        this.currentGeometryType = geometryType;
-        // TODO context.setGeometryType(currentGeometryType);
-
-        OptionalInt dimension = OptionalInt.empty();
-        if (context.additionalInfo().containsKey("srsDimension")) {
-          try {
-            dimension =
-                OptionalInt.of(Integer.parseInt(context.additionalInfo().get("srsDimension")));
-          } catch (NumberFormatException e) {
-            // ignore
-          }
-        }
-        /* TODO
-        context.setGeometryDimension(dimension);
-        context.setInGeometry(true);
-         */
-
-        List<String> path = context.pathTracker().asList();
-
-        context.pathTracker().track(path.size() - 1);
-
-        if (!passThrough) {
-          getDownstream().onObjectStart(context);
-        }
-
-        context.pathTracker().track(path.get(path.size() - 1));
-      }
-    }
-
-    if (!passThrough) {
-      switch (GmlGeometryType.fromString(localName).toSimpleFeatureGeometry()) {
-        case MULTI_LINE_STRING:
-        case POLYGON:
-        case MULTI_POLYGON:
-          getDownstream().onArrayStart(context);
-          break;
-      }
-    } else {
-      if (GEOMETRY_PARTS.contains(localName)) {
-        getDownstream().onArrayStart(context);
-      } else {
-        getDownstream().onObjectStart(context);
-      }
-    }
-  }
-
-  private void onGeometryPartEnd(final String localName, boolean endOfGeometry) throws Exception {
-    if (Objects.isNull(currentGeometrySchema)) {
-      return;
-    }
-
-    if (!passThrough) {
-      switch (GmlGeometryType.fromString(localName).toSimpleFeatureGeometry()) {
-        case MULTI_LINE_STRING:
-        case POLYGON:
-        case MULTI_POLYGON:
-          getDownstream().onArrayEnd(context);
-          break;
-      }
-    } else {
-      if (GEOMETRY_PARTS.contains(localName)) {
-        getDownstream().onArrayEnd(context);
-      } else {
-        getDownstream().onObjectEnd(context);
-      }
-    }
   }
 }

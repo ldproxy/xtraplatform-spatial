@@ -22,7 +22,6 @@ import javax.xml.namespace.QName
 /**
  * @author zahnen
  */
-@Ignore
 class FeatureTokenDecoderGmlSpec extends Specification {
 
     static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenDecoderGmlSpec.class)
