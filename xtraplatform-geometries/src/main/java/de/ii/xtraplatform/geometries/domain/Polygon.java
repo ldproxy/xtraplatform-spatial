@@ -59,7 +59,7 @@ public interface Polygon extends SingleSurface<LineString> {
         "A non-empty polygon must have at least an outer ring that is not empty.");
     Preconditions.checkState(
         getValue().stream().allMatch(SingleCurve::isClosed),
-        "All rings must be closed. Not closed: {}",
+        "All rings must be closed. Not closed: %s",
         getValue().stream().filter(c -> !c.isClosed()).toList());
     Preconditions.checkArgument(
         getValue().stream().allMatch(g -> g.getAxes().equals(getAxes())),
