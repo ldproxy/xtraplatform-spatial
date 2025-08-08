@@ -17,7 +17,7 @@ import de.ii.xtraplatform.features.gml.domain.ImmutableConnectionInfoWfsHttp
 import de.ii.xtraplatform.features.gml.domain.WfsConnector
 import de.ii.xtraplatform.features.domain.Metadata
 import de.ii.xtraplatform.features.domain.SchemaBase
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+import de.ii.xtraplatform.geometries.domain.GeometryType
 import de.ii.xtraplatform.features.gml.infra.req.WFS
 import org.codehaus.staxmate.SMInputFactory
 import spock.lang.Ignore
@@ -57,7 +57,7 @@ class WfsSchemaCrawlerSpec extends Specification {
         featureTypeList.get(0).getPropertyMap().get("kreis").sourcePath.get() == "ave:kreis"
         featureTypeList.get(0).getPropertyMap().containsKey("geometrie")
         featureTypeList.get(0).getPropertyMap().get("geometrie").type == SchemaBase.Type.GEOMETRY
-        featureTypeList.get(0).getPropertyMap().get("geometrie").geometryType.get() == SimpleFeatureGeometry.MULTI_POLYGON
+        featureTypeList.get(0).getPropertyMap().get("geometrie").geometryType.get() == GeometryType.MULTI_POLYGON
         featureTypeList.get(0).getPropertyMap().get("geometrie").sourcePath.get() == "ave:geometrie"
         featureTypeList.get(0).getPropertyMap().get("geometrie").additionalInfo.get("crs") == "25832"
         featureTypeList.get(0).getPropertyMap().get("geometrie").additionalInfo.get("multiple") == "false"
@@ -95,7 +95,7 @@ class WfsSchemaCrawlerSpec extends Specification {
         featureTypeList.get(0).getPropertyMap().get("validFrom").getSourcePath().get() == "validFrom"
         featureTypeList.get(0).getPropertyMap().get("position").getType() == SchemaBase.Type.OBJECT_ARRAY
         featureTypeList.get(0).getPropertyMap().get("position").getPropertyMap().get("geometry").getType() == SchemaBase.Type.GEOMETRY
-        featureTypeList.get(0).getPropertyMap().get("position").getPropertyMap().get("geometry").getGeometryType().get() == SimpleFeatureGeometry.POINT
+        featureTypeList.get(0).getPropertyMap().get("position").getPropertyMap().get("geometry").getGeometryType().get() == GeometryType.POINT
         featureTypeList.get(0).getPropertyMap().get("pronunciation").getType() == SchemaBase.Type.OBJECT_ARRAY
         featureTypeList.get(0).getPropertyMap().get("pronunciation").getPropertyMap().get("pronunciationIPA").getType() == SchemaBase.Type.VALUE_ARRAY
         featureTypeList.get(0).getPropertyMap().get("pronunciation").getPropertyMap().get("pronunciationIPA").getValueType().get() == SchemaBase.Type.STRING

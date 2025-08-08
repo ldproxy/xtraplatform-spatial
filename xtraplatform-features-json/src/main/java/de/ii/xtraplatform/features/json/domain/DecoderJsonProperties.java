@@ -211,6 +211,7 @@ public class DecoderJsonProperties {
 
         if (schema.filter(s -> s.isSimpleFeatureGeometry()).isPresent()
             && geometryDecoder.isPresent()) {
+          // used by GraphQL provider, is this needed?
           geometryDecoder
               .get()
               .decode(

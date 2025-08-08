@@ -13,6 +13,7 @@ public enum FeatureTokenType {
   OBJECT,
   ARRAY,
   VALUE,
+  GEOMETRY,
   ARRAY_END,
   OBJECT_END,
   FEATURE_END,

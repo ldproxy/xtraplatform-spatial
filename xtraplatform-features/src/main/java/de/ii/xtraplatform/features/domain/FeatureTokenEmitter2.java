@@ -9,10 +9,8 @@ package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 public interface FeatureTokenEmitter2<
@@ -77,21 +75,12 @@ public interface FeatureTokenEmitter2<
 
   @Override
   default void onObjectStart(V context) {
-    onObjectStart(context.path(), context.geometryType(), context.geometryDimension());
+    onObjectStart(context.path());
   }
 
-  default void onObjectStart(
-      List<String> path,
-      Optional<SimpleFeatureGeometry> geometryType,
-      OptionalInt geometryDimension) {
+  default void onObjectStart(List<String> path) {
     push(FeatureTokenType.OBJECT);
     push(path);
-    if (geometryType.isPresent()) {
-      push(geometryType.get());
-      if (geometryDimension.isPresent()) {
-        push(geometryDimension.getAsInt());
-      }
-    }
   }
 
   @Override
@@ -125,6 +114,18 @@ public interface FeatureTokenEmitter2<
   }
 
   @Override
+  default void onGeometry(V context) {
+    onGeometry(context.path(), context.geometry());
+  }
+  ;
+
+  default void onGeometry(List<String> path, Geometry<?> geometry) {
+    push(FeatureTokenType.GEOMETRY);
+    push(path);
+    push(geometry);
+  }
+
+  @Override
   default void onValue(V context) {
     onValue(context.path(), context.value(), context.valueType());
   }
@@ -132,9 +133,7 @@ public interface FeatureTokenEmitter2<
   default void onValue(List<String> path, String value, Type type) {
     push(FeatureTokenType.VALUE);
     push(path);
-    // if (Objects.nonNull(value)) {
     push(value);
     push(type);
-    // }
   }
 }

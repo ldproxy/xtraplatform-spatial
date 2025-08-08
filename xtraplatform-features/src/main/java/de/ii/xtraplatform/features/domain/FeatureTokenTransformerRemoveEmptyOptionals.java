@@ -42,11 +42,6 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
 
   @Override
   public void onObjectStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (context.inGeometry()) {
-      openIfNecessary(context);
-      super.onObjectStart(context);
-      return;
-    }
     if (context.schema().isEmpty()) {
       return;
     }
@@ -63,10 +58,6 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
 
   @Override
   public void onObjectEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (context.inGeometry()) {
-      super.onObjectEnd(context);
-      return;
-    }
     if (context.schema().isEmpty()) {
       return;
     }
@@ -81,11 +72,6 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
 
   @Override
   public void onArrayStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (context.inGeometry()) {
-      openIfNecessary(context);
-      super.onArrayStart(context);
-      return;
-    }
     if (context.schema().isEmpty()) {
       return;
     }
@@ -102,10 +88,6 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
 
   @Override
   public void onArrayEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (context.inGeometry()) {
-      super.onArrayEnd(context);
-      return;
-    }
     if (context.schema().isEmpty()) {
       return;
     }
@@ -115,6 +97,21 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
     } else {
       nestingStack.remove(nestingStack.size() - 1);
       schemaStack.remove(schemaStack.size() - 1);
+    }
+  }
+
+  @Override
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    if (context.schema().isEmpty()) {
+      return;
+    }
+
+    if (Objects.nonNull(context.geometry())
+        || context.schema().get().isRequired()
+        || !removeNullValues.getOrDefault(context.type(), true)) {
+      openIfNecessary(context);
+
+      super.onGeometry(context);
     }
   }
 

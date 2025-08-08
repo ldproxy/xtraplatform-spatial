@@ -19,7 +19,7 @@ import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema.Builder;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -109,62 +109,37 @@ public interface VectorLayer {
   }
 
   static String getTypeAsString(SchemaBase.Type type) {
-    switch (type) {
-      case INTEGER:
-        return "Integer";
-      case FLOAT:
-        return "Number";
-      case BOOLEAN:
-        return "Boolean";
-      case DATETIME:
-      case STRING:
-      default:
-        return "String";
-    }
+    return switch (type) {
+      case INTEGER -> "Integer";
+      case FLOAT -> "Number";
+      case BOOLEAN -> "Boolean";
+      default -> "String";
+    };
   }
 
   static SchemaBase.Type getTypeFromString(String type) {
-    switch (type) {
-      case "Number":
-        return Type.FLOAT;
-      case "Boolean":
-        return Type.BOOLEAN;
-      case "String":
-      default:
-        return Type.STRING;
-    }
+    return switch (type) {
+      case "Number" -> Type.FLOAT;
+      case "Boolean" -> Type.BOOLEAN;
+      default -> Type.STRING;
+    };
   }
 
-  static String getGeometryTypeAsString(SimpleFeatureGeometry geometryType) {
-    switch (geometryType) {
-      case POINT:
-      case MULTI_POINT:
-        return "points";
-      case LINE_STRING:
-      case MULTI_LINE_STRING:
-        return "lines";
-      case POLYGON:
-      case MULTI_POLYGON:
-        return "polygons";
-      case GEOMETRY_COLLECTION:
-      case ANY:
-      case NONE:
-      default:
-        return "unknown";
-    }
+  static String getGeometryTypeAsString(GeometryType geometryType) {
+    return switch (geometryType) {
+      case POINT, MULTI_POINT -> "points";
+      case LINE_STRING, MULTI_LINE_STRING -> "lines";
+      case POLYGON, MULTI_POLYGON -> "polygons";
+      default -> "unknown";
+    };
   }
 
-  static SimpleFeatureGeometry getGeometryTypeFromString(String geometryType) {
-    switch (geometryType) {
-      case "points":
-        return SimpleFeatureGeometry.MULTI_POINT;
-      case "lines":
-        return SimpleFeatureGeometry.MULTI_LINE_STRING;
-      case "polygons":
-        return SimpleFeatureGeometry.MULTI_POLYGON;
-      case "unknown":
-      default:
-        return SimpleFeatureGeometry.ANY;
-    }
+  static GeometryType getGeometryTypeFromString(String geometryType) {
+    return switch (geometryType) {
+      case "points" -> GeometryType.MULTI_POINT;
+      case "lines" -> GeometryType.MULTI_LINE_STRING;
+      case "polygons" -> GeometryType.MULTI_POLYGON;
+      default -> GeometryType.ANY;
+    };
   }
 }

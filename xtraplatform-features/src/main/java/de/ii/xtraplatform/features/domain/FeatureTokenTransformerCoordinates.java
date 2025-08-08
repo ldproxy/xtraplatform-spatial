@@ -8,102 +8,99 @@
 package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
-import de.ii.xtraplatform.features.app.ImmutableCoordinatesWriterFeatureTokens;
-import de.ii.xtraplatform.geometries.domain.CoordinatesTransformer;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesTransformer;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
-import java.io.IOException;
+import de.ii.xtraplatform.geometries.domain.CompoundCurve;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.geometries.domain.MultiLineString;
+import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
+import de.ii.xtraplatform.geometries.domain.SingleCurve;
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation;
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableSimplifyLine;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer {
 
-  private final Optional<CrsTransformer> crsTransformer;
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(FeatureTokenTransformerCoordinates.class);
+
+  private final Optional<CrsTransformer> crsTransformerTargetCrs;
   private final Optional<CrsTransformer> crsTransformerWgs84;
-  private ImmutableCoordinatesTransformer.Builder coordinatesTransformerBuilder;
-  private int targetDimension;
 
   public FeatureTokenTransformerCoordinates(
-      Optional<CrsTransformer> crsTransformer, Optional<CrsTransformer> crsTransformerWgs84) {
-    this.crsTransformer = crsTransformer;
+      Optional<CrsTransformer> crsTransformerTargetCrs,
+      Optional<CrsTransformer> crsTransformerWgs84) {
+    this.crsTransformerTargetCrs = crsTransformerTargetCrs;
     this.crsTransformerWgs84 = crsTransformerWgs84;
   }
 
   @Override
-  public void onObjectStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (context.schema().filter(SchemaBase::isSpatial).isPresent()
-        || context.geometryType().isPresent()) {
-      this.coordinatesTransformerBuilder = ImmutableCoordinatesTransformer.builder();
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    Geometry<?> geometry = context.geometry();
+    if (geometry != null) {
+      // Upgrade geometries to their true type, if a simpler type was used in the feature provider,
+      // typically because the provider cannot represent all information.
+      // TODO: move to its own transformer
+      if (geometry.getType() == GeometryType.POLYHEDRAL_SURFACE
+          && !((PolyhedralSurface) geometry).isClosed()
+          && context
+              .schema()
+              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getClosed))
+              .orElse(false)) {
+        geometry =
+            PolyhedralSurface.of(
+                ((PolyhedralSurface) geometry).getValue(), true, geometry.getCrs());
+      } else if (geometry.getType() == GeometryType.MULTI_POLYGON
+          && context
+              .schema()
+              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getComposite))
+              .orElse(false)
+          && context
+              .schema()
+              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getClosed))
+              .orElse(false)) {
+        geometry =
+            PolyhedralSurface.of(((MultiPolygon) geometry).getValue(), true, geometry.getCrs());
+      } else if (geometry.getType() == GeometryType.MULTI_LINE_STRING
+          && context
+              .schema()
+              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getComposite))
+              .orElse(false)) {
+        geometry =
+            CompoundCurve.of(
+                ((MultiLineString) geometry)
+                    .getValue().stream().map(SingleCurve.class::cast).toList(),
+                geometry.getCrs());
+      }
+
+      CoordinatesTransformation next = null;
 
       // A SECONDARY_GEOMETRY is always forced to WGS84 longitude/latitude, not the target CRS
-      boolean isSecondaryGeometryForceWgs84 =
+      boolean isSecondaryGeometry =
           context.schema().filter(SchemaBase::isSecondaryGeometry).isPresent();
 
-      if (isSecondaryGeometryForceWgs84) {
-        crsTransformerWgs84.ifPresent(
-            transformer -> coordinatesTransformerBuilder.crsTransformer(transformer));
-      } else {
-        crsTransformer.ifPresent(
-            transformer -> coordinatesTransformerBuilder.crsTransformer(transformer));
+      // since the secondary geometry is in WGS84, the offset may be in the wrong unit, so we skip
+      // simplification
+      if (context.query().getMaxAllowableOffset() > 0 && !isSecondaryGeometry) {
+        next = ImmutableSimplifyLine.of(Optional.empty(), context.query().getMaxAllowableOffset());
       }
 
-      int fallbackDimension = context.geometryDimension().orElse(2);
-      int sourceDimension =
-          crsTransformer.map(CrsTransformer::getSourceDimension).orElse(fallbackDimension);
-      this.targetDimension =
-          crsTransformer.map(CrsTransformer::getTargetDimension).orElse(fallbackDimension);
-      coordinatesTransformerBuilder.sourceDimension(sourceDimension);
-      coordinatesTransformerBuilder.targetDimension(targetDimension);
-
-      if (!isSecondaryGeometryForceWgs84 && context.query().getMaxAllowableOffset() > 0) {
-        int minPoints =
-            context.geometryType().get() == SimpleFeatureGeometry.MULTI_POLYGON
-                    || context.geometryType().get() == SimpleFeatureGeometry.POLYGON
-                ? 4
-                : 2;
-        coordinatesTransformerBuilder.maxAllowableOffset(context.query().getMaxAllowableOffset());
-        coordinatesTransformerBuilder.minNumberOfCoordinates(minPoints);
+      Optional<CrsTransformer> crsTransformer =
+          isSecondaryGeometry ? crsTransformerWgs84 : crsTransformerTargetCrs;
+      if (crsTransformer.isPresent()) {
+        next = ImmutableCrsTransform.of(Optional.ofNullable(next), crsTransformer.get());
       }
 
-      // TODO: currently never true, see GeotoolsCrsTransformer.needsAxisSwap, find cfg example with
-      // forceAxisOrder
-      /*if (transformationContext.shouldSwapCoordinates()) {
-        coordinatesTransformerBuilder.isSwapXY(true);
-      }*/
-
-      if (isSecondaryGeometryForceWgs84) {
-        if (context.query().getWgs84GeometryPrecision().get(0) > 0) {
-          coordinatesTransformerBuilder.precision(context.query().getWgs84GeometryPrecision());
-        }
-      } else if (context.query().getGeometryPrecision().get(0) > 0) {
-        coordinatesTransformerBuilder.precision(context.query().getGeometryPrecision());
+      if (next != null) {
+        geometry = geometry.accept(new CoordinatesTransformer(next));
+        context.setGeometry(geometry);
       }
-
-      // TODO: currently never true, see FeatureProperty.isForceReversePolygon, find cfg example
-      /*if (Objects.equals(featureProperty.isForceReversePolygon(), true)) {
-        coordinatesTransformerBuilder.isReverseOrder(true);
-      }*/
     }
 
-    getDownstream().onObjectStart(context);
-  }
-
-  @Override
-  public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (context.inGeometry()) {
-      CoordinatesTransformer coordinatesTransformer =
-          coordinatesTransformerBuilder
-              .coordinatesWriter(
-                  ImmutableCoordinatesWriterFeatureTokens.of(
-                      getDownstream(), targetDimension, context))
-              .build();
-      try {
-        coordinatesTransformer.write(context.value());
-        coordinatesTransformer.close();
-      } catch (IOException e) {
-        throw new IllegalArgumentException(e);
-      }
-    } else {
-      getDownstream().onValue(context);
-    }
+    getDownstream().onGeometry(context);
   }
 }

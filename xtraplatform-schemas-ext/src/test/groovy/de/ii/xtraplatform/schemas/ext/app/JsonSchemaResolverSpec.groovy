@@ -3,7 +3,7 @@ package de.ii.xtraplatform.schemas.ext.app
 import com.fasterxml.jackson.databind.ObjectMapper
 import de.ii.xtraplatform.features.domain.*
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema.Builder
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+import de.ii.xtraplatform.geometries.domain.GeometryType
 import de.ii.xtraplatform.schemas.ext.domain.ImmutableJsonSchemaConfiguration
 import de.ii.xtraplatform.blobs.domain.ResourceStore
 import spock.lang.Shared
@@ -18,8 +18,8 @@ class JsonSchemaResolverSpec extends Specification {
             .addExtensions(new ImmutableJsonSchemaConfiguration.Builder()
                     .enabled(true)
                     .geometryTypeRefs([
-                            '#/$defs/polygonGeoJSON'     : SimpleFeatureGeometry.POLYGON,
-                            '#/$defs/multipolygonGeoJSON': SimpleFeatureGeometry.MULTI_POLYGON
+                            '#/$defs/polygonGeoJSON'     : GeometryType.POLYGON,
+                            '#/$defs/multipolygonGeoJSON': GeometryType.MULTI_POLYGON
                     ])
                     .relationRefs(['#/$defs/Adres': 'adres'])
                     .compositionIndexes(['#/$defs/Waardetype': 5])

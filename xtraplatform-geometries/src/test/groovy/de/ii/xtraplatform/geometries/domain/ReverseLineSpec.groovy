@@ -7,6 +7,9 @@
  */
 package de.ii.xtraplatform.geometries.domain
 
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableReverseLine
+import de.ii.xtraplatform.geometries.domain.transform.ReverseLine
 import spock.lang.Specification
 
 class ReverseLineSpec extends Specification {
@@ -15,37 +18,35 @@ class ReverseLineSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        ReverseLine reverseLine = ImmutableReverseLine.of(next)
+        CoordinatesTransformation next = Mock()
+        ReverseLine reverseLine = ImmutableReverseLine.of(Optional.of(next))
         double[] coordinates = [10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0]
         int dimension = 2
 
         when:
 
-        reverseLine.onCoordinates(coordinates, coordinates.length, dimension)
+        reverseLine.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(2))
 
         then:
 
-        1 * next.onCoordinates([13.0, 10.0, 12.0, 9.0, 11.0, 11.0, 10.0, 10.0], coordinates.length, dimension)
-        0 * _
+        1 * next.onCoordinates([13.0, 10.0, 12.0, 9.0, 11.0, 11.0, 10.0, 10.0], coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(2))
     }
 
     def '3d'() {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        ReverseLine reverseLine = ImmutableReverseLine.of(next)
+        CoordinatesTransformation next = Mock()
+        ReverseLine reverseLine = ImmutableReverseLine.of(Optional.of(next))
         double[] coordinates = [10.0, 10.0, 10.0, 11.0, 11.0, 10.0, 12.0, 9.0, 10.0, 13.0, 10.0, 10.0]
         int dimension = 3
 
         when:
 
-        reverseLine.onCoordinates(coordinates, coordinates.length, dimension)
+        reverseLine.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(2))
 
         then:
 
-        1 * next.onCoordinates([13.0, 10.0, 10.0, 12.0, 9.0, 10.0, 11.0, 11.0, 10.0, 10.0, 10.0, 10.0], coordinates.length, dimension)
-        0 * _
+        1 * next.onCoordinates([13.0, 10.0, 10.0, 12.0, 9.0, 10.0, 11.0, 11.0, 10.0, 10.0, 10.0, 10.0], coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(2))
     }
 }

@@ -69,12 +69,8 @@ public interface FeatureTokens {
         tokens.add(token.getValueType());
       }
 
-      if (Objects.nonNull(token.getGeometryType())) {
-        tokens.add(token.getGeometryType());
-      }
-
-      if (Objects.nonNull(token.getGeometryDimension())) {
-        tokens.add(token.getGeometryDimension());
+      if (Objects.nonNull(token.getGeometry())) {
+        tokens.add(token.getGeometry());
       }
     }
 
