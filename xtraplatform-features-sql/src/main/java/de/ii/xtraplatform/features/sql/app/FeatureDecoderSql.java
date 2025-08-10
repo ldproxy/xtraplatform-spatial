@@ -75,7 +75,7 @@ public class FeatureDecoderSql
     List<List<String>> multiTables =
         sqlQueryMappings.stream()
             .flatMap(s -> s.getTables().stream())
-            .filter(schema -> !schema.isRoot())
+            .filter(table -> !table.isRoot() && table.hasReadableColumns())
             .map(SqlQuerySchema::getFullPath)
             .distinct()
             .toList();
