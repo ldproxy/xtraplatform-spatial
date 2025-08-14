@@ -232,6 +232,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
     Optional<String> role =
         schema
             .getRole()
+            .filter(r -> !Role.FILTER_GEOMETRY.equals(r))
             .map(Enum::name)
             .map(r -> CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_HYPHEN, r))
             .or(() -> schema.getRefType().map(ignore -> "reference"))
@@ -370,7 +371,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
               valueSchema,
               schema.isPrimaryGeometry()
                   ? getNameWithRole(Role.PRIMARY_GEOMETRY.name(), propertyName)
-                  : getNameWithRole(Role.SECONDARY_GEOMETRY.name(), propertyName));
+                  : propertyName);
     } else {
       valueSchema =
           withName(
