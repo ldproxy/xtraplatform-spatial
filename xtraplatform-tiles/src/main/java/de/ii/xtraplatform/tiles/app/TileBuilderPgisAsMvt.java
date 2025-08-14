@@ -31,7 +31,6 @@ import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.features.domain.profile.ProfileSet;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
 import de.ii.xtraplatform.features.sql.domain.SqlConnector;
@@ -176,8 +175,7 @@ public class TileBuilderPgisAsMvt
       BoundingBox tileBounds,
       Optional<BoundingBox> clippedBounds,
       FeatureProvider featureProvider,
-      PropertyTransformations baseTransformations,
-      List<ProfileSet> profileSets) {
+      PropertyTransformations baseTransformations) {
     try (Context timed = timers.get(featureProvider.getId()).time()) {
       if (clippedBounds.isEmpty()) {
         return EMPTY_TILES.get(tileQuery.getMediaType());

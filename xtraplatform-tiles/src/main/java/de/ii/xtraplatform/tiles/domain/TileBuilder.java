@@ -12,9 +12,7 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
-import de.ii.xtraplatform.features.domain.profile.ProfileSet;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -33,6 +31,5 @@ public interface TileBuilder {
       BoundingBox tileBounds,
       Optional<BoundingBox> clippedBounds,
       FeatureProvider featureProvider,
-      PropertyTransformations baseTransformations,
-      List<ProfileSet> profileSets);
+      PropertyTransformations baseTransformations);
 }

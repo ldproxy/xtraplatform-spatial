@@ -316,6 +316,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<T> getIdParent() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
     return getAllObjects().stream()
         .filter(schema -> schema.getProperties().stream().anyMatch(SchemaBase::isId))
         .findFirst();
@@ -345,6 +348,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<T> getPrimaryGeometryParent() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
     return getAllObjects().stream()
         .filter(schema -> schema.getProperties().stream().anyMatch(SchemaBase::isPrimaryGeometry))
         .findFirst();
@@ -440,6 +446,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<T> getPrimaryInstantParent() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
     return getAllObjects().stream()
         .filter(schema -> schema.getProperties().stream().anyMatch(SchemaBase::isPrimaryInstant))
         .findFirst();
@@ -473,6 +482,10 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<Tuple<T, T>> getPrimaryInterval() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
+
     Optional<T> start =
         getAllNestedFeatureProperties().stream()
             .filter(SchemaBase::isPrimaryIntervalStart)
@@ -481,8 +494,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
         getAllNestedFeatureProperties().stream()
             .filter(SchemaBase::isPrimaryIntervalEnd)
             .findFirst();
-    return start.isPresent() && end.isPresent()
-        ? Optional.of(Tuple.of(start.get(), end.get()))
+    return start.isPresent() || end.isPresent()
+        ? Optional.of(Tuple.of(start.orElse(null), end.orElse(null)))
         : Optional.empty();
   }
 
@@ -511,6 +524,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<T> getPrimaryIntervalStartParent() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
     return getAllObjects().stream()
         .filter(
             schema -> schema.getProperties().stream().anyMatch(SchemaBase::isPrimaryIntervalStart))
@@ -521,6 +537,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<T> getPrimaryIntervalEndParent() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
     return getAllObjects().stream()
         .filter(
             schema -> schema.getProperties().stream().anyMatch(SchemaBase::isPrimaryIntervalEnd))
@@ -550,6 +569,9 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<T> getSecondaryGeometryParent() {
+    if (!isFeature()) {
+      return Optional.empty();
+    }
     return getAllObjects().stream()
         .filter(schema -> schema.getProperties().stream().anyMatch(SchemaBase::isSecondaryGeometry))
         .findFirst();
@@ -571,15 +593,17 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default boolean hasEmbeddedFeature() {
-    return getAllNestedProperties().stream()
-        .anyMatch(s -> s.getRole().filter(r -> r == Role.EMBEDDED_FEATURE).isPresent());
+    if (!isFeature()) {
+      return false;
+    }
+    return getAllNestedProperties().stream().anyMatch(SchemaBase::isEmbeddedFeature);
   }
 
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
   default List<T> getSecondaryGeometries() {
-    return getPrimaryGeometry().stream().collect(Collectors.toList());
+    return getSecondaryGeometry().stream().collect(Collectors.toList());
   }
 
   @JsonIgnore

@@ -16,8 +16,10 @@ import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
+import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.AbstractPersistentEntity;
 import de.ii.xtraplatform.entities.domain.ValidationResult;
 import de.ii.xtraplatform.entities.domain.ValidationResult.MODE;
@@ -69,7 +71,8 @@ public abstract class AbstractFeatureProvider<
 
   private final ConnectorFactory connectorFactory;
   private final Reactive reactive;
-  private final CrsTransformerFactory crsTransformerFactory;
+  protected final CrsTransformerFactory crsTransformerFactory;
+  protected final CrsInfo crsInfo;
   private final ProviderExtensionRegistry extensionRegistry;
   private final Values<Codelist> codelistStore;
   private final FeatureChanges changeHandler;
@@ -85,6 +88,7 @@ public abstract class AbstractFeatureProvider<
       ConnectorFactory connectorFactory,
       Reactive reactive,
       CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
       ProviderExtensionRegistry extensionRegistry,
       Values<Codelist> codelistStore,
       FeatureProviderDataV2 data,
@@ -93,6 +97,7 @@ public abstract class AbstractFeatureProvider<
     this.connectorFactory = connectorFactory;
     this.reactive = reactive;
     this.crsTransformerFactory = crsTransformerFactory;
+    this.crsInfo = crsInfo;
     this.extensionRegistry = extensionRegistry;
     this.codelistStore = codelistStore;
     this.volatileRegistry = volatileRegistry;
@@ -496,10 +501,13 @@ public abstract class AbstractFeatureProvider<
 
     Query query2 = preprocessQuery(query);
 
+    boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
+
     return new FeatureStreamImpl(
         query2,
         getData(),
         crsTransformerFactory,
+        nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
         !query.hitsOnly());
