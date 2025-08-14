@@ -231,7 +231,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
     }
 
     queryablesSchema
-        .getPrimaryGeometry()
+        .getFilterGeometry()
         .map(SchemaBase::getFullPathAsString)
         .ifPresentOrElse(
             spatialProperty -> {

@@ -93,6 +93,10 @@ public interface SqlQueryMapping {
     return getColumnForRole(Role.ID);
   }
 
+  default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForFilterGeometry() {
+    return getColumnForRole(Role.FILTER_GEOMETRY).or(() -> getColumnForRole(Role.PRIMARY_GEOMETRY));
+  }
+
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForPrimaryGeometry() {
     return getColumnForRole(Role.PRIMARY_GEOMETRY);
   }
