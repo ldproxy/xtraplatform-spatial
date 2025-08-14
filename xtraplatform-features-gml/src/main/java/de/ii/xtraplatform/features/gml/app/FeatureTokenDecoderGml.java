@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.app;
 import com.fasterxml.aalto.AsyncByteArrayFeeder;
 import com.fasterxml.aalto.AsyncXMLStreamReader;
 import com.fasterxml.aalto.stax.InputFactoryImpl;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLStreamConstants;
@@ -53,6 +55,8 @@ public class FeatureTokenDecoderGml
   private int featureDepth = 0;
   private boolean inFeature = false;
   private boolean inGeometry = false;
+  private Optional<EpsgCrs> crs = Optional.empty();
+  private OptionalInt srsDimension = OptionalInt.empty();
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
 
   public FeatureTokenDecoderGml(
@@ -119,7 +123,6 @@ public class FeatureTokenDecoderGml
   }
 
   // TODO: single feature or collection
-  // TODO: should get default CRS from gml:Envelope
   protected boolean advanceParser() {
 
     boolean feedMeMore = false;
@@ -146,7 +149,8 @@ public class FeatureTokenDecoderGml
           if (geometryDecoder.isWaitingForInput()) {
             // continue decoding the geometry
             Optional<Geometry<?>> optGeometry =
-                geometryDecoder.continueDecoding(parser, parser.getLocalName(), null);
+                geometryDecoder.continueDecoding(
+                    parser, crs, srsDimension, parser.getLocalName(), null);
             if (optGeometry.isPresent()) {
               context.setGeometry(optGeometry.get());
               getDownstream().onGeometry(context);
@@ -188,6 +192,23 @@ public class FeatureTokenDecoderGml
             }
 
             getDownstream().onStart(context);
+          } else if ("Envelope".equals(parser.getLocalName()) && depth == 2) {
+            String srsName = parser.getAttributeValue(null, "srsName");
+            if (srsName != null && !srsName.isEmpty()) {
+              try {
+                crs = Optional.of(EpsgCrs.fromString(srsName));
+              } catch (IllegalArgumentException e) {
+                crs = Optional.empty();
+              }
+            } else {
+              crs = Optional.empty();
+            }
+            try {
+              srsDimension =
+                  OptionalInt.of(Integer.parseInt(parser.getAttributeValue(null, "srsDimension")));
+            } catch (NumberFormatException e) {
+              srsDimension = OptionalInt.empty();
+            }
           } else if (matchesFeatureType(parser.getNamespaceURI(), parser.getLocalName())
               || matchesFeatureType(parser.getLocalName())) {
             inFeature = true;
@@ -237,7 +258,7 @@ public class FeatureTokenDecoderGml
 
             if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
               this.inGeometry = true;
-              Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser);
+              Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser, crs, srsDimension);
               // Was the geometry decoded completely? If not, the rest will be buffered before
               // decoding is continued...
               if (optGeometry.isPresent()) {
@@ -285,7 +306,7 @@ public class FeatureTokenDecoderGml
               // continue decoding the geometry with the new buffered input
               Optional<Geometry<?>> optGeometry =
                   geometryDecoder.continueDecoding(
-                      parser, parser.getLocalName(), buffer.toString());
+                      parser, crs, srsDimension, parser.getLocalName(), buffer.toString());
               buffer.setLength(0);
               if (optGeometry.isPresent()) {
                 context.setGeometry(optGeometry.get());
@@ -300,7 +321,8 @@ public class FeatureTokenDecoderGml
           } else if (geometryDecoder.isWaitingForInput()) {
             // continue decoding the geometry
             Optional<Geometry<?>> optGeometry =
-                geometryDecoder.continueDecoding(parser, parser.getLocalName(), "");
+                geometryDecoder.continueDecoding(
+                    parser, crs, srsDimension, parser.getLocalName(), "");
             if (optGeometry.isPresent()) {
               context.setGeometry(optGeometry.get());
               getDownstream().onGeometry(context);

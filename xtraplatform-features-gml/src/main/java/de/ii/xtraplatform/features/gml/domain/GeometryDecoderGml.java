@@ -68,13 +68,19 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   public GeometryDecoderGml() {}
 
-  public Optional<Geometry<?>> decode(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser)
+  public Optional<Geometry<?>> decode(
+      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
+      Optional<EpsgCrs> crs,
+      OptionalInt srsDimension)
       throws XMLStreamException, IOException {
-    return decode(parser, false);
+    return decode(parser, crs, srsDimension, false);
   }
 
   public Optional<Geometry<?>> decode(
-      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser, boolean useCurrentEvent)
+      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
+      Optional<EpsgCrs> defaultCrs,
+      OptionalInt srsDimension,
+      boolean useCurrentEvent)
       throws XMLStreamException, IOException {
     String localName;
     waitingForInput = false;
@@ -89,8 +95,11 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
         case XMLStreamConstants.START_ELEMENT:
           localName = parser.getLocalName();
           if (waitingForGeometry) {
-            Optional<EpsgCrs> crs = getCrsFromSrsName(parser);
-            Axes axes = getDimFromSrsDimension(parser).orElse(2) == 2 ? Axes.XY : Axes.XYZ;
+            Optional<EpsgCrs> crs = getCrsFromSrsName(parser).or(() -> defaultCrs);
+            Axes axes =
+                getDimFromSrsDimension(parser).orElse(srsDimension.orElse(2)) == 2
+                    ? Axes.XY
+                    : Axes.XYZ;
             Geometry<?> geom =
                 switch (localName) {
                   case "Point" -> ImmutablePoint.builder()
@@ -292,7 +301,11 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   }
 
   public Optional<Geometry<?>> continueDecoding(
-      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser, String localName, String bufferedText)
+      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
+      Optional<EpsgCrs> defaultCrs,
+      OptionalInt srsDimension,
+      String localName,
+      String bufferedText)
       throws XMLStreamException, IOException {
     if (GEOMETRY_COORDINATES.contains(localName)) {
       if (currentGeometry == null) {
@@ -306,9 +319,9 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       double[] coords = parseDoubles(currentGeometry.textBuffer.append(bufferedText).toString());
       currentGeometry.textBuffer.setLength(0);
       handleCoordinates(localName, coords);
-      return decode(parser, false);
+      return decode(parser, defaultCrs, srsDimension, false);
     }
-    return decode(parser, true);
+    return decode(parser, defaultCrs, srsDimension, true);
   }
 
   private void addCoordinates(double[] coords) {
