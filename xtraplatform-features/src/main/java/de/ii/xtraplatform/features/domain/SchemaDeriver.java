@@ -17,6 +17,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
 import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
 import de.ii.xtraplatform.strings.domain.StringTemplateFilters;
+import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSchema, T> {
@@ -83,7 +85,9 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
     Map<String, T> definitions = extractDefinitions(visitedProperties);
 
     Map<String, T> properties =
-        visitedProperties.stream()
+        IntStream.range(0, visitedProperties.size())
+            .mapToObj(i -> new AbstractMap.SimpleEntry<>(i, visitedProperties.get(i)))
+            .map(entry -> withPropertySeq(entry.getValue(), entry.getKey()))
             .filter(property -> Objects.nonNull(property) && getPropertyName(property).isPresent())
             .map(
                 property ->
@@ -169,8 +173,13 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
   private T deriveObjectSchema(
       FeatureSchema schema, List<T> visitedProperties, boolean arrayAllowed) {
     Map<String, T> properties =
-        visitedProperties.stream()
-            .filter(property -> Objects.nonNull(property) && getPropertyName(property).isPresent())
+        IntStream.range(0, visitedProperties.size())
+            .mapToObj(i -> new AbstractMap.SimpleEntry<>(i, visitedProperties.get(i)))
+            .filter(
+                entry ->
+                    Objects.nonNull(entry.getValue())
+                        && getPropertyName(entry.getValue()).isPresent())
+            .map(entry -> withPropertySeq(entry.getValue(), entry.getKey()))
             .map(
                 property ->
                     new SimpleEntry<>(
@@ -417,6 +426,8 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       Optional<String> title,
       Optional<String> description,
       Optional<String> role);
+
+  protected abstract T withPropertySeq(T schema, int propertySeq);
 
   protected abstract T withName(T schema, String propertyName);
 

@@ -188,7 +188,6 @@ public class FeatureProviderGraphQl
   public static final String PROVIDER_TYPE = "GRAPHQL";
   private static final MediaType MEDIA_TYPE = new MediaType("application", "geo+json");
 
-  private final CrsTransformerFactory crsTransformerFactory;
   private final Cql cql;
 
   private FeatureQueryEncoderGraphQl queryTransformer;
@@ -197,6 +196,7 @@ public class FeatureProviderGraphQl
   @AssistedInject
   public FeatureProviderGraphQl(
       CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
       Cql cql,
       ConnectorFactory connectorFactory,
       Reactive reactive,
@@ -208,12 +208,12 @@ public class FeatureProviderGraphQl
         connectorFactory,
         reactive,
         crsTransformerFactory,
+        crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
         data,
         volatileRegistry);
 
-    this.crsTransformerFactory = crsTransformerFactory;
     this.cql = cql;
   }
 
