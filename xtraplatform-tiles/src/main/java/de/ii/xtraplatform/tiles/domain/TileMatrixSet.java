@@ -17,6 +17,7 @@ import java.math.RoundingMode;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -366,5 +367,18 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    */
   default int getXyzRow(int level, int tmsRow) {
     return getRows(level) - 1 - tmsRow;
+  }
+
+  default boolean isQuadTree() {
+    return getInitialHeight() == 1
+        && getInitialWidth() == 1
+        && getMinLevel() == 0
+        && IntStream.range(0, getMaxLevel())
+            .allMatch(
+                level -> {
+                  TileMatrix tileMatrix = getTileMatrix(level);
+                  return tileMatrix.getMatrixWidth() == Math.pow(2, level)
+                      && tileMatrix.getMatrixHeight() == Math.pow(2, level);
+                });
   }
 }
