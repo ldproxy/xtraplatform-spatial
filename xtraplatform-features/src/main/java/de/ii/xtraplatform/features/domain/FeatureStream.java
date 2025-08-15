@@ -30,6 +30,7 @@ public interface FeatureStream {
 
   enum PipelineSteps {
     MAPPING,
+    GEOMETRY,
     COORDINATES,
     CLEAN,
     ETAG,

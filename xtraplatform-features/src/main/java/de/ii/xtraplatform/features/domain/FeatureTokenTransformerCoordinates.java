@@ -8,25 +8,14 @@
 package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
-import de.ii.xtraplatform.geometries.domain.CompoundCurve;
 import de.ii.xtraplatform.geometries.domain.Geometry;
-import de.ii.xtraplatform.geometries.domain.GeometryType;
-import de.ii.xtraplatform.geometries.domain.MultiLineString;
-import de.ii.xtraplatform.geometries.domain.MultiPolygon;
-import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
-import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableSimplifyLine;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer {
-
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(FeatureTokenTransformerCoordinates.class);
 
   private final Optional<CrsTransformer> crsTransformerTargetCrs;
   private final Optional<CrsTransformer> crsTransformerWgs84;
@@ -42,41 +31,6 @@ public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer 
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     Geometry<?> geometry = context.geometry();
     if (geometry != null) {
-      // Upgrade geometries to their true type, if a simpler type was used in the feature provider,
-      // typically because the provider cannot represent all information.
-      // TODO: move to its own transformer
-      if (geometry.getType() == GeometryType.POLYHEDRAL_SURFACE
-          && !((PolyhedralSurface) geometry).isClosed()
-          && context
-              .schema()
-              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getClosed))
-              .orElse(false)) {
-        geometry =
-            PolyhedralSurface.of(
-                ((PolyhedralSurface) geometry).getValue(), true, geometry.getCrs());
-      } else if (geometry.getType() == GeometryType.MULTI_POLYGON
-          && context
-              .schema()
-              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getComposite))
-              .orElse(false)
-          && context
-              .schema()
-              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getClosed))
-              .orElse(false)) {
-        geometry =
-            PolyhedralSurface.of(((MultiPolygon) geometry).getValue(), true, geometry.getCrs());
-      } else if (geometry.getType() == GeometryType.MULTI_LINE_STRING
-          && context
-              .schema()
-              .flatMap(s -> s.getConstraints().flatMap(SchemaConstraints::getComposite))
-              .orElse(false)) {
-        geometry =
-            CompoundCurve.of(
-                ((MultiLineString) geometry)
-                    .getValue().stream().map(SingleCurve.class::cast).toList(),
-                geometry.getCrs());
-      }
-
       CoordinatesTransformation next = null;
 
       // A SECONDARY_GEOMETRY is always forced to WGS84 longitude/latitude, not the target CRS
