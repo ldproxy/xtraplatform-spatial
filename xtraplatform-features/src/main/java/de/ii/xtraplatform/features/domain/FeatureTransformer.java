@@ -8,7 +8,7 @@
 package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.features.domain.legacy.TargetMapping;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.List;
 import java.util.OptionalLong;
 
@@ -33,7 +33,7 @@ public interface FeatureTransformer {
   void onPropertyEnd() throws Exception;
 
   void onGeometryStart(
-      final TargetMapping mapping, final SimpleFeatureGeometry type, final Integer dimension)
+      final TargetMapping mapping, final GeometryType type, final Integer dimension)
       throws Exception;
 
   void onGeometryNestedStart() throws Exception;

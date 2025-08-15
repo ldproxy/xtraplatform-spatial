@@ -11,8 +11,7 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandler;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
-import de.ii.xtraplatform.geometries.domain.CoordinatesWriter;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.transcode.CoordinatesWriter;
 import java.io.IOException;
 import org.immutables.value.Value;
 
@@ -25,22 +24,8 @@ public abstract class CoordinatesWriterFeatureTokens
   @Value.Parameter
   public abstract ModifiableContext<FeatureSchema, SchemaMapping> getContext();
 
-  @Value.Derived
-  public boolean isPoint() {
-    return getContext()
-        .geometryType()
-        .filter(
-            geoType ->
-                geoType == SimpleFeatureGeometry.POINT
-                    || geoType == SimpleFeatureGeometry.MULTI_POINT)
-        .isPresent();
-  }
-
   @Override
   public void onStart() throws IOException {
-    if (!isPoint()) {
-      getDelegate().onArrayStart(getContext());
-    }
     getDelegate().onArrayStart(getContext());
   }
 
@@ -71,8 +56,5 @@ public abstract class CoordinatesWriterFeatureTokens
   @Override
   public void onEnd() throws IOException {
     getDelegate().onArrayEnd(getContext());
-    if (!isPoint()) {
-      getDelegate().onArrayEnd(getContext());
-    }
   }
 }

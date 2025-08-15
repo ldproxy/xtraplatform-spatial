@@ -10,7 +10,7 @@ package de.ii.xtraplatform.features.domain;
 import com.google.common.base.Splitter;
 import de.ii.xtraplatform.features.domain.transform.DynamicTargetSchemaTransformer;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -24,8 +24,7 @@ public interface SchemaMapping extends SchemaMappingBase<FeatureSchema> {
   List<DynamicTargetSchemaTransformer> getDynamicTransformers();
 
   @Override
-  default FeatureSchema schemaWithGeometryType(
-      FeatureSchema schema, SimpleFeatureGeometry geometryType) {
+  default FeatureSchema schemaWithGeometryType(FeatureSchema schema, GeometryType geometryType) {
     return new ImmutableFeatureSchema.Builder().from(schema).geometryType(geometryType).build();
   }
 

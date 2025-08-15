@@ -19,13 +19,9 @@ import de.ii.xtraplatform.features.domain.PropertyBase;
 import de.ii.xtraplatform.features.domain.PropertyBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesTransformer;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesTransformer.Builder;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesWriterWkt;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
-import java.io.IOException;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WktWkbGeometryType;
 import java.io.StringWriter;
-import java.io.Writer;
 import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -227,7 +223,7 @@ public interface ObjectSql {
 
   default Map.Entry<String, String> toWkt(
       PropertySql propertySql, Optional<CrsTransformer> crsTransformer, EpsgCrs nativeCrs) {
-    SimpleFeatureGeometry geometryType =
+    GeometryType geometryType =
         propertySql
             .getGeometryType()
             .or(
@@ -235,16 +231,16 @@ public interface ObjectSql {
                     propertySql
                         .getSchema()
                         .flatMap(SchemaSql::getGeometryType)
-                        .filter(SimpleFeatureGeometry::isSpecific))
+                        .filter(GeometryType::isSpecific))
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
                         "Cannot encode geometry as WKT, no specific geometry type found."));
-    SimpleFeatureGeometryFromToWkt wktType =
-        SimpleFeatureGeometryFromToWkt.fromSimpleFeatureGeometry(geometryType);
+    WktWkbGeometryType wktType = WktWkbGeometryType.fromGeometryType(geometryType);
     Integer dimension = 2;
 
     StringWriter geometryWriter = new StringWriter();
+    /* FIXME
     ImmutableCoordinatesTransformer.Builder coordinatesTransformerBuilder =
         ImmutableCoordinatesTransformer.builder();
     coordinatesTransformerBuilder.coordinatesWriter(
@@ -264,6 +260,7 @@ public interface ObjectSql {
     } catch (IOException e) {
 
     }
+     */
 
     // TODO: functions from Dialect
     return new AbstractMap.SimpleImmutableEntry<>(
@@ -272,6 +269,7 @@ public interface ObjectSql {
             "ST_ForcePolygonCW(ST_GeomFromText('%s',%s))", geometryWriter, nativeCrs.getCode()));
   }
 
+  /* FIXME
   // TODO: test all geo types
   default void toWktArray(
       PropertySql propertySql, Writer structureWriter, Builder coordinatesWriterBuilder)
@@ -309,6 +307,7 @@ public interface ObjectSql {
       structureWriter.append(")");
     }
   }
+   */
 
   default Optional<PropertySql> findChild(List<String> path) {
     if (path.size() < 2) {

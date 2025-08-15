@@ -7,7 +7,11 @@
  */
 package de.ii.xtraplatform.features.domain
 
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+
+import de.ii.xtraplatform.geometries.domain.GeometryType
+import de.ii.xtraplatform.geometries.domain.Axes
+import de.ii.xtraplatform.geometries.domain.MultiPoint
+import de.ii.xtraplatform.geometries.domain.Position
 import spock.lang.Specification
 
 /**
@@ -94,54 +98,18 @@ class FeatureTokenReaderSpec extends Specification {
         })
 
         then:
-        1 * eventHandler.onObjectStart({ FeatureEventHandler.ModifiableContext context ->
+        1 * eventHandler.onGeometry({ FeatureEventHandler.ModifiableContext context ->
             context.path() == ["geometry"]
-            context.geometryType() == Optional.of(SimpleFeatureGeometry.POINT)
-            context.geometryDimension() == OptionalInt.of(2)
-            context.inGeometry()
-            context.inObject()
+            context.geometry().getValue() ==  Position.ofXY(6.295202392345018, 50.11336914792363)
+            context.geometry().getType() == GeometryType.POINT
+            context.geometry().getAxes() == Axes.XY
         })
-
-        then:
-        1 * eventHandler.onArrayStart({ FeatureEventHandler.ModifiableContext context ->
-            context.path() == ["geometry"]
-            context.inGeometry()
-            context.inObject()
-            context.inArray()
-        })
-
-        then:
-        1 * eventHandler.onValue({ FeatureEventHandler.ModifiableContext context ->
-            context.path() == ["geometry"]
-            context.value() == "6.295202392345018"
-            context.valueType() == SchemaBase.Type.FLOAT
-            context.inGeometry()
-            context.inObject()
-            context.inArray()
-        })
-
-        then:
-        1 * eventHandler.onValue({ FeatureEventHandler.ModifiableContext context ->
-            context.path() == ["geometry"]
-            context.value() == "50.11336914792363"
-            context.valueType() == SchemaBase.Type.FLOAT
-            context.inGeometry()
-            context.inObject()
-            context.inArray()
-        })
-
-        then:
-        1 * eventHandler.onArrayEnd(_)
-
-        then:
-        1 * eventHandler.onObjectEnd(_)
 
         then:
         1 * eventHandler.onValue({ FeatureEventHandler.ModifiableContext context ->
             context.path() == ["kennung"]
             context.value() == "580340001-1"
             context.valueType() == SchemaBase.Type.STRING
-            (!context.inGeometry())
             (!context.inObject())
             (!context.inArray())
         })
@@ -180,37 +148,12 @@ class FeatureTokenReaderSpec extends Specification {
         })
 
         then:
-        1 * eventHandler.onObjectStart({ FeatureEventHandler.ModifiableContext context ->
+        1 * eventHandler.onGeometry({ FeatureEventHandler.ModifiableContext context ->
             context.path() == ["geometry"]
-            context.geometryType() == Optional.of(SimpleFeatureGeometry.MULTI_POINT)
+            ((MultiPoint) context.geometry()).getValue().get(0).getValue() == Position.ofXY(6.406233970262905, 50.1501333536934)
+            context.geometry().getType() == GeometryType.MULTI_POINT
+            context.geometry().getAxes() == Axes.XY
         })
-
-        then:
-        1 * eventHandler.onArrayStart({ FeatureEventHandler.ModifiableContext context ->
-            context.path() == ["geometry"]
-        })
-
-        then:
-        1 * eventHandler.onValue({ FeatureEventHandler.ModifiableContext context ->
-            context.path() == ["geometry"]
-            context.value() == "6.406233970262905"
-            context.valueType() == SchemaBase.Type.FLOAT
-            context.indexes() == [1]
-        })
-
-        then:
-        1 * eventHandler.onValue({ FeatureEventHandler.ModifiableContext context ->
-            context.path() == ["geometry"]
-            context.value() == "50.1501333536934"
-            context.valueType() == SchemaBase.Type.FLOAT
-            context.indexes() == [2]
-        })
-
-        then:
-        1 * eventHandler.onArrayEnd(_)
-
-        then:
-        1 * eventHandler.onObjectEnd(_)
 
         then:
         1 * eventHandler.onValue({ FeatureEventHandler.ModifiableContext context ->

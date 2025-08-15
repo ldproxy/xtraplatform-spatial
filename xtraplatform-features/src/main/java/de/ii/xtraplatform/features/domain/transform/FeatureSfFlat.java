@@ -136,11 +136,11 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
 
   @Value.Lazy
   default boolean hasGeometry() {
-    return getGeometry().isPresent();
+    return getGeometryProperty().isPresent();
   }
 
   @Value.Lazy
-  default Optional<PropertySfFlat> getGeometry() {
+  default Optional<PropertySfFlat> getGeometryProperty() {
     return getProperties().stream()
         .filter(
             property ->
@@ -153,6 +153,6 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
   }
 
   default Optional<Geometry> getJtsGeometry(GeometryFactory geometryFactory) {
-    return getGeometry().flatMap(geometry -> geometry.getJtsGeometry(geometryFactory));
+    return getGeometryProperty().flatMap(geometry -> geometry.getJtsGeometry(geometryFactory));
   }
 }

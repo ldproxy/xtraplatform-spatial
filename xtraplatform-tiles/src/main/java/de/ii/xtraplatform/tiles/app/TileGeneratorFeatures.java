@@ -31,7 +31,7 @@ import de.ii.xtraplatform.features.domain.profile.ProfileTransformations;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.WithTransformationsApplied;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileGenerationContext;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
@@ -341,7 +341,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
 
     return new TileGenerationSchema() {
       @Override
-      public SimpleFeatureGeometry getGeometryType() {
+      public GeometryType getGeometryType() {
         return featureSchema.getEffectiveGeometryType();
       }
 

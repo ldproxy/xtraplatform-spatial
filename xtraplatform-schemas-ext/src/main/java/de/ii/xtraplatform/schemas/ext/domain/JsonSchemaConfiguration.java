@@ -10,7 +10,7 @@ package de.ii.xtraplatform.schemas.ext.domain;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.JsonDynamicSubType;
 import de.ii.xtraplatform.features.domain.ExtensionConfiguration;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.Map;
 import org.immutables.value.Value;
 
@@ -48,7 +48,7 @@ public interface JsonSchemaConfiguration extends ExtensionConfiguration {
    * @default {}
    * @since v3.4
    */
-  Map<String, SimpleFeatureGeometry> getGeometryTypeRefs();
+  Map<String, GeometryType> getGeometryTypeRefs();
 
   /**
    * @langEn Allows to map JSON schema definitions to a `refType`, e.g. `'#/$defs/Address':

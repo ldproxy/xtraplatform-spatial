@@ -95,6 +95,7 @@ public interface TransformerChain<T, U> {
 
   static boolean matchesValueType(FeatureSchema schema, String valueType) {
     return schema.isValue()
+        && !schema.isSpatial()
         && Objects.equals(schema.getValueType().orElse(schema.getType()), Type.valueOf(valueType));
   }
 

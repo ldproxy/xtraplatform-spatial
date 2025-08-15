@@ -13,7 +13,7 @@ import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+import de.ii.xtraplatform.geometries.domain.GeometryType
 import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
@@ -64,7 +64,7 @@ class FeatureProviderDataV2Spec extends Specification {
                         .putProperties2("geomLowerPoint", new ImmutableFeatureSchema.Builder()
                                 .sourcePath("geomlowerpoint")
                                 .type(SchemaBase.Type.GEOMETRY)
-                                .geometryType(SimpleFeatureGeometry.POINT)
+                                .geometryType(GeometryType.POINT)
                         )
                         .putProperties2("explorationSite", new ImmutableFeatureSchema.Builder()
                                 .sourcePath("[explorationsite_fk=id]explorationsite")
@@ -201,7 +201,7 @@ class FeatureProviderDataV2Spec extends Specification {
                 .path("geoPath")
                 .name("geoName")
                 .type(FeaturePropertyV2.Type.STRING)
-                .geometryType(SimpleFeatureGeometry.POINT)
+                .geometryType(GeometryType.POINT)
                 .build()
 
         then:

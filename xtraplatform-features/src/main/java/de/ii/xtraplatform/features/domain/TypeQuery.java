@@ -42,4 +42,9 @@ public interface TypeQuery {
   default boolean skipGeometry() {
     return false;
   }
+
+  @Value.Default
+  default boolean forceSimpleFeatureGeometry() {
+    return false;
+  }
 }
