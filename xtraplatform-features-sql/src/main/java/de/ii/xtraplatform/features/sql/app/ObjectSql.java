@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import org.immutables.value.Value;
 
+// TODO: delete
 public interface ObjectSql {
 
   List<FeatureStoreRelation> getPath();
@@ -46,7 +47,6 @@ public interface ObjectSql {
 
   Map<String, String> getIds();
 
-  // TODO
   @Value.Derived
   default Map<List<String>, List<Integer>> getRowCounts() {
     return getRowCounts(ImmutableList.of(), 0);
@@ -240,7 +240,7 @@ public interface ObjectSql {
     Integer dimension = 2;
 
     StringWriter geometryWriter = new StringWriter();
-    /* FIXME
+    /*
     ImmutableCoordinatesTransformer.Builder coordinatesTransformerBuilder =
         ImmutableCoordinatesTransformer.builder();
     coordinatesTransformerBuilder.coordinatesWriter(
@@ -269,7 +269,7 @@ public interface ObjectSql {
             "ST_ForcePolygonCW(ST_GeomFromText('%s',%s))", geometryWriter, nativeCrs.getCode()));
   }
 
-  /* FIXME
+  /*
   // TODO: test all geo types
   default void toWktArray(
       PropertySql propertySql, Writer structureWriter, Builder coordinatesWriterBuilder)
