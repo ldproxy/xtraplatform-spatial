@@ -211,6 +211,12 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
           withConstraints(objectSchema, schema.getConstraints().get(), schema, codelists);
     }
 
+    if (!schema.receivable() && schema.returnable()) {
+      objectSchema = withReadOnly(objectSchema);
+    } else if (!schema.returnable() && schema.receivable()) {
+      objectSchema = withWriteOnly(objectSchema);
+    }
+
     return objectSchema;
   }
 
