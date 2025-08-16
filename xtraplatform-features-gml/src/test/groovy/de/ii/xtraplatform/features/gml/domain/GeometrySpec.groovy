@@ -99,7 +99,6 @@ class GeometrySpec extends Specification {
         String gmlOut = sb.toString()
 
         then:
-        // TODO what should be serialized for empty points?
         gmlOut == "<gml:Point><gml:pos>NaN NaN</gml:pos></gml:Point>"
     }
 
