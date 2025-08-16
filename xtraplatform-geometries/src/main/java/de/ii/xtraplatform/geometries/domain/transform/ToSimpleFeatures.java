@@ -25,8 +25,19 @@ import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
 import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 public class ToSimpleFeatures implements GeometryTransformer {
+
+  private final OptionalDouble maxDeviation;
+
+  public ToSimpleFeatures() {
+    this.maxDeviation = OptionalDouble.empty();
+  }
+
+  public ToSimpleFeatures(double maxDeviation) {
+    this.maxDeviation = OptionalDouble.of(maxDeviation);
+  }
 
   @Override
   public Geometry<?> visit(Point geometry) {
@@ -36,8 +47,22 @@ public class ToSimpleFeatures implements GeometryTransformer {
   @Override
   public Geometry<?> visit(SingleCurve geometry) {
     if (geometry.getType() == GeometryType.CIRCULAR_STRING) {
-      // TODO properly interpolate arcs
-      return LineString.of(geometry.getValue(), geometry.getCrs());
+      double maxDev =
+          maxDeviation.orElseGet(
+              () -> {
+                double[][] minMax = geometry.accept(new MinMaxDeriver());
+                return (Math.sqrt(
+                        Math.pow(
+                            minMax[1][0] - minMax[0][0],
+                            2 + Math.pow(minMax[1][1] - minMax[0][1], 2))))
+                    / 1000.0;
+              });
+      return LineString.of(
+          PositionList.of(
+              geometry.getAxes(),
+              ArcInterpolator.interpolateArcString(
+                  geometry.getValue().getCoordinates(), geometry.getAxes().size(), maxDev)),
+          geometry.getCrs());
     }
     return geometry;
   }

@@ -9,7 +9,9 @@ package de.ii.xtraplatform.geometries.domain.transform;
 
 import de.ii.xtraplatform.geometries.domain.PositionList.Interpolation;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import org.immutables.value.Value;
@@ -47,17 +49,49 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
   }
 
   private double[] simplify(
-      double[] points,
+      double[] coordinates,
       int numberOfPositions,
       int dimension,
       Interpolation interpolation,
       int minNumberOfPositions) {
 
-    // TODO add support for circular arcs (interpolation == Interpolation.CIRCULAR), simplify to
-    // LineString
+    return interpolation == Interpolation.LINE
+        ? simplifyLine(coordinates, numberOfPositions, dimension, minNumberOfPositions)
+        : simplifyArcs(coordinates, numberOfPositions, dimension);
+  }
+
+  private double[] simplifyArcs(double[] coordinates, int numberOfPositions, int dimension) {
+
+    List<double[]> arcSegments = new ArrayList<>();
+    for (int i = 0; i <= numberOfPositions - 2; i += 2) {
+      arcSegments.add(
+          ArcInterpolator.interpolateArc3Points(coordinates, i, dimension, getDistanceTolerance()));
+    }
+
+    // Flatten the list of arrays into a single array
+    int totalLength =
+        arcSegments.stream().mapToInt(arr -> arr.length).sum()
+            - (arcSegments.size() - 1) * dimension;
+    double[] result = new double[totalLength];
+    // first point
+    int cursor = 0;
+    System.arraycopy(arcSegments.get(0), 0, result, cursor, dimension);
+    cursor += dimension;
+
+    // Skip the first point of each segment as it is already set
+    for (double[] segment : arcSegments) {
+      System.arraycopy(segment, dimension, result, cursor, segment.length - dimension);
+      cursor += segment.length - dimension;
+    }
+
+    return result;
+  }
+
+  public double[] simplifyLine(
+      double[] coordinates, int numberOfPositions, int dimension, int minNumberOfPositions) {
 
     if (minNumberOfPositions > 0 && numberOfPositions <= minNumberOfPositions) {
-      return Arrays.copyOf(points, numberOfPositions * dimension);
+      return Arrays.copyOf(coordinates, numberOfPositions * dimension);
     }
 
     boolean[] keepPoints = new boolean[numberOfPositions];
@@ -68,7 +102,7 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
 
       for (int i = 0; i < numberOfPositions; i = i + split) {
         simplifySection(
-            points, dimension, i, Math.min(i + split - 1, numberOfPositions - 1), keepPoints);
+            coordinates, dimension, i, Math.min(i + split - 1, numberOfPositions - 1), keepPoints);
       }
       /*
       simplifySection(points, dimension, 0, split, keepPoints);
@@ -78,7 +112,7 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
       simplifySection(points, dimension, split * 3, numberOfPoints - 1, keepPoints);
        */
     } else {
-      simplifySection(points, dimension, 0, numberOfPositions - 1, keepPoints);
+      simplifySection(coordinates, dimension, 0, numberOfPositions - 1, keepPoints);
     }
 
     int simplifiedLength = 0;
@@ -93,7 +127,7 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
     for (int i = 0; i < numberOfPositions; i++) {
       if (keepPoints[i]) {
         for (int j = i * dimension; j < i * dimension + dimension; j++) {
-          simplifiedPoints[cursor++] = points[j];
+          simplifiedPoints[cursor++] = coordinates[j];
         }
       }
     }
@@ -102,7 +136,7 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
   }
 
   private void simplifySection(
-      double[] points, int dimension, int start, int end, boolean[] keepPoints) {
+      double[] coordinates, int dimension, int start, int end, boolean[] keepPoints) {
     if ((start + 1) == end) {
       return;
     }
@@ -112,12 +146,12 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
     for (int i = start + 1; i < end; i++) {
       double distance =
           distance(
-              points[start * dimension],
-              points[start * dimension + 1],
-              points[end * dimension],
-              points[end * dimension + 1],
-              points[i * dimension],
-              points[i * dimension + 1]);
+              coordinates[start * dimension],
+              coordinates[start * dimension + 1],
+              coordinates[end * dimension],
+              coordinates[end * dimension + 1],
+              coordinates[i * dimension],
+              coordinates[i * dimension + 1]);
       if (distance > maxDistance) {
         maxDistance = distance;
         maxIndex = i;
@@ -128,8 +162,8 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
         keepPoints[i] = false;
       }
     } else {
-      simplifySection(points, dimension, start, maxIndex, keepPoints);
-      simplifySection(points, dimension, maxIndex, end, keepPoints);
+      simplifySection(coordinates, dimension, start, maxIndex, keepPoints);
+      simplifySection(coordinates, dimension, maxIndex, end, keepPoints);
     }
   }
 

@@ -7,8 +7,11 @@
  */
 package de.ii.xtraplatform.geometries.domain
 
+import de.ii.xtraplatform.geometries.domain.transform.ArcInterpolator
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableReverseLine
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableSimplifyLine
+import de.ii.xtraplatform.geometries.domain.transform.ReverseLine
 import de.ii.xtraplatform.geometries.domain.transform.SimplifyLine
 import spock.lang.Specification
 
@@ -88,5 +91,34 @@ class SimplifyLineSpec extends Specification {
 
         1 * next.onCoordinates([10.0, 10.0, 11.0, 11.0, 12.0, 9.0, 13.0, 10.0], 8, 2, Optional.of(PositionList.Interpolation.LINE), OptionalInt.of(3))
         0 * _
+    }
+
+    def '3d circle'() {
+
+        given:
+
+        double[] coordinatesCCW = [-1.0, 0.0, 10.0, 0.0, -1.0, 11.0, 1.0, 0.0, 12.0, 0.0, 1.0, 11.0, -1.0, 0.0, 10.0]
+        double[] coordinatesCW = [-1.0, 0.0, 10.0, 0.0, 1.0, 11.0, 1.0, 0.0, 12.0, 0.0, -1.0, 11.0, -1.0, 0.0, 10.0]
+        int dimension = 3
+        double maxDistance = 0.05
+        ReverseLine reverseLine = ImmutableReverseLine.of(Optional.empty())
+        SimplifyLine simplifyLine = ImmutableSimplifyLine.of(Optional.empty(), maxDistance)
+
+        when:
+
+        double[] simplifiedCCW = simplifyLine.onCoordinates(coordinatesCCW, coordinatesCCW.length, dimension, Optional.of(PositionList.Interpolation.CIRCULAR), OptionalInt.empty())
+
+        double[] simplifiedCW = simplifyLine.onCoordinates(coordinatesCW, coordinatesCW.length, dimension, Optional.of(PositionList.Interpolation.CIRCULAR), OptionalInt.empty())
+
+        double[] coordinatesCCWrev = reverseLine.onCoordinates(coordinatesCCW, coordinatesCCW.length, dimension, Optional.empty(), OptionalInt.empty())
+        double[] simplifiedCCWrev = simplifyLine.onCoordinates(coordinatesCCWrev, coordinatesCCWrev.length, dimension, Optional.of(PositionList.Interpolation.CIRCULAR), OptionalInt.empty())
+
+        double[] coordinatesCWrev = reverseLine.onCoordinates(coordinatesCW, coordinatesCW.length, dimension, Optional.empty(), OptionalInt.empty())
+        double[] simplifiedCWrev = simplifyLine.onCoordinates(coordinatesCWrev, coordinatesCWrev.length, dimension, Optional.of(PositionList.Interpolation.CIRCULAR), OptionalInt.empty())
+
+        then:
+
+        simplifiedCCW == simplifiedCWrev
+        simplifiedCW == simplifiedCCWrev
     }
 }
