@@ -490,6 +490,10 @@ public class SqlMappingDeriver {
           SqlQueryColumn.Operation.CONSTANT, new String[] {sqlPath.getConstantValue().get()});
     }
 
+    if (sqlPath.getGenerated().isPresent() && sqlPath.getGenerated().get() == false) {
+      operations.put(SqlQueryColumn.Operation.DO_NOT_GENERATE, new String[] {});
+    }
+
     if (sqlPath.isConnected()) {
       String connector = sqlPath.getConnector().orElse("");
 
