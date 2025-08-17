@@ -60,13 +60,18 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   }
 
   @Override
+  public int getPriority() {
+    // should be higher than for the processors of the created jobs (VectorSeedingJobProcessor)
+    return 1001;
+  }
+
+  @Override
   public int getConcurrency(JobSet jobSet) {
     return concurrency;
   }
 
   @Override
   public JobResult process(Job job, JobSet jobSet, Consumer<Job> pushJob) {
-
     TileSeedingJobSet seedingJobSet = getSetDetails(jobSet);
     boolean isCleanup = getDetails(job);
 
@@ -101,12 +106,10 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
         if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
           LOGGER.info(
               MARKER.JOBS,
-              "{} started (Tilesets: {})",
+              "{} scheduled (Tilesets: {})",
               jobSet.getLabel(),
               seedingJobSet.getTileSets().keySet());
         }
-
-        jobSet.start();
 
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
             tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
@@ -173,6 +176,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
                   Job job2 =
                       isRaster
                           ? TileSeedingJob.raster(
+                              jobSet.getPriority(),
                               tileProvider.getId(),
                               tileSet,
                               tileMatrixSet,
@@ -184,6 +188,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
                                   .get()
                                   .getRasterStorageInfo(tileSet, tileMatrixSet, subMatrix))
                           : TileSeedingJob.of(
+                              jobSet.getPriority(),
                               tileProvider.getId(),
                               tileSet,
                               tileMatrixSet,

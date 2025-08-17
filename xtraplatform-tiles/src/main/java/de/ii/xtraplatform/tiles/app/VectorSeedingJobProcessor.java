@@ -49,6 +49,11 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
   }
 
   @Override
+  public int getPriority() {
+    return 1000;
+  }
+
+  @Override
   public int getConcurrency(JobSet jobSet) {
     return concurrency;
   }

@@ -1,4 +1,4 @@
 [versions]
-xtraplatform-core    = '6.5.0-SNAPSHOT'
+xtraplatform-core    = '6.5.0-job-prios-SNAPSHOT'
 xtraplatform-native  = '2.5.0'
 

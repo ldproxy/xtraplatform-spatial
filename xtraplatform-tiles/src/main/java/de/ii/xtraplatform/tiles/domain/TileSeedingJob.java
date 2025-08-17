@@ -25,6 +25,7 @@ public interface TileSeedingJob {
   String TYPE_PNG = TileSeedingJobSet.type("raster", "png");
 
   static Job of(
+      int priority,
       String tileProvider,
       String tileSet,
       String tileMatrixSet,
@@ -43,10 +44,11 @@ public interface TileSeedingJob {
             .addAllSubMatrices(subMatrices)
             .build();
 
-    return Job.of(TYPE_MVT, details, jobSetId, (int) details.getNumberOfTiles());
+    return Job.of(TYPE_MVT, priority, details, jobSetId, (int) details.getNumberOfTiles());
   }
 
   static Job raster(
+      int priority,
       String tileProvider,
       String tileSet,
       String tileMatrixSet,
@@ -65,7 +67,7 @@ public interface TileSeedingJob {
             .storage(storageInfo)
             .build();
 
-    return Job.of(TYPE_PNG, details, jobSetId, (int) details.getNumberOfTiles());
+    return Job.of(TYPE_PNG, priority, details, jobSetId, (int) details.getNumberOfTiles());
   }
 
   String getTileProvider();

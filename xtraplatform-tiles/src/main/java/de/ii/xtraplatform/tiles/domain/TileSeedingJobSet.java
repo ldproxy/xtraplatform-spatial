@@ -34,9 +34,13 @@ public interface TileSeedingJobSet extends JobSetDetails {
   }
 
   static JobSet of(
-      String tileProvider, Map<String, TileGenerationParameters> tileSets, boolean reseed) {
+      String tileProvider,
+      Map<String, TileGenerationParameters> tileSets,
+      boolean reseed,
+      int priority) {
     return JobSet.of(
             TYPE,
+            priority,
             tileProvider,
             LABEL,
             String.format(" (Tilesets: %s)", tileSets.keySet()),
@@ -45,7 +49,7 @@ public interface TileSeedingJobSet extends JobSetDetails {
                 .tileSets(TilesetDetails.of(tileSets))
                 .isReseed(reseed)
                 .build())
-        .with(Job.of(TYPE_SETUP, false), Job.of(TYPE_SETUP, true));
+        .with(Job.of(TYPE_SETUP, priority, false), Job.of(TYPE_SETUP, priority, true));
   }
 
   static JobSet with(JobSet jobSet, Map<String, TileGenerationParameters> tileSets) {
@@ -60,6 +64,13 @@ public interface TileSeedingJobSet extends JobSetDetails {
   String getTileProvider();
 
   Map<String, TilesetDetails> getTileSets();
+
+  @JsonIgnore
+  @Value.Lazy
+  @Override
+  default String getLabel() {
+    return "Tilesets: " + getTileSets().keySet();
+  }
 
   @JsonIgnore
   @Value.Lazy
