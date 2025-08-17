@@ -41,7 +41,9 @@ import javax.xml.stream.XMLStreamException;
 
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
-  // TODO: add more GML geometry types if needed, currently only the most common ones are supported
+  // In principle, we could support more GML geometry types, currently only the most common ones are
+  // supported.
+  // However, GML decoding is currently only relevant for un-maintained WFS feature providers.
   // TODO: support GML 2.1 and GML 3.1
 
   static final List<String> GEOMETRY_PARTS =
