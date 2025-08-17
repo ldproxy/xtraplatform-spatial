@@ -5,10 +5,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.features.json.domain;
+package de.ii.xtraplatform.geometries.domain.transcode.json;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.geometries.domain.Axes;
@@ -122,6 +124,68 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
     };
   }
 
+  public Geometry<?> decode(JsonNode node, Optional<EpsgCrs> crs, Optional<Axes> axes)
+      throws IOException {
+    if (!node.isObject()) {
+      throw new IOException(
+          "Expected OBJECT representing a geometry, but got: " + node.getNodeType());
+    }
+
+    // TODO: support "coordRefSys", "measures"
+
+    String type = node.get("type").asText();
+    GeometryType geometryType =
+        geoJsonOnly
+            ? GeoJsonGeometryType.forString(type).toGeometryType()
+            : JsonFgGeometryType.forString(type).toGeometryType();
+
+    return switch (geometryType) {
+      case POINT,
+          MULTI_POINT,
+          LINE_STRING,
+          MULTI_LINE_STRING,
+          POLYGON,
+          MULTI_POLYGON,
+          CIRCULAR_STRING,
+          POLYHEDRAL_SURFACE -> {
+        Objects.requireNonNull(
+            node.get("coordinates"), "Coordinates must not be null for type: " + type);
+        Object coordinatesRaw = readCoordinatesRaw((ArrayNode) node.get("coordinates"));
+        yield switch (geometryType) {
+          case POINT -> point(toPosition(axes, coordinatesRaw), crs);
+          case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), crs);
+          case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), crs);
+          case MULTI_LINE_STRING -> multiLineString(
+              toListOfPositionList(axes, coordinatesRaw), crs);
+          case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), crs);
+          case MULTI_POLYGON -> multiPolygon(toListOfListOfPositionList(axes, coordinatesRaw), crs);
+          case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), crs);
+          case POLYHEDRAL_SURFACE -> polyhedralSurface(
+              toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, crs);
+          default -> throw new IllegalStateException("Unsupported geometry type: " + type);
+        };
+      }
+      case COMPOUND_CURVE, CURVE_POLYGON, MULTI_CURVE, MULTI_SURFACE, GEOMETRY_COLLECTION -> {
+        Objects.requireNonNull(
+            node.get("geometries"), "Geometries must not be null for type: " + type);
+        ImmutableList.Builder<Geometry<?>> builder = ImmutableList.builder();
+        for (JsonNode geom : node.get("geometries")) {
+          builder.add(decode(geom, crs, axes));
+        }
+        List<Geometry<?>> geometries = builder.build();
+        yield switch (geometryType) {
+          case COMPOUND_CURVE -> compoundCurve(geometries, crs);
+          case CURVE_POLYGON -> curvePolygon(geometries, crs);
+          case MULTI_CURVE -> multiCurve(geometries, crs);
+          case MULTI_SURFACE -> multiSurface(geometries, crs);
+          case GEOMETRY_COLLECTION -> geometryCollection(geometries, crs);
+          default -> throw new IllegalStateException("Unsupported geometry type: " + type);
+        };
+      }
+      default -> throw new IllegalStateException("Unsupported geometry type: " + type);
+    };
+  }
+
   private Position toPosition(Optional<Axes> axes, Object coordinatesRaw) {
     double[] coords = toDoubleArray(coordinatesRaw);
     Axes finalAxes = getAxes(axes, coords);
@@ -225,6 +289,24 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
         list.add(parser.getDoubleValue());
       } else {
         throw new IllegalStateException("Unexpected Token: " + parser.currentToken());
+      }
+    }
+    return list.build();
+  }
+
+  private Object readCoordinatesRaw(ArrayNode arrayNode) throws IOException {
+    return readArray(arrayNode);
+  }
+
+  private Object readArray(ArrayNode arrayNode) throws IOException {
+    ImmutableList.Builder<Object> list = ImmutableList.builder();
+    for (JsonNode node : arrayNode) {
+      if (node.isArray()) {
+        list.add(readArray((ArrayNode) node));
+      } else if (node.isNumber()) {
+        list.add(node.asDouble());
+      } else {
+        throw new IllegalStateException("Unexpected Node Type: " + node.getNodeType());
       }
     }
     return list.build();

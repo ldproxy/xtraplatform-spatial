@@ -20,6 +20,17 @@ public interface Polygon extends SingleSurface<LineString> {
     return ImmutablePolygon.builder().value(List.of()).axes(axes).build();
   }
 
+  static Polygon of(double[] xyOuterRing) {
+    return ImmutablePolygon.builder().value(List.of(LineString.of(xyOuterRing))).build();
+  }
+
+  static Polygon of(double[] xyOuterRing, EpsgCrs crs) {
+    return ImmutablePolygon.builder()
+        .crs(crs)
+        .value(List.of(LineString.of(xyOuterRing, crs)))
+        .build();
+  }
+
   static Polygon of(List<PositionList> rings) {
     return ImmutablePolygon.builder()
         .value(rings.stream().map(LineString::of).filter(ring -> !ring.isEmpty()).toList())
@@ -34,6 +45,17 @@ public interface Polygon extends SingleSurface<LineString> {
                 .map(ring -> LineString.of(ring, crs))
                 .filter(ring -> !ring.isEmpty())
                 .toList())
+        .build();
+  }
+
+  static Polygon ofBbox(double xmin, double ymin, double xmax, double ymax, EpsgCrs crs) {
+    return ImmutablePolygon.builder()
+        .crs(crs)
+        .value(
+            List.of(
+                LineString.of(
+                    new double[] {xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin},
+                    crs)))
         .build();
   }
 

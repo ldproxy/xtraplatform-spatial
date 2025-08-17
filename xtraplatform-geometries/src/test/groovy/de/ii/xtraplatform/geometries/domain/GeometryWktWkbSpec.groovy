@@ -261,6 +261,7 @@ class GeometryWktWkbSpec extends Specification {
         ((MultiPoint) geometry).getValue().get(0).getValue() == Position.ofXY(10.0, 10.0)
         ((MultiPoint) geometry).getValue().get(1).getValue() == Position.ofXY(20.0, 20.0)
         new GeometryEncoderWkt().encode(geometry) == wkt
+        new GeometryEncoderWkt(true).encode(geometry) == "MULTIPOINT(10.0 10.0,20.0 20.0)"
         new GeometryEncoderWkt().encode(new GeometryDecoderWkb().decode(new GeometryEncoderWkb().encode(geometry))) == wkt
     }
 

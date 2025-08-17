@@ -34,16 +34,32 @@ import java.util.List;
 public class GeometryEncoderWkt {
 
   private final int[] precision;
+  private final boolean multiPointAsFlatList;
 
   public GeometryEncoderWkt() {
     this.precision = new int[] {};
+    this.multiPointAsFlatList = false;
   }
 
   public GeometryEncoderWkt(List<Integer> precision) {
     this.precision =
         precision.stream().anyMatch(v -> v > 0)
             ? precision.stream().mapToInt(v -> v).toArray()
+            : new int[] {};
+    this.multiPointAsFlatList = false;
+  }
+
+  public GeometryEncoderWkt(boolean multiPointAsFlatList) {
+    this.precision = new int[] {};
+    this.multiPointAsFlatList = multiPointAsFlatList;
+  }
+
+  public GeometryEncoderWkt(List<Integer> precision, boolean multiPointAsFlatList) {
+    this.precision =
+        precision.stream().anyMatch(v -> v > 0)
+            ? precision.stream().mapToInt(v -> v).toArray()
             : null;
+    this.multiPointAsFlatList = multiPointAsFlatList;
   }
 
   public String encode(Geometry<?> geometry) throws IOException {
@@ -147,9 +163,13 @@ public class GeometryEncoderWkt {
         builder.append(",");
       }
       first = false;
-      builder.append("(");
-      writePosition(builder, point.getValue(), false);
-      builder.append(")");
+      if (multiPointAsFlatList) {
+        writePosition(builder, point.getValue(), false);
+      } else {
+        builder.append("(");
+        writePosition(builder, point.getValue(), false);
+        builder.append(")");
+      }
     }
   }
 

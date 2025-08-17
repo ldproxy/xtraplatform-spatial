@@ -18,7 +18,7 @@ class ToSimpleFeaturesSpec extends Specification {
     def 'POINT XY'() {
 
         given:
-        Geometry<?> geometry = Point.of(Position.ofXY(10.81, 10.37))
+        Geometry<?> geometry = Point.of(10.81, 10.37)
 
         when:
         Geometry<?> sfGeometry =geometry.accept(toSf)
@@ -84,7 +84,7 @@ class ToSimpleFeaturesSpec extends Specification {
 
     def 'LINESTRING XY'() {
         given:
-        Geometry<?> geometry = LineString.of(PositionList.of(Axes.XY, new double[]{10.0,10.0,20.0,20.0,30.0,40.0}));
+        Geometry<?> geometry = LineString.of(new double[]{10.0,10.0,20.0,20.0,30.0,40.0});
 
         when:
         Geometry<?> sfGeometry =geometry.accept(toSf)
@@ -106,7 +106,7 @@ class ToSimpleFeaturesSpec extends Specification {
 
     def 'MULTIPOINT XY'() {
         given:
-        Geometry<?> geometry = MultiPoint.of(List.of(Point.of(Position.ofXY(10,10)),Point.of(Position.ofXY(20,20))))
+        Geometry<?> geometry = MultiPoint.of(List.of(Point.of(10,10),Point.of(20,20)))
 
         when:
         Geometry<?> sfGeometry =geometry.accept(toSf)
@@ -117,7 +117,7 @@ class ToSimpleFeaturesSpec extends Specification {
 
     def 'POLYGON XY'() {
         given:
-        Geometry<?> geometry = Polygon.of(List.of(PositionList.of(Axes.XY,new double[]{10.0,10.0,20.0,20.0,30.0,40.0,10.0,10.0})))
+        Geometry<?> geometry = Polygon.of(new double[]{10.0,10.0,20.0,20.0,30.0,40.0,10.0,10.0})
 
         when:
         Geometry<?> sfGeometry =geometry.accept(toSf)
@@ -129,8 +129,8 @@ class ToSimpleFeaturesSpec extends Specification {
     def 'MULTILINESTRING XY'() {
         given:
         Geometry<?> geometry = MultiLineString.of(List.of(
-                LineString.of(PositionList.of(Axes.XY, new double[]{10.0,10.0,20.0,20.0})),
-                LineString.of(PositionList.of(Axes.XY, new double[]{30.0,40.0,50.0,60.0}))
+                LineString.of(new double[]{10.0,10.0,20.0,20.0}),
+                LineString.of(new double[]{30.0,40.0,50.0,60.0})
         ))
 
         when:
@@ -153,7 +153,7 @@ class ToSimpleFeaturesSpec extends Specification {
 
     def 'GEOMETRYCOLLECTION with Point and LineString'() {
         given:
-        Geometry<?> geometry = GeometryCollection.of(List.of(Point.of(Position.ofXY(10,10)),LineString.of(PositionList.of(Axes.XY, new double[]{20.0,20.0,30.0,30.0}))))
+        Geometry<?> geometry = GeometryCollection.of(List.of(Point.of(10,10),LineString.of(new double[]{20.0,20.0,30.0,30.0})))
 
         when:
         Geometry<?> sfGeometry =geometry.accept(toSf)
@@ -164,8 +164,8 @@ class ToSimpleFeaturesSpec extends Specification {
 
     def 'Nested GEOMETRYCOLLECTION with Point and LineString / MultiPoint'() {
         given:
-        Geometry<?> multiPoint = MultiPoint.of(List.of(Point.of(Position.ofXY(10,10)),Point.of(Position.ofXY(20,20))))
-        Geometry<?> geometryCollection = GeometryCollection.of(List.of(Point.of(Position.ofXY(10,10)),LineString.of(PositionList.of(Axes.XY, new double[]{20.0,20.0,30.0,30.0}))))
+        Geometry<?> multiPoint = MultiPoint.of(List.of(Point.of(10,10),Point.of(20,20)))
+        Geometry<?> geometryCollection = GeometryCollection.of(List.of(Point.of(10,10),LineString.of(new double[]{20.0,20.0,30.0,30.0})))
         Geometry<?> geometry = GeometryCollection.of(List.of(geometryCollection, multiPoint))
 
         when:
@@ -201,21 +201,21 @@ class ToSimpleFeaturesSpec extends Specification {
         Geometry<?> sfGeometry =geometry.accept(toSf)
 
         then:
-        sfGeometry == LineString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 0.09903113209758097, 0.43388373911755823, 0.3765101981412665, 0.7818314824680299, 0.7774790660436857, 0.9749279121818236, 1.2225209339563143, 0.9749279121818236, 1.6234898018587336, 0.7818314824680298, 1.900968867902419, 0.4338837391175581, 2.0, 0.0}))
+        sfGeometry == LineString.of(new double[]{0.0, 0.0, 0.09903113209758097, 0.43388373911755823, 0.3765101981412665, 0.7818314824680299, 0.7774790660436857, 0.9749279121818236, 1.2225209339563143, 0.9749279121818236, 1.6234898018587336, 0.7818314824680298, 1.900968867902419, 0.4338837391175581, 2.0, 0.0})
     }
 
     def 'COMPOUNDCURVE XY'() {
         given:
         Geometry<?> geometry = CompoundCurve.of(List.of(
-                LineString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 1.0, 1.0})),
-                LineString.of(PositionList.of(Axes.XY, new double[]{1.0, 1.0, 2.0, 0.0}))
+                LineString.of(new double[]{0.0, 0.0, 1.0, 1.0}),
+                LineString.of(new double[]{1.0, 1.0, 2.0, 0.0})
         ))
 
         when:
         Geometry<?> sfGeometry =geometry.accept(toSf)
 
         then:
-        sfGeometry == LineString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 1.0, 1.0, 2.0, 0.0}))
+        sfGeometry == LineString.of(new double[]{0.0, 0.0, 1.0, 1.0, 2.0, 0.0})
     }
 
     def 'CURVEPOLYGON XY'() {
@@ -234,7 +234,7 @@ class ToSimpleFeaturesSpec extends Specification {
     def 'MULTICURVE XY'() {
         given:
         Geometry<?> geometry = MultiCurve.of(List.of(
-                LineString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 1.0, 1.0})),
+                LineString.of(new double[]{0.0, 0.0, 1.0, 1.0}),
                 CircularString.of(PositionList.of(Axes.XY, new double[]{1.0, 1.0, 2.0, 0.0, 3.0, 1.0}))
         ))
 
@@ -243,8 +243,8 @@ class ToSimpleFeaturesSpec extends Specification {
 
         then:
         sfGeometry == MultiLineString.of(List.of(
-                LineString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 1.0, 1.0})),
-                LineString.of(PositionList.of(Axes.XY, new double[]{1.0, 1.0, 1.099031132097581, 0.5661162608824419, 1.3765101981412662, 0.2181685175319703, 1.7774790660436854, 0.02507208781817649, 2.2225209339563143, 0.02507208781817627, 2.6234898018587334, 0.21816851753197009, 2.900968867902419, 0.5661162608824417, 3.0, 1.0}))
+                LineString.of(new double[]{0.0, 0.0, 1.0, 1.0}),
+                LineString.of(new double[]{1.0, 1.0, 1.099031132097581, 0.5661162608824419, 1.3765101981412662, 0.2181685175319703, 1.7774790660436854, 0.02507208781817649, 2.2225209339563143, 0.02507208781817627, 2.6234898018587334, 0.21816851753197009, 2.900968867902419, 0.5661162608824417, 3.0, 1.0})
         ))
     }
 

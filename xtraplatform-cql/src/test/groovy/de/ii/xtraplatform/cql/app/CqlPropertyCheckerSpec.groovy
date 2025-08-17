@@ -8,12 +8,6 @@
 package de.ii.xtraplatform.cql.app
 
 import de.ii.xtraplatform.cql.domain.Cql
-import de.ii.xtraplatform.cql.domain.Cql2Expression
-import de.ii.xtraplatform.cql.domain.Geometry
-import de.ii.xtraplatform.cql.domain.Property
-import de.ii.xtraplatform.cql.domain.SIntersects
-import de.ii.xtraplatform.cql.domain.SpatialLiteral
-import de.ii.xtraplatform.crs.domain.OgcCrs
 import spock.lang.Shared
 import spock.lang.Specification
 

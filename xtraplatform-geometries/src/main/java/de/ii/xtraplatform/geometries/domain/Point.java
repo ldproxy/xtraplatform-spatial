@@ -18,6 +18,22 @@ public interface Point extends Primitive<Position> {
     return ImmutablePoint.builder().value(Position.empty(axes)).build();
   }
 
+  static Point of(double x, double y) {
+    return ImmutablePoint.builder().value(Position.ofXY(x, y)).build();
+  }
+
+  static Point of(double x, double y, double z) {
+    return ImmutablePoint.builder().value(Position.ofXYZ(x, y, z)).build();
+  }
+
+  static Point of(double x, double y, EpsgCrs crs) {
+    return ImmutablePoint.builder().crs(crs).value(Position.ofXY(x, y)).build();
+  }
+
+  static Point of(double x, double y, double z, EpsgCrs crs) {
+    return ImmutablePoint.builder().crs(crs).value(Position.ofXYZ(x, y, z)).build();
+  }
+
   static Point of(Position pos) {
     return ImmutablePoint.builder().value(pos).build();
   }

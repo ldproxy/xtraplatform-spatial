@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.geometries.domain;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.IntStream;
 import javax.validation.constraints.NotNull;
 import org.immutables.value.Value;
@@ -34,6 +35,24 @@ public abstract class PositionList {
         .coordinates(coordinates)
         .interpolation(interpolation)
         .build();
+  }
+
+  public static PositionList of(List<Position> positions) {
+    if (positions.isEmpty()) {
+      return empty(Axes.XY);
+    }
+    Axes axes = positions.get(0).getAxes();
+    double[] coordinates = new double[axes.size() * positions.size()];
+    for (int i = 0; i < positions.size(); i++) {
+      Position position = positions.get(i);
+      System.arraycopy(
+          position.getCoordinates(),
+          0,
+          coordinates,
+          i * position.getAxes().size(),
+          position.getAxes().size());
+    }
+    return PositionList.of(axes, coordinates);
   }
 
   public static PositionList concat(PositionList first, PositionList second) {

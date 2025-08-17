@@ -20,6 +20,7 @@ import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
 import de.ii.xtraplatform.geometries.domain.Axes;
 import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.transcode.json.GeometryDecoderJson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;

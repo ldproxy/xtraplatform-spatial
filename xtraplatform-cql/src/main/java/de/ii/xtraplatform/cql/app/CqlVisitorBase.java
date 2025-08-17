@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.app;
 
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
 import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
@@ -18,13 +19,14 @@ import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.CqlVisitor;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.Interval;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
+import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
 import de.ii.xtraplatform.cql.domain.SpatialLiteral;
@@ -124,47 +126,17 @@ public class CqlVisitorBase<T> implements CqlVisitor<T> {
   }
 
   @Override
-  public T visit(Geometry.Coordinate coordinate, List<T> children) {
+  public T visit(PositionNode position, List<T> children) {
     return null;
   }
 
   @Override
-  public T visit(Geometry.Point point, List<T> children) {
+  public T visit(GeometryNode geometry, List<T> children) {
     return null;
   }
 
   @Override
-  public T visit(Geometry.LineString lineString, List<T> children) {
-    return null;
-  }
-
-  @Override
-  public T visit(Geometry.Polygon polygon, List<T> children) {
-    return null;
-  }
-
-  @Override
-  public T visit(Geometry.MultiPoint multiPoint, List<T> children) {
-    return null;
-  }
-
-  @Override
-  public T visit(Geometry.MultiLineString multiLineString, List<T> children) {
-    return null;
-  }
-
-  @Override
-  public T visit(Geometry.MultiPolygon multiPolygon, List<T> children) {
-    return null;
-  }
-
-  @Override
-  public T visit(Geometry.GeometryCollection geometryCollection, List<T> children) {
-    return null;
-  }
-
-  @Override
-  public T visit(Geometry.Bbox bbox, List<T> children) {
+  public T visit(Bbox bbox, List<T> children) {
     return null;
   }
 
