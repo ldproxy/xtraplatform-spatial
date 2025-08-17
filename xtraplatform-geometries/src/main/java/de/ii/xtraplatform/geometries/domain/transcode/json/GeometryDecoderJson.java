@@ -19,6 +19,7 @@ import de.ii.xtraplatform.geometries.domain.GeometryType;
 import de.ii.xtraplatform.geometries.domain.Position;
 import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.transcode.AbstractGeometryDecoder;
+import de.ii.xtraplatform.geometries.domain.transform.CrsSetter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +42,10 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
       throws IOException {
     String type = null;
     Object coordinatesRaw = null;
-    List<Geometry<?>> geometries = null;
+    boolean hasMeasures = false;
+    List<Geometry<?>> geometries = List.of();
     JsonToken token = parser.currentToken();
+    Optional<EpsgCrs> coordRefSys = crs;
     if (token == null) {
       token = parser.nextToken();
     }
@@ -54,10 +57,34 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
       token = parser.nextToken();
       if (token == JsonToken.FIELD_NAME) {
         String name = parser.currentName();
-        // TODO: support "coordRefSys", "measures"
         if ("type".equals(name)) {
           parser.nextToken();
           type = parser.getText();
+        } else if ("measures".equals(name)) {
+          token = parser.nextToken();
+          if (token != JsonToken.START_OBJECT) {
+            throw new IOException("Expected START_OBJECT token, but got: " + token);
+          }
+          while (token != JsonToken.END_OBJECT) {
+            token = parser.nextToken();
+            if (token == JsonToken.FIELD_NAME && "enabled".equals(parser.currentName())) {
+              token = parser.nextToken();
+              if (token != JsonToken.VALUE_TRUE && token != JsonToken.VALUE_FALSE) {
+                throw new IOException("Expected boolean value for 'enabled', but got: " + token);
+              }
+              hasMeasures = parser.getBooleanValue();
+            }
+          }
+          if (hasMeasures) {
+            // update geometries that have already been parsed
+          }
+        } else if ("coordRefSys".equals(name)) {
+          coordRefSys = parseCoordRefSys(parser);
+          // update geometries that have already been parsed
+          CrsSetter crsSetter = new CrsSetter(coordRefSys);
+          ImmutableList.Builder<Geometry<?>> builder = ImmutableList.builder();
+          geometries.forEach(geom -> builder.add(geom.accept(crsSetter)));
+          geometries = builder.build();
         } else if ("coordinates".equals(name)) {
           token = parser.nextToken();
           if (token != JsonToken.START_ARRAY) {
@@ -73,7 +100,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
           if (token != JsonToken.START_ARRAY) {
             throw new IOException("Expected START_ARRAY token, but got: " + token);
           }
-          geometries = readGeometries(parser, crs, axes);
+          geometries = readGeometries(parser, coordRefSys, axes);
           token = parser.currentToken();
           if (token != JsonToken.END_OBJECT && token != JsonToken.END_ARRAY) {
             throw new IOException("Expected END_ARRAY or END_OBJECT token, but got: " + token);
@@ -106,20 +133,22 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
     }
 
     return switch (geometryType) {
-      case POINT -> point(toPosition(axes, coordinatesRaw), crs);
-      case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), crs);
-      case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), crs);
-      case MULTI_LINE_STRING -> multiLineString(toListOfPositionList(axes, coordinatesRaw), crs);
-      case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), crs);
-      case MULTI_POLYGON -> multiPolygon(toListOfListOfPositionList(axes, coordinatesRaw), crs);
-      case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), crs);
+      case POINT -> point(toPosition(axes, coordinatesRaw), coordRefSys);
+      case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), coordRefSys);
+      case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), coordRefSys);
+      case MULTI_LINE_STRING -> multiLineString(
+          toListOfPositionList(axes, coordinatesRaw), coordRefSys);
+      case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), coordRefSys);
+      case MULTI_POLYGON -> multiPolygon(
+          toListOfListOfPositionList(axes, coordinatesRaw), coordRefSys);
+      case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), coordRefSys);
       case POLYHEDRAL_SURFACE -> polyhedralSurface(
-          toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, crs);
-      case COMPOUND_CURVE -> compoundCurve(geometries, crs);
-      case CURVE_POLYGON -> curvePolygon(geometries, crs);
-      case MULTI_CURVE -> multiCurve(geometries, crs);
-      case MULTI_SURFACE -> multiSurface(geometries, crs);
-      case GEOMETRY_COLLECTION -> geometryCollection(geometries, crs);
+          toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, coordRefSys);
+      case COMPOUND_CURVE -> compoundCurve(geometries, coordRefSys);
+      case CURVE_POLYGON -> curvePolygon(geometries, coordRefSys);
+      case MULTI_CURVE -> multiCurve(geometries, coordRefSys);
+      case MULTI_SURFACE -> multiSurface(geometries, coordRefSys);
+      case GEOMETRY_COLLECTION -> geometryCollection(geometries, coordRefSys);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
   }
@@ -131,13 +160,20 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
           "Expected OBJECT representing a geometry, but got: " + node.getNodeType());
     }
 
-    // TODO: support "coordRefSys", "measures"
-
     String type = node.get("type").asText();
     GeometryType geometryType =
         geoJsonOnly
             ? GeoJsonGeometryType.forString(type).toGeometryType()
             : JsonFgGeometryType.forString(type).toGeometryType();
+
+    Optional<EpsgCrs> coordRefSys = crs;
+    boolean hasMeasures = false;
+    if (node.has("coordRefSys")) {
+      coordRefSys = parseCoordRefSys(node);
+    }
+    if (node.has("measures")) {
+      hasMeasures = node.get("measures").get("enabled").asBoolean();
+    }
 
     return switch (geometryType) {
       case POINT,
@@ -148,37 +184,41 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
           MULTI_POLYGON,
           CIRCULAR_STRING,
           POLYHEDRAL_SURFACE -> {
-        Objects.requireNonNull(
-            node.get("coordinates"), "Coordinates must not be null for type: " + type);
+        if (!node.has("coordinates")) {
+          throw new IOException("Coordinates must not be null for type: " + type);
+        }
         Object coordinatesRaw = readCoordinatesRaw((ArrayNode) node.get("coordinates"));
+
         yield switch (geometryType) {
-          case POINT -> point(toPosition(axes, coordinatesRaw), crs);
-          case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), crs);
-          case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), crs);
+          case POINT -> point(toPosition(axes, coordinatesRaw), coordRefSys);
+          case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), coordRefSys);
+          case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), coordRefSys);
           case MULTI_LINE_STRING -> multiLineString(
-              toListOfPositionList(axes, coordinatesRaw), crs);
-          case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), crs);
-          case MULTI_POLYGON -> multiPolygon(toListOfListOfPositionList(axes, coordinatesRaw), crs);
-          case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), crs);
+              toListOfPositionList(axes, coordinatesRaw), coordRefSys);
+          case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), coordRefSys);
+          case MULTI_POLYGON -> multiPolygon(
+              toListOfListOfPositionList(axes, coordinatesRaw), coordRefSys);
+          case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), coordRefSys);
           case POLYHEDRAL_SURFACE -> polyhedralSurface(
-              toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, crs);
+              toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, coordRefSys);
           default -> throw new IllegalStateException("Unsupported geometry type: " + type);
         };
       }
       case COMPOUND_CURVE, CURVE_POLYGON, MULTI_CURVE, MULTI_SURFACE, GEOMETRY_COLLECTION -> {
-        Objects.requireNonNull(
-            node.get("geometries"), "Geometries must not be null for type: " + type);
+        if (!node.has("geometries")) {
+          throw new IOException("Geometries must not be null for type: " + type);
+        }
         ImmutableList.Builder<Geometry<?>> builder = ImmutableList.builder();
         for (JsonNode geom : node.get("geometries")) {
-          builder.add(decode(geom, crs, axes));
+          builder.add(decode(geom, coordRefSys, axes));
         }
         List<Geometry<?>> geometries = builder.build();
         yield switch (geometryType) {
-          case COMPOUND_CURVE -> compoundCurve(geometries, crs);
-          case CURVE_POLYGON -> curvePolygon(geometries, crs);
-          case MULTI_CURVE -> multiCurve(geometries, crs);
-          case MULTI_SURFACE -> multiSurface(geometries, crs);
-          case GEOMETRY_COLLECTION -> geometryCollection(geometries, crs);
+          case COMPOUND_CURVE -> compoundCurve(geometries, coordRefSys);
+          case CURVE_POLYGON -> curvePolygon(geometries, coordRefSys);
+          case MULTI_CURVE -> multiCurve(geometries, coordRefSys);
+          case MULTI_SURFACE -> multiSurface(geometries, coordRefSys);
+          case GEOMETRY_COLLECTION -> geometryCollection(geometries, coordRefSys);
           default -> throw new IllegalStateException("Unsupported geometry type: " + type);
         };
       }
@@ -353,5 +393,69 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
       for (double d : arr) flat.add(d);
     }
     return flat.stream().mapToDouble(Double::doubleValue).toArray();
+  }
+
+  private Optional<EpsgCrs> parseCoordRefSys(JsonParser parser) throws IOException {
+    JsonToken token = parser.nextToken();
+    if (token == JsonToken.VALUE_STRING) {
+      return Optional.of(EpsgCrs.fromString(parser.getText()));
+    } else if (token == JsonToken.START_OBJECT) {
+      Optional<EpsgCrs> crs = Optional.empty();
+      while (token != JsonToken.END_OBJECT) {
+        token = parser.nextToken();
+        if (token == JsonToken.FIELD_NAME && "href".equals(parser.currentName())) {
+          token = parser.nextToken();
+          if (token != JsonToken.VALUE_STRING) {
+            throw new IOException("Expected string value for 'href', but got: " + token);
+          }
+          crs = Optional.of(EpsgCrs.fromString(parser.getText()));
+        }
+      }
+      return crs;
+    } else if (token == JsonToken.START_ARRAY) {
+      Optional<EpsgCrs> crs = Optional.empty();
+      while (token != JsonToken.END_ARRAY) {
+        Optional<EpsgCrs> crs2 = parseCoordRefSys(parser);
+        if (crs2.isPresent()) {
+          crs =
+              crs.map(
+                      epsgCrs ->
+                          EpsgCrs.of(
+                              epsgCrs.getCode(), crs2.get().getCode(), epsgCrs.getForceAxisOrder()))
+                  .or(() -> crs2);
+        }
+        token = parser.currentToken();
+      }
+      return crs;
+    } else {
+      throw new IOException(
+          "Expected STRING, START_OBJECT or START_ARRAY token for 'coordRefSys', but got: "
+              + token);
+    }
+  }
+
+  private Optional<EpsgCrs> parseCoordRefSys(JsonNode node) throws IOException {
+    if (node.isTextual()) {
+      return Optional.of(EpsgCrs.fromString(node.asText()));
+    } else if (node.isObject() && node.has("href")) {
+      return parseCoordRefSys(node.get("href"));
+    } else if (node.isArray()) {
+      Optional<EpsgCrs> crs = Optional.empty();
+      for (JsonNode n : ((ArrayNode) node)) {
+        Optional<EpsgCrs> crs2 = parseCoordRefSys(n);
+        if (crs2.isPresent()) {
+          crs =
+              crs.map(
+                      epsgCrs ->
+                          EpsgCrs.of(
+                              epsgCrs.getCode(), crs2.get().getCode(), epsgCrs.getForceAxisOrder()))
+                  .or(() -> crs2);
+        }
+      }
+      return crs;
+    } else {
+      throw new IOException(
+          "Expected STRING, OBJECT or ARRAY for 'coordRefSys', but got: " + node.getNodeType());
+    }
   }
 }
