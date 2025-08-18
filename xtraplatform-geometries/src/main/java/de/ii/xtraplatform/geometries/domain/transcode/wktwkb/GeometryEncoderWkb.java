@@ -28,7 +28,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
-// TODO change to GeometryVisitor
 public class GeometryEncoderWkb {
 
   static final byte[] ENDIANNESS =

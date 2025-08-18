@@ -30,7 +30,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
-// TODO change to GeometryVisitor
 public class GeometryEncoderWkt {
 
   private final int[] precision;
