@@ -5,34 +5,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.features.json.domain
+package de.ii.xtraplatform.geometries.domain
 
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.util.TokenBuffer
 import de.ii.xtraplatform.crs.domain.OgcCrs
-import de.ii.xtraplatform.geometries.domain.Axes
-import de.ii.xtraplatform.geometries.domain.CircularString
-import de.ii.xtraplatform.geometries.domain.CompoundCurve
-import de.ii.xtraplatform.geometries.domain.CurvePolygon
-import de.ii.xtraplatform.geometries.domain.Geometry
-import de.ii.xtraplatform.geometries.domain.GeometryCollection
-import de.ii.xtraplatform.geometries.domain.LineString
-import de.ii.xtraplatform.geometries.domain.MultiCurve
-import de.ii.xtraplatform.geometries.domain.MultiLineString
-import de.ii.xtraplatform.geometries.domain.MultiPoint
-import de.ii.xtraplatform.geometries.domain.MultiPolygon
-import de.ii.xtraplatform.geometries.domain.MultiSurface
-import de.ii.xtraplatform.geometries.domain.Point
-import de.ii.xtraplatform.geometries.domain.Polygon
-import de.ii.xtraplatform.geometries.domain.PolyhedralSurface
-import de.ii.xtraplatform.geometries.domain.Position
-import de.ii.xtraplatform.geometries.domain.PositionList
 import de.ii.xtraplatform.geometries.domain.transcode.json.GeometryDecoderJson
 import de.ii.xtraplatform.geometries.domain.transcode.json.GeometryEncoderJson
 import spock.lang.Specification
 
-class GeometrySpec extends Specification {
+class GeometryJsonSpec extends Specification {
 
     ObjectMapper objectMapper = new ObjectMapper()
 

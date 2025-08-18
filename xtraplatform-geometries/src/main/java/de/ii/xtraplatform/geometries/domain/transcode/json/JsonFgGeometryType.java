@@ -12,7 +12,6 @@ import de.ii.xtraplatform.geometries.domain.GeometryType;
 import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
 import java.util.Optional;
 
-// TODO add unit tests for all geometry types
 public enum JsonFgGeometryType {
   POINT("Point", GeometryType.POINT),
   MULTI_POINT("MultiPoint", GeometryType.MULTI_POINT),
