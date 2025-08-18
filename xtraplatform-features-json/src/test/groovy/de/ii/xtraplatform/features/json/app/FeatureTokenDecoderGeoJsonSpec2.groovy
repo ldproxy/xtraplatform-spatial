@@ -51,7 +51,6 @@ class FeatureTokenDecoderGeoJsonSpec2 extends Specification {
 
     public <T> T runStream(Reactive.Stream<T> stream) {
         def result = stream.on(runner).run().toCompletableFuture().join()
-        println(result.toString())
         return result
     }
 
