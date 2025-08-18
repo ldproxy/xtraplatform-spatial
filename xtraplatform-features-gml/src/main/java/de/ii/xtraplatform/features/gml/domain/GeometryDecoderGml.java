@@ -15,6 +15,7 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.geometries.domain.Axes;
 import de.ii.xtraplatform.geometries.domain.Geometry;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.geometries.domain.ImmutableGeometryCollection;
 import de.ii.xtraplatform.geometries.domain.ImmutableLineString;
 import de.ii.xtraplatform.geometries.domain.ImmutableMultiLineString;
 import de.ii.xtraplatform.geometries.domain.ImmutableMultiPoint;
@@ -42,15 +43,16 @@ import javax.xml.stream.XMLStreamException;
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   // In principle, we could support more GML geometry types, currently only the most common ones are
-  // supported.
-  // However, GML decoding is currently only relevant for un-maintained WFS feature providers.
-  // TODO: support GML 2.1 and GML 3.1
+  // supported. However, GML decoding is currently only relevant for un-maintained WFS feature
+  // providers.
 
   static final List<String> GEOMETRY_PARTS =
       new ImmutableList.Builder<String>()
           .add("pointMember")
           .add("curveMember")
+          .add("lineStringMember")
           .add("surfaceMember")
+          .add("polygonMember")
           .build();
   static final List<String> GEOMETRY_COORDINATES =
       new ImmutableList.Builder<String>().add("posList").add("pos").add("coordinates").build();
@@ -114,11 +116,15 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
                       .build();
                   case "Polygon" -> ImmutablePolygon.builder().crs(crs).axes(axes).build();
                   case "MultiPoint" -> ImmutableMultiPoint.builder().crs(crs).axes(axes).build();
-                  case "MultiCurve" -> ImmutableMultiLineString.builder()
+                  case "MultiCurve", "MultiLineString" -> ImmutableMultiLineString.builder()
                       .crs(crs)
                       .axes(axes)
                       .build();
-                  case "MultiSurface" -> ImmutableMultiPolygon.builder()
+                  case "MultiSurface", "MultiPolygon" -> ImmutableMultiPolygon.builder()
+                      .crs(crs)
+                      .axes(axes)
+                      .build();
+                  case "MultiGeometry" -> ImmutableGeometryCollection.builder()
                       .crs(crs)
                       .axes(axes)
                       .build();
@@ -422,7 +428,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   }
 
   private static double[] parseDoubles(String text) {
-    String[] parts = text.trim().split("[ \n\r\t]+");
+    String[] parts = text.trim().split("[ \n\r\t,]+");
     double[] coords = new double[parts.length];
     for (int i = 0; i < parts.length; i++) {
       coords[i] = Double.parseDouble(parts[i]);

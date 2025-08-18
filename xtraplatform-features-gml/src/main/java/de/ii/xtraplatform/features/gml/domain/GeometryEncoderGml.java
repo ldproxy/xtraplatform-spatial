@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-// TODO add support for GML 2.1 and GML 3.1
 public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   public static final String SPACE = " ";
@@ -43,6 +42,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   public static final String EQUALS = "=";
   public static final String QUOTE = "\"";
   public static final String SLASH = "/";
+  public static final String COMMA = ",";
 
   private static final String POINT = "Point";
   private static final String MULTI_POINT = "MultiPoint";
@@ -61,22 +61,29 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private static final String MULTI_POLYGON = "MultiPolygon";
   private static final String SOLID = "Solid";
   private static final String SHELL = "Shell";
+  // these will be needed for the AdV LoD2 CityGML profile
   private static final String COMPOSITE_SURFACE = "CompositeSurface";
   private static final String COMPOSITE_CURVE = "CompositeCurve";
   private static final String POS = "pos";
   private static final String POS_LIST = "posList";
+  private static final String COORDINATES = "coordinates";
   private static final String ID = "id";
   private static final String SRS_NAME = "srsName";
   private static final String SEGMENTS = "segments";
   private static final String PATCHES = "patches";
   private static final String POINT_MEMBER = "pointMember";
   private static final String CURVE_MEMBER = "curveMember";
+  private static final String LINE_STRING_MEMBER = "lineStringMember";
   private static final String LINEAR_RING = "LinearRing";
   private static final String RING = "Ring";
   private static final String EXTERIOR = "exterior";
   private static final String INTERIOR = "interior";
+  private static final String OUTER_BOUNDARY_IS = "outerBoundaryIs";
+  private static final String INNER_BOUNDARY_IS = "innerBoundaryIs";
   private static final String SURFACE_MEMBER = "surfaceMember";
+  private static final String POLYGON_MEMBER = "polygonMember";
   private static final String GEOMETRY_MEMBER = "geometryMember";
+
   /*
   private static final Map<GmlVersion, Map<GeometryType, String>> GEOMETRY_ELEMENT =
       ImmutableMap.of(
@@ -108,11 +115,6 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
               GeometryType.MULTI_POLYGON, MULTI_POLYGON.substring(3),
               GeometryType.GEOMETRY_COLLECTION, "gml21" + MULTI_GEOMETRY.substring(3)));
   */
-  private static final String OUTER_BOUNDARY_IS = "gml21:outerBoundaryIs";
-  private static final String INNER_BOUNDARY_IS = "gml21:innerBoundaryIs";
-  private static final String LINE_STRING_MEMBER = "gml21:lineStringMember";
-  private static final String COORDINATES = "gml21:coordinates";
-  private static final String POLYGON_MEMBER = "gml21:polygonMember";
 
   public enum Options {
     WITH_GML_ID,
@@ -128,6 +130,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private final int[] precision;
   private final Optional<GeometryEncoderGml> encodeAsSegmentOrPatch;
   private final Optional<GeometryEncoderGml> encodeAsEmbeddedGeometry;
+  private final GmlVersion version;
   private int nextGmlId = 0;
   private String srsName;
 
@@ -141,18 +144,22 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
         Optional.of(
             new GeometryEncoderGml(
                 builder,
+                GmlVersion.GML32,
                 Set.of(Options.LINE_STRING_AS_SEGMENT, Options.POLYGON_AS_PATCH),
                 this.gmlPrefix,
                 Optional.empty(),
                 List.of()));
     this.encodeAsEmbeddedGeometry =
         Optional.of(
-            new GeometryEncoderGml(builder, Set.of(), this.gmlPrefix, Optional.empty(), List.of()));
+            new GeometryEncoderGml(
+                builder, GmlVersion.GML32, Set.of(), this.gmlPrefix, Optional.empty(), List.of()));
     this.srsName = null;
+    this.version = GmlVersion.GML32;
   }
 
   public GeometryEncoderGml(
       StringBuilder builder,
+      GmlVersion version,
       Set<GeometryEncoderGml.Options> options,
       Optional<String> gmlPrefix,
       Optional<String> gmlIdPrefix,
@@ -168,6 +175,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
             : Optional.of(
                 new GeometryEncoderGml(
                     builder,
+                    version,
                     ImmutableSet.<Options>builder()
                         .addAll(options)
                         .add(Options.LINE_STRING_AS_SEGMENT, Options.POLYGON_AS_PATCH)
@@ -180,6 +188,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
             ? Optional.of(
                 new GeometryEncoderGml(
                     builder,
+                    version,
                     ImmutableSet.<Options>builder()
                         .addAll(
                             options.stream()
@@ -195,6 +204,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
             ? precision.stream().mapToInt(v -> v).toArray()
             : null;
     this.srsName = null;
+    this.version = version;
   }
 
   @Override
@@ -281,7 +291,13 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     for (int i = 0; i < coordinates.length / axes.size(); i++) {
       for (int j = 0; j < dimensionWithoutM; j++) {
         if (i > 0 || j > 0) {
-          write(SPACE);
+          if (version == GmlVersion.GML21) {
+            // coordinates
+            write(COMMA);
+          } else {
+            // pos, posList
+            write(SPACE);
+          }
         }
         if (precision != null && j < precision.length && precision[j] > 0) {
           write(
@@ -295,15 +311,15 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   private void writePosition(double[] coordinates, Axes axes) {
-    writeStartTagProperty(POS);
+    writeStartTagProperty(version != GmlVersion.GML21 ? POS : COORDINATES);
     writeCoordinates(coordinates, axes);
-    writeEndTag(POS);
+    writeEndTag(version != GmlVersion.GML21 ? POS : COORDINATES);
   }
 
   private void writePositionList(double[] coordinates, Axes axes) {
-    writeStartTagProperty(POS_LIST);
+    writeStartTagProperty(version != GmlVersion.GML21 ? POS_LIST : COORDINATES);
     writeCoordinates(coordinates, axes);
-    writeEndTag(POS_LIST);
+    writeEndTag(version != GmlVersion.GML21 ? POS_LIST : COORDINATES);
   }
 
   @Override
@@ -367,14 +383,14 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(MultiLineString geometry) {
-    writeStartTagObject(MULTI_CURVE, false);
+    writeStartTagObject(version != GmlVersion.GML21 ? MULTI_CURVE : MULTI_LINE_STRING, false);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       LineString lineString = geometry.getValue().get(i);
-      writeStartTagProperty(CURVE_MEMBER);
+      writeStartTagProperty(version != GmlVersion.GML21 ? CURVE_MEMBER : LINE_STRING_MEMBER);
       lineString.accept(encodeAsEmbeddedGeometry.orElse(this));
-      writeEndTag(CURVE_MEMBER);
+      writeEndTag(version != GmlVersion.GML21 ? CURVE_MEMBER : LINE_STRING_MEMBER);
     }
-    writeEndTag(MULTI_CURVE);
+    writeEndTag(version != GmlVersion.GML21 ? MULTI_CURVE : MULTI_LINE_STRING);
     return null;
   }
 
@@ -389,17 +405,17 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     for (int i = 0; i < geometry.getNumRings(); i++) {
       LineString ring = geometry.getValue().get(i);
       if (i == 0) {
-        writeStartTagProperty(EXTERIOR);
+        writeStartTagProperty(version != GmlVersion.GML21 ? EXTERIOR : OUTER_BOUNDARY_IS);
       } else {
-        writeStartTagProperty(INTERIOR);
+        writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
       }
       writeStartTagObject(LINEAR_RING, true);
       writePositionList(ring.getValue().getCoordinates(), geometry.getAxes());
       writeEndTag(LINEAR_RING);
       if (i == 0) {
-        writeEndTag(EXTERIOR);
+        writeEndTag(version != GmlVersion.GML21 ? EXTERIOR : OUTER_BOUNDARY_IS);
       } else {
-        writeEndTag(INTERIOR);
+        writeEndTag(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
       }
     }
     if (asPatch) {
@@ -412,14 +428,14 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(MultiPolygon geometry) {
-    writeStartTagObject(MULTI_SURFACE, false);
+    writeStartTagObject(version != GmlVersion.GML21 ? MULTI_SURFACE : MULTI_POLYGON, false);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       Polygon polygon = geometry.getValue().get(i);
-      writeStartTagProperty(SURFACE_MEMBER);
+      writeStartTagProperty(version != GmlVersion.GML21 ? SURFACE_MEMBER : POLYGON_MEMBER);
       polygon.accept(encodeAsEmbeddedGeometry.orElse(this));
-      writeEndTag(SURFACE_MEMBER);
+      writeEndTag(version != GmlVersion.GML21 ? SURFACE_MEMBER : POLYGON_MEMBER);
     }
-    writeEndTag(MULTI_SURFACE);
+    writeEndTag(version != GmlVersion.GML21 ? MULTI_SURFACE : MULTI_POLYGON);
     return null;
   }
 
