@@ -8,8 +8,6 @@
 package de.ii.xtraplatform.routes.sql.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
-import de.ii.xtraplatform.cql.domain.Geometry;
-import de.ii.xtraplatform.cql.domain.Geometry.Point;
 import de.ii.xtraplatform.crs.domain.CoordinateTuple;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -25,8 +23,12 @@ import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlConnector;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
+import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.Point;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryEncoderWkt;
 import de.ii.xtraplatform.routes.sql.domain.RouteQuery;
 import de.ii.xtraplatform.routes.sql.domain.RoutesConfiguration;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -263,7 +265,7 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
       List<String> flags,
       Optional<Double> weight,
       Optional<Double> height,
-      Optional<Geometry.MultiPolygon> obstacles) {
+      Optional<MultiPolygon> obstacles) {
 
     int mask = 0;
     for (String flag : flags) {
@@ -321,16 +323,16 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
 
     return "WITH\n"
         + " pnts AS (SELECT ST_GeomFromText('POINT("
-        + start.getCoordinates().get(0).get(0)
+        + start.getValue().x()
         + " "
-        + start.getCoordinates().get(0).get(1)
+        + start.getValue().y()
         + ")', "
         + cfg.getNativeCrs().getCode()
         + ") AS pnt1,\n"
         + "                 ST_GeomFromText('POINT("
-        + end.getCoordinates().get(0).get(0)
+        + end.getValue().x()
         + " "
-        + end.getCoordinates().get(0).get(1)
+        + end.getValue().y()
         + ")', "
         + cfg.getNativeCrs().getCode()
         + ") AS pnt2),\n"
@@ -367,10 +369,7 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
           crsTransformerFactory.getTransformer(sourceCrs, targetCrs);
       if (transformer.isPresent()) {
         CoordinateTuple coordinateTuple =
-            transformer
-                .get()
-                .transform(
-                    point.getCoordinates().get(0).get(0), point.getCoordinates().get(0).get(1));
+            transformer.get().transform(point.getValue().x(), point.getValue().y());
         return Point.of(coordinateTuple.getX(), coordinateTuple.getY(), targetCrs);
       }
     }
@@ -419,38 +418,11 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
         .findFirst();
   }
 
-  private String getWkt(Geometry.MultiPolygon multiPolygon) {
-    return "MULTIPOLYGON("
-        + multiPolygon.getCoordinates().stream()
-            .map(this::getPolygon)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .collect(Collectors.joining(","))
-        + ")";
-  }
-
-  private Optional<String> getPolygon(Geometry.Polygon polygon) {
-    List<Optional<String>> rings =
-        polygon.getCoordinates().stream()
-            .map(this::getRing)
-            .collect(Collectors.toUnmodifiableList());
-    if (rings.get(0).isEmpty()) return Optional.empty();
-    return Optional.of(
-        "("
-            + rings.stream()
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.joining(","))
-            + ")");
-  }
-
-  private Optional<String> getRing(List<Geometry.Coordinate> ring) {
-    if (ring.size() < 4) return Optional.empty();
-    return Optional.of(
-        "(" + ring.stream().map(this::getPos).collect(Collectors.joining(",")) + ")");
-  }
-
-  private String getPos(Geometry.Coordinate pos) {
-    return pos.stream().map(String::valueOf).collect(Collectors.joining(" "));
+  private String getWkt(MultiPolygon multiPolygon) {
+    try {
+      return new GeometryEncoderWkt().encode(multiPolygon);
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
+    }
   }
 }

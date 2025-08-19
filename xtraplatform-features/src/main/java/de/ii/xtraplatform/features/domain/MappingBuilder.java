@@ -9,7 +9,7 @@ package de.ii.xtraplatform.features.domain;
 
 import com.google.common.base.Joiner;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +88,7 @@ public class MappingBuilder {
     addValue(name, path, type, Optional.empty(), Optional.empty(), true);
   }
 
-  public void addGeometry(String name, List<String> path, SimpleFeatureGeometry type) {
+  public void addGeometry(String name, List<String> path, GeometryType type) {
     addValue(
         name,
         path,
@@ -103,7 +103,7 @@ public class MappingBuilder {
       List<String> path,
       FeatureSchema.Type type,
       Optional<FeatureSchema.Role> role,
-      Optional<SimpleFeatureGeometry> geometryType,
+      Optional<GeometryType> geometryType,
       boolean isArray) {
     nestingTracker.closeAuto(path);
 

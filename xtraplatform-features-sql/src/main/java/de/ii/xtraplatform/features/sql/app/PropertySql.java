@@ -11,6 +11,7 @@ import de.ii.xtraplatform.features.domain.PropertyBase;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import org.immutables.value.Value;
 
+// TODO: delete
 @Value.Modifiable
 @Value.Style(set = "*")
 public interface PropertySql extends PropertyBase<PropertySql, SchemaSql>, ObjectSql {}

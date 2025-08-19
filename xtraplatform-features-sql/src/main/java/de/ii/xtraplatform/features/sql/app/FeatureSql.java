@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.immutables.value.Value;
 
+// TODO: delete
 @Value.Modifiable
 @Value.Style(set = "*")
 public interface FeatureSql extends FeatureBase<PropertySql, SchemaSql>, ObjectSql {

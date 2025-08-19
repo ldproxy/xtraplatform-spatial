@@ -18,34 +18,23 @@ public enum Type {
   Interval,
   OPEN,
   Geometry,
+  Bbox,
   List,
   UNKNOWN;
 
   public String schemaType() {
-    switch (this) {
-      case String:
-        return "STRING";
-      case Boolean:
-        return "BOOLEAN";
-      case Integer:
-      case Long:
-        return "INTEGER";
-      case Double:
-        return "FLOAT";
-      case LocalDate:
-        return "DATE";
-      case OPEN:
-        return "UNBOUNDED_START_OR_END";
-      case Instant:
-        return "DATETIME";
-      case Interval:
-        return "INTERVAL";
-      case Geometry:
-        return "GEOMETRY";
-      case List:
-        return "ARRAY";
-      default:
-        return "unknown";
-    }
+    return switch (this) {
+      case String -> "STRING";
+      case Boolean -> "BOOLEAN";
+      case Integer, Long -> "INTEGER";
+      case Double -> "FLOAT";
+      case LocalDate -> "DATE";
+      case OPEN -> "UNBOUNDED_START_OR_END";
+      case Instant -> "DATETIME";
+      case Interval -> "INTERVAL";
+      case Geometry -> "GEOMETRY";
+      case List -> "ARRAY";
+      default -> "unknown";
+    };
   }
 }

@@ -25,31 +25,25 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlParseException;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.ImmutableBbox;
 import de.ii.xtraplatform.cql.domain.ImmutableBetween;
 import de.ii.xtraplatform.cql.domain.ImmutableEq;
-import de.ii.xtraplatform.cql.domain.ImmutableGeometryCollection;
 import de.ii.xtraplatform.cql.domain.ImmutableGt;
 import de.ii.xtraplatform.cql.domain.ImmutableGte;
 import de.ii.xtraplatform.cql.domain.ImmutableIn;
 import de.ii.xtraplatform.cql.domain.ImmutableIsNull;
 import de.ii.xtraplatform.cql.domain.ImmutableLike;
-import de.ii.xtraplatform.cql.domain.ImmutableLineString;
 import de.ii.xtraplatform.cql.domain.ImmutableLt;
 import de.ii.xtraplatform.cql.domain.ImmutableLte;
-import de.ii.xtraplatform.cql.domain.ImmutableMultiLineString;
-import de.ii.xtraplatform.cql.domain.ImmutableMultiPoint;
-import de.ii.xtraplatform.cql.domain.ImmutableMultiPolygon;
 import de.ii.xtraplatform.cql.domain.ImmutableNeq;
-import de.ii.xtraplatform.cql.domain.ImmutablePoint;
-import de.ii.xtraplatform.cql.domain.ImmutablePolygon;
 import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.Not;
 import de.ii.xtraplatform.cql.domain.Operand;
 import de.ii.xtraplatform.cql.domain.Or;
+import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -63,6 +57,15 @@ import de.ii.xtraplatform.cql.domain.Vector;
 import de.ii.xtraplatform.cql.infra.CqlParser.GeometryCollectionContext;
 import de.ii.xtraplatform.cql.infra.CqlParser.PatternExpressionContext;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.geometries.domain.ImmutableGeometryCollection;
+import de.ii.xtraplatform.geometries.domain.LineString;
+import de.ii.xtraplatform.geometries.domain.MultiLineString;
+import de.ii.xtraplatform.geometries.domain.MultiPoint;
+import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.Point;
+import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.Position;
+import de.ii.xtraplatform.geometries.domain.PositionList;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
@@ -70,6 +73,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -458,68 +462,73 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitGeometryLiteral(CqlParser.GeometryLiteralContext ctx) {
     CqlNode geomLiteral = ctx.getChild(0).accept(this);
-    return SpatialLiteral.of((Geometry<?>) geomLiteral);
+    if (geomLiteral instanceof PositionNode posNode) {
+      return SpatialLiteral.of(Point.of(posNode.getPosition(), Optional.of(defaultCrs)));
+    }
+    return SpatialLiteral.of(((GeometryNode) geomLiteral).getGeometry());
   }
 
   @Override
   public CqlNode visitPoint(CqlParser.PointContext ctx) {
-    Geometry.Coordinate coordinate = (Geometry.Coordinate) ctx.coordinate().accept(this);
-
-    return new ImmutablePoint.Builder().addCoordinates(coordinate).crs(defaultCrs).build();
+    return ctx.coordinate().accept(this);
   }
 
   @Override
   public CqlNode visitMultiPoint(CqlParser.MultiPointContext ctx) {
-    List<Geometry.Point> points =
+    List<Point> points =
         ctx.coordinate().stream()
-            .map(
-                coordinateContext ->
-                    Geometry.Point.of((Geometry.Coordinate) coordinateContext.accept(this)))
-            .collect(Collectors.toList());
+            .map(coordinateContext -> coordinateContext.accept(this))
+            .map(point -> Point.of(((PositionNode) point).getPosition(), Optional.of(defaultCrs)))
+            .toList();
 
-    return new ImmutableMultiPoint.Builder().coordinates(points).crs(defaultCrs).build();
+    return GeometryNode.of(MultiPoint.of(points, Optional.of(defaultCrs)));
   }
 
   @Override
   public CqlNode visitMultiLinestring(CqlParser.MultiLinestringContext ctx) {
-    List<Geometry.LineString> lineStrings =
+    List<LineString> lineStrings =
         ctx.linestringDef().stream()
-            .map(linestringContext -> ((Geometry.LineString) linestringContext.accept(this)))
+            .map(
+                linestringContext ->
+                    (LineString) ((GeometryNode) linestringContext.accept(this)).getGeometry())
             .collect(Collectors.toList());
 
-    return new ImmutableMultiLineString.Builder().coordinates(lineStrings).crs(defaultCrs).build();
+    return GeometryNode.of(MultiLineString.of(lineStrings, Optional.of(defaultCrs)));
   }
 
   @Override
   public CqlNode visitMultiPolygon(CqlParser.MultiPolygonContext ctx) {
-    List<Geometry.Polygon> polygons =
+    List<Polygon> polygons =
         ctx.polygonDef().stream()
-            .map(polygonDefContext -> ((Geometry.Polygon) polygonDefContext.accept(this)))
-            .collect(Collectors.toList());
+            .map(
+                polygonDefContext ->
+                    (Polygon) ((GeometryNode) (polygonDefContext.accept(this))).getGeometry())
+            .toList();
 
-    return new ImmutableMultiPolygon.Builder().coordinates(polygons).crs(defaultCrs).build();
+    return GeometryNode.of(MultiPolygon.of(polygons, Optional.of(defaultCrs)));
   }
 
   @Override
   public CqlNode visitPolygonDef(CqlParser.PolygonDefContext ctx) {
-    List<List<Geometry.Coordinate>> coordinates =
+    List<PositionList> rings =
         ctx.linestringDef().stream()
             .map(
                 linestringContext ->
-                    ((Geometry.LineString) linestringContext.accept(this)).getCoordinates())
-            .collect(Collectors.toList());
+                    (PositionList)
+                        ((GeometryNode) linestringContext.accept(this)).getGeometry().getValue())
+            .toList();
 
-    return new ImmutablePolygon.Builder().coordinates(coordinates).crs(defaultCrs).build();
+    return GeometryNode.of(Polygon.of(rings, Optional.of(defaultCrs)));
   }
 
   @Override
   public CqlNode visitLinestringDef(CqlParser.LinestringDefContext ctx) {
-    List<Geometry.Coordinate> coordinates =
+    List<Position> coordinates =
         ctx.coordinate().stream()
-            .map(pointContext -> (Geometry.Coordinate) pointContext.accept(this))
-            .collect(Collectors.toList());
+            .map(pointContext -> ((PositionNode) pointContext.accept(this)).getPosition())
+            .toList();
 
-    return new ImmutableLineString.Builder().coordinates(coordinates).crs(defaultCrs).build();
+    return GeometryNode.of(LineString.of(PositionList.of(coordinates), Optional.of(defaultCrs)));
   }
 
   @Override
@@ -546,29 +555,29 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
 
   @Override
   public CqlNode visitGeometryCollection(GeometryCollectionContext ctx) {
-    return SpatialLiteral.of(
-        new ImmutableGeometryCollection.Builder()
-            .addAllCoordinates(
-                IntStream.range(0, ctx.geometryLiteral().size())
-                    .mapToObj(
-                        i ->
-                            (Geometry<?>)
-                                ((SpatialLiteral) ctx.geometryLiteral(i).accept(this)).getValue())
-                    .collect(Collectors.toList()))
-            .build());
+    ImmutableGeometryCollection.Builder builder = ImmutableGeometryCollection.builder();
+    IntStream.range(0, ctx.geometryLiteral().size())
+        .forEach(
+            i ->
+                builder.addValue(
+                    ((GeometryNode)
+                            ((SpatialLiteral) ctx.geometryLiteral(i).accept(this)).getValue())
+                        .getGeometry()));
+
+    return SpatialLiteral.of(builder.crs(defaultCrs).build());
   }
 
   @Override
   public CqlNode visitCoordinate(CqlParser.CoordinateContext ctx) {
-    Double x = Double.valueOf(ctx.xCoord().getText());
-    Double y = Double.valueOf(ctx.yCoord().getText());
+    double x = Double.parseDouble(ctx.xCoord().getText());
+    double y = Double.parseDouble(ctx.yCoord().getText());
 
     if (Objects.nonNull(ctx.zCoord())) {
-      Double z = Double.valueOf(ctx.zCoord().getText());
-      return new Geometry.Coordinate(x, y, z);
+      double z = Double.parseDouble(ctx.zCoord().getText());
+      return PositionNode.of(Position.ofXYZ(x, y, z));
     }
 
-    return new Geometry.Coordinate(x, y);
+    return PositionNode.of(Position.ofXY(x, y));
   }
 
   @Override

@@ -89,19 +89,10 @@ tokens:
     target: rechtscharakter
     value: 1000
     valueType: STRING
-  - type: OBJECT
-    source: /coretable{filter=featuretype='BP_AnpflanzungBindungErhaltung'}/geometry
-    target: position
-    geometryType: POINT
-    geometryDimension: 2
-  - type: VALUE
-    source: /coretable{filter=featuretype='BP_AnpflanzungBindungErhaltung'}/geometry
-    target: position
-    value: "561524.729 5942848.073"
-    valueType: STRING
-  - type: OBJECT_END
-    source: /coretable{filter=featuretype='BP_AnpflanzungBindungErhaltung'}/geometry
-    target: position
+  #- type: GEOMETRY
+  #  source: /coretable{filter=featuretype='BP_AnpflanzungBindungErhaltung'}/geometry
+  #  target: position
+  #  geometry: "POINT(561524.729 5942848.073)"
   - type: VALUE
     source: /coretable{filter=featuretype='BP_AnpflanzungBindungErhaltung'}/[JSON]properties/nordwinkel
     target: nordwinkel

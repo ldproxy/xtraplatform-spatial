@@ -14,7 +14,7 @@ import de.ii.xtraplatform.feature.provider.api.FeatureConsumer;
 import de.ii.xtraplatform.feature.provider.api.FeatureQuery;
 import de.ii.xtraplatform.feature.provider.api.FeatureStream;
 import de.ii.xtraplatform.feature.provider.api.ImmutableFeatureQuery;
-import de.ii.xtraplatform.feature.provider.api.SimpleFeatureGeometry;
+import de.ii.xtraplatform.feature.provider.api.GeometryType;
 import de.ii.xtraplatform.feature.provider.api.TargetMapping;
 import de.ii.xtraplatform.feature.transformer.api.AbstractFeatureTransformerService;
 import de.ii.xtraplatform.feature.transformer.api.FeatureTransformer;
@@ -376,7 +376,7 @@ public class TestEntityRepository {
 //        }
 //
 //        @Override
-//        public void onGeometryStart(TargetMapping mapping, SimpleFeatureGeometry type, Integer dimension) throws Exception {
+//        public void onGeometryStart(TargetMapping mapping, GeometryType type, Integer dimension) throws Exception {
 //            log.append("    ");
 //            log.append(Objects.nonNull(mapping) ? mapping.getName() : "NOMAPPING");
 //            log.append("|");

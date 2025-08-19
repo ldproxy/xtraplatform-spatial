@@ -8,7 +8,7 @@
 package de.ii.xtraplatform.features.sql.domain;
 
 import de.ii.xtraplatform.features.domain.SchemaMappingBase;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
@@ -18,7 +18,7 @@ import org.immutables.value.Value;
 public interface SchemaMappingSql extends SchemaMappingBase<SchemaSql> {
 
   @Override
-  default SchemaSql schemaWithGeometryType(SchemaSql schema, SimpleFeatureGeometry geometryType) {
+  default SchemaSql schemaWithGeometryType(SchemaSql schema, GeometryType geometryType) {
     return new ImmutableSchemaSql.Builder().from(schema).geometryType(geometryType).build();
   }
 

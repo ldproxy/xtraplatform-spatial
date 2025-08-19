@@ -10,6 +10,7 @@ package de.ii.xtraplatform.cql.app;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
 import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
@@ -22,7 +23,7 @@ import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlVisitor;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.Gt;
 import de.ii.xtraplatform.cql.domain.Gte;
 import de.ii.xtraplatform.cql.domain.ImmutableAccenti;
@@ -49,6 +50,7 @@ import de.ii.xtraplatform.cql.domain.Neq;
 import de.ii.xtraplatform.cql.domain.Not;
 import de.ii.xtraplatform.cql.domain.Operand;
 import de.ii.xtraplatform.cql.domain.Or;
+import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -105,7 +107,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
               children.stream()
                   .filter(child -> child instanceof Scalar)
                   .map(child -> (Scalar) child)
-                  .collect(Collectors.toUnmodifiableList()))
+                  .toList())
           .build();
     }
 
@@ -153,12 +155,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   @Override
   public CqlNode visit(Interval interval, List<CqlNode> children) {
     ImmutableInterval.Builder builder = new ImmutableInterval.Builder();
-    return builder
-        .args(
-            children.stream()
-                .map(child -> (Operand) child)
-                .collect(Collectors.toUnmodifiableList()))
-        .build();
+    return builder.args(children.stream().map(child -> (Operand) child).toList()).build();
   }
 
   @Override
@@ -171,7 +168,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
             children.stream()
                 .filter(child -> child instanceof Scalar)
                 .map(child -> (Scalar) child)
-                .collect(Collectors.toUnmodifiableList()))
+                .toList())
         .build();
   }
 
@@ -194,7 +191,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
         children.stream()
             .filter(child -> child instanceof Temporal)
             .map(child -> (Temporal) child)
-            .collect(Collectors.toUnmodifiableList());
+            .toList();
     return BinaryTemporalOperation.of(
         temporalOperation.getTemporalOperator(), temporals.get(0), temporals.get(1));
   }
@@ -205,7 +202,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
         children.stream()
             .filter(child -> child instanceof Spatial)
             .map(child -> (Spatial) child)
-            .collect(Collectors.toUnmodifiableList());
+            .toList();
     return BinarySpatialOperation.of(
         spatialOperation.getSpatialOperator(), spatials.get(0), spatials.get(1));
   }
@@ -216,7 +213,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
         children.stream()
             .filter(child -> child instanceof Vector)
             .map(child -> (Vector) child)
-            .collect(Collectors.toUnmodifiableList());
+            .toList();
     return BinaryArrayOperation.of(
         arrayOperation.getArrayOperator(), vectors.get(0), vectors.get(1));
   }
@@ -247,47 +244,17 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   }
 
   @Override
-  public CqlNode visit(Geometry.Coordinate coordinate, List<CqlNode> children) {
-    return coordinate;
+  public CqlNode visit(PositionNode position, List<CqlNode> children) {
+    return position;
   }
 
   @Override
-  public CqlNode visit(Geometry.Point point, List<CqlNode> children) {
-    return point;
+  public CqlNode visit(GeometryNode geometry, List<CqlNode> children) {
+    return geometry;
   }
 
   @Override
-  public CqlNode visit(Geometry.LineString lineString, List<CqlNode> children) {
-    return lineString;
-  }
-
-  @Override
-  public CqlNode visit(Geometry.Polygon polygon, List<CqlNode> children) {
-    return polygon;
-  }
-
-  @Override
-  public CqlNode visit(Geometry.MultiPoint multiPoint, List<CqlNode> children) {
-    return multiPoint;
-  }
-
-  @Override
-  public CqlNode visit(Geometry.MultiLineString multiLineString, List<CqlNode> children) {
-    return multiLineString;
-  }
-
-  @Override
-  public CqlNode visit(Geometry.MultiPolygon multiPolygon, List<CqlNode> children) {
-    return multiPolygon;
-  }
-
-  @Override
-  public CqlNode visit(Geometry.GeometryCollection geometryCollection, List<CqlNode> children) {
-    return geometryCollection;
-  }
-
-  @Override
-  public CqlNode visit(Geometry.Bbox bbox, List<CqlNode> children) {
+  public CqlNode visit(Bbox bbox, List<CqlNode> children) {
     return bbox;
   }
 

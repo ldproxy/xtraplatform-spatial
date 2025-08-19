@@ -45,6 +45,7 @@ public interface SqlQueryTemplates {
         long offset,
         List<SortKey> additionalSortKeys,
         Optional<Cql2Expression> filter,
+        boolean forceSimpleFeatures,
         Optional<Tuple<Object, Object>> minMaxKeys,
         Map<String, String> virtualTables);
   }

@@ -33,6 +33,7 @@ import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
 import de.ii.xtraplatform.features.domain.transform.WithScope;
 import de.ii.xtraplatform.features.domain.transform.WithoutProperties;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Runner;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
@@ -320,6 +321,15 @@ public abstract class AbstractFeatureProvider<
   @Override
   public Set<FeatureSchema> getSchemas() {
     return Set.copyOf(getData().getTypes().values());
+  }
+
+  @Override
+  public Set<GeometryType> getGeometryTypes() {
+    List<GeometryType> types = getData().getProvidesGeometryTypes();
+    if (types.isEmpty()) {
+      return GeometryType.DEFAULT_GEOMETRY_TYPES;
+    }
+    return Set.copyOf(types);
   }
 
   private boolean softClosePrevious(

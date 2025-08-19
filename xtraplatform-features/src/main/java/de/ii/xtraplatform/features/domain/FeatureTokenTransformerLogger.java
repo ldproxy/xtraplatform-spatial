@@ -57,6 +57,13 @@ public class FeatureTokenTransformerLogger extends FeatureTokenTransformer {
   }
 
   @Override
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    LOGGER.debug("GEOMETRY {}", context.pathAsString());
+
+    super.onGeometry(context);
+  }
+
+  @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
 
     super.onValue(context);

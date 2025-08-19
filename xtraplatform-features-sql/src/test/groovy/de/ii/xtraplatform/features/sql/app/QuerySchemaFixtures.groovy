@@ -19,7 +19,7 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableSchemaSql
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlRelation
 import de.ii.xtraplatform.features.sql.domain.SchemaSql
 import de.ii.xtraplatform.features.sql.domain.SqlRelation
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+import de.ii.xtraplatform.geometries.domain.GeometryType
 
 class QuerySchemaFixtures {
 
@@ -1057,7 +1057,7 @@ class QuerySchemaFixtures {
                             .addProperties(new ImmutableSchemaSql.Builder()
                                     .name("geometrie")
                                     .type(Type.GEOMETRY)
-                                    .geometryType(SimpleFeatureGeometry.MULTI_POLYGON)
+                                    .geometryType(GeometryType.MULTI_POLYGON)
                                     .role(SchemaBase.Role.PRIMARY_GEOMETRY)
                                     .sourcePath("geometry")
                                     .parentPath(["o73005", "[sch=ags]verwaltungseinheit"])
@@ -1097,7 +1097,7 @@ class QuerySchemaFixtures {
                             .addProperties(new ImmutableSchemaSql.Builder()
                                     .name("geometrie")
                                     .type(Type.GEOMETRY)
-                                    .geometryType(SimpleFeatureGeometry.MULTI_POLYGON)
+                                    .geometryType(GeometryType.MULTI_POLYGON)
                                     .role(SchemaBase.Role.PRIMARY_GEOMETRY)
                                     .sourcePath("geometry")
                                     .parentPath(["o73004", "[sch=ags]verwaltungseinheit"])

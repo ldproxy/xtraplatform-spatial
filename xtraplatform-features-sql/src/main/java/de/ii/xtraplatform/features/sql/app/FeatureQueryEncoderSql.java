@@ -210,6 +210,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                             Math.max(0L, offset - skipped),
                             sortKeys,
                             typeQuery.getFilter(),
+                            typeQuery.forceSimpleFeatureGeometry(),
                             ((Objects.nonNull(metaResult.getMinKey())
                                         && Objects.nonNull(metaResult.getMaxKey()))
                                     || metaResult.getNumberReturned() == 0)

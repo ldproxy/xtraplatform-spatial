@@ -16,6 +16,14 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.EpsgCrs
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
+import de.ii.xtraplatform.geometries.domain.Axes
+import de.ii.xtraplatform.geometries.domain.MultiLineString
+import de.ii.xtraplatform.geometries.domain.LineString
+import de.ii.xtraplatform.geometries.domain.MultiPolygon
+import de.ii.xtraplatform.geometries.domain.Polygon
+import de.ii.xtraplatform.geometries.domain.Point
+import de.ii.xtraplatform.geometries.domain.MultiPoint
+import de.ii.xtraplatform.geometries.domain.PositionList
 import de.ii.xtraplatform.proj.domain.ProjLoaderImpl
 import spock.lang.Shared
 import spock.lang.Specification
@@ -65,7 +73,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         //
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,48,12, 52,OgcCrs.CRS84))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,48,12, 52,OgcCrs.CRS84))).accept(visitor1)
 
         then:
         noExceptionThrown()
@@ -73,7 +81,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         and:
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,48,12, 52,OgcCrs.CRS84))).accept(visitor2)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,48,12, 52,OgcCrs.CRS84))).accept(visitor2)
 
         then:
         noExceptionThrown()
@@ -92,7 +100,7 @@ class CqlCoordinateCheckerSpec extends Specification {
     def 'Test crsTransformerFilterToCrs84 is present'() {
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,52,12, 53, OgcCrs.CRS84))).accept(visitor3)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,52,12, 53, OgcCrs.CRS84))).accept(visitor3)
 
         then:
         thrown IllegalArgumentException
@@ -104,7 +112,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         //
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,53,12, 52,OgcCrs.CRS84))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,53,12, 52,OgcCrs.CRS84))).accept(visitor1)
 
         then:
         thrown IllegalArgumentException
@@ -112,7 +120,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         and:
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,53,12, 52,OgcCrs.CRS84))).accept(visitor2)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,53,12, 52,OgcCrs.CRS84))).accept(visitor2)
 
         then:
 
@@ -124,7 +132,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         //
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,10,12, 100,OgcCrs.CRS84))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,10,12, 100,OgcCrs.CRS84))).accept(visitor1)
 
         then:
         thrown IllegalArgumentException
@@ -132,7 +140,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         and:
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(6,10,12, 100,OgcCrs.CRS84))).accept(visitor2)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(6,10,12, 100,OgcCrs.CRS84))).accept(visitor2)
 
         then:
         thrown IllegalArgumentException
@@ -143,7 +151,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         //
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(160,-30,-160, 10,OgcCrs.CRS84))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(160,-30,-160, 10,OgcCrs.CRS84))).accept(visitor1)
 
         then:
         thrown IllegalArgumentException
@@ -151,7 +159,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         and:
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Bbox.of(160,-30,-160, 10,OgcCrs.CRS84))).accept(visitor2)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Bbox.of(160,-30,-160, 10,OgcCrs.CRS84))).accept(visitor2)
 
         then:
         noExceptionThrown()
@@ -159,7 +167,7 @@ class CqlCoordinateCheckerSpec extends Specification {
 
     def 'Basic test'() {
         given:
-        String cqlText = "S_INTERSECTS(\"bbox\",POLYGON((6.841676292954137 51.530481422116154,6.910590039820299 51.48142884149749,6.920492602491171 51.47642346300475,6.92048790793338 51.48838138815214,6.920711061968184 51.49719648216943,6.9155177499026191 51.49619902382169,6.915465875139691 51.51941060843487,6.909367346948651 51.52980833786589,6.906686188338441 51.536126767037025,6.841676292954131 51.530481422116154)))"
+        String cqlText = "S_INTERSECTS(\"bbox\",POLYGON((6.841676292954137 51.530481422116154,6.910590039820299 51.48142884149749,6.920492602491171 51.47642346300475,6.92048790793338 51.48838138815214,6.920711061968184 51.49719648216943,6.9155177499026191 51.49619902382169,6.915465875139691 51.51941060843487,6.909367346948651 51.52980833786589,6.906686188338441 51.536126767037025,6.841676292954137 51.530481422116154)))"
 
         when:
         def test = cql.read(cqlText, Cql.Format.TEXT).accept(visitor1)
@@ -170,7 +178,7 @@ class CqlCoordinateCheckerSpec extends Specification {
 
     def "Visit with Point test" (){
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Point.of(5.00, 42.27))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Point.of(5.00, 42.27))).accept(visitor1)
 
         then:
         thrown IllegalArgumentException
@@ -178,18 +186,18 @@ class CqlCoordinateCheckerSpec extends Specification {
         and:
 
         when:
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Point.of(6.00, 47.27))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Point.of(6.00, 47.27))).accept(visitor1)
 
         then:
         noExceptionThrown()
     }
 
 
-    def "Visit with Linestring test" () {
+    def "Visit with LineString test" () {
 
         when:
 
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.LineString.of(Geometry.Coordinate.of((double)6.00, (double)47.27)))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(LineString.of(new double[]{(double)6.00, (double)47.27, (double)7.00, (double)48.27}))).accept(visitor1)
 
         then:
         noExceptionThrown()
@@ -205,15 +213,15 @@ class CqlCoordinateCheckerSpec extends Specification {
         where:
 
         xCoordinate     |    yCoordinate     |      spatialLiteral                                                              |       ex
-        (double) 8.00   |    (double) 5      |     Geometry.LineString.of(Geometry.Coordinate.of(xCoordinate, yCoordinate))     |       IllegalArgumentException
-        (double) 0.50   |    (double) 1000   |     Geometry.LineString.of(Geometry.Coordinate.of(xCoordinate, yCoordinate))     |       NullPointerException
+        (double) 8.00   |    (double) 5      |     LineString.of(new double[]{xCoordinate, yCoordinate, xCoordinate, yCoordinate}) |       IllegalArgumentException
+        (double) 0.50   |    (double) 1000   |     LineString.of(new double[]{xCoordinate, yCoordinate, xCoordinate, yCoordinate}) |       NullPointerException
 
     }
 
-    def "Test visit Multipoint"(){
+    def "Test visit MultiPoint"(){
         when:
 
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiPoint.of(Geometry.Point.of((double)12.00, (double)55.09), Geometry.Point.of((double)11.00, (double)54.09)))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(MultiPoint.of(List.of(Point.of((double)12.00, (double)55.09), Point.of((double)11.00, (double)54.09))))).accept(visitor1)
 
         then:
 
@@ -232,8 +240,8 @@ class CqlCoordinateCheckerSpec extends Specification {
         where:
 
         xCoordinate     |    yCoordinate     |      spatialLiteral                                                        |       ex
-        (double) 11.00  |    (double) 56.00  |     Geometry.MultiPoint.of(Geometry.Point.of(xCoordinate, yCoordinate))    |       IllegalArgumentException
-        (double) 0.50   |    (double) 1000   |     Geometry.MultiPoint.of(Geometry.Point.of(xCoordinate, yCoordinate))    |       NullPointerException
+        (double) 11.00  |    (double) 56.00  |     MultiPoint.of(List.of(Point.of(xCoordinate, yCoordinate))) |       IllegalArgumentException
+        (double) 0.50   |    (double) 1000   |     MultiPoint.of(List.of(Point.of(xCoordinate, yCoordinate))) |       NullPointerException
 
     }
 
@@ -241,10 +249,10 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         when:
 
-        Geometry.LineString lineString1 =  Geometry.LineString.of(Geometry.Coordinate.of((double)6.00, (double)47.27))
-        Geometry.LineString lineString2 =  Geometry.LineString.of(Geometry.Coordinate.of((double)11.00, (double)50.27))
+        LineString lineString1 =  LineString.of(new double[]{(double)6.00, (double)47.27, (double)11.00, (double)50.27})
+        LineString lineString2 =  LineString.of(new double[]{(double)6.00, (double)47.27, (double)11.00, (double)50.27})
 
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiLineString.of(lineString1, lineString2))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(MultiLineString.of(List.of(lineString1, lineString2)))).accept(visitor1)
 
         then:
         noExceptionThrown()
@@ -260,8 +268,8 @@ class CqlCoordinateCheckerSpec extends Specification {
         where:
 
         xCoordinate1    |    yCoordinate1   |    xCoordinate2   |    yCoordinate2        |      spatialLiteral                                                                                                                                                |       ex
-        (double) 8.00   |    (double) 5     |    (double) 4.40  |    (double) 51.00      |     Geometry.MultiLineString.of(Geometry.LineString.of(Geometry.Coordinate.of(xCoordinate1, yCoordinate1), Geometry.Coordinate.of(xCoordinate2, yCoordinate2)))   |       IllegalArgumentException
-        (double) 0.50   |    (double) 1000  |    (double) 0.03  |    (double) 1          |     Geometry.MultiLineString.of(Geometry.LineString.of(Geometry.Coordinate.of(xCoordinate1, yCoordinate1), Geometry.Coordinate.of(xCoordinate2, yCoordinate2)))   |       NullPointerException
+        (double) 8.00   |    (double) 5     |    (double) 4.40  |    (double) 51.00      |     MultiLineString.of(List.of(LineString.of(xCoordinate1, yCoordinate1, xCoordinate2, yCoordinate2))) |       IllegalArgumentException
+        (double) 0.50   |    (double) 1000  |    (double) 0.03  |    (double) 1          |     MultiLineString.of(List.of(LineString.of(xCoordinate1, yCoordinate1, xCoordinate2, yCoordinate2))) |       NullPointerException
 
     }
 
@@ -269,12 +277,9 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         when:
 
-        List<Geometry.Coordinate> coordinateList = new ArrayList<>()
-        coordinateList.add(Geometry.Coordinate.of((double)6.00, (double)47.27))
-        coordinateList.add(Geometry.Coordinate.of((double)11.00, (double)50.27))
-        Geometry.Polygon polygon1 =  Geometry.Polygon.of(coordinateList)
+        Polygon polygon1 =  Polygon.of(List.of(PositionList.of(Axes.XY, new double[]{(double)6.00, (double)47.27, (double)11.00, (double)50.27, (double)11.00, (double)50.27, (double)6.00, (double)47.27})))
 
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiPolygon.of(polygon1))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(MultiPolygon.of(List.of(polygon1)))).accept(visitor1)
 
         then:
         noExceptionThrown()
@@ -282,18 +287,10 @@ class CqlCoordinateCheckerSpec extends Specification {
         and:
 
         when:
-        List<Geometry.Coordinate> coordinateList2 = new ArrayList<>()
-        coordinateList2.add(Geometry.Coordinate.of(xCoordinate1, yCoordinate1))
-        coordinateList2.add(Geometry.Coordinate.of(xCoordinate2, yCoordinate2))
-        Geometry.Polygon polygon2 =  Geometry.Polygon.of(coordinateList2)
+        Polygon polygon2 =  Polygon.of(List.of(PositionList.of(Axes.XY, new double[]{xCoordinate1, yCoordinate1, xCoordinate2, yCoordinate2, xCoordinate2, yCoordinate2, xCoordinate1, yCoordinate1})))
+        Polygon polygon3 =  Polygon.of(List.of(PositionList.of(Axes.XY, new double[]{xCoordinate3, yCoordinate3, xCoordinate4, yCoordinate4, xCoordinate4, yCoordinate4, xCoordinate3, yCoordinate3})))
 
-        List<Geometry.Coordinate> coordinateList3 = new ArrayList<>()
-        coordinateList3.add(Geometry.Coordinate.of(xCoordinate3, yCoordinate3))
-        coordinateList3.add(Geometry.Coordinate.of(xCoordinate4, yCoordinate4))
-        Geometry.Polygon polygon3 =  Geometry.Polygon.of(coordinateList3)
-
-
-        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiPolygon.of(polygon2, polygon3))).accept(visitor1)
+        SIntersects.of(Property.of("bbox"), SpatialLiteral.of(MultiPolygon.of(List.of(polygon2, polygon3)))).accept(visitor1)
 
         then:
         thrown ex
@@ -332,7 +329,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         double xmax = 12.00
         double ymax = 12.00
 
-        SpatialLiteral.of(Geometry.Bbox.of(xmin, ymin, xmax, ymax, OgcCrs.CRS84)).accept(visitor4)
+        SpatialLiteral.of(Bbox.of(xmin, ymin, xmax, ymax, OgcCrs.CRS84)).accept(visitor4)
 
 
 
@@ -368,7 +365,7 @@ class CqlCoordinateCheckerSpec extends Specification {
         double xmax = 2.00
         double ymax = 2.00
 
-        SpatialLiteral.of(Geometry.Bbox.of(xmin, ymin, xmax, ymax, OgcCrs.CRS84)).accept(visitor4)
+        SpatialLiteral.of(Bbox.of(xmin, ymin, xmax, ymax, OgcCrs.CRS84)).accept(visitor4)
 
 
 

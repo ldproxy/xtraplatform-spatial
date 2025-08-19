@@ -9,6 +9,7 @@ descriptionDe = 'CQL2 Ausdrücke.'
 
 dependencies {
     provided project(":xtraplatform-crs")
+    provided project(":xtraplatform-geometries")
 
     antlr libs.antlr
 
