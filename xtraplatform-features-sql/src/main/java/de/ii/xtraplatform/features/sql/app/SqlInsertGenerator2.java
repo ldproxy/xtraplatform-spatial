@@ -88,7 +88,8 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
             .filter(
                 col ->
                     !Objects.equals(col.getName(), primaryKey)
-                        || schema.getStaticInserts().containsKey(primaryKey))
+                        || schema.getStaticInserts().containsKey(primaryKey)
+                        || col.hasOperation(Operation.DO_NOT_GENERATE))
             // TODO: in deriver
             .filter(col -> !col.hasOperation(Operation.CONSTANT))
             .map(SqlQueryColumn::getName)

@@ -97,6 +97,7 @@ import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
@@ -1103,9 +1104,12 @@ public class FeatureProviderSql
 
   @Override
   public MutationResult createFeatures(
-      String featureType, FeatureTokenSource featureTokenSource, EpsgCrs crs) {
+      String featureType,
+      FeatureTokenSource featureTokenSource,
+      EpsgCrs crs,
+      Optional<String> featureId) {
 
-    return writeFeatures(featureType, featureTokenSource, Optional.empty(), crs, false);
+    return writeFeatures(Type.CREATE, featureType, featureTokenSource, featureId, crs, false);
   }
 
   @Override
@@ -1115,7 +1119,13 @@ public class FeatureProviderSql
       FeatureTokenSource featureTokenSource,
       EpsgCrs crs,
       boolean partial) {
-    return writeFeatures(featureType, featureTokenSource, Optional.of(featureId), crs, partial);
+    return writeFeatures(
+        partial ? Type.UPDATE : Type.REPLACE,
+        featureType,
+        featureTokenSource,
+        Optional.of(featureId),
+        crs,
+        partial);
   }
 
   @Override
@@ -1143,7 +1153,38 @@ public class FeatureProviderSql
     return deletionStream.run().toCompletableFuture().join();
   }
 
+  @Override
+  public boolean hasGeneratedId(String featureType) {
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
+
+    if (queryMapping.isPresent()) {
+      return queryMapping.get().stream()
+          .allMatch(
+              mapping -> {
+                if (mapping.getColumnForId().isPresent() && mapping.getSchemaForId().isPresent()) {
+                  String primaryKey = mapping.getColumnForId().get().first().getPrimaryKey();
+                  String idColumn = mapping.getColumnForId().get().second().getName();
+
+                  if (!Objects.equals(primaryKey, idColumn)) {
+                    return false;
+                  }
+
+                  return !mapping
+                      .getColumnForId()
+                      .get()
+                      .second()
+                      .hasOperation(Operation.DO_NOT_GENERATE);
+                }
+                return true;
+              });
+    }
+
+    return true;
+  }
+
   private MutationResult writeFeatures(
+      Type type,
       String featureType,
       FeatureTokenSource featureTokenSource,
       Optional<String> featureId,
@@ -1158,15 +1199,13 @@ public class FeatureProviderSql
     }
 
     Transformer<FeatureDataSql, String> featureWriter =
-        featureId.isPresent()
-            ? featureMutationsSql.getUpdaterFlow(
-                queryMapping.get().get(0), null, featureId.get(), crs)
-            : featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, crs);
+        type == Type.CREATE
+            ? featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, featureId, crs)
+            : featureMutationsSql.getUpdaterFlow(
+                queryMapping.get().get(0), null, featureId.get(), crs);
 
     ImmutableMutationResult.Builder builder =
-        ImmutableMutationResult.builder()
-            .type(featureId.isPresent() ? partial ? Type.UPDATE : Type.REPLACE : Type.CREATE)
-            .hasFeatures(false);
+        ImmutableMutationResult.builder().type(type).hasFeatures(false);
     FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
 
     Source<FeatureDataSql> featureSqlSource =
