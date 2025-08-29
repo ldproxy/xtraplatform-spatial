@@ -80,6 +80,11 @@ public class TileProviderFeaturesFactory
   }
 
   @Override
+  public Optional<AutoEntityFactory> auto() {
+    return Optional.of(this);
+  }
+
+  @Override
   public Class<? extends PersistentEntity> entityClass() {
     return TileProviderFeatures.class;
   }
