@@ -117,23 +117,19 @@ public interface SeedingOptions {
   }
 
   /**
-   * @langEn The maximum number of threads the seeding is allowed to use. The actual number of
-   *     threads used depends on the number of available background task threads when the seeding is
-   *     about to start. If you want to allow more than thread, first check if sufficient background
-   *     task threads are configured. Take into account that the seeding for multiple APIs will
-   *     compete for the available background task threads.
-   * @langDe Die maximale Anzahl an Threads, die für das Seeding verwendet werden darf. Die
-   *     tatsächlich verwendete Zahl der Threads hängt davon ab, wie viele Threads für
-   *     [Hintergrundprozesse](../../application/20-configuration/90-background-tasks.md) zur
-   *     Verfügung stehen, wenn das Seeding startet. Wenn mehr als ein Thread erlaubt sein soll, ist
-   *     zunächst zu prüfen, ob genügend Threads fürHintergrundprozesse konfiguriert sind. Es ist zu
-   *     berücksichtigen, dass alle APIs um die vorhandenen Threads für Hintergrundprozesse
-   *     konkurrieren.
+   * @langEn *Deprecated* This option has no effect anymore. All available background task threads
+   *     will be used for seeding. You can control the order of execution by setting the `priority`
+   *     of the seeding job.
+   * @langDe *Deprecated* Diese Option hat keine Auswirkung mehr. Alle verfügaren Threads für
+   *     Hintergrundprozesse werden für das Seeding verwendet. Die Reihenfolge der Ausführung kann
+   *     über die `priority` des Seeding-Jobs gesteuert werden.
    * @default 1
    */
+  @Deprecated(since = "v4.5", forRemoval = true)
   @Nullable
   Integer getMaxThreads();
 
+  @Deprecated(since = "v4.5", forRemoval = true)
   @Value.Lazy
   @JsonIgnore
   default int getEffectiveMaxThreads() {
@@ -155,5 +151,24 @@ public interface SeedingOptions {
   @JsonIgnore
   default int getEffectiveJobSize() {
     return Objects.requireNonNullElse(getJobSize(), JobSize.M).getNumberOfTiles();
+  }
+
+  /**
+   * @langEn The priority of the seeding job. This controls the order in which this seeding job is
+   *     executed compared to other seeding jobs. A higher number means that the seeding job is
+   *     executed earlier.
+   * @langDe Die Priorität des Seeding-Jobs. Diese steuert die Reihenfolge, in der dieser
+   *     Seeding-Job im Vergleich zu anderen Seeding-Jobs ausgeführt wird. Eine höhere Zahl
+   *     bedeutet, dass der Seeding-Job früher ausgeführt wird.
+   * @since v4.5
+   * @default 1000
+   */
+  @Nullable
+  Integer getPriority();
+
+  @Value.Lazy
+  @JsonIgnore
+  default int getEffectivePriority() {
+    return Objects.requireNonNullElse(getPriority(), 1000);
   }
 }
