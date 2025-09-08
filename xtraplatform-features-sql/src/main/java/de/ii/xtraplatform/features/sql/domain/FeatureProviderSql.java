@@ -1171,7 +1171,7 @@ public class FeatureProviderSql
 
     Source<FeatureDataSql> featureSqlSource =
         featureTokenSource
-            // TODO: Simple .via(statsCollector)
+            .via(statsCollector)
             .via(
                 new FeatureEncoderSql(
                     queryMapping.get().get(0),
