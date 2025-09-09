@@ -201,7 +201,7 @@ class SqlInsertsFixtures {
                     .primaryKey(Optional.of("id"))
                     .addParentPath("osirisobjekt", "[id=id]fundorttiere", "[id=id]artbeobachtung")
                     .addProperties(new ImmutableSchemaSql.Builder()
-                            .name("ST_AsText(ST_ForcePolygonCCW(geom))")
+                            .name("ST_AsBinary(ST_ForcePolygonCCW(geom))")
                             .type(SchemaBase.Type.GEOMETRY)
                             .build())
                     .addRelation(new ImmutableSqlRelation.Builder()
