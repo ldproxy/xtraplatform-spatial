@@ -8,7 +8,7 @@
 package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -16,8 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,9 +37,7 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
   private final Queue<Integer> schemaIndexQueue;
   private final Queue<List<Integer>> indexesQueue;
   private final Queue<String> valueQueue;
-  private final Queue<Optional<SimpleFeatureGeometry>> geoTypeQueue;
-  private final Queue<OptionalInt> geoDimQueue;
-  private final Queue<Boolean> inGeoQueue;
+  private final Queue<Geometry<?>> geoQueue;
   private final Queue<Boolean> inArrayQueue;
   private final Queue<Boolean> inObjectQueue;
   private final Queue<FeatureTokenType> tokenQueue;
@@ -62,9 +58,7 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
     this.schemaIndexQueue = new LinkedList<>();
     this.indexesQueue = new LinkedList<>();
     this.valueQueue = new LinkedList<>();
-    this.geoTypeQueue = new LinkedList<>();
-    this.geoDimQueue = new LinkedList<>();
-    this.inGeoQueue = new LinkedList<>();
+    this.geoQueue = new LinkedList<>();
     this.inArrayQueue = new LinkedList<>();
     this.inObjectQueue = new LinkedList<>();
     this.tokenQueue = new LinkedList<>();
@@ -135,6 +129,13 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
     int index = getIndex(context.path());
 
     checkBuffer(context, FeatureTokenType.ARRAY_END, index, false);
+  }
+
+  @Override
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    int index = getIndex(context.path());
+
+    checkBuffer(context, FeatureTokenType.GEOMETRY, index, index > bufferIndex);
   }
 
   @Override
@@ -266,9 +267,7 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
     schemaIndexQueue.add(context.schemaIndex());
     indexesQueue.add(new ArrayList<>(context.indexes()));
     valueQueue.add(context.value());
-    geoTypeQueue.add(context.geometryType());
-    geoDimQueue.add(context.geometryDimension());
-    inGeoQueue.add(context.inGeometry());
+    geoQueue.add(context.geometry());
     inArrayQueue.add(context.inArray());
     inObjectQueue.add(context.inObject());
     valueTypeQueue.add(context.valueType());
@@ -281,9 +280,7 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
     int schemaIndex = context.schemaIndex();
     ArrayList<Integer> indexes = new ArrayList<>(context.indexes());
     String value = context.value();
-    Optional<SimpleFeatureGeometry> geometryType = context.geometryType();
-    OptionalInt geometryDimension = context.geometryDimension();
-    boolean inGeometry = context.inGeometry();
+    Geometry<?> geometry = context.geometry();
     boolean inArray = context.inArray();
     boolean inObject = context.inObject();
 
@@ -296,9 +293,7 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
       context.setIndexes(indexesQueue.remove());
       context.setValue(valueQueue.remove());
       context.setValueType(valueTypeQueue.remove());
-      context.setGeometryType(geoTypeQueue.remove());
-      context.setGeometryDimension(geoDimQueue.remove());
-      context.setInGeometry(inGeoQueue.remove());
+      context.setGeometry(geoQueue.remove());
       context.setInArray(inArrayQueue.remove());
       context.setInObject(inObjectQueue.remove());
 
@@ -309,9 +304,7 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
     context.setSchemaIndex(schemaIndex);
     context.setIndexes(indexes);
     context.setValue(value);
-    context.setGeometryType(geometryType);
-    context.setGeometryDimension(geometryDimension);
-    context.setInGeometry(inGeometry);
+    context.setGeometry(geometry);
     context.setInArray(inArray);
     context.setInObject(inObject);
 
@@ -328,6 +321,10 @@ public class FeatureTokenTransformerSorting extends FeatureTokenTransformer {
       case VALUE:
         // downstream.onValue(context);
         super.onValue(context);
+        break;
+      case GEOMETRY:
+        // downstream.onGeometry(context);
+        super.onGeometry(context);
         break;
       case OBJECT:
         // downstream.onObjectStart(context);

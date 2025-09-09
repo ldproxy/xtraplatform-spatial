@@ -193,15 +193,15 @@ public interface FeatureProviderSqlData
 
     /**
      * @langEn Encoding of the returned geometries, either Well-Known Text (WKT) or Well-Known
-     *     Binary (WKB).
+     *     Binary (WKB). WKB is the default encoding since v4.5.
      * @langDe Kodierung der zurückgegebenen Geometrien, entweder Well-Known Text (WKT) oder
-     *     Well-Known Binary (WKB).
-     * @default WKT
+     *     Well-Known Binary (WKB). WKB ist die Standardkodierung seit v4.5.
+     * @default WKB
      * @since v4.4
      */
     @Value.Default
     default GeometryEncoding getGeometryEncoding() {
-      return GeometryEncoding.WKT;
+      return GeometryEncoding.WKB;
     }
 
     @JsonIgnore

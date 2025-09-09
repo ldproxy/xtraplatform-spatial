@@ -15,7 +15,7 @@ import de.ii.xtraplatform.features.domain.FeatureTokenType;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SchemaMappingBase;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -336,6 +336,15 @@ public class FeatureEventBuffer<
   }
 
   @Override
+  public void onGeometry(W context) {
+    if (doBuffer) {
+      bufferIn.onGeometry(context);
+    } else {
+      downstream.onGeometry(context);
+    }
+  }
+
+  @Override
   public void onValue(W context) {
     if (doBuffer) {
       bufferIn.onValue(context);
@@ -358,8 +367,8 @@ public class FeatureEventBuffer<
               if (token instanceof SchemaBase.Type) {
                 return "Type." + token;
               }
-              if (token instanceof SimpleFeatureGeometry) {
-                return "SimpleFeatureGeometry." + token;
+              if (token instanceof GeometryType) {
+                return "GeometryType." + token;
               }
               if (token instanceof String) {
                 return "\"" + token + "\"";

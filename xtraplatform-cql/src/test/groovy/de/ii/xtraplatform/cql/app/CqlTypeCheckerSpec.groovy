@@ -15,12 +15,12 @@ import de.ii.xtraplatform.cql.domain.ArrayFunction
 import de.ii.xtraplatform.cql.domain.Between
 import de.ii.xtraplatform.cql.domain.BinaryArrayOperation
 import de.ii.xtraplatform.cql.domain.BinarySpatialOperation
+import de.ii.xtraplatform.cql.domain.Bbox
 import de.ii.xtraplatform.cql.domain.Casei
 import de.ii.xtraplatform.cql.domain.Cql
 import de.ii.xtraplatform.cql.domain.CqlPredicate
 import de.ii.xtraplatform.cql.domain.Eq
 import de.ii.xtraplatform.cql.domain.Function
-import de.ii.xtraplatform.cql.domain.Geometry
 import de.ii.xtraplatform.cql.domain.Gte
 import de.ii.xtraplatform.cql.domain.In
 import de.ii.xtraplatform.cql.domain.IsNull
@@ -43,6 +43,12 @@ import de.ii.xtraplatform.cql.infra.CqlIncompatibleTypes
 import de.ii.xtraplatform.crs.domain.BoundingBox
 import de.ii.xtraplatform.crs.domain.EpsgCrs
 import de.ii.xtraplatform.crs.domain.OgcCrs
+import de.ii.xtraplatform.geometries.domain.GeometryType
+import de.ii.xtraplatform.geometries.domain.Point
+import de.ii.xtraplatform.geometries.domain.LineString
+import de.ii.xtraplatform.geometries.domain.Polygon
+import de.ii.xtraplatform.geometries.domain.MultiLineString
+import de.ii.xtraplatform.geometries.domain.MultiPolygon
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -526,7 +532,7 @@ class CqlTypeCheckerSpec extends Specification {
     def 'Test Bbox with bounding box'(){
         when:
 
-        SpatialLiteral.of(Geometry.Bbox.of(BoundingBox.of(2,2,4,4, OgcCrs.CRS84))).accept(visitor)
+        SpatialLiteral.of(Bbox.of(BoundingBox.of(2,2,4,4, OgcCrs.CRS84))).accept(visitor)
 
         then:
 
@@ -534,26 +540,15 @@ class CqlTypeCheckerSpec extends Specification {
 
     }
 
-    def 'Test Bbox getType'(){
-        when:
-
-        def type = Geometry.Bbox.of(BoundingBox.of(2,2,4,4, OgcCrs.CRS84)).getType()
-
-        then:
-
-        type == Geometry.Type.BBox
-
-    }
-
     def 'Test Point getType'(){
 
         when:
 
-        def type = Geometry.Point.of(1 as double, 1 as double, EpsgCrs.of(555)).getType()
+        def type = Point.of(1 as double, 1 as double, EpsgCrs.of(555)).getType()
 
         then:
 
-        type == Geometry.Type.Point
+        type == GeometryType.POINT
 
     }
 
@@ -561,11 +556,11 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-        def type = Geometry.LineString.of(Geometry.Coordinate.of(1 as double, 1 as double)).getType()
+        def type = LineString.of(1 as double, 1 as double, 2 as double, 2 as double).getType()
 
         then:
 
-        type == Geometry.Type.LineString
+        type == GeometryType.LINE_STRING
 
     }
 
@@ -573,12 +568,12 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-        def type = Geometry.MultiLineString.of(Geometry.LineString.of(Geometry.Coordinate.of(1 as double, 1 as double)),
-                Geometry.LineString.of(Geometry.Coordinate.of(1 as double, 1 as double))).getType()
+        def type = MultiLineString.of(List.of(LineString.of(1 as double, 1 as double, 2 as double, 2 as double),
+                LineString.of(1 as double, 1 as double, 2 as double, 2 as double))).getType()
 
         then:
 
-        type == Geometry.Type.MultiLineString
+        type == GeometryType.MULTI_LINE_STRING
 
     }
 
@@ -586,12 +581,11 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-        def type = Geometry.MultiPolygon.of(Geometry.Polygon.of(ImmutableList.of(Geometry.Coordinate.of(1 as double, 1 as double))),
-                Geometry.Polygon.of(ImmutableList.of(Geometry.Coordinate.of(1 as double, 1 as double)))).getType()
+        def type = MultiPolygon.of(List.of(Polygon.of(new double[]{1 as double, 1 as double, 2 as double, 3 as double, 3 as double, 5 as double, 1 as double, 1 as double}))).getType()
 
         then:
 
-        type == Geometry.Type.MultiPolygon
+        type == GeometryType.MULTI_POLYGON
 
     }
 
@@ -636,7 +630,7 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-        SpatialLiteral.of(Geometry.Point.of(Geometry.Coordinate.of(1.00 as double, 2 as double, 3 as double))).accept(visitor)
+        SpatialLiteral.of(Point.of(1.00 as double, 2 as double, 3 as double)).accept(visitor)
 
         then:
 
@@ -648,7 +642,7 @@ class CqlTypeCheckerSpec extends Specification {
 
         when:
 
-        SpatialLiteral.of(Geometry.Point.of(1 as double, 1 as double, EpsgCrs.of(555))).accept(visitor)
+        SpatialLiteral.of(Point.of(1 as double, 1 as double, EpsgCrs.of(555))).accept(visitor)
 
         then:
 

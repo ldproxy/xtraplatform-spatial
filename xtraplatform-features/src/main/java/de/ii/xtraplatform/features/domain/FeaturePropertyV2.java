@@ -16,7 +16,7 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEncodingEnabled;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -65,7 +65,7 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
 
   Optional<String> getDescription();
 
-  Optional<SimpleFeatureGeometry> getGeometryType();
+  Optional<GeometryType> getGeometryType();
 
   Map<String, String> getTransformers();
 

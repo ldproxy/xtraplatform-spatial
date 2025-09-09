@@ -23,6 +23,9 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.features.sql.domain.SqlRowMeta;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryDecoderWkb;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryDecoderWkt;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -91,9 +94,9 @@ public class FeatureDecoderSql
   protected void init() {
     this.context = createContext().setMappings(mappings).setQuery(query);
     if (geometryAsWkb) {
-      this.geometryDecoderWkb = new GeometryDecoderWkb(getDownstream(), context);
+      this.geometryDecoderWkb = new GeometryDecoderWkb();
     } else {
-      this.geometryDecoderWkt = new GeometryDecoderWkt(getDownstream(), context);
+      this.geometryDecoderWkt = new GeometryDecoderWkt();
     }
     this.nestingTracker =
         new NestingTracker(getDownstream(), context, mainTablePaths, false, false, false);
@@ -256,16 +259,18 @@ public class FeatureDecoderSql
 
       if (sqlRow.isSpatialColumn(i)) {
         if (Objects.nonNull(sqlRow.getValues().get(i))) {
+          Geometry<?> geometry;
           try {
             context.setSchemaIndex(sqlRow.getSchemaIndex(i));
-            if (geometryAsWkb) {
-              geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i));
-            } else {
-              geometryDecoderWkt.decode((String) sqlRow.getValues().get(i));
-            }
+            geometry =
+                geometryAsWkb
+                    ? geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i), query.getCrs())
+                    : geometryDecoderWkt.decode((String) sqlRow.getValues().get(i), query.getCrs());
           } catch (IOException e) {
             throw new IllegalStateException("Error parsing WKT or WKB geometry", e);
           }
+          context.setGeometry(geometry);
+          getDownstream().onGeometry(context);
         }
       } else {
         context.setValueType(Type.STRING);

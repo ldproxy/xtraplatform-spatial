@@ -7,12 +7,14 @@
  */
 package de.ii.xtraplatform.features.json.app
 
+import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.features.domain.FeatureSchema
 import de.ii.xtraplatform.features.domain.FeatureTokenFixtures
 import de.ii.xtraplatform.features.domain.SchemaMapping
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple
 import de.ii.xtraplatform.features.json.domain.FeatureTokenDecoderGeoJson
+import de.ii.xtraplatform.geometries.domain.Axes
 import de.ii.xtraplatform.streams.app.ReactiveRx
 import de.ii.xtraplatform.streams.domain.Reactive
 import org.slf4j.Logger
@@ -44,12 +46,11 @@ class FeatureTokenDecoderGeoJsonSpec2 extends Specification {
     }
 
     def setup() {
-        decoder = new FeatureTokenDecoderGeoJson(Optional.empty())
+        decoder = new FeatureTokenDecoderGeoJson(Optional.empty(), OgcCrs.CRS84, Axes.XY)
     }
 
     public <T> T runStream(Reactive.Stream<T> stream) {
         def result = stream.on(runner).run().toCompletableFuture().join()
-        println(result.toString())
         return result
     }
 

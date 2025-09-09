@@ -7,6 +7,9 @@
  */
 package de.ii.xtraplatform.geometries.domain
 
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableSwapXY
+import de.ii.xtraplatform.geometries.domain.transform.SwapXY
 import spock.lang.Specification
 
 class SwapXYSpec extends Specification {
@@ -15,18 +18,18 @@ class SwapXYSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        SwapXY swapXY = ImmutableSwapXY.of(next)
+        CoordinatesTransformation next = Mock()
+        SwapXY swapXY = ImmutableSwapXY.of(Optional.of(next))
         double[] coordinates = [10.81, 10.33, 10.91, 20.05]
         int dimension = 2
 
         when:
 
-        swapXY.onCoordinates(coordinates, coordinates.length, dimension)
+        swapXY.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
 
         then:
 
-        1 * next.onCoordinates([10.33, 10.81, 20.05, 10.91], coordinates.length, dimension)
+        1 * next.onCoordinates([10.33, 10.81, 20.05, 10.91], 4, 2, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
         0 * _
     }
 
@@ -34,18 +37,18 @@ class SwapXYSpec extends Specification {
 
         given:
 
-        DoubleArrayProcessor next = Mock()
-        SwapXY swapXY = ImmutableSwapXY.of(next)
+        CoordinatesTransformation next = Mock()
+        SwapXY swapXY = ImmutableSwapXY.of(Optional.of(next))
         double[] coordinates = [10.81, 10.33, 100.0, 10.91, 20.05, 110.0]
         int dimension = 3
 
         when:
 
-        swapXY.onCoordinates(coordinates, coordinates.length, dimension)
+        swapXY.onCoordinates(coordinates, coordinates.length, dimension, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
 
         then:
 
-        1 * next.onCoordinates([10.33, 10.81, 100.0, 20.05, 10.91, 110.0], coordinates.length, dimension)
+        1 * next.onCoordinates([10.33, 10.81, 100.0, 20.05, 10.91, 110.0], 6, 3, Optional.of(PositionList.Interpolation.LINE), OptionalInt.empty())
         0 * _
     }
 }

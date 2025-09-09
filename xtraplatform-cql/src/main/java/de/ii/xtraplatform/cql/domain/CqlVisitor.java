@@ -50,24 +50,12 @@ public interface CqlVisitor<T> {
       return visit((TemporalLiteral) node, children);
     } else if (node instanceof ArrayLiteral) {
       return visit((ArrayLiteral) node, children);
-    } else if (node instanceof Geometry.Coordinate) {
-      return visit((Geometry.Coordinate) node, children);
-    } else if (node instanceof Geometry.Point) {
-      return visit((Geometry.Point) node, children);
-    } else if (node instanceof Geometry.LineString) {
-      return visit((Geometry.LineString) node, children);
-    } else if (node instanceof Geometry.Polygon) {
-      return visit((Geometry.Polygon) node, children);
-    } else if (node instanceof Geometry.MultiPoint) {
-      return visit((Geometry.MultiPoint) node, children);
-    } else if (node instanceof Geometry.MultiLineString) {
-      return visit((Geometry.MultiLineString) node, children);
-    } else if (node instanceof Geometry.MultiPolygon) {
-      return visit((Geometry.MultiPolygon) node, children);
-    } else if (node instanceof Geometry.Bbox) {
-      return visit((Geometry.Bbox) node, children);
-    } else if (node instanceof Geometry.GeometryCollection) {
-      return visit((Geometry.GeometryCollection) node, children);
+    } else if (node instanceof PositionNode) {
+      return visit((PositionNode) node, children);
+    } else if (node instanceof GeometryNode) {
+      return visit((GeometryNode) node, children);
+    } else if (node instanceof Bbox) {
+      return visit((Bbox) node, children);
     } else if (node instanceof SpatialLiteral) {
       return visit((SpatialLiteral) node, children);
     } else if (node instanceof Function) {
@@ -115,23 +103,11 @@ public interface CqlVisitor<T> {
 
   T visit(SpatialLiteral spatialLiteral, List<T> children);
 
-  T visit(Geometry.Coordinate coordinate, List<T> children);
+  T visit(PositionNode position, List<T> children);
 
-  T visit(Geometry.Point point, List<T> children);
+  T visit(GeometryNode geometry, List<T> children);
 
-  T visit(Geometry.LineString lineString, List<T> children);
-
-  T visit(Geometry.Polygon polygon, List<T> children);
-
-  T visit(Geometry.MultiPoint multiPoint, List<T> children);
-
-  T visit(Geometry.MultiLineString multiLineString, List<T> children);
-
-  T visit(Geometry.MultiPolygon multiPolygon, List<T> children);
-
-  T visit(Geometry.GeometryCollection multiPolygon, List<T> children);
-
-  T visit(Geometry.Bbox envelope, List<T> children);
+  T visit(Bbox envelope, List<T> children);
 
   T visit(Function function, List<T> children);
 
