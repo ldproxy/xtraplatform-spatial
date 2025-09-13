@@ -22,6 +22,7 @@ import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,8 +95,11 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
                     new SimpleEntry<>(
                         getNameWithoutRole(getPropertyName(property).get()), property))
             .collect(
-                ImmutableMap.toImmutableMap(
-                    Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first));
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (first, second) -> first,
+                    LinkedHashMap::new));
 
     List<String> required =
         visitedProperties.stream()
@@ -113,8 +117,11 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
   private Map<String, T> extractDefinitions(List<T> properties) {
     return extractDefinitions(properties.stream())
         .collect(
-            ImmutableMap.toImmutableMap(
-                def -> getPropertyName(def).get(), def -> def, (first, second) -> second));
+            Collectors.toMap(
+                def -> getPropertyName(def).get(),
+                def -> def,
+                (first, second) -> second,
+                LinkedHashMap::new));
   }
 
   protected Stream<T> extractDefinitions(Stream<T> properties) {
@@ -184,7 +191,12 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
                 property ->
                     new SimpleEntry<>(
                         getNameWithoutRole(getPropertyName(property).get()), property))
-            .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (first, second) -> first,
+                    LinkedHashMap::new));
 
     List<String> required =
         visitedProperties.stream()
