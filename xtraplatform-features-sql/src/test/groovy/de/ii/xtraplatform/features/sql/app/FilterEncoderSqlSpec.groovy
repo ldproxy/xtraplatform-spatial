@@ -119,7 +119,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_15_RandomCrs
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Within(AA.location, ST_GeomFromText('POLYGON((-118.0 33.8,-117.9 33.8,-117.9 34.0,-118.0 34.0,-118.0 33.8))',4326)))"
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Within(AA.location, ST_GeomFromText('POLYGON((-118.0 33.8,-118.0 34.0,-117.9 34.0,-117.9 33.8,-118.0 33.8))',4326)))"
 
         String actual = filterEncoder2.encode(filter, instanceContainer)
 

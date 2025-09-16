@@ -196,7 +196,7 @@ public class CqlFilterExamples {
   public static final Cql2Expression EXAMPLE_15_RandomCrs =
       SWithin.of(
           Property.of("location"),
-          SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0, EpsgCrs.of(8888))));
+          SpatialLiteral.of(Bbox.of(33.8, -118.0, 34.0, -117.9, EpsgCrs.of(8888))));
 
   public static final CqlFilter EXAMPLE_15_OLD =
       CqlFilter.of(

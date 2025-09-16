@@ -278,7 +278,9 @@ public class CqlToText implements CqlVisitor<String> {
   public String visit(GeometryNode geometry, List<String> children) {
     try {
       return new GeometryEncoderWkt(true)
-          .encode(transformIfNecessary(geometry.getCrs()).apply(geometry.getGeometry()));
+          .encode(
+              transformIfNecessary(geometry.getCrs().or(() -> geometry.getGeometry().getCrs()))
+                  .apply(geometry.getGeometry()));
     } catch (IOException e) {
       throw new IllegalStateException("Error converting a geometry to CQL2-Text / WKT", e);
     }
