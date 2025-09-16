@@ -124,7 +124,7 @@ class SqlQueryTemplatesDeriverSpec extends Specification {
 
 
     static String meta(List<SqlQueryTemplates> templates, List<SortKey> sortBy, Optional<Cql2Expression> userFilter) {
-        return templates.stream().map(t -> t.getMetaQueryTemplate().generateMetaQuery(10, 10, 0, sortBy, userFilter, ImmutableMap.of(), false, true)).collect(Collectors.joining("\n"))
+        return templates.stream().map(t -> t.getMetaQueryTemplate().generateMetaQuery(10, 10, 0, sortBy, userFilter, ImmutableMap.of(), false, true, false)).collect(Collectors.joining("\n"))
     }
 
     static List<String> values(List<SqlQueryTemplates> templates, int limit, int offset, List<SortKey> sortBy, Cql2Expression filter) {

@@ -35,7 +35,8 @@ public interface SqlQueryTemplates {
         Optional<Cql2Expression> filter,
         Map<String, String> virtualTables,
         boolean withNumberSkipped,
-        boolean withNumberReturned);
+        boolean withNumberReturned,
+        boolean forceNumberMatched);
   }
 
   @FunctionalInterface
