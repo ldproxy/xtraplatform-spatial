@@ -8,11 +8,12 @@
 package de.ii.xtraplatform.features.gml.app
 
 import de.ii.xtraplatform.features.domain.*
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
+import de.ii.xtraplatform.geometries.domain.GeometryType
 import de.ii.xtraplatform.streams.app.ReactiveRx
 import de.ii.xtraplatform.streams.domain.Reactive
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -53,7 +54,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                 .putProperties2("geometry", new ImmutableFeatureSchema.Builder()
                         .sourcePath("bag:geom")
                         .type(SchemaBase.Type.GEOMETRY)
-                        .geometryType(SimpleFeatureGeometry.POLYGON))
+                        .geometryType(GeometryType.POLYGON))
                 .build()
 
         decoder = new FeatureTokenDecoderGml(

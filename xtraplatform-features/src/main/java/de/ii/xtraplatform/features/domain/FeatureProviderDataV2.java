@@ -17,6 +17,7 @@ import de.ii.xtraplatform.entities.domain.AutoEntity;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.ValidationResult.MODE;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -113,6 +114,25 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    * @default `{{value}}`
    */
   Optional<String> getLabelTemplate();
+
+  /**
+   * @langEn This option allows to specify the specific geometry types that are provided by the
+   *     provider. Known geometry types are `POINT`, `MULTI_POINT`, `LINE_STRING`,
+   *     `MULTI_LINE_STRING`, `POLYGON`, `MULTI_POLYGON`, `GEOMETRY_COLLECTION`, `CIRCULAR_STRING`,
+   *     `COMPOUND_CURVE`, `CURVE_POLYGON`, `MULTI_CURVE`, `MULTI_SURFACE`, and
+   *     `POLYHEDRAL_SURFACE`. More complex geometry types like `CIRCULAR_STRING`, `COMPOUND_CURVE`
+   *     or `CURVE_POLYGON` will be simplified for PostGIS feature providers, if the output format
+   *     does not support them.
+   * @langDe Über diese Option kann deklariert werden, welche konkreten Geometrietypen vom Provider
+   *     angeliefert werden. Unterstützte Geometrietypen sind `POINT`, `MULTI_POINT`, `LINE_STRING`,
+   *     `MULTI_LINE_STRING`, `POLYGON`, `MULTI_POLYGON`, `GEOMETRY_COLLECTION`, `CIRCULAR_STRING`,
+   *     `COMPOUND_CURVE`, `CURVE_POLYGON`, `MULTI_CURVE`, `MULTI_SURFACE` und `POLYHEDRAL_SURFACE`.
+   *     Komplexere Geometrietypen wie `CIRCULAR_STRING`, `COMPOUND_CURVE` oder `CURVE_POLYGON`
+   *     werden bei PostGIS-Feature-Providern automatisch vereinfacht, wenn das Ausgabeformat diese
+   *     nicht unterstützt.
+   * @default `[ POINT, MULTI_POINT, LINE_STRING, MULTI_LINE_STRING, POLYGON, MULTI_POLYGON ]`
+   */
+  List<GeometryType> getProvidesGeometryTypes();
 
   /**
    * @langEn Definition of extensions, see [Extensions](90-extensions/README.md).

@@ -44,6 +44,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final QueryRunner runner;
   private final boolean doTransform;
   private final boolean stepMapping;
+  private final boolean stepGeometry;
   private final boolean stepCoordinates;
   private final boolean stepClean;
   private final boolean stepEtag;
@@ -66,6 +67,9 @@ public class FeatureStreamImpl implements FeatureStream {
     this.doTransform = doTransform;
     this.stepMapping =
         !query.debugSkipPipelineSteps().contains(PipelineSteps.MAPPING)
+            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepGeometry =
+        !query.debugSkipPipelineSteps().contains(PipelineSteps.GEOMETRY)
             && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepCoordinates =
         !query.debugSkipPipelineSteps().contains(PipelineSteps.COORDINATES)
@@ -232,7 +236,9 @@ public class FeatureStreamImpl implements FeatureStream {
                     crsTransformerFactory.getTransformer(
                         data.getNativeCrs().orElse(OgcCrs.CRS84),
                         nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
-    FeatureTokenTransformerCoordinates valueMapper =
+    FeatureTokenTransformerGeometry geometryMapper = new FeatureTokenTransformerGeometry();
+
+    FeatureTokenTransformerCoordinates coordinatesMapper =
         new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
 
     FeatureTokenTransformerRemoveEmptyOptionals cleaner =
@@ -243,8 +249,11 @@ public class FeatureStreamImpl implements FeatureStream {
     if (stepMapping) {
       tokenSourceTransformed = tokenSourceTransformed.via(schemaMapper);
     }
+    if (stepGeometry) {
+      tokenSourceTransformed = tokenSourceTransformed.via(geometryMapper);
+    }
     if (stepCoordinates) {
-      tokenSourceTransformed = tokenSourceTransformed.via(valueMapper);
+      tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
     }
     if (stepClean) {
       tokenSourceTransformed = tokenSourceTransformed.via(cleaner);

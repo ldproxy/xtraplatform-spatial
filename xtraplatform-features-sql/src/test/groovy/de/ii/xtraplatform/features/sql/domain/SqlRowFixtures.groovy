@@ -19,9 +19,7 @@ import de.ii.xtraplatform.features.domain.ImmutableFeatureStoreRelatedContainer
 import de.ii.xtraplatform.features.domain.ImmutableFeatureStoreRelation
 import de.ii.xtraplatform.features.domain.ImmutableFeatureStoreTypeInfo
 import de.ii.xtraplatform.features.domain.SchemaBase
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry
-
-import java.util.stream.Collectors
+import de.ii.xtraplatform.geometries.domain.GeometryType
 
 class SqlRowFixtures {
 
@@ -184,7 +182,7 @@ class SqlRowFixtures {
             SchemaBase.Type.STRING,
             FeatureTokenType.OBJECT,
             ["biotop", "geometry"],
-            SimpleFeatureGeometry.POINT,
+            GeometryType.POINT,
             FeatureTokenType.VALUE,
             ["biotop", "geometry"],
             "8.18523495507722 49.698295103021096",
@@ -220,7 +218,7 @@ class SqlRowFixtures {
             SchemaBase.Type.STRING,
             FeatureTokenType.OBJECT,
             ["biotop", "geometry"],
-            SimpleFeatureGeometry.MULTI_POINT,
+            GeometryType.MULTI_POINT,
             FeatureTokenType.ARRAY,
             ["biotop", "geometry"],
             FeatureTokenType.VALUE,
@@ -263,7 +261,7 @@ class SqlRowFixtures {
             SchemaBase.Type.STRING,
             FeatureTokenType.OBJECT,
             ["biotop", "geometry"],
-            SimpleFeatureGeometry.MULTI_POLYGON,
+            GeometryType.MULTI_POLYGON,
             FeatureTokenType.ARRAY,
             ["biotop", "geometry"],
             FeatureTokenType.ARRAY,
@@ -486,7 +484,7 @@ class SqlRowFixtures {
             SchemaBase.Type.STRING,
             FeatureTokenType.OBJECT,
             ["biotop", "geometry"],
-            SimpleFeatureGeometry.POINT,
+            GeometryType.POINT,
             FeatureTokenType.VALUE,
             ["biotop", "geometry"],
             "6.295202392345018 50.11336914792363",
@@ -516,7 +514,7 @@ class SqlRowFixtures {
             SchemaBase.Type.STRING,
             FeatureTokenType.OBJECT,
             ["biotop", "geometry"],
-            SimpleFeatureGeometry.MULTI_POINT,
+            GeometryType.MULTI_POINT,
             FeatureTokenType.ARRAY,
             ["biotop", "geometry"],
             FeatureTokenType.VALUE,

@@ -35,7 +35,8 @@ public interface SqlQueryTemplates {
         Optional<Cql2Expression> filter,
         Map<String, String> virtualTables,
         boolean withNumberSkipped,
-        boolean withNumberReturned);
+        boolean withNumberReturned,
+        boolean forceNumberMatched);
   }
 
   @FunctionalInterface
@@ -45,6 +46,7 @@ public interface SqlQueryTemplates {
         long offset,
         List<SortKey> additionalSortKeys,
         Optional<Cql2Expression> filter,
+        boolean forceSimpleFeatures,
         Optional<Tuple<Object, Object>> minMaxKeys,
         Map<String, String> virtualTables);
   }

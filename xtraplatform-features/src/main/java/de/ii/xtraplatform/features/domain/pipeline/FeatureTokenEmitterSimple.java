@@ -10,10 +10,8 @@ package de.ii.xtraplatform.features.domain.pipeline;
 import de.ii.xtraplatform.features.domain.FeatureTokenType;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 public interface FeatureTokenEmitterSimple<T, U, V extends ModifiableContext<T, U>>
@@ -77,21 +75,12 @@ public interface FeatureTokenEmitterSimple<T, U, V extends ModifiableContext<T, 
 
   @Override
   default void onObjectStart(V context) {
-    onObjectStart(context.path(), context.geometryType(), context.geometryDimension());
+    onObjectStart(context.path());
   }
 
-  default void onObjectStart(
-      List<String> path,
-      Optional<SimpleFeatureGeometry> geometryType,
-      OptionalInt geometryDimension) {
+  default void onObjectStart(List<String> path) {
     push(FeatureTokenType.OBJECT);
     push(path);
-    if (geometryType.isPresent()) {
-      push(geometryType.get());
-      if (geometryDimension.isPresent()) {
-        push(geometryDimension.getAsInt());
-      }
-    }
   }
 
   @Override
@@ -122,6 +111,17 @@ public interface FeatureTokenEmitterSimple<T, U, V extends ModifiableContext<T, 
   default void onArrayEnd(List<String> path) {
     push(FeatureTokenType.ARRAY_END);
     push(path);
+  }
+
+  @Override
+  default void onGeometry(V context) {
+    onGeometry(context.path(), context.geometry());
+  }
+
+  default void onGeometry(List<String> path, Geometry<?> geometry) {
+    push(FeatureTokenType.GEOMETRY);
+    push(path);
+    push(geometry);
   }
 
   @Override

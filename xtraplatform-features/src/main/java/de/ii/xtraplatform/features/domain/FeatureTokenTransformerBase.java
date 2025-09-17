@@ -154,6 +154,11 @@ public abstract class FeatureTokenTransformerBase<
   }
 
   @Override
+  public void onGeometry(V context) {
+    getDownstream().onGeometry(context);
+  }
+
+  @Override
   public void onValue(V context) {
     getDownstream().onValue(context);
   }

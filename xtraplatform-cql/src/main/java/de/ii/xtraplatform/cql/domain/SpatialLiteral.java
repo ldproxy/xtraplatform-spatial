@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.domain;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -16,6 +17,10 @@ import org.immutables.value.Value;
 public interface SpatialLiteral extends Spatial, Literal, CqlNode {
 
   static SpatialLiteral of(String literal) throws CqlParseException {
+    return new SpatialLiteral.Builder(literal).build();
+  }
+
+  static SpatialLiteral of(Bbox literal) {
     return new SpatialLiteral.Builder(literal).build();
   }
 
@@ -31,8 +36,15 @@ public interface SpatialLiteral extends Spatial, Literal, CqlNode {
     @JsonCreator
     public Builder(Geometry<?> literal) {
       super();
-      value(literal);
+      value(GeometryNode.of(literal));
       type(Geometry.class);
+    }
+
+    @JsonCreator
+    public Builder(Bbox literal) {
+      super();
+      value(literal);
+      type(Bbox.class);
     }
 
     @JsonCreator

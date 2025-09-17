@@ -13,7 +13,6 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.domain.Cql
 import de.ii.xtraplatform.cql.domain.Cql2Expression
 import de.ii.xtraplatform.cql.domain.CqlParseException
-import de.ii.xtraplatform.cql.domain.Geometry
 import de.ii.xtraplatform.cql.domain.In
 import de.ii.xtraplatform.cql.domain.Interval
 import de.ii.xtraplatform.cql.domain.Property
@@ -25,13 +24,21 @@ import de.ii.xtraplatform.crs.domain.CrsInfo
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
+import de.ii.xtraplatform.geometries.domain.Axes
+import de.ii.xtraplatform.geometries.domain.GeometryCollection
+import de.ii.xtraplatform.geometries.domain.MultiLineString
+import de.ii.xtraplatform.geometries.domain.Polygon
+import de.ii.xtraplatform.geometries.domain.MultiPolygon
+import de.ii.xtraplatform.geometries.domain.Point
+import de.ii.xtraplatform.geometries.domain.MultiPoint
+import de.ii.xtraplatform.geometries.domain.LineString
+import de.ii.xtraplatform.geometries.domain.PositionList
+import de.ii.xtraplatform.geometries.domain.Position
 import de.ii.xtraplatform.proj.domain.ProjLoaderImpl
 import spock.lang.Shared
 import spock.lang.Specification
 
 import java.nio.file.Path
-import java.text.Format
-import java.time.LocalDate
 import java.util.concurrent.CompletableFuture
 
 class CqlTextSpec extends Specification {
@@ -396,7 +403,8 @@ class CqlTextSpec extends Specification {
 
         when:
 
-        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiPoint.of(Geometry.Point.of((double)12.00, (double)55.09), Geometry.Point.of((double)11.00, (double)54.09)))), Cql.Format.TEXT)
+        MultiPoint multiPoint = MultiPoint.of(List.of(Point.of((double)12.00, (double)55.09), Point.of((double)11.00, (double)54.09)))
+        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(multiPoint)), Cql.Format.TEXT)
 
         then:
 
@@ -407,10 +415,10 @@ class CqlTextSpec extends Specification {
 
         given:
 
-        String cqlText = "S_INTERSECTS(\"bbox\", MULTILINESTRING((6.0 47.27),(11.0 50.27)))"
+        String cqlText = "S_INTERSECTS(\"bbox\", MULTILINESTRING((6.0 57.27,11.0 50.27),(6.0 47.27,11.0 50.27)))"
 
-        Geometry.LineString lineString1 =  Geometry.LineString.of(Geometry.Coordinate.of((double)6.00, (double)47.27))
-        Geometry.LineString lineString2 =  Geometry.LineString.of(Geometry.Coordinate.of((double)11.00, (double)50.27))
+        LineString lineString1 =  LineString.of(PositionList.of(Axes.XY,new double[]{(double)6.00, (double)57.27, (double)11.00, (double)50.27}))
+        LineString lineString2 =  LineString.of(PositionList.of(Axes.XY,new double[]{(double)6.00, (double)47.27, (double)11.00, (double)50.27}))
 
         when: 'reading text'
 
@@ -424,7 +432,7 @@ class CqlTextSpec extends Specification {
 
         when:
 
-        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiLineString.of(lineString1, lineString2))), Cql.Format.TEXT)
+        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(MultiLineString.of(List.of(lineString1, lineString2)))), Cql.Format.TEXT)
 
         then:
 
@@ -436,13 +444,10 @@ class CqlTextSpec extends Specification {
 
         given:
 
-        String cqlText = "S_INTERSECTS(\"bbox\", MULTIPOLYGON(((6.0 47.27,11.0 50.27)),((6.0 47.27,11.0 50.27))))"
+        String cqlText = "S_INTERSECTS(\"bbox\", MULTIPOLYGON(((6.0 47.27,11.0 50.27,11.0 50.27,6.0 47.27)),((6.0 47.27,11.0 50.27,11.0 50.27,6.0 47.27))))"
 
-        List<Geometry.Coordinate> coordinateList = new ArrayList<>()
-        coordinateList.add(Geometry.Coordinate.of((double)6.00, (double)47.27))
-        coordinateList.add(Geometry.Coordinate.of((double)11.00, (double)50.27))
-        Geometry.Polygon polygon1 =  Geometry.Polygon.of(coordinateList)
-        Geometry.Polygon polygon2 =  Geometry.Polygon.of(coordinateList)
+        Polygon polygon1 =  Polygon.of(List.of(PositionList.of(Axes.XY, new double[]{6.0,47.27,11.0,50.27,11.0,50.27,6.0,47.27})))
+        Polygon polygon2 =  Polygon.of(List.of(PositionList.of(Axes.XY, new double[]{6.0,47.27,11.0,50.27,11.0,50.27,6.0,47.27})))
 
 
         when:
@@ -457,7 +462,7 @@ class CqlTextSpec extends Specification {
 
         when:
 
-        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.MultiPolygon.of(polygon1, polygon2))), Cql.Format.TEXT)
+        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(MultiPolygon.of(List.of(polygon1, polygon2)))), Cql.Format.TEXT)
 
         then:
 
@@ -469,11 +474,11 @@ class CqlTextSpec extends Specification {
 
         given:
 
-        String cqlText = "S_INTERSECTS(\"bbox\", GEOMETRYCOLLECTION(LINESTRING(6.0 47.27 0.0,11.0 50.27 3.0),POINT(0.0 0.0 0.0)))"
+        String cqlText = "S_INTERSECTS(\"bbox\", GEOMETRYCOLLECTION Z(LINESTRING Z(6.0 47.27 0.0,11.0 50.27 3.0),POINT Z(0.0 0.0 0.0)))"
 
-        Geometry.LineString lineString =  Geometry.LineString.of(Geometry.Coordinate.of((double)6.00, (double)47.27, (double)0), Geometry.Coordinate.of((double)11.00, (double)50.27, (double)3))
-        Geometry.Point point =  Geometry.Point.of(Geometry.Coordinate.of((double)0, (double)0, (double)0))
-        Geometry.GeometryCollection geometryCollection = Geometry.GeometryCollection.of(lineString, point)
+        LineString lineString =  LineString.of(PositionList.of(Axes.XYZ, new double[]{(double)6.00, (double)47.27, (double)0, (double)11.00, (double)50.27, (double)3}));
+        Point point =  Point.of(Position.ofXYZ((double)0, (double)0, (double)0))
+        GeometryCollection geometryCollection = GeometryCollection.of(List.of(lineString, point))
 
         when: 'reading text'
 
@@ -513,7 +518,7 @@ class CqlTextSpec extends Specification {
 
         when:
 
-        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Geometry.Point.of(5.00, 42.27))) , Cql.Format.TEXT)
+        String actual2 = cql.write( SIntersects.of(Property.of("bbox"), SpatialLiteral.of(Point.of(5.00, 42.27))) , Cql.Format.TEXT)
 
         then:
 
@@ -1737,7 +1742,7 @@ class CqlTextSpec extends Specification {
     def 'Array predicate with nested array operation and Geometry.LineString Geometry.Polygon '() {
         given:
 
-        String cqlText = "A_CONTAINS(theme[S_WITHIN(LINESTRING(1.0 1.0), POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)))].concept, ('DLKM','Basis-DLM','DLM50'))"
+        String cqlText = "A_CONTAINS(theme[S_WITHIN(POINT(1.0 1.0), POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)))].concept, ('DLKM','Basis-DLM','DLM50'))"
 
         when: 'reading text'
 
@@ -1745,8 +1750,7 @@ class CqlTextSpec extends Specification {
 
         then:
 
-        //TODO Crs is not given in cqlText
-        actual != CqlFilterExamples.EXAMPLE_61
+        actual == CqlFilterExamples.EXAMPLE_61
 
         and:
 
@@ -1777,7 +1781,7 @@ class CqlTextSpec extends Specification {
 
         given:
 
-        String cqlText = "A_CONTAINS(theme[S_WITHIN(LINESTRING(1.0 1.0), POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)))].concept, ('DLKM','Basis-DLM','DLM50'))"
+        String cqlText = "A_CONTAINS(theme[S_WITHIN(POINT(1.0 1.0), POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)))].concept, ('DLKM','Basis-DLM','DLM50'))"
 
         when: 'reading text'
 
@@ -1893,7 +1897,7 @@ class CqlTextSpec extends Specification {
         cqlText                                                                | wrappedAxis
         "floors > 5 AND S_WITHIN(geometry, BBOX(-118.0,33.8,-117.9,34.0))" | 0
         "floors > 5 AND S_WITHIN(geometry, BBOX(-110,33.8,-117.9,34.0))"   | 0
-        "floors > 5 AND S_WITHIN(geometry, BBOX(-118.0,38.8,-117.9,34.0))" | 1
+        "floors > 5 AND S_WITHIN(geometry, BBOX(-118.0,34.8,-117.9,34.0))" | 1
 
     }
 

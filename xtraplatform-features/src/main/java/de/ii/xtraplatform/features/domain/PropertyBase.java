@@ -9,7 +9,8 @@ package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerFlatten;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,7 +22,8 @@ public interface PropertyBase<T extends PropertyBase<T, U>, U extends SchemaBase
   enum Type {
     VALUE,
     ARRAY,
-    OBJECT
+    OBJECT,
+    GEOMETRY
   }
 
   Type getType();
@@ -35,6 +37,9 @@ public interface PropertyBase<T extends PropertyBase<T, U>, U extends SchemaBase
 
   @Nullable
   String getValue();
+
+  @Nullable
+  Geometry<?> getGeometry();
 
   @Value.Auxiliary
   Optional<T> getParent();
@@ -73,7 +78,7 @@ public interface PropertyBase<T extends PropertyBase<T, U>, U extends SchemaBase
             .contains(FeaturePropertyTransformerFlatten.TYPE);
   }
 
-  Optional<SimpleFeatureGeometry> getGeometryType();
+  Optional<GeometryType> getGeometryType();
 
   PropertyBase<T, U> schema(Optional<U> schema);
 
@@ -85,6 +90,8 @@ public interface PropertyBase<T extends PropertyBase<T, U>, U extends SchemaBase
 
   PropertyBase<T, U> value(String value);
 
+  PropertyBase<T, U> geometry(Geometry<?> geometry);
+
   PropertyBase<T, U> parent(T parent);
 
   PropertyBase<T, U> addNestedProperties(T element);
@@ -95,7 +102,7 @@ public interface PropertyBase<T extends PropertyBase<T, U>, U extends SchemaBase
 
   PropertyBase<T, U> transformed(Map<String, ? extends String> transformed);
 
-  PropertyBase<T, U> geometryType(Optional<SimpleFeatureGeometry> geometryType);
+  PropertyBase<T, U> geometryType(Optional<GeometryType> geometryType);
 
-  PropertyBase<T, U> geometryType(SimpleFeatureGeometry geometryType);
+  PropertyBase<T, U> geometryType(GeometryType geometryType);
 }

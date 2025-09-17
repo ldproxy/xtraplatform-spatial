@@ -16,6 +16,7 @@ import de.ii.xtraplatform.cql.domain.AOverlaps;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
 import de.ii.xtraplatform.cql.domain.BinarySpatialOperation;
 import de.ii.xtraplatform.cql.domain.BooleanValue2;
@@ -24,13 +25,6 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlFilter;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry;
-import de.ii.xtraplatform.cql.domain.Geometry.Coordinate;
-import de.ii.xtraplatform.cql.domain.Geometry.GeometryCollection;
-import de.ii.xtraplatform.cql.domain.Geometry.LineString;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiPoint;
-import de.ii.xtraplatform.cql.domain.Geometry.Point;
-import de.ii.xtraplatform.cql.domain.Geometry.Polygon;
 import de.ii.xtraplatform.cql.domain.Gt;
 import de.ii.xtraplatform.cql.domain.Gte;
 import de.ii.xtraplatform.cql.domain.In;
@@ -59,7 +53,18 @@ import de.ii.xtraplatform.cql.domain.TemporalLiteral;
 import de.ii.xtraplatform.cql.domain.TemporalOperation;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
+import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.GeometryCollection;
+import de.ii.xtraplatform.geometries.domain.LineString;
+import de.ii.xtraplatform.geometries.domain.MultiLineString;
+import de.ii.xtraplatform.geometries.domain.MultiPoint;
+import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.Point;
+import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.PositionList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class CqlFilterExamples {
 
@@ -186,77 +191,80 @@ public class CqlFilterExamples {
   public static final Cql2Expression EXAMPLE_15 =
       SWithin.of(
           Property.of("location"),
-          SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84)));
+          SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84)));
 
   public static final Cql2Expression EXAMPLE_15_RandomCrs =
       SWithin.of(
           Property.of("location"),
-          SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0, EpsgCrs.of(8888))));
+          SpatialLiteral.of(Bbox.of(33.8, -118.0, 34.0, -117.9, EpsgCrs.of(8888))));
 
   public static final CqlFilter EXAMPLE_15_OLD =
       CqlFilter.of(
           SpatialOperation.of(
               SpatialFunction.S_WITHIN,
               "location",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_16 =
       SIntersects.of(
           Property.of("location"),
           SpatialLiteral.of(
-              Geometry.Polygon.of(
-                  OgcCrs.CRS84,
-                  ImmutableList.of(
-                      Geometry.Coordinate.of(-10.0, -10.0),
-                      Geometry.Coordinate.of(10.0, -10.0),
-                      Geometry.Coordinate.of(10.0, 10.0),
-                      Geometry.Coordinate.of(-10.0, -10.0)))));
+              Polygon.of(
+                  List.of(
+                      PositionList.of(
+                          Axes.XY,
+                          new double[] {-10.0, -10.0, 10.0, -10.0, 10.0, 10.0, -10.0, -10.0})),
+                  Optional.of(OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_16_MultiPolygon =
       SIntersects.of(
           Property.of("location"),
           SpatialLiteral.of(
-              Geometry.MultiPolygon.of(
-                  OgcCrs.CRS84,
-                  Polygon.of(
-                      ImmutableList.of(
-                          Geometry.Coordinate.of(-10.0, -10.0),
-                          Geometry.Coordinate.of(10.0, -10.0),
-                          Geometry.Coordinate.of(10.0, 10.0),
-                          Geometry.Coordinate.of(-10.0, -10.0))),
-                  Polygon.of(
-                      ImmutableList.of(
-                          Geometry.Coordinate.of(-15.0, -15.0),
-                          Geometry.Coordinate.of(15.0, -15.0),
-                          Geometry.Coordinate.of(15.0, 15.0),
-                          Geometry.Coordinate.of(-15.0, -15.0))))));
+              MultiPolygon.of(
+                  List.of(
+                      Polygon.of(
+                          List.of(
+                              PositionList.of(
+                                  Axes.XY,
+                                  new double[] {
+                                    -10.0, -10.0, 10.0, -10.0, 10.0, 10.0, -10.0, -10.0
+                                  })),
+                          Optional.of(OgcCrs.CRS84)),
+                      Polygon.of(
+                          List.of(
+                              PositionList.of(
+                                  Axes.XY,
+                                  new double[] {
+                                    -15.0, -15.0, 15.0, -15.0, 15.0, 15.0, -15.0, -15.0
+                                  })),
+                          Optional.of(OgcCrs.CRS84))),
+                  Optional.of(OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_16_MultiLineString =
       SIntersects.of(
           Property.of("location"),
           SpatialLiteral.of(
-              Geometry.MultiLineString.of(
-                  OgcCrs.CRS84,
-                  LineString.of(
-                      Geometry.Coordinate.of(-10.0, -10.0),
-                      Geometry.Coordinate.of(10.0, -10.0),
-                      Geometry.Coordinate.of(10.0, 10.0),
-                      Geometry.Coordinate.of(-10.0, -10.0)),
-                  LineString.of(
-                      Geometry.Coordinate.of(-15.0, -15.0),
-                      Geometry.Coordinate.of(15.0, -15.0),
-                      Geometry.Coordinate.of(15.0, 15.0),
-                      Geometry.Coordinate.of(-15.0, -15.0)))));
+              MultiLineString.of(
+                  List.of(
+                      LineString.of(
+                          PositionList.of(
+                              Axes.XY,
+                              new double[] {-10.0, -10.0, 10.0, -10.0, 10.0, 10.0, -10.0, -10.0}),
+                          Optional.of(OgcCrs.CRS84)),
+                      LineString.of(
+                          PositionList.of(
+                              Axes.XY,
+                              new double[] {-15.0, -15.0, 15.0, -15.0, 15.0, 15.0, -15.0, -15.0}),
+                          Optional.of(OgcCrs.CRS84))),
+                  Optional.of(OgcCrs.CRS84))));
   public static final Cql2Expression EXAMPLE_16_LineString =
       SIntersects.of(
           Property.of("location"),
           SpatialLiteral.of(
               LineString.of(
-                  OgcCrs.CRS84,
-                  Geometry.Coordinate.of(-10.0, -10.0),
-                  Geometry.Coordinate.of(10.0, -10.0),
-                  Geometry.Coordinate.of(10.0, 10.0),
-                  Geometry.Coordinate.of(-10.0, -10.0))));
+                  PositionList.of(
+                      Axes.XY, new double[] {-10.0, -10.0, 10.0, -10.0, 10.0, 10.0, -10.0, -10.0}),
+                  Optional.of(OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_16_Point =
       SIntersects.of(Property.of("location"), SpatialLiteral.of(Point.of(10, -10, OgcCrs.CRS84)));
@@ -264,42 +272,47 @@ public class CqlFilterExamples {
   public static final Cql2Expression EXAMPLE_16_MultiPoint =
       SIntersects.of(
           Property.of("location"),
-          SpatialLiteral.of(MultiPoint.of(OgcCrs.CRS84, Point.of(10, -10), Point.of(10, 10))));
+          SpatialLiteral.of(
+              MultiPoint.of(
+                  List.of(Point.of(10, -10, OgcCrs.CRS84), Point.of(10, 10, OgcCrs.CRS84)),
+                  Optional.of(OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_16_BBox =
       SIntersects.of(
           Property.of("location"),
-          SpatialLiteral.of(Geometry.Bbox.of(-10.0, -10.0, 10.0, 10.0, OgcCrs.CRS84)));
+          SpatialLiteral.of(Bbox.of(-10.0, -10.0, 10.0, 10.0, OgcCrs.CRS84)));
 
   public static final Cql2Expression EXAMPLE_16_GeometryCollection =
       SIntersects.of(
           Property.of("location"),
-          SpatialLiteral.of(GeometryCollection.of(Point.of(10, -10), Point.of(10, 10))));
+          SpatialLiteral.of(
+              GeometryCollection.of(
+                  List.of(Point.of(10, -10, OgcCrs.CRS84), Point.of(10, 10, OgcCrs.CRS84)),
+                  Optional.of(OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_16_OLD =
       SIntersects.of(
           Property.of("location"),
           SpatialLiteral.of(
-              Geometry.Polygon.of(
-                  OgcCrs.CRS84,
-                  ImmutableList.of(
-                      Geometry.Coordinate.of(-10.0, -10.0),
-                      Geometry.Coordinate.of(10.0, -10.0),
-                      Geometry.Coordinate.of(10.0, 10.0),
-                      Geometry.Coordinate.of(-10.0, -10.0)))));
+              Polygon.of(
+                  List.of(
+                      PositionList.of(
+                          Axes.XY,
+                          new double[] {-10.0, -10.0, 10.0, -10.0, 10.0, 10.0, -10.0, -10.0})),
+                  Optional.of(OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_17 =
       And.of(
           EXAMPLE_1,
           SWithin.of(
               Property.of("geometry"),
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))));
   public static final Cql2Expression EXAMPLE_17_OLD =
       And.of(
           EXAMPLE_1_OLD,
           SWithin.of(
               Property.of("geometry"),
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))));
 
   public static final Cql2Expression EXAMPLE_18 =
       Between.of(Property.of("floors"), ScalarLiteral.of(4), ScalarLiteral.of(8));
@@ -750,8 +763,7 @@ public class CqlFilterExamples {
                   "theme",
                   SWithin.of(
                       Property.of("theme.location"),
-                      SpatialLiteral.of(
-                          Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))))),
+                      SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84))))),
           ArrayLiteral.of(
               ImmutableList.of(
                   ScalarLiteral.of("DLKM"),
@@ -780,15 +792,11 @@ public class CqlFilterExamples {
               ImmutableMap.of(
                   "theme",
                   SWithin.of(
-                      SpatialLiteral.of(Geometry.LineString.of(Coordinate.of(1.00, 1.00))),
+                      SpatialLiteral.of(Point.of(1.00, 1.00, OgcCrs.CRS84)),
                       SpatialLiteral.of(
-                          Geometry.Polygon.of(
-                              OgcCrs.CRS84,
-                              ImmutableList.of(
-                                  Geometry.Coordinate.of(-10.0, -10.0),
-                                  Geometry.Coordinate.of(10.0, -10.0),
-                                  Geometry.Coordinate.of(10.0, 10.0),
-                                  Geometry.Coordinate.of(-10.0, -10.0))))))),
+                          Polygon.of(
+                              new double[] {-10.0, -10.0, 10.0, -10.0, 10.0, 10.0, -10.0, -10.0},
+                              OgcCrs.CRS84))))),
           ArrayLiteral.of(
               ImmutableList.of(
                   ScalarLiteral.of("DLKM"),
@@ -817,42 +825,42 @@ public class CqlFilterExamples {
           SpatialOperation.of(
               SpatialFunction.S_DISJOINT,
               "geometry",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))));
 
   public static final CqlFilter EXAMPLE_SEQUALS =
       CqlFilter.of(
           SpatialOperation.of(
               SpatialFunction.S_EQUALS,
               "geometry",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))));
 
   public static final CqlFilter EXAMPLE_STOUCHES =
       CqlFilter.of(
           SpatialOperation.of(
               SpatialFunction.S_TOUCHES,
               "geometry",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))));
 
   public static final CqlFilter EXAMPLE_SOVERLAPS =
       CqlFilter.of(
           SpatialOperation.of(
               SpatialFunction.S_OVERLAPS,
               "geometry",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))));
 
   public static final CqlFilter EXAMPLE_SCROSSES =
       CqlFilter.of(
           SpatialOperation.of(
               SpatialFunction.S_CROSSES,
               "geometry",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))));
 
   public static final CqlFilter EXAMPLE_SCONTAINS =
       CqlFilter.of(
           SpatialOperation.of(
               SpatialFunction.S_CONTAINS,
               "geometry",
-              SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))));
+              SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))));
 
   public static final CqlFilter EXAMPLE_NESTED_TEMPORAL =
       CqlFilter.of(
@@ -876,7 +884,7 @@ public class CqlFilterExamples {
                       "filterValues",
                       STouches.of(
                           Property.of("filterValues.location"),
-                          SpatialLiteral.of(Geometry.Bbox.of(-118.0, 33.8, -117.9, 34.0))))),
+                          SpatialLiteral.of(Bbox.of(-118.0, 33.8, -117.9, 34.0))))),
               ScalarLiteral.of(0.1)));
 
   public static final Cql2Expression EXAMPLE_IN_WITH_FUNCTION =

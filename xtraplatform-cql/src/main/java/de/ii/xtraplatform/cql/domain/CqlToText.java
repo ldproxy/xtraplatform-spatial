@@ -12,9 +12,16 @@ import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.LineString;
+import de.ii.xtraplatform.geometries.domain.PositionList;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryEncoderWkt;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,7 +29,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.threeten.extra.Interval;
 
 public class CqlToText implements CqlVisitor<String> {
@@ -101,8 +107,7 @@ public class CqlToText implements CqlVisitor<String> {
           .put(ImmutableIsNull.class, "IS NULL")
           .build();
 
-  private final Optional<
-          java.util.function.BiFunction<List<Double>, Optional<EpsgCrs>, List<Double>>>
+  private final Optional<java.util.function.BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>>>
       coordinatesTransformer;
   private final boolean isNestedFilter;
 
@@ -117,26 +122,35 @@ public class CqlToText implements CqlVisitor<String> {
   }
 
   public CqlToText(
-      java.util.function.BiFunction<List<Double>, Optional<EpsgCrs>, List<Double>>
+      java.util.function.BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>>
           coordinatesTransformer) {
     this.coordinatesTransformer = Optional.ofNullable(coordinatesTransformer);
     this.isNestedFilter = false;
   }
 
-  private java.util.function.Function<Geometry.Coordinate, Geometry.Coordinate>
-      transformIfNecessary(Optional<EpsgCrs> sourceCrs) {
-    return coordinate ->
-        coordinatesTransformer
-            .map(transformer -> transformer.apply(coordinate, sourceCrs))
-            .map(list -> Geometry.Coordinate.of(list.get(0), list.get(1)))
-            .orElse(coordinate);
+  private java.util.function.Function<Geometry<?>, Geometry<?>> transformIfNecessary(
+      Optional<EpsgCrs> sourceCrs) {
+    return geometry -> {
+      if (coordinatesTransformer.isEmpty()) {
+        return geometry;
+      }
+      return coordinatesTransformer.get().apply(geometry, sourceCrs);
+    };
   }
 
   private java.util.function.Function<List<Double>, List<Double>> transformIfNecessary2(
       Optional<EpsgCrs> sourceCrs) {
     return coordinates ->
         coordinatesTransformer
-            .map(transformer -> transformer.apply(coordinates, sourceCrs))
+            .map(
+                transformer ->
+                    transformer.apply(
+                        LineString.of(
+                            PositionList.of(
+                                Axes.XY, coordinates.stream().mapToDouble(d -> d).toArray())),
+                        sourceCrs))
+            .map(
+                ls -> Arrays.stream(((LineString) ls).getValue().getCoordinates()).boxed().toList())
             .orElse(coordinates);
   }
 
@@ -261,100 +275,24 @@ public class CqlToText implements CqlVisitor<String> {
   }
 
   @Override
-  public String visit(Geometry.Coordinate coordinate, List<String> children) {
-    return coordinate.stream().map(Object::toString).collect(Collectors.joining(" "));
+  public String visit(GeometryNode geometry, List<String> children) {
+    try {
+      return new GeometryEncoderWkt(true)
+          .encode(
+              transformIfNecessary(geometry.getCrs().or(() -> geometry.getGeometry().getCrs()))
+                  .apply(geometry.getGeometry()));
+    } catch (IOException e) {
+      throw new IllegalStateException("Error converting a geometry to CQL2-Text / WKT", e);
+    }
   }
 
   @Override
-  public String visit(Geometry.Point point, List<String> children) {
-    return String.format(
-        "POINT(%s)",
-        transformIfNecessary(point.getCrs()).apply(point.getCoordinates().get(0)).accept(this));
+  public String visit(PositionNode position, List<String> children) {
+    throw new IllegalStateException("PositionNode should not be visited here");
   }
 
   @Override
-  public String visit(Geometry.LineString lineString, List<String> children) {
-    return String.format(
-        "LINESTRING%s",
-        lineString.getCoordinates().stream()
-            .map(transformIfNecessary(lineString.getCrs()))
-            .map(coordinate -> coordinate.accept(this))
-            .collect(Collectors.joining(",", "(", ")")));
-  }
-
-  @Override
-  public String visit(Geometry.Polygon polygon, List<String> children) {
-    return String.format(
-        "POLYGON%s",
-        polygon.getCoordinates().stream()
-            .flatMap(
-                l ->
-                    Stream.of(
-                        l.stream()
-                            .map(transformIfNecessary(polygon.getCrs()))
-                            .flatMap(coordinate -> Stream.of(coordinate.accept(this)))
-                            .collect(Collectors.joining(",", "(", ")"))))
-            .collect(Collectors.joining(",", "(", ")")));
-  }
-
-  @Override
-  public String visit(Geometry.MultiPoint multiPoint, List<String> children) {
-    return String.format(
-        "MULTIPOINT%s",
-        multiPoint.getCoordinates().stream()
-            .flatMap(point -> point.getCoordinates().stream())
-            .map(transformIfNecessary(multiPoint.getCrs()))
-            .map(coordinate -> coordinate.accept(this))
-            .collect(Collectors.joining(",", "(", ")")));
-  }
-
-  @Override
-  public String visit(Geometry.MultiLineString multiLineString, List<String> children) {
-    return String.format(
-        "MULTILINESTRING%s",
-        multiLineString.getCoordinates().stream()
-            .flatMap(
-                ls ->
-                    Stream.of(
-                        ls.getCoordinates().stream()
-                            .map(transformIfNecessary(multiLineString.getCrs()))
-                            .map(coordinate -> coordinate.accept(this))
-                            .collect(Collectors.joining(",", "(", ")"))))
-            .collect(Collectors.joining(",", "(", ")")));
-  }
-
-  @Override
-  public String visit(Geometry.MultiPolygon multiPolygon, List<String> children) {
-    return String.format(
-        "MULTIPOLYGON%s",
-        multiPolygon.getCoordinates().stream()
-            .flatMap(
-                p ->
-                    Stream.of(
-                        p.getCoordinates().stream()
-                            .flatMap(
-                                l ->
-                                    Stream.of(
-                                        l.stream()
-                                            .map(transformIfNecessary(multiPolygon.getCrs()))
-                                            .flatMap(
-                                                coordinate -> Stream.of(coordinate.accept(this)))
-                                            .collect(Collectors.joining(",", "(", ")"))))
-                            .collect(Collectors.joining(",", "(", ")"))))
-            .collect(Collectors.joining(",", "(", ")")));
-  }
-
-  @Override
-  public String visit(Geometry.GeometryCollection geometryCollection, List<String> children) {
-    return String.format(
-        "GEOMETRYCOLLECTION%s",
-        geometryCollection.getCoordinates().stream()
-            .map(geom -> visit((Geometry<?>) geom, children))
-            .collect(Collectors.joining(",", "(", ")")));
-  }
-
-  @Override
-  public String visit(Geometry.Bbox bbox, List<String> children) {
+  public String visit(Bbox bbox, List<String> children) {
     return String.format(
         "BBOX%s",
         transformIfNecessary2(bbox.getCrs()).apply(bbox.getCoordinates()).stream()

@@ -10,11 +10,10 @@ package de.ii.xtraplatform.features.domain;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.PropertyBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 public abstract class FeatureObjectEncoderBase<
         T extends SchemaBase<T>,
@@ -67,11 +66,7 @@ public abstract class FeatureObjectEncoderBase<
     }
 
     this.currentObjectOrArray =
-        createProperty(
-            PropertyBase.Type.OBJECT,
-            context.path(),
-            context.schema().get(),
-            context.geometryType().orElse(null));
+        createProperty(PropertyBase.Type.OBJECT, context.path(), context.schema().get(), null);
   }
 
   @Override
@@ -95,6 +90,15 @@ public abstract class FeatureObjectEncoderBase<
   }
 
   @Override
+  public final void onGeometry(ModifiableContext<T, U> context) {
+    if (context.schema().isEmpty()) {
+      return;
+    }
+
+    createProperty(Type.GEOMETRY, context.path(), context.schema().get(), context.geometry());
+  }
+
+  @Override
   public final void onValue(ModifiableContext<T, U> context) {
     if (context.schema().isEmpty() || Objects.isNull(context.value())) {
       return;
@@ -112,9 +116,8 @@ public abstract class FeatureObjectEncoderBase<
     return createProperty(type, path, schema, null, null, ImmutableMap.of());
   }
 
-  private V createProperty(
-      Property.Type type, List<String> path, T schema, SimpleFeatureGeometry geometryType) {
-    return createProperty(type, path, schema, null, geometryType, ImmutableMap.of());
+  private V createProperty(Type type, List<String> path, T schema, Geometry<?> geometry) {
+    return createProperty(type, path, schema, null, geometry, ImmutableMap.of());
   }
 
   private V createProperty(
@@ -127,22 +130,16 @@ public abstract class FeatureObjectEncoderBase<
       List<String> path,
       T schema,
       String value,
-      SimpleFeatureGeometry geometryType,
+      Geometry<?> geometry,
       Map<String, String> transformed) {
 
-    /*return currentFeature.getProperties()
-    .stream()
-    .filter(t -> t.getType() == type && t.getSchema().isPresent() && Objects
-        .equals(t.getSchema().get(), schema) && !t.getSchema().get().isGeometry())
-    .findFirst()
-    .orElseGet(() -> {*/
     V property = createProperty();
     property
         .type(type)
         .schema(schema)
         .propertyPath(path)
         .value(value)
-        .geometryType(Optional.ofNullable(geometryType))
+        .geometry(geometry)
         .transformed(transformed);
 
     if (Objects.nonNull(currentObjectOrArray)) {
