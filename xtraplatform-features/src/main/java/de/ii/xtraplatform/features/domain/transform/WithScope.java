@@ -41,7 +41,9 @@ public class WithScope implements SchemaVisitorTopDown<FeatureSchema, FeatureSch
     if (!schema.hasOneOf(scopes)
         && !schema.isId()
         && !schema.isEmbeddedId()
-        && !schema.isObject()) {
+        && (!schema.isObject()
+            || scopes.contains(Scope.RETURNABLE)
+            || scopes.contains(Scope.RECEIVABLE))) {
       return null;
     }
 
