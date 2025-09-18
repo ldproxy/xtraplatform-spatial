@@ -48,7 +48,10 @@ public interface FeatureTransactions {
   }
 
   MutationResult createFeatures(
-      String featureType, FeatureTokenSource featureTokenSource, EpsgCrs crs);
+      String featureType,
+      FeatureTokenSource featureTokenSource,
+      EpsgCrs crs,
+      Optional<String> featureId);
 
   MutationResult updateFeature(
       String type, String id, FeatureTokenSource featureTokenSource, EpsgCrs crs, boolean partial);

@@ -48,7 +48,7 @@ public class FeatureMutationsSql {
   }
 
   public Reactive.Transformer<FeatureDataSql, String> getCreatorFlow(
-      SqlQueryMapping schema, Object executionContext, EpsgCrs crs) {
+      SqlQueryMapping schema, Object executionContext, Optional<String> id, EpsgCrs crs) {
 
     RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
 
@@ -57,7 +57,7 @@ public class FeatureMutationsSql {
     return sqlClient
         .get()
         .getMutationFlow(
-            feature -> createInstanceInserts(feature, rowCursor, Optional.empty(), crs),
+            feature -> createInstanceInserts(feature, rowCursor, id, crs, false),
             executionContext,
             primaryKey,
             Optional.empty());
@@ -73,7 +73,7 @@ public class FeatureMutationsSql {
     return sqlClient
         .get()
         .getMutationFlow(
-            feature -> createInstanceInserts(feature, rowCursor, Optional.of(id), crs),
+            feature -> createInstanceInserts(feature, rowCursor, Optional.of(id), crs, true),
             executionContext,
             primaryKey,
             Optional.of(id));
@@ -89,12 +89,15 @@ public class FeatureMutationsSql {
   }
 
   List<Supplier<Tuple<String, Consumer<String>>>> createInstanceInserts(
-      FeatureDataSql feature, RowCursor rowCursor, Optional<String> id, EpsgCrs crs) {
-    boolean withId = id.isPresent();
+      FeatureDataSql feature,
+      RowCursor rowCursor,
+      Optional<String> id,
+      EpsgCrs crs,
+      boolean deleteFirst) {
     SqlQuerySchema mainTable = feature.getMapping().getMainTable();
 
     Stream<Supplier<Tuple<String, Consumer<String>>>> instance =
-        withId
+        deleteFirst
             ? Stream.concat(
                 Stream.of(createInstanceDelete(feature.getMapping(), id.get())),
                 createObjectInserts(feature, mainTable, rowCursor, id, crs).stream())
