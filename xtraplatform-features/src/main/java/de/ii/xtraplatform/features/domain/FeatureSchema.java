@@ -336,7 +336,11 @@ public interface FeatureSchema
   @Value.Derived
   @Value.Auxiliary
   default boolean receivable() {
-    return !isConstant() && !getExcludedScopes().contains(Scope.RECEIVABLE);
+    return !isConstant()
+        && !isId()
+        && !getExcludedScopes().contains(Scope.RECEIVABLE)
+        && !isMultiSource()
+        && getTransformations().stream().allMatch(PropertyTransformation::isInternal);
   }
 
   @JsonIgnore

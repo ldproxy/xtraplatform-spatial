@@ -60,6 +60,7 @@ public class SqlPathParser {
     JOINTYPE,
     ROOT,
     JOINED,
+    GENERATED,
   }
 
   private interface Tokens {
@@ -89,6 +90,8 @@ public class SqlPathParser {
     String FILTER_FLAG = String.format("\\{filter=(?<%s>.+?)\\}", MatcherGroups.FILTER);
     String CONSTANT_FLAG = String.format("\\{constant='(?<%s>.+?)'\\}", MatcherGroups.CONSTANT);
     String INSERTS_FLAG = String.format("\\{inserts=(?<%s>.+?)\\}", MatcherGroups.INSERTS);
+    String GENERATED_FLAG =
+        String.format("\\{generated=(?<%s>true|false)\\}", MatcherGroups.GENERATED);
     // TODO: remove
     String JUNCTION_FLAG = "\\{junction\\}";
     String JOIN_TYPE_FLAG =
@@ -183,6 +186,8 @@ public class SqlPathParser {
 
     Pattern CONSTANT_FLAG = Pattern.compile(PatternStrings.CONSTANT_FLAG);
 
+    Pattern GENERATED_FLAG = Pattern.compile(PatternStrings.GENERATED_FLAG);
+
     Pattern INSERTS_FLAG = Pattern.compile(PatternStrings.INSERTS_FLAG);
 
     Pattern PRIMARY_KEY_FLAG = Pattern.compile(PatternStrings.PRIMARY_KEY_FLAG);
@@ -253,7 +258,8 @@ public class SqlPathParser {
             .sortKeyUnique(true)
             .primaryKey("")
             .junction(false)
-            .constantValue(getConstantFlag(flags));
+            .constantValue(getConstantFlag(flags))
+            .generated(getGeneratedFlag(flags));
 
         return builder.build();
       }
@@ -530,6 +536,16 @@ public class SqlPathParser {
 
     if (matcher.find()) {
       return Optional.of(matcher.group(MatcherGroups.CONSTANT.name()));
+    }
+
+    return Optional.empty();
+  }
+
+  public Optional<Boolean> getGeneratedFlag(String flags) {
+    Matcher matcher = Patterns.GENERATED_FLAG.matcher(flags);
+
+    if (matcher.find()) {
+      return Optional.of(Boolean.parseBoolean(matcher.group(MatcherGroups.GENERATED.name())));
     }
 
     return Optional.empty();
