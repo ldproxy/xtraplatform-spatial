@@ -172,6 +172,9 @@ import org.threeten.extra.Interval;
  *     <p>### Dataset Changes
  *     <p>{@docVar:datasetChanges}
  *     <p>{@docTable:datasetChanges}
+ *     <p>### Query Generation
+ *     <p>Options for query generation.
+ *     <p>{@docTable:queryGeneration}
  *     <p>### Source Path Defaults
  *     <p>Defaults for the path expressions in `sourcePath`, also see [Source Path
  *     Syntax](#path-syntax).
@@ -202,13 +205,50 @@ import org.threeten.extra.Interval;
  *     <p>Additional columns for CRUD inserts can be set by adding `{inserts=columnName=value}`
  *     after the table name. The value may be a constant or a function, for example
  *     `{inserts=id=gen_random_uuid()&featuretype='type1'}`.
+ *     <p>Also regarding CRUD, if a property with `role: ID` does match the primary key of the main
+ *     table, but it should not be automatically generated on insert, add `{generated=false}` to the
+ *     `sourcePath` of that property.
  *     <p>All table and column names must be unquoted identifiers.
  *     <p>Arbitrary SQL expressions for values are supported, for example to apply function calls.
  *     As an example, this `[EXPRESSION]{sql=$T$.length+55.5}` (instead of just `length`) would add
  *     a fixed amount to the length column. The prefix `$T$` will be replaced with the table alias.
- *     <p>### Query Generation
- *     <p>Options for query generation.
- *     <p>{@docTable:queryGeneration}
+ *     <p>### CRUD
+ *     <p>If the features of this provider should be mutated via the API, `datasetChanges.mode` has
+ *     to be set to `CRUD`. Also consider the following paragraphs to understand which adjustments
+ *     to the mapping might be necessary for your use case.
+ *     <p>#### Table types
+ *     <p><code>
+ * - `main` Main tables represent the instances of a feature type. They are defined in the
+ *   upper-most `sourcePath` of a type.
+ * - `secondary` Secondary tables are connected to main tables via joins, either directly or
+ *   through a chain of secondary and/or junction tables.
+ * - `junction` Junction tables usually represent m:n relations. They only contain two foreign keys
+ *   of main and/or secondary tables.
+ *     </code>
+ *     <p>#### Primary keys
+ *     <p>It is expected that every main and secondary table has a primary key, and that the value
+ *     for the primary key is automatically generated on insert. Usually
+ *     `sourcePathDefaults.primaryKey` should match the primary key name from the database. If not
+ *     every table has the same primary key, it can be overridden, see [Source Path
+ *     Syntax](#source-path-syntax).
+ *     <p>In rare cases, when another column than the primary key is used in join conditions, the
+ *     `primaryKey` in the mapping needs to match that column and differ from the actual primary
+ *     key. An example would be a junction table that connects feature instances by id.
+ *     <p>#### Feature ids
+ *     <p>There are four variants for creating new feature ids on insert:
+ *     <p><code>
+ * - **Primary key, auto-generated** The `sourcePath` of the property with `role: ID` matches
+ *   the `primaryKey` and new values are automatically generated on insert by the database.
+ * - **Primary key, user-defined** The `sourcePath` of the property with `role: ID` matches the
+ *   `primaryKey` and has the flag `{generated=false}`, the value from the payload given by the
+ *   user is inserted.
+ * - **Other column, auto-generated** The `sourcePath` of the property with `role: ID` does not
+ *   match the `primaryKey`, and the `sourcePath` of the main table has a matching `inserts` flag
+ *   with a generation function, e.g. `{inserts=id=gen_random_uuid()'}` (see [Source Path Syntax](#source-path-syntax)).
+ * - **Other column, user-defined** The `sourcePath` of the property with `role: ID` does not match
+ *   the `primaryKey`, and the `sourcePath` of the main table does not have a matching `inserts`
+ *   flag, the value from the payload given by the user is inserted.
+ *     </code>
  * @cfgPropertiesAdditionalDe ### Connection Info
  *     <p>Das Connection-Info-Objekt für SQL-Datenbanken wird wie folgt beschrieben:
  *     <p>{@docTable:connectionInfo}
@@ -218,6 +258,9 @@ import org.threeten.extra.Interval;
  *     <p>### Datensatzänderungen
  *     <p>{@docVar:datasetChanges}
  *     <p>{@docTable:datasetChanges}
+ *     <p>### Query-Generierung
+ *     <p>Optionen für die Query-Generierung in `queryGeneration`.
+ *     <p>{@docTable:queryGeneration}
  *     <p>### SQL-Pfad-Defaults
  *     <p>Defaults für die Pfad-Ausdrücke in `sourcePath`, siehe auch
  *     [SQL-Pfad-Syntax](#path-syntax).
@@ -254,14 +297,55 @@ import org.threeten.extra.Interval;
  *     <p>Zusätzliche Spalten für CRUD Inserts können durch den Zusatz `{inserts=Spaltenname=Wert}`
  *     nach dem Tabellennamen angegeben werden. Der Wert kann eine Konstante oder eine Funktion
  *     sein, z.B. `{inserts=id=gen_random_uuid()&featuretype='type1'}`.
+ *     <p>Auch im Hinblick auf CRUD: wenn eine Eigenschaft mit `role: ID` dem Primärschlüssel der
+ *     Haupttabelle entspricht, aber der Wert beim Einfügen nicht automatisch generiert werden soll,
+ *     dann ist für diese Eigenschaft in `sourcePath` das Flag `{generated=false}` anzugeben.
  *     <p>Alle Tabellen- und Spaltennamen müssen "unquoted Identifier" sein.
  *     <p>Beliebige SQL-Ausdrücke für Werte sind möglich, z.B. um Funktionsaufrufe anzuwenden. So
  *     würde z.B. dieser Ausdruck `[EXPRESSION]{sql=$T$.length+55.5}` (anstatt nur `length`) einen
  *     fixen Wert zur Längen-Spalte addieren. Der Präfix `$T$` wird durch den Tabellen-Alias
  *     ersetzt.
- *     <p>### Query-Generierung
- *     <p>Optionen für die Query-Generierung in `queryGeneration`.
- *     <p>{@docTable:queryGeneration}
+ *     <p>### CRUD
+ *     <p>Wenn die Features dieses Providers über die API verändert werden sollen, muss
+ *     `datasetChanges.mode` auf `CRUD` gesetzt werden. Außerdem sind die folgenden Absätze zu
+ *     beachten, um zu verstehen, welche Anpassungen am Mapping für den eigenen Anwendungsfall
+ *     notwendig sind.
+ *     <p>#### Tabellentypen
+ *     <p><code>
+ * - `main` Haupttabellen repräsentieren die Instanzen einer Objektart. Sie sind im
+ *   obersten `sourcePath` einer Objektart definiert.
+ * - `secondary` Sekundärtabellen sind über Joins mit Haupttabellen verbunden, entweder direkt
+ *   oder über eine Kette von Sekundär- und/oder Junction-Tabellen.
+ * - `junction` Junction-Tabellen repräsentieren in der Regel m:n-Beziehungen. Sie enthalten
+ *   ausschließlich zwei Fremdschlüssel von Haupt- und/oder Sekundärtabellen.
+ *     </code>
+ *     <p>#### Primärschlüssel
+ *     <p>Es wird erwartet, dass jede Haupt- und Sekundärtabelle einen Primärschlüssel hat und dass
+ *     der Wert für den Primärschlüssel beim Einfügen automatisch generiert wird. In der Regel
+ *     sollte `sourcePathDefaults.primaryKey` dem Primärschlüssel aus der Datenbank entsprechen.
+ *     Wenn nicht jede Tabelle denselben Primärschlüssel hat, kann dieser überschrieben werden,
+ *     siehe [SQL-Pfad-Syntax](#sql-pfad-syntax).
+ *     <p>In seltenen Fällen, wenn in Join-Bedingungen eine andere Spalte als der Primärschlüssel
+ *     verwendet wird, muss der `primaryKey` im Mapping dieser Spalte entsprechen und sich vom
+ *     tatsächlichen Primärschlüssel unterscheiden. Ein Beispiel wäre eine Junction-Tabelle, die
+ *     Feature-Instanzen über deren Ids verbindet.
+ *     <p>#### Feature-Ids
+ *     <p>Es gibt vier Varianten, um bei Inserts neue Feature-Ids zu erzeugen:
+ *     <p><code>
+ * - **Primärschlüssel, automatisch generiert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht dem `primaryKey` und neue Werte werden beim Einfügen automatisch von der
+ *   Datenbank generiert.
+ * - **Primärschlüssel, benutzerdefiniert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht dem `primaryKey` und hat das Flag `{generated=false}`, der Wert aus dem
+ *   Payload wird eingefügt.
+ * - **Andere Spalte, automatisch generiert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat ein
+ *   entsprechendes `inserts`-Flag mit einer Generierungsfunktion, z.B.
+ *   `{inserts=id=gen_random_uuid()'}` (siehe [SQL-Pfad-Syntax](#sql-pfad-syntax)).
+ * - **Andere Spalte, benutzerdefiniert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat kein
+ *   entsprechendes `inserts`-Flag, der Wert aus der Nutzlast wird eingefügt.
+ *     </code>
  * @ref:cfgProperties {@link de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData}
  * @ref:connectionInfo {@link de.ii.xtraplatform.features.sql.domain.ImmutableConnectionInfoSql}
  * @ref:pool {@link de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings}
