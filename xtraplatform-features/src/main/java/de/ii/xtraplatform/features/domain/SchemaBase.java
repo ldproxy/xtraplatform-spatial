@@ -7,20 +7,14 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.ANY;
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.LINE_STRING;
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.MULTI_LINE_STRING;
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.MULTI_POINT;
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.MULTI_POLYGON;
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.POINT;
-import static de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry.POLYGON;
+import static de.ii.xtraplatform.geometries.domain.GeometryType.ANY;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.docs.DocFile;
 import de.ii.xtraplatform.docs.DocIgnore;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -153,7 +147,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
 
   Optional<Type> getValueType();
 
-  Optional<SimpleFeatureGeometry> getGeometryType();
+  Optional<GeometryType> getGeometryType();
 
   Optional<String> getFormat();
 
@@ -379,7 +373,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
-  default List<SimpleFeatureGeometry> getGeometryTypes() {
+  default List<GeometryType> getGeometryTypes() {
     return getPrimaryGeometries().stream()
         .map(SchemaBase::getGeometryType)
         .filter(Optional::isPresent)
@@ -391,7 +385,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
-  default SimpleFeatureGeometry getEffectiveGeometryType() {
+  default GeometryType getEffectiveGeometryType() {
     return getGeometryTypes().stream().reduce((a, b) -> ANY).orElse(ANY);
   }
 
@@ -399,30 +393,16 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default Optional<Integer> getEffectiveGeometryDimension() {
-    switch (getGeometryTypes().stream()
+    return getGeometryTypes().stream()
+        .map(GeometryType::getGeometryDimension)
         .reduce(
             (a, b) -> {
-              if (a == POINT && b == MULTI_POINT) return MULTI_POINT;
-              if (b == POINT && a == MULTI_POINT) return MULTI_POINT;
-              if (a == LINE_STRING && b == MULTI_LINE_STRING) return MULTI_LINE_STRING;
-              if (b == LINE_STRING && a == MULTI_LINE_STRING) return MULTI_LINE_STRING;
-              if (a == POLYGON && b == MULTI_POLYGON) return MULTI_POLYGON;
-              if (b == POLYGON && a == MULTI_POLYGON) return MULTI_POLYGON;
-              return ANY;
+              if (a.isPresent() && b.isPresent()) {
+                return a.get().equals(b.get()) ? a : Optional.empty();
+              }
+              return Optional.empty();
             })
-        .orElse(ANY)) {
-      case POINT:
-      case MULTI_POINT:
-        return Optional.of(0);
-      case LINE_STRING:
-      case MULTI_LINE_STRING:
-        return Optional.of(1);
-      case POLYGON:
-      case MULTI_POLYGON:
-        return Optional.of(2);
-      default:
-        return Optional.empty();
-    }
+        .flatMap(dim -> dim);
   }
 
   @JsonIgnore
@@ -833,7 +813,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default boolean isSimpleFeatureGeometry() {
-    return getGeometryType().isPresent() && !is3dGeometry();
+    return getGeometryType().filter(GeometryType::isSimpleFeature).isPresent();
   }
 
   @JsonIgnore
@@ -841,7 +821,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Auxiliary
   default boolean is3dGeometry() {
     return getGeometryType().isPresent()
-        && getGeometryType().get() == SimpleFeatureGeometry.MULTI_POLYGON
+        && getGeometryType().get() == GeometryType.MULTI_POLYGON
         && getConstraints().isPresent()
         && getConstraints().get().isClosed()
         && getConstraints().get().isComposite();

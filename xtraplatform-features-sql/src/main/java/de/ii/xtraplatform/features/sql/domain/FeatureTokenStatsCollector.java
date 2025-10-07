@@ -85,22 +85,7 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
     if (Objects.nonNull(context.value())) {
       String value = context.value();
 
-      if (context.inGeometry()) {
-        if (axis == 0 && (xmin.isEmpty() || value.compareTo(xmin) < 0)) {
-          this.xmin = value;
-        }
-        if (axis == 0 && (xmax.isEmpty() || value.compareTo(xmax) > 0)) {
-          this.xmax = value;
-        }
-        if (axis == 1 && (ymin.isEmpty() || value.compareTo(ymin) < 0)) {
-          this.ymin = value;
-        }
-        if (axis == 1 && (ymax.isEmpty() || value.compareTo(ymax) > 0)) {
-          this.ymax = value;
-        }
-
-        this.axis = (axis + 1) % dim;
-      } else if (hasRole(context, Role.PRIMARY_INSTANT)) {
+      if (hasRole(context, Role.PRIMARY_INSTANT)) {
         if (start.isEmpty() || value.compareTo(start) < 0) {
           this.start = value;
         }
@@ -119,6 +104,28 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
     }
 
     super.onValue(context);
+  }
+
+  @Override
+  public void onGeometry(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
+    if (Objects.nonNull(context.value())) {
+      String value = context.value();
+
+      if (axis == 0 && (xmin.isEmpty() || value.compareTo(xmin) < 0)) {
+        this.xmin = value;
+      }
+      if (axis == 0 && (xmax.isEmpty() || value.compareTo(xmax) > 0)) {
+        this.xmax = value;
+      }
+      if (axis == 1 && (ymin.isEmpty() || value.compareTo(ymin) < 0)) {
+        this.ymin = value;
+      }
+      if (axis == 1 && (ymax.isEmpty() || value.compareTo(ymax) > 0)) {
+        this.ymax = value;
+      }
+
+      this.axis = (axis + 1) % dim;
+    }
   }
 
   private boolean hasRole(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context, Role role) {

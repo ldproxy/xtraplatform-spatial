@@ -18,6 +18,7 @@ import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
 import de.ii.xtraplatform.features.domain.transform.TokenSliceTransformerChain;
 import de.ii.xtraplatform.features.domain.transform.TransformerChain;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.List;
@@ -196,8 +197,7 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
       if (context.schema().filter(schema -> schema.isObject() || schema.isSpatial()).isPresent()) {
         FeatureSchema schema = context.schema().get();
 
-        downstream.onObjectStart(
-            schema.getFullPath(), context.geometryType(), context.geometryDimension());
+        downstream.onObjectStart(schema.getFullPath());
       }
     }
   }
@@ -238,6 +238,20 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
       if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
         FeatureSchema schema = context.schema().get();
         downstream.onArrayEnd(schema.getFullPath());
+      }
+    }
+  }
+
+  @Override
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    int pos = context.pos();
+    if (pos > -1) {
+      downstream.next(pos, context.parentPos());
+
+      if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
+        FeatureSchema schema = context.schema().get();
+        Geometry<?> geometry = context.geometry();
+        downstream.onGeometry(schema.getFullPath(), geometry);
       }
     }
   }

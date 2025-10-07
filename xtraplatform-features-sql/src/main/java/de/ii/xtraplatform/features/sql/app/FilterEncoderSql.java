@@ -17,9 +17,9 @@ import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.primitives.Doubles;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
 import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
@@ -32,9 +32,7 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlToText;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry;
-import de.ii.xtraplatform.cql.domain.Geometry.Coordinate;
-import de.ii.xtraplatform.cql.domain.ImmutablePolygon;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
@@ -62,6 +60,12 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryTable;
+import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.PositionList;
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -90,7 +94,7 @@ public class FilterEncoderSql {
   private final CrsInfo crsInfo;
   private final Cql cql;
   private final String accentiCollation;
-  BiFunction<List<Double>, Optional<EpsgCrs>, List<Double>> coordinatesTransformer;
+  BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
       EpsgCrs nativeCrs,
@@ -145,25 +149,26 @@ public class FilterEncoderSql {
             cql.mapEnvelopes(cqlFilter, crsInfo), sqlDialect.getTemporalOperators()));
   }
 
-  private List<Double> transformCoordinatesIfNecessary(
-      List<Double> coordinates, Optional<EpsgCrs> sourceCrs) {
+  private Geometry<?> transformCoordinatesIfNecessary(
+      Geometry<?> geometry, Optional<EpsgCrs> sourceCrs) {
 
     if (sourceCrs.isPresent() && !Objects.equals(sourceCrs.get(), nativeCrs)) {
       Optional<CrsTransformer> transformer =
           crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
       if (transformer.isPresent()) {
-        double[] transformed =
-            transformer.get().transform(Doubles.toArray(coordinates), coordinates.size() / 2, 2);
+        Geometry<?> transformed =
+            geometry.accept(
+                new CoordinatesTransformer(
+                    ImmutableCrsTransform.of(Optional.empty(), transformer.get())));
         if (Objects.isNull(transformed)) {
           throw new IllegalArgumentException(
-              String.format(
-                  "Filter is invalid. Coordinates cannot be transformed: %s", coordinates));
+              String.format("Filter is invalid. Geometry cannot be transformed: %s", geometry));
         }
 
-        return Doubles.asList(transformed);
+        return transformed;
       }
     }
-    return coordinates;
+    return geometry;
   }
 
   public Optional<String> encodeRelationFilter(
@@ -934,77 +939,23 @@ public class FilterEncoderSql {
     }
 
     @Override
-    public String visit(Geometry.Point point, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(point, children), nativeCrs.getCode());
+    public String visit(GeometryNode geometry, List<String> children) {
+      return sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
     }
 
     @Override
-    public String visit(Geometry.LineString lineString, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(lineString, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.Polygon polygon, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(polygon, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.MultiPoint multiPoint, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(multiPoint, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.MultiLineString multiLineString, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(multiLineString, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.MultiPolygon multiPolygon, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(multiPolygon, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.GeometryCollection geometryCollection, List<String> children) {
-      return sqlDialect.applyToWkt(
-          String.format(
-              "GEOMETRYCOLLECTION%s",
-              geometryCollection.getCoordinates().stream()
-                  .map(
-                      geom -> {
-                        if (geom instanceof Geometry.Point) {
-                          return super.visit((Geometry.Point) geom, children);
-                        } else if (geom instanceof Geometry.MultiPoint) {
-                          return super.visit((Geometry.MultiPoint) geom, children);
-                        } else if (geom instanceof Geometry.LineString) {
-                          return super.visit((Geometry.LineString) geom, children);
-                        } else if (geom instanceof Geometry.MultiLineString) {
-                          return super.visit((Geometry.MultiLineString) geom, children);
-                        } else if (geom instanceof Geometry.Polygon) {
-                          return super.visit((Geometry.Polygon) geom, children);
-                        } else if (geom instanceof Geometry.MultiPolygon) {
-                          return super.visit((Geometry.MultiPolygon) geom, children);
-                        }
-                        throw new IllegalStateException(
-                            "unsupported spatial type: " + geom.getClass().getSimpleName());
-                      })
-                  .collect(Collectors.joining(",", "(", ")"))),
-          nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.Bbox bbox, List<String> children) {
+    public String visit(Bbox bbox, List<String> children) {
       List<Double> c = bbox.getCoordinates();
-
-      List<Coordinate> coordinates =
-          ImmutableList.of(
-              Coordinate.of(c.get(0), c.get(1)),
-              Coordinate.of(c.get(2), c.get(1)),
-              Coordinate.of(c.get(2), c.get(3)),
-              Coordinate.of(c.get(0), c.get(3)),
-              Coordinate.of(c.get(0), c.get(1)));
-      Geometry.Polygon polygon =
-          new ImmutablePolygon.Builder().addCoordinates(coordinates).crs(bbox.getCrs()).build();
-      return visit(polygon, ImmutableList.of());
+      Polygon polygon =
+          Polygon.of(
+              List.of(
+                  PositionList.of(
+                      Axes.XY,
+                      new double[] {
+                        c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0),
+                        c.get(3), c.get(0), c.get(1)
+                      })));
+      return visit(GeometryNode.of(polygon), ImmutableList.of());
     }
 
     @Override
@@ -1997,77 +1948,23 @@ public class FilterEncoderSql {
     }
 
     @Override
-    public String visit(Geometry.Point point, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(point, children), nativeCrs.getCode());
+    public String visit(GeometryNode geometry, List<String> children) {
+      return sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
     }
 
     @Override
-    public String visit(Geometry.LineString lineString, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(lineString, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.Polygon polygon, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(polygon, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.MultiPoint multiPoint, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(multiPoint, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.MultiLineString multiLineString, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(multiLineString, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.MultiPolygon multiPolygon, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(multiPolygon, children), nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.GeometryCollection geometryCollection, List<String> children) {
-      return sqlDialect.applyToWkt(
-          String.format(
-              "GEOMETRYCOLLECTION%s",
-              geometryCollection.getCoordinates().stream()
-                  .map(
-                      geom -> {
-                        if (geom instanceof Geometry.Point) {
-                          return super.visit((Geometry.Point) geom, children);
-                        } else if (geom instanceof Geometry.MultiPoint) {
-                          return super.visit((Geometry.MultiPoint) geom, children);
-                        } else if (geom instanceof Geometry.LineString) {
-                          return super.visit((Geometry.LineString) geom, children);
-                        } else if (geom instanceof Geometry.MultiLineString) {
-                          return super.visit((Geometry.MultiLineString) geom, children);
-                        } else if (geom instanceof Geometry.Polygon) {
-                          return super.visit((Geometry.Polygon) geom, children);
-                        } else if (geom instanceof Geometry.MultiPolygon) {
-                          return super.visit((Geometry.MultiPolygon) geom, children);
-                        }
-                        throw new IllegalStateException(
-                            "unsupported spatial type: " + geom.getClass().getSimpleName());
-                      })
-                  .collect(Collectors.joining(",", "(", ")"))),
-          nativeCrs.getCode());
-    }
-
-    @Override
-    public String visit(Geometry.Bbox bbox, List<String> children) {
+    public String visit(Bbox bbox, List<String> children) {
       List<Double> c = bbox.getCoordinates();
-
-      List<Coordinate> coordinates =
-          ImmutableList.of(
-              Coordinate.of(c.get(0), c.get(1)),
-              Coordinate.of(c.get(2), c.get(1)),
-              Coordinate.of(c.get(2), c.get(3)),
-              Coordinate.of(c.get(0), c.get(3)),
-              Coordinate.of(c.get(0), c.get(1)));
-      Geometry.Polygon polygon =
-          new ImmutablePolygon.Builder().addCoordinates(coordinates).crs(bbox.getCrs()).build();
-      return visit(polygon, ImmutableList.of());
+      Polygon polygon =
+          Polygon.of(
+              List.of(
+                  PositionList.of(
+                      Axes.XY,
+                      new double[] {
+                        c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0),
+                        c.get(3), c.get(0), c.get(1)
+                      })));
+      return visit(GeometryNode.of(polygon), ImmutableList.of());
     }
 
     @Override

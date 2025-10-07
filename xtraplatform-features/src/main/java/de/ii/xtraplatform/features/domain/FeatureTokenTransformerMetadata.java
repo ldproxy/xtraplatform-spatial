@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
+import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,12 +22,7 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   private final Consumer<BoundingBox> spatialExtentSetter;
   private final Consumer<Tuple<Instant, Instant>> temporalExtentSetter;
   private Optional<EpsgCrs> crs;
-  private int axis = 0;
-  private int dim = 2;
-  private String xmin = "";
-  private String ymin = "";
-  private String xmax = "";
-  private String ymax = "";
+  private double[][] minMax = null;
   private String start = "";
   private String end = "";
   private boolean isSingleFeature = false;
@@ -46,8 +42,6 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
 
   @Override
   public void onStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    // TODO from CRS, requires crsInfo or add info to query
-    this.dim = context.geometryDimension().orElse(2);
     this.crs = context.query().getCrs();
     this.isSingleFeature = context.metadata().isSingleFeature();
 
@@ -57,14 +51,23 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   @Override
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     try {
-      if (!xmin.isEmpty() && !ymin.isEmpty() && !xmax.isEmpty() && !ymax.isEmpty()) {
+      if (minMax != null) {
         spatialExtentSetter.accept(
-            BoundingBox.of(
-                Double.parseDouble(xmin),
-                Double.parseDouble(ymin),
-                Double.parseDouble(xmax),
-                Double.parseDouble(ymax),
-                crs.orElse(dim == 2 ? OgcCrs.CRS84 : OgcCrs.CRS84h)));
+            minMax[0].length == 2
+                ? BoundingBox.of(
+                    minMax[0][0],
+                    minMax[0][1],
+                    minMax[1][0],
+                    minMax[1][1],
+                    crs.orElse(OgcCrs.CRS84))
+                : BoundingBox.of(
+                    minMax[0][0],
+                    minMax[0][1],
+                    minMax[0][2],
+                    minMax[1][0],
+                    minMax[1][1],
+                    minMax[1][2],
+                    crs.orElse(OgcCrs.CRS84h)));
       }
     } catch (Throwable ignore) {
     }
@@ -91,26 +94,34 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   }
 
   @Override
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    if (context.schema().filter(SchemaBase::isPrimaryGeometry).isPresent()
+        && Objects.nonNull(context.geometry())) {
+      double[][] minMax2 = null;
+      minMax2 = context.geometry().accept(new MinMaxDeriver());
+      if (minMax == null) {
+        minMax = minMax2;
+      } else {
+        for (int i = 0; i < minMax[0].length; i++) {
+          if (minMax2[0][i] < minMax[0][i]) {
+            minMax[0][i] = minMax2[0][i];
+          }
+          if (minMax2[1][i] > minMax[1][i]) {
+            minMax[1][i] = minMax2[1][i];
+          }
+        }
+      }
+    }
+
+    super.onGeometry(context);
+  }
+
+  @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (Objects.nonNull(context.value())) {
       String value = context.value();
 
-      if (context.inGeometry()) {
-        if (axis == 0 && (xmin.isEmpty() || value.compareTo(xmin) < 0)) {
-          this.xmin = value;
-        }
-        if (axis == 0 && (xmax.isEmpty() || value.compareTo(xmax) > 0)) {
-          this.xmax = value;
-        }
-        if (axis == 1 && (ymin.isEmpty() || value.compareTo(ymin) < 0)) {
-          this.ymin = value;
-        }
-        if (axis == 1 && (ymax.isEmpty() || value.compareTo(ymax) > 0)) {
-          this.ymax = value;
-        }
-
-        this.axis = (axis + 1) % dim;
-      } else if (context.schema().filter(SchemaBase::isPrimaryInstant).isPresent()) {
+      if (context.schema().filter(SchemaBase::isPrimaryInstant).isPresent()) {
         if (start.isEmpty() || value.compareTo(start) < 0) {
           this.start = value;
         }

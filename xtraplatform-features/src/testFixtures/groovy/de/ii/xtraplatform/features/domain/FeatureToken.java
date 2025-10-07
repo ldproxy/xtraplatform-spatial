@@ -9,7 +9,7 @@ package de.ii.xtraplatform.features.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -32,10 +32,7 @@ public interface FeatureToken {
   Type getValueType();
 
   @Nullable
-  SimpleFeatureGeometry getGeometryType();
-
-  @Nullable
-  Integer getGeometryDimension();
+  Geometry<?> getGeometry();
 
   @Nullable
   String getOnlyIf();

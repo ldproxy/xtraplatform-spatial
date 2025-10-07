@@ -66,13 +66,11 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onArrayStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (!context.inGeometry()) {
-      LOGGER.trace("START ARRAY {}", context.pathAsString());
-    }
+    LOGGER.trace("START ARRAY {}", context.pathAsString());
     if (nestingTracker.isNested() && nestingTracker.doesNotStartWithPreviousPath(context.path())) {
       error(context.path(), Type.array, true);
     }
-    if (nestingTracker.inArray() && !context.inGeometry()) {
+    if (nestingTracker.inArray()) {
       error(context.path(), Type.array, true);
     }
 
@@ -83,9 +81,7 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onArrayEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (!context.inGeometry()) {
-      LOGGER.trace("END ARRAY {}", context.pathAsString());
-    }
+    LOGGER.trace("END ARRAY {}", context.pathAsString());
     if (!nestingTracker.inArray() || !nestingTracker.isSamePath(context.path())) {
       error(context.path(), Type.array, false);
     }
@@ -97,9 +93,7 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (!context.inGeometry()) {
-      LOGGER.trace("VALUE {} {}", context.pathAsString(), context.value());
-    }
+    LOGGER.trace("VALUE {} {}", context.pathAsString(), context.value());
     if (nestingTracker.isNested() && nestingTracker.doesNotStartWithPreviousPath(context.path())) {
       error(context.path(), Type.value, true);
     }
@@ -108,6 +102,13 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
     }
 
     super.onValue(context);
+  }
+
+  @Override
+  public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    LOGGER.trace("GEOMETRY {} {}", context.pathAsString(), context.geometry());
+
+    super.onGeometry(context);
   }
 
   private enum Type {

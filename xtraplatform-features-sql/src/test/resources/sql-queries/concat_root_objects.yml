@@ -3,7 +3,7 @@
   FROM o73005 A
   ORDER BY 1
 - >-
-  SELECT A.sch AS SKEY, B.id AS SKEY_1, ST_AsText(ST_ForcePolygonCCW(B.geometrie))
+  SELECT A.sch AS SKEY, B.id AS SKEY_1, ST_AsBinary(ST_ForcePolygonCCW(B.geometrie))
   FROM o73005 A
   JOIN verwaltungseinheit B ON (A.sch=B.ags)
   ORDER BY 1,2
@@ -12,7 +12,7 @@
   FROM o73004 A
   ORDER BY 1
 - >-
-  SELECT A.sch AS SKEY, B.id AS SKEY_1, ST_AsText(ST_ForcePolygonCCW(B.geometrie))
+  SELECT A.sch AS SKEY, B.id AS SKEY_1, ST_AsBinary(ST_ForcePolygonCCW(B.geometrie))
   FROM o73004 A
   JOIN verwaltungseinheit B ON (A.sch=B.ags)
   ORDER BY 1,2

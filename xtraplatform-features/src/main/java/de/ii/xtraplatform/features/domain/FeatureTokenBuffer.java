@@ -144,6 +144,15 @@ public class FeatureTokenBuffer<
   }
 
   @Override
+  public void onGeometry(W context) {
+    if (doBuffer) {
+      bufferIn.onGeometry(context);
+    } else {
+      downstream.onGeometry(context);
+    }
+  }
+
+  @Override
   public void onValue(W context) {
     if (doBuffer) {
       bufferIn.onValue(context);

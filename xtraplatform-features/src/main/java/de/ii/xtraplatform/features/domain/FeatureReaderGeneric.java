@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
@@ -33,6 +34,9 @@ public interface FeatureReaderGeneric
   void onArrayStart(List<String> path, Map<String, String> context) throws Exception;
 
   void onArrayEnd(List<String> path, Map<String, String> context) throws Exception;
+
+  void onGeometry(List<String> path, Geometry<?> geometry, Map<String, String> context)
+      throws Exception;
 
   void onValue(List<String> path, String value, Map<String, String> context) throws Exception;
 }

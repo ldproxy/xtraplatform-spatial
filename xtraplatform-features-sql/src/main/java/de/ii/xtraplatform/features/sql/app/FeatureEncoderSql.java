@@ -22,20 +22,17 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
-import de.ii.xtraplatform.geometries.domain.GeometryWithStringCoordinates;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesTransformer;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesTransformer.Builder;
-import de.ii.xtraplatform.geometries.domain.ImmutableCoordinatesWriterWkt;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryEncoderWkt;
+import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
+import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
 import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -64,7 +61,6 @@ public class FeatureEncoderSql
   private final boolean trace;
 
   private ModifiableFeatureDataSql currentFeature;
-  private GeometryWithStringCoordinates<?> currentGeometry;
   private Tuple<SqlQuerySchema, SqlQueryColumn> currentJsonColumn;
   private JsonBuilder currentJson;
   private Consumer<String> currentJsonSetter;
@@ -100,7 +96,6 @@ public class FeatureEncoderSql
   public void onFeatureStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     currentFeature = ModifiableFeatureDataSql.create().setMapping(mapping);
     currentFeature.addRow(mapping.getMainTable());
-    currentGeometry = null;
     if (!isPatch) {
       currentJsonColumn = null;
       jsonColumns.clear();
@@ -136,21 +131,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onObjectStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), context.inGeometry());
-
-    if (context.inGeometry() && context.geometryType().isPresent()) {
-      SimpleFeatureGeometry geometryType =
-          context
-              .geometryType()
-              .filter(SimpleFeatureGeometry::isSpecific)
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          "Cannot encode geometry as WKT, no specific geometry type found."));
-
-      currentGeometry = GeometryWithStringCoordinates.of(geometryType, context.geometryDimension());
-      return;
-    }
+    if (trace) LOGGER.debug("onObjectStart: {}", context.pathAsString());
 
     mapping.getMainSchema().getAllObjects().stream()
         .filter(schema -> Objects.equals(schema.getFullPath(), context.path()))
@@ -184,36 +165,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onObjectEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onObjectEnd: {} {}", context.pathAsString(), context.inGeometry());
-
-    if (context.inGeometry()) {
-      if (trace) LOGGER.debug("geometry: {} {}", context.pathAsString(), currentGeometry);
-
-      mapping
-          .getColumnForPrimaryGeometry()
-          .ifPresentOrElse(
-              column -> {
-                mapping
-                    .getSchemaForPrimaryGeometry()
-                    .ifPresentOrElse(
-                        schema -> {
-                          String value = toWkt(currentGeometry, crsTransformer, nativeCrs);
-
-                          currentFeature.addColumn(column.first(), column.second(), value);
-
-                          if (trace) LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
-                        },
-                        () -> {
-                          if (trace)
-                            LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
-                        });
-              },
-              () -> {
-                if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
-              });
-
-      currentGeometry = null;
-    }
+    if (trace) LOGGER.debug("onObjectEnd: {}", context.pathAsString());
 
     Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
@@ -239,11 +191,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onArrayStart: {} {}", context.pathAsString(), context.inGeometry());
-
-    if (context.inGeometry()) {
-      currentGeometry.openChild();
-    }
+    if (trace) LOGGER.debug("onArrayStart: {} {}", context.pathAsString());
 
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -263,11 +211,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onArrayEnd: {} {}", context.pathAsString(), context.inGeometry());
-
-    if (context.inGeometry()) {
-      currentGeometry.closeChild();
-    }
+    if (trace) LOGGER.debug("onArrayEnd: {} {}", context.pathAsString());
 
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -286,15 +230,45 @@ public class FeatureEncoderSql
   }
 
   @Override
-  public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (context.inGeometry() && Objects.nonNull(currentGeometry)) {
-      currentGeometry.addCoordinate(context.value());
-      if (trace)
-        LOGGER.debug(
-            "onValue: {} {} {}", context.pathAsString(), context.value(), context.inGeometry());
-      return;
+  public void onGeometry(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
+    Geometry<?> geometry = context.geometry();
+
+    if (trace) {
+      LOGGER.debug("geometry: {} {}", context.pathAsString(), geometry);
     }
 
+    mapping
+        .getColumnForPrimaryGeometry()
+        .ifPresentOrElse(
+            column -> {
+              mapping
+                  .getSchemaForPrimaryGeometry()
+                  .ifPresentOrElse(
+                      schema -> {
+                        String value = toWkt(geometry, crsTransformer, nativeCrs);
+
+                        currentFeature.addColumn(column.first(), column.second(), value);
+
+                        if (trace) {
+                          LOGGER.debug("onGeometry: {} {}", context.pathAsString(), value);
+                        }
+                      },
+                      () -> {
+                        if (trace) {
+                          LOGGER.warn(
+                              "onGeometry: {} not found in mapping", context.pathAsString());
+                        }
+                      });
+            },
+            () -> {
+              if (trace) {
+                LOGGER.warn("onGeometry: {} not found in mapping", context.pathAsString());
+              }
+            });
+  }
+
+  @Override
+  public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
         // TODO: this is only correct for geojson, should be handled in the decoder
@@ -395,104 +369,30 @@ public class FeatureEncoderSql
   }
 
   private static String toWkt(
-      GeometryWithStringCoordinates<?> geometry,
-      Optional<CrsTransformer> crsTransformer,
-      EpsgCrs nativeCrs) {
-    SimpleFeatureGeometryFromToWkt wktType =
-        SimpleFeatureGeometryFromToWkt.fromSimpleFeatureGeometry(geometry.getType());
-    int dimension = geometry.getDimension();
+      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs nativeCrs) {
 
-    StringWriter geometryWriter = new StringWriter();
-    ImmutableCoordinatesTransformer.Builder coordinatesTransformerBuilder =
-        ImmutableCoordinatesTransformer.builder();
-    coordinatesTransformerBuilder.coordinatesWriter(
-        ImmutableCoordinatesWriterWkt.of(geometryWriter, dimension));
+    if (crsTransformer.isPresent()) {
+      geometry =
+          geometry.accept(
+              new CoordinatesTransformer(
+                  ImmutableCrsTransform.of(Optional.empty(), crsTransformer.get())));
+    }
 
-    coordinatesTransformerBuilder.crsTransformer(crsTransformer);
-
-    coordinatesTransformerBuilder.sourceDimension(dimension);
-    coordinatesTransformerBuilder.targetDimension(dimension);
-
-    geometryWriter.append(wktType.toString());
-
+    String wkt;
     try {
-      toWktArray(geometry, geometryWriter, coordinatesTransformerBuilder);
+      wkt = new GeometryEncoderWkt().encode(geometry);
     } catch (IOException e) {
-
+      throw new IllegalStateException(e);
     }
 
     // TODO: functions from Dialect
-    String result = String.format("ST_GeomFromText('%s',%s)", geometryWriter, nativeCrs.getCode());
+    String result = String.format("ST_GeomFromText('%s',%s)", wkt, nativeCrs.getCode());
 
-    if (geometry.getType() == SimpleFeatureGeometry.POLYGON
-        || geometry.getType() == SimpleFeatureGeometry.MULTI_POLYGON) {
+    if (geometry.getType() == GeometryType.POLYGON
+        || geometry.getType() == GeometryType.MULTI_POLYGON) {
       result = String.format("ST_ForcePolygonCW(%s)", result);
     }
 
     return result;
-  }
-
-  private static void toWktArray(
-      GeometryWithStringCoordinates<?> geometry,
-      Writer structureWriter,
-      Builder coordinatesWriterBuilder)
-      throws IOException {
-    structureWriter.append("(");
-
-    Writer coordinatesWriter = coordinatesWriterBuilder.build();
-
-    if (geometry instanceof GeometryWithStringCoordinates.Point point) {
-      toWktArray(point.getCoordinates(), coordinatesWriter);
-    } else if (geometry instanceof GeometryWithStringCoordinates.LineString lineString) {
-      toWktArray(lineString.getCoordinates(), coordinatesWriter);
-    } else if (geometry instanceof GeometryWithStringCoordinates.Polygon polygon) {
-      toWktArray(polygon.getCoordinates(), coordinatesWriter, structureWriter);
-    } else if (geometry instanceof GeometryWithStringCoordinates.MultiPoint multiPoint) {
-      toWktArray(multiPoint.getCoordinates(), coordinatesWriter, structureWriter);
-    } else if (geometry instanceof GeometryWithStringCoordinates.MultiLineString multiLineString) {
-      toWktArray(multiLineString.getCoordinates(), coordinatesWriter, structureWriter);
-    } else if (geometry instanceof GeometryWithStringCoordinates.MultiPolygon multiPolygon) {
-      for (int i = 0; i < multiPolygon.getCoordinates().size(); i++) {
-        structureWriter.append("(");
-
-        toWktArray(
-            multiPolygon.getCoordinates().get(i).getCoordinates(),
-            coordinatesWriter,
-            structureWriter);
-
-        coordinatesWriter = coordinatesWriterBuilder.build();
-
-        structureWriter.append(")");
-        if (i < multiPolygon.getCoordinates().size() - 1) {
-          structureWriter.append(",");
-        }
-      }
-    }
-
-    structureWriter.append(")");
-  }
-
-  private static void toWktArray(List<String> coordinates, Writer coordinatesWriter)
-      throws IOException {
-    for (int i = 0; i < coordinates.size(); i++) {
-      coordinatesWriter.append(coordinates.get(i));
-      if (i < coordinates.size() - 1) {
-        coordinatesWriter.append(",");
-      }
-    }
-
-    coordinatesWriter.flush();
-  }
-
-  private static void toWktArray(
-      List<List<String>> coordinates, Writer coordinatesWriter, Writer structureWriter)
-      throws IOException {
-    for (int i = 0; i < coordinates.size(); i++) {
-      structureWriter.append("(");
-
-      toWktArray(coordinates.get(i), coordinatesWriter);
-
-      structureWriter.append(")");
-    }
   }
 }
