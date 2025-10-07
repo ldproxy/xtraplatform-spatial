@@ -83,6 +83,20 @@ public class FeatureChangeHandlerImpl implements FeatureChanges {
 
   @Override
   public void handle(FeatureChange change) {
-    executor.submit(() -> featureListeners.forEach(listener -> listener.onFeatureChange(change)));
+    executor.submit(
+        () -> {
+          if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("Handling feature change: {}", change);
+          }
+
+          featureListeners.forEach(
+              listener -> {
+                if (LOGGER.isTraceEnabled()) {
+                  LOGGER.trace(
+                      "Notifying feature change listener: {}", listener.getClass().getSimpleName());
+                }
+                listener.onFeatureChange(change);
+              });
+        });
   }
 }
