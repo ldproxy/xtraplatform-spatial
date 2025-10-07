@@ -222,7 +222,7 @@ import org.threeten.extra.Interval;
  *   upper-most `sourcePath` of a type.
  * - `secondary` Secondary tables are connected to main tables via joins, either directly or
  *   through a chain of secondary and/or junction tables.
- * - `junction` Junction tables usually represent m:n relations. They only contain two foreign keys
+ * - `junction` Junction tables usually represent m:n relations. They mainly contain two foreign keys
  *   of main and/or secondary tables.
  *     </code>
  *     <p>#### Primary keys
@@ -249,6 +249,10 @@ import org.threeten.extra.Interval;
  *   the `primaryKey`, and the `sourcePath` of the main table does not have a matching `inserts`
  *   flag, the value from the payload given by the user is inserted.
  *     </code>
+ *     <p>#### Additional columns
+ *     <p>If an insert or update should set additional columns that are not mapped to any property,
+ *     use the `inserts` flag in `sourcePath` (see [Source Path Syntax](#source-path-syntax)), e.g.
+ *     `{inserts=id=gen_random_uuid()&featuretype='Street'}`.
  * @cfgPropertiesAdditionalDe ### Connection Info
  *     <p>Das Connection-Info-Objekt für SQL-Datenbanken wird wie folgt beschrieben:
  *     <p>{@docTable:connectionInfo}
@@ -317,7 +321,7 @@ import org.threeten.extra.Interval;
  * - `secondary` Sekundärtabellen sind über Joins mit Haupttabellen verbunden, entweder direkt
  *   oder über eine Kette von Sekundär- und/oder Junction-Tabellen.
  * - `junction` Junction-Tabellen repräsentieren in der Regel m:n-Beziehungen. Sie enthalten
- *   ausschließlich zwei Fremdschlüssel von Haupt- und/oder Sekundärtabellen.
+ *   hauptsächlich zwei Fremdschlüssel von Haupt- und/oder Sekundärtabellen.
  *     </code>
  *     <p>#### Primärschlüssel
  *     <p>Es wird erwartet, dass jede Haupt- und Sekundärtabelle einen Primärschlüssel hat und dass
@@ -346,6 +350,11 @@ import org.threeten.extra.Interval;
  *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat kein
  *   entsprechendes `inserts`-Flag, der Wert aus der Nutzlast wird eingefügt.
  *     </code>
+ *     <p>#### Zusätzliche Spalten
+ *     <p>Wenn bei einem Insert oder Update zusätzliche Spalten gesetzt werden sollen, die nicht auf
+ *     eine Eigenschaft abgebildet sind, kann das `inserts`-Flag in `sourcePath` verwendet werden
+ *     (siehe [SQL-Pfad-Syntax](#sql-pfad-syntax)), z.B.
+ *     `{inserts=id=gen_random_uuid()&featuretype='Strasse'}`.
  * @ref:cfgProperties {@link de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData}
  * @ref:connectionInfo {@link de.ii.xtraplatform.features.sql.domain.ImmutableConnectionInfoSql}
  * @ref:pool {@link de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings}
