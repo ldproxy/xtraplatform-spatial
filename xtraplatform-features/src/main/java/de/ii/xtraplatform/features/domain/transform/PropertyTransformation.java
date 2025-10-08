@@ -279,6 +279,12 @@ public interface PropertyTransformation
    */
   List<String> getNullify();
 
+  @JsonIgnore
+  @Value.Derived
+  default boolean isInternal() {
+    return getWrap().isPresent();
+  }
+
   @Override
   default PropertyTransformation mergeInto(PropertyTransformation source) {
     return new ImmutablePropertyTransformation.Builder()

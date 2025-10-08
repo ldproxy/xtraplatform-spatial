@@ -223,6 +223,12 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
           withConstraints(objectSchema, schema.getConstraints().get(), schema, codelists);
     }
 
+    if (!schema.receivable() && schema.returnable()) {
+      objectSchema = withReadOnly(objectSchema);
+    } else if (!schema.returnable() && schema.receivable()) {
+      objectSchema = withWriteOnly(objectSchema);
+    }
+
     return objectSchema;
   }
 
@@ -249,7 +255,8 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
             .map(r -> CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_HYPHEN, r))
             .or(() -> schema.getRefType().map(ignore -> "reference"))
             .or(() -> schema.getEmbeddedRole().map(Enum::name));
-    Optional<String> refCollectionId = schema.getRefType();
+    Optional<String> refCollectionId =
+        schema.getRefType().filter(refType -> !FeatureRefResolver.REF_TYPE_DYNAMIC.equals(refType));
     Optional<String> refUriTemplate =
         schema
             .getRefUriTemplate()

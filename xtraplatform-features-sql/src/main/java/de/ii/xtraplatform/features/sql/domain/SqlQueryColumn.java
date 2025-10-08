@@ -33,7 +33,8 @@ public interface SqlQueryColumn {
     DATETIME,
     CONSTANT,
     EXPRESSION,
-    CONNECTOR;
+    CONNECTOR,
+    DO_NOT_GENERATE;
   }
 
   String getName();

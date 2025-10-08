@@ -23,9 +23,9 @@ public interface SqlPathDefaults {
 
   /**
    * @langEn The default column that is used for join analysis if no differing primary key is set in
-   *     the [sourcePath](#path-syntax). Only relevant for CRUD.
+   *     the [sourcePath](#source-path-syntax). Only relevant for CRUD.
    * @langDe Die Standard-Spalte die zur Analyse von Joins verwendet wird, wenn keine abweichende
-   *     Spalte in `sourcePath` gesetzt wird. Nur relevant für CRUD.
+   *     Spalte in [sourcePath](#sql-pfad-syntax) gesetzt wird. Nur relevant für CRUD.
    * @default `id`
    */
   @Value.Default
@@ -35,10 +35,10 @@ public interface SqlPathDefaults {
 
   /**
    * @langEn The default column that is used to sort rows if no differing sort key is set in the
-   *     [sourcePath](#path-syntax).
-   * @langDe Die Standard-Spalte die zur Sortierung von Reihen verwendet wird, wenn keine
-   *     abweichende Spalte in `sourcePath` gesetzt wird. Es wird empfohlen, dass als Datentyp eine
-   *     Ganzzahl verwendet wird.
+   *     [sourcePath](#source-path-syntax).
+   * @langDe Die Standard-Spalte die zur Sortierung von Rows verwendet wird, wenn keine abweichende
+   *     Spalte in [sourcePath](#sql-pfad-syntax) gesetzt wird. Es wird empfohlen, dass als Datentyp
+   *     eine Ganzzahl verwendet wird.
    * @default `id`
    */
   @Value.Default
@@ -49,8 +49,9 @@ public interface SqlPathDefaults {
   /**
    * @since v3.3
    * @langEn The default schema that is applied to tables without prefix in
-   *     [sourcePaths](#path-syntax).
-   * @langDe Das Standard-Schema das Tabellen ohne Präfix in `sourcePath` vorangestellt wird.
+   *     [sourcePaths](#source-path-syntax).
+   * @langDe Das Standard-Schema das Tabellen ohne Präfix in [sourcePaths](#sql-pfad-syntax)
+   *     vorangestellt wird.
    * @default null
    */
   Optional<String> getSchema();
