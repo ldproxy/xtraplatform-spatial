@@ -25,4 +25,8 @@ public interface FeatureInfo {
   Set<FeatureSchema> getSchemas();
 
   Set<GeometryType> getGeometryTypes();
+
+  default boolean hasGeneratedId(String featureType) {
+    return true;
+  }
 }
