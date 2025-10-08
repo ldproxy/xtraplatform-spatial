@@ -142,6 +142,19 @@ public interface SqlQueryMapping {
     if (role == Role.PRIMARY_GEOMETRY) {
       return getMainSchema().getPrimaryGeometry();
     }
+    if (role == Role.PRIMARY_INSTANT) {
+      return getMainSchema().getPrimaryInstant();
+    }
+    if (role == Role.PRIMARY_INTERVAL_START) {
+      return getMainSchema()
+          .getPrimaryInterval()
+          .map(de.ii.xtraplatform.features.domain.Tuple::first);
+    }
+    if (role == Role.PRIMARY_INTERVAL_END) {
+      return getMainSchema()
+          .getPrimaryInterval()
+          .map(de.ii.xtraplatform.features.domain.Tuple::second);
+    }
 
     return Optional.empty();
   }

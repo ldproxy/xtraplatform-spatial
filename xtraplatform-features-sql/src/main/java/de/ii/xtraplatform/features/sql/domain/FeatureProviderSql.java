@@ -1299,10 +1299,11 @@ public class FeatureProviderSql
 
     ImmutableMutationResult.Builder builder =
         ImmutableMutationResult.builder().type(type).hasFeatures(false);
+    FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
 
     Source<FeatureDataSql> featureSqlSource =
         featureTokenSource
-            // TODO: Simple .via(statsCollector)
+            .via(statsCollector)
             .via(
                 new FeatureEncoderSql(
                     queryMapping.get().get(0),

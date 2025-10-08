@@ -321,7 +321,9 @@ public class FeatureEncoderSql
 
   @Override
   public ModifiableContext<SqlQuerySchema, SqlQueryMapping> createContext() {
-    return ModifiableFeatureEncoderSqlContext.create();
+    return ModifiableFeatureEncoderSqlContext.create()
+        .setType(mapping.getMainSchema().getName())
+        .setMappings(Map.of(mapping.getMainSchema().getName(), mapping));
   }
 
   private boolean checkJson(Tuple<SqlQuerySchema, SqlQueryColumn> column) {
