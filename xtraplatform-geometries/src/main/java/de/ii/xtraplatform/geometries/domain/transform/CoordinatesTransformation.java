@@ -14,4 +14,10 @@ public interface CoordinatesTransformation extends DoubleArrayProcessor<double[]
 
   @Value.Parameter
   Optional<CoordinatesTransformation> getNext();
+
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean simplifiesArcs() {
+    return false;
+  }
 }

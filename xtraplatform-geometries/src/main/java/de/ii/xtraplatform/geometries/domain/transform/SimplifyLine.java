@@ -23,6 +23,11 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
   protected abstract double getDistanceTolerance();
 
   @Override
+  public boolean simplifiesArcs() {
+    return true;
+  }
+
+  @Override
   public double[] onCoordinates(
       double[] coordinates,
       int length,
