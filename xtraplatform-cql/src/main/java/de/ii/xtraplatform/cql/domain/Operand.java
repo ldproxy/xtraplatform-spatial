@@ -112,6 +112,8 @@ public interface Operand extends CqlNode {
             list.add(getOperand(parser, listNode, "args"));
           }
           return Function.of(node.get("function").get("name").textValue(), list);
+        } else if (Objects.nonNull(node.get("$parameter"))) {
+          return oc.treeToValue(node.get("$parameter"), Parameter.class);
         }
       } else if (node.isArray()) {
         if (TEMPORAL.contains(parent)) {
@@ -153,7 +155,7 @@ public interface Operand extends CqlNode {
       JsonStreamContext parent = parser.getParsingContext().getParent();
 
       // Get name of the parent key
-      String parentName = parent.getCurrentName().toLowerCase();
+      String parentName = Objects.requireNonNullElse(parent.getCurrentName(), "null").toLowerCase();
 
       return getOperand(parser, node, parentName);
     }

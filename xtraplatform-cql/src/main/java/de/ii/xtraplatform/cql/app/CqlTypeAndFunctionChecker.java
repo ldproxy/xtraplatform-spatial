@@ -22,6 +22,7 @@ import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.ImmutableBetween;

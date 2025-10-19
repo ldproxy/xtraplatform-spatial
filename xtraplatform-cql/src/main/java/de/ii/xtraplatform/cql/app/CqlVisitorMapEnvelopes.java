@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.app;
 
 import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorCopy;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.SpatialLiteral;
 import de.ii.xtraplatform.crs.domain.CrsInfo;

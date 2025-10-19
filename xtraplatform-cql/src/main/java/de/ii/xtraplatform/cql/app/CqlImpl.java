@@ -16,12 +16,11 @@ import com.fasterxml.jackson.databind.ser.std.StdDelegatingSerializer;
 import com.fasterxml.jackson.databind.util.StdConverter;
 import com.github.azahnen.dagger.annotations.AutoBind;
 import com.google.common.collect.ImmutableList;
-import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlParseException;
 import de.ii.xtraplatform.cql.domain.CqlToText;
-import de.ii.xtraplatform.cql.domain.Operation;
+import de.ii.xtraplatform.cql.domain.CqlVisitorExtractParameters;
 import de.ii.xtraplatform.cql.domain.TemporalFunction;
 import de.ii.xtraplatform.cql.domain.TemporalLiteral;
 import de.ii.xtraplatform.cql.infra.CqlTextParser;
@@ -80,16 +79,19 @@ public class CqlImpl implements Cql {
       case TEXT:
         return cqlTextParser.parse(cql, crs);
       case JSON:
-        // handle boolean value
-        if (cql.trim().equalsIgnoreCase("true")) {
-          return BooleanValue2.of(true);
-        } else if (cql.trim().equalsIgnoreCase("false")) {
-          return BooleanValue2.of(false);
-        }
         cqlJsonMapper.setInjectableValues(
             new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
         try {
-          return cqlJsonMapper.readValue(cql, Operation.class);
+          Cql2Expression expression = cqlJsonMapper.readValue(cql, Cql2Expression.class);
+
+          // parameters are a CQL2-JSON extension used in stored queries; they must not appear in
+          // normal CQL2 expressions
+          if (!expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
+            throw new CqlParseException(
+                "Parameters are not allowed in CQL2 filter expressions, except in stored queries.");
+          }
+
+          return expression;
         } catch (IOException e) {
           throw new CqlParseException(e.getMessage());
         }
