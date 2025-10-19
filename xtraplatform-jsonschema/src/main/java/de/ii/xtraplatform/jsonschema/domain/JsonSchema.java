@@ -13,7 +13,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
-import de.ii.xtraplatform.jsonschema.domain.ImmutableJsonSchemaAllOf.Builder;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -111,7 +110,7 @@ public abstract class JsonSchema {
     return false;
   }
 
-  public JsonSchema accept(JsonSchemaVisitor visitor) {
+  public <T> T accept(JsonSchemaVisitor<T> visitor) {
     return visitor.visit(this);
   }
 
