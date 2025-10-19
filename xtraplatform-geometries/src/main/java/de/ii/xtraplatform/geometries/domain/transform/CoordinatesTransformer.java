@@ -16,15 +16,27 @@ import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.PositionList.Interpolation;
 import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 
 public class CoordinatesTransformer implements GeometryTransformer {
 
   private final CoordinatesTransformation transformationChain;
+  private final boolean simplifiesArcs;
 
   public CoordinatesTransformer(CoordinatesTransformation transformationChain) {
     this.transformationChain = transformationChain;
+    CoordinatesTransformation current = transformationChain;
+    boolean simplifiesArcs = false;
+    while (Objects.nonNull(current)) {
+      if (current.simplifiesArcs()) {
+        simplifiesArcs = true;
+        break;
+      }
+      current = current.getNext().orElse(null);
+    }
+    this.simplifiesArcs = simplifiesArcs;
   }
 
   @Override
@@ -45,15 +57,17 @@ public class CoordinatesTransformer implements GeometryTransformer {
     int dimension = geometry.getAxes().size();
     double[] coordinates = geometry.getValue().getCoordinates();
     if (geometry instanceof CircularString) {
-      return CircularString.of(
+      PositionList posList =
           PositionList.of(
               geometry.getAxes(),
               processPositions(
                   coordinates,
                   dimension,
                   Optional.of(Interpolation.CIRCULAR),
-                  OptionalInt.of(geometry.isClosed() ? 4 : 2))),
-          geometry.getCrs());
+                  OptionalInt.of(geometry.isClosed() ? 4 : 2)));
+      return simplifiesArcs
+          ? LineString.of(posList, geometry.getCrs())
+          : CircularString.of(posList, geometry.getCrs());
     }
     return LineString.of(
         PositionList.of(
