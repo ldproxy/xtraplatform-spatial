@@ -28,6 +28,10 @@ public abstract class JsonSchemaString extends JsonSchema {
 
   public abstract Optional<String> getPattern();
 
+  public abstract Optional<Integer> getMinLength();
+
+  public abstract Optional<Integer> getMaxLength();
+
   @JsonProperty("enum")
   public abstract Optional<List<String>> getEnums();
 
