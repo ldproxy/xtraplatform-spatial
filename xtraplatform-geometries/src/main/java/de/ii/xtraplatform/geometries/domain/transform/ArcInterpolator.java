@@ -43,6 +43,15 @@ public class ArcInterpolator {
   public static double[] interpolateArc3Points(
       double[] coordinates, int index, int dimension, double maxDeviation) {
     double[] center2d = calculateCircleCenter2d(coordinates, index, dimension);
+
+    if (Double.valueOf(center2d[0]).isNaN() || Double.valueOf(center2d[1]).isNaN()) {
+      // Points are collinear, return a line with the first and last points
+      double[] result = new double[2 * dimension];
+      System.arraycopy(coordinates, index * dimension, result, 0, dimension);
+      System.arraycopy(coordinates, (index + 2) * dimension, result, dimension, dimension);
+      return result;
+    }
+
     double radius =
         distance2d(
             center2d,
@@ -166,12 +175,57 @@ public class ArcInterpolator {
     double x2 = coordinates[(index + 1) * dimension], y2 = coordinates[(index + 1) * dimension + 1];
     double x3 = coordinates[(index + 2) * dimension], y3 = coordinates[(index + 2) * dimension + 1];
 
-    double ma = (y2 - y1) / (x2 - x1);
-    double mb = (y3 - y2) / (x3 - x2);
+    // Center points of the segments
+    double mx1 = (x1 + x2) / 2.0, my1 = (y1 + y2) / 2.0;
+    double mx2 = (x2 + x3) / 2.0, my2 = (y2 + y3) / 2.0;
 
-    double centerX = (ma * mb * (y1 - y3) + mb * (x1 + x2) - ma * (x2 + x3)) / (2 * (mb - ma));
-    double centerY = -1 / ma * (centerX - (x1 + x2) / 2) + (y1 + y2) / 2;
+    // Gradients of the segments
+    double dx1 = x2 - x1, dy1 = y2 - y1;
+    double dx2 = x3 - x2, dy2 = y3 - y2;
 
-    return new double[] {centerX, centerY};
+    // Handle vertical/horizontal lines to avoid NaN values
+    boolean vert1 = dx1 == 0.0;
+    boolean vert2 = dx2 == 0.0;
+    boolean hor1 = dy1 == 0.0;
+    boolean hor2 = dy2 == 0.0;
+
+    if ((vert1 && vert2) || (hor1 && hor2)) {
+      // collinear points, not an arc
+      return new double[] {Double.NaN, Double.NaN};
+    } else if (vert1) {
+      // first segment is vertical
+      double perp2 = -dx2 / dy2;
+      double centerY = my1;
+      double centerX = ((centerY - my2) / perp2) + mx2;
+      return new double[] {centerX, centerY};
+    } else if (vert2) {
+      // second segment is vertical
+      double perp1 = -dx1 / dy1;
+      double centerY = my2;
+      double centerX = ((centerY - my1) / perp1) + mx1;
+      return new double[] {centerX, centerY};
+    } else if (hor1) {
+      // first segment is horizontal
+      double perp2 = -dx2 / dy2;
+      double centerX = mx1;
+      double centerY = perp2 * (centerX - mx2) + my2;
+      return new double[] {centerX, centerY};
+    } else if (hor2) {
+      // second segment is horizontal
+      double perp1 = -dx1 / dy1;
+      double centerX = mx2;
+      double centerY = perp1 * (centerX - mx1) + my1;
+      return new double[] {centerX, centerY};
+    } else {
+      // standard case
+      double perp1 = -dx1 / dy1;
+      double perp2 = -dx2 / dy2;
+      if (perp1 == perp2) {
+        return new double[] {Double.NaN, Double.NaN};
+      }
+      double centerX = (perp1 * mx1 - perp2 * mx2 + my2 - my1) / (perp1 - perp2);
+      double centerY = perp1 * (centerX - mx1) + my1;
+      return new double[] {centerX, centerY};
+    }
   }
 }
