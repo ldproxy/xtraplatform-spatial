@@ -90,6 +90,27 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
           tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
 
           long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
+          List<String> errors = jobSet.getErrors().get();
+
+          if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
+            LOGGER.warn(
+                MARKER.JOBS,
+                "{} had {} errors{}",
+                jobSet.getLabel(),
+                errors.size(),
+                jobSet.getDescription().orElse(""));
+
+            if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
+              for (String error : errors) {
+                LOGGER.debug(
+                    MARKER.JOBS,
+                    "{} error: {}{}",
+                    jobSet.getLabel(),
+                    error,
+                    jobSet.getDescription().orElse(""));
+              }
+            }
+          }
 
           if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
             LOGGER.info(
