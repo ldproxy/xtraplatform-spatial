@@ -5,60 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.cql.app;
+package de.ii.xtraplatform.cql.domain;
 
-import de.ii.xtraplatform.cql.domain.Accenti;
-import de.ii.xtraplatform.cql.domain.And;
-import de.ii.xtraplatform.cql.domain.ArrayLiteral;
-import de.ii.xtraplatform.cql.domain.Bbox;
-import de.ii.xtraplatform.cql.domain.Between;
-import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
-import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
-import de.ii.xtraplatform.cql.domain.BinarySpatialOperation;
-import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
-import de.ii.xtraplatform.cql.domain.BooleanValue2;
-import de.ii.xtraplatform.cql.domain.Casei;
-import de.ii.xtraplatform.cql.domain.Cql2Expression;
-import de.ii.xtraplatform.cql.domain.CqlNode;
-import de.ii.xtraplatform.cql.domain.CqlVisitor;
-import de.ii.xtraplatform.cql.domain.Eq;
-import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.GeometryNode;
-import de.ii.xtraplatform.cql.domain.Gt;
-import de.ii.xtraplatform.cql.domain.Gte;
-import de.ii.xtraplatform.cql.domain.ImmutableAccenti;
-import de.ii.xtraplatform.cql.domain.ImmutableBetween;
-import de.ii.xtraplatform.cql.domain.ImmutableCasei;
-import de.ii.xtraplatform.cql.domain.ImmutableEq;
-import de.ii.xtraplatform.cql.domain.ImmutableGt;
-import de.ii.xtraplatform.cql.domain.ImmutableGte;
-import de.ii.xtraplatform.cql.domain.ImmutableIn;
-import de.ii.xtraplatform.cql.domain.ImmutableInterval;
-import de.ii.xtraplatform.cql.domain.ImmutableIsNull;
-import de.ii.xtraplatform.cql.domain.ImmutableLike;
-import de.ii.xtraplatform.cql.domain.ImmutableLt;
-import de.ii.xtraplatform.cql.domain.ImmutableLte;
-import de.ii.xtraplatform.cql.domain.ImmutableNeq;
-import de.ii.xtraplatform.cql.domain.In;
-import de.ii.xtraplatform.cql.domain.Interval;
-import de.ii.xtraplatform.cql.domain.IsNull;
-import de.ii.xtraplatform.cql.domain.Like;
-import de.ii.xtraplatform.cql.domain.LogicalOperation;
-import de.ii.xtraplatform.cql.domain.Lt;
-import de.ii.xtraplatform.cql.domain.Lte;
-import de.ii.xtraplatform.cql.domain.Neq;
-import de.ii.xtraplatform.cql.domain.Not;
-import de.ii.xtraplatform.cql.domain.Operand;
-import de.ii.xtraplatform.cql.domain.Or;
-import de.ii.xtraplatform.cql.domain.PositionNode;
-import de.ii.xtraplatform.cql.domain.Property;
-import de.ii.xtraplatform.cql.domain.Scalar;
-import de.ii.xtraplatform.cql.domain.ScalarLiteral;
-import de.ii.xtraplatform.cql.domain.Spatial;
-import de.ii.xtraplatform.cql.domain.SpatialLiteral;
-import de.ii.xtraplatform.cql.domain.Temporal;
-import de.ii.xtraplatform.cql.domain.TemporalLiteral;
-import de.ii.xtraplatform.cql.domain.Vector;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -266,5 +214,10 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   @Override
   public CqlNode visit(BooleanValue2 booleanValue, List<CqlNode> children) {
     return booleanValue;
+  }
+
+  @Override
+  public CqlNode visit(Parameter parameter, List<CqlNode> children) {
+    return parameter;
   }
 }

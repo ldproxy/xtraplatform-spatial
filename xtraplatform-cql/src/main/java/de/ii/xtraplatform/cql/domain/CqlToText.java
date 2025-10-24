@@ -408,4 +408,9 @@ public class CqlToText implements CqlVisitor<String> {
   public String visit(BooleanValue2 booleanValue, List<String> children) {
     return booleanValue.getValue().toString();
   }
+
+  @Override
+  public String visit(Parameter parameter, List<String> children) {
+    return parameter.getName();
+  }
 }

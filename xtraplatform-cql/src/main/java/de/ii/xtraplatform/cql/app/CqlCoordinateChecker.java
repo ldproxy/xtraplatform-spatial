@@ -10,6 +10,7 @@ package de.ii.xtraplatform.cql.app;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.SpatialLiteral;

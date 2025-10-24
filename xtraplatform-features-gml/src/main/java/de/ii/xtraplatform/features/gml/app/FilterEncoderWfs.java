@@ -39,6 +39,7 @@ import de.ii.xtraplatform.cql.domain.Lt;
 import de.ii.xtraplatform.cql.domain.Lte;
 import de.ii.xtraplatform.cql.domain.Not;
 import de.ii.xtraplatform.cql.domain.Or;
+import de.ii.xtraplatform.cql.domain.Parameter;
 import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -417,6 +418,14 @@ public class FilterEncoderWfs {
       FesLiteral literal0 = new FesLiteral("0");
       FesLiteral literal1 = new FesLiteral("1");
       return new FesPropertyIsEqualTo(literal0, literal1);
+    }
+
+    @Override
+    public FesExpression visit(Parameter parameter, List<FesExpression> children) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Parameters are not supported in filter expressions for WFS feature providers. Found: %s",
+              parameter.getName()));
     }
   }
 }

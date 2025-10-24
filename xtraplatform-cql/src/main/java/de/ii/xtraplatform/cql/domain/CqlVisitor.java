@@ -62,6 +62,8 @@ public interface CqlVisitor<T> {
       return visit((Function) node, children);
     } else if (node instanceof BooleanValue2) {
       return visit((BooleanValue2) node, children);
+    } else if (node instanceof Parameter) {
+      return visit((Parameter) node, children);
     }
 
     throw new IllegalStateException();
@@ -112,4 +114,6 @@ public interface CqlVisitor<T> {
   T visit(Function function, List<T> children);
 
   T visit(BooleanValue2 booleanValue, List<T> children);
+
+  T visit(Parameter parameter, List<T> children);
 }

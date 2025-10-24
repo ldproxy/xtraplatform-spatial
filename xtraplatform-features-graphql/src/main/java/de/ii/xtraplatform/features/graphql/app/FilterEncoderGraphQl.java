@@ -31,6 +31,7 @@ import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
+import de.ii.xtraplatform.cql.domain.Parameter;
 import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.SIntersects;
@@ -368,6 +369,14 @@ public class FilterEncoderGraphQl {
           String.format(
               "Booleans are not supported in filter expressions for GraphQL feature providers. Found: %s",
               booleanValue));
+    }
+
+    @Override
+    public Map<String, String> visit(Parameter parameter, List<Map<String, String>> children) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Parameters are not supported in filter expressions for GraphQL feature providers. Found: %s",
+              parameter.getName()));
     }
   }
 

@@ -5,32 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.cql.app;
+package de.ii.xtraplatform.cql.domain;
 
-import de.ii.xtraplatform.cql.domain.Accenti;
-import de.ii.xtraplatform.cql.domain.ArrayLiteral;
-import de.ii.xtraplatform.cql.domain.Bbox;
-import de.ii.xtraplatform.cql.domain.Between;
-import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
-import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
-import de.ii.xtraplatform.cql.domain.BinarySpatialOperation;
-import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
-import de.ii.xtraplatform.cql.domain.BooleanValue2;
-import de.ii.xtraplatform.cql.domain.Casei;
-import de.ii.xtraplatform.cql.domain.CqlVisitor;
-import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.GeometryNode;
-import de.ii.xtraplatform.cql.domain.In;
-import de.ii.xtraplatform.cql.domain.Interval;
-import de.ii.xtraplatform.cql.domain.IsNull;
-import de.ii.xtraplatform.cql.domain.Like;
-import de.ii.xtraplatform.cql.domain.LogicalOperation;
-import de.ii.xtraplatform.cql.domain.Not;
-import de.ii.xtraplatform.cql.domain.PositionNode;
-import de.ii.xtraplatform.cql.domain.Property;
-import de.ii.xtraplatform.cql.domain.ScalarLiteral;
-import de.ii.xtraplatform.cql.domain.SpatialLiteral;
-import de.ii.xtraplatform.cql.domain.TemporalLiteral;
 import java.util.List;
 
 public class CqlVisitorBase<T> implements CqlVisitor<T> {
@@ -147,6 +123,11 @@ public class CqlVisitorBase<T> implements CqlVisitor<T> {
 
   @Override
   public T visit(BooleanValue2 booleanValue, List<T> children) {
+    return null;
+  }
+
+  @Override
+  public T visit(Parameter parameter, List<T> children) {
     return null;
   }
 }

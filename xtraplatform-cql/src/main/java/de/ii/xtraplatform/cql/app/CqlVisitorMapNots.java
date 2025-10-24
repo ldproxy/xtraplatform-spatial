@@ -10,6 +10,7 @@ package de.ii.xtraplatform.cql.app;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorCopy;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Gt;
 import de.ii.xtraplatform.cql.domain.Gte;

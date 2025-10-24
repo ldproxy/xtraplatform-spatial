@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorCopy;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.Gt;
