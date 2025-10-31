@@ -135,7 +135,7 @@ public interface FeaturePropertyTokenSliceTransformer
     return transformed;
   }
 
-  default List<Object> transformValues(List<String> path, List<Object> slice) {
+  default List<Object> transformValues(List<String> path, boolean isArray, List<Object> slice) {
     if (slice.isEmpty()) {
       return slice;
     }
@@ -149,7 +149,7 @@ public interface FeaturePropertyTokenSliceTransformer
 
     List<Object> before = slice.subList(0, min);
     List<Object> after = slice.subList(max + 1, slice.size());
-    boolean inArray = before.contains(FeatureTokenType.ARRAY);
+    boolean inArray = isArray || before.contains(FeatureTokenType.ARRAY);
     List<Object> transformed = new ArrayList<>();
 
     transformed.addAll(before);
