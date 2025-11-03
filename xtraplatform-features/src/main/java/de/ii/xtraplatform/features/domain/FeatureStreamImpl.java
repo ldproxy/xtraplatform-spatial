@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 
@@ -87,7 +88,9 @@ public class FeatureStreamImpl implements FeatureStream {
 
   @Override
   public CompletionStage<Result> runWith(
-      Sink<Object> sink, Map<String, PropertyTransformations> propertyTransformations) {
+      Sink<Object> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(propertyTransformations);
@@ -120,7 +123,8 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
-          source = source.via(new FeatureTokenTransformerHasFeatures(resultBuilder));
+          source =
+              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
           Reactive.BasicStream<?, Void> basicStream =
               sink instanceof Reactive.SinkTransformed
@@ -151,7 +155,9 @@ public class FeatureStreamImpl implements FeatureStream {
 
   @Override
   public <X> CompletionStage<ResultReduced<X>> runWith(
-      SinkReduced<Object, X> sink, Map<String, PropertyTransformations> propertyTransformations) {
+      SinkReduced<Object, X> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(propertyTransformations);
@@ -182,7 +188,8 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
-          source = source.via(new FeatureTokenTransformerHasFeatures(resultBuilder));
+          source =
+              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
           Reactive.BasicStream<?, X> basicStream =
               sink instanceof Reactive.SinkReducedTransformed
