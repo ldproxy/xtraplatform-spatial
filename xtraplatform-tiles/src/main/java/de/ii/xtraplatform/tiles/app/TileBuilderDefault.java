@@ -11,6 +11,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.codahale.metrics.Timer.Context;
 import com.github.azahnen.dagger.annotations.AutoBind;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.base.domain.AppConfiguration;
 import de.ii.xtraplatform.cql.domain.Bbox;
@@ -23,11 +24,13 @@ import de.ii.xtraplatform.cql.domain.SpatialLiteral;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.features.domain.DeterminePipelineStepsThatCannotBeSkipped;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureQueries;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureStream;
+import de.ii.xtraplatform.features.domain.FeatureStream.PipelineSteps;
 import de.ii.xtraplatform.features.domain.FeatureStream.ResultReduced;
 import de.ii.xtraplatform.features.domain.FeatureTokenEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
@@ -120,6 +123,21 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
           metricRegistry.timer(String.format("tiles.%s.generated.mvt", featureProvider.getId())));
     }
 
+    String featureType = tileset.getFeatureType().orElse(tileset.getId());
+    FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
+
+    if (Objects.isNull(schema)) {
+      throw new IllegalArgumentException(
+          String.format("Unknown feature type '%s' in tileset '%s'", featureType, tileset.getId()));
+    }
+
+    PropertyTransformations propertyTransformations =
+        tileQuery
+            .getGenerationParameters()
+            .flatMap(TileGenerationParameters::getPropertyTransformations)
+            .map(pt -> pt.mergeInto(baseTransformations))
+            .orElse(baseTransformations);
+
     try (Context timed = timers.get(featureProvider.getId()).time()) {
       FeatureQuery featureQuery =
           getFeatureQuery(
@@ -130,6 +148,40 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
               clippedBounds,
               tileQuery.getGenerationParametersTransient(),
               featureProvider.queries().get());
+
+      if (featureProvider.queries().isAvailable()
+          && featureProvider.queries().get().skipUnusedPipelineSteps()
+          && !featureQuery.skipPipelineSteps().contains(PipelineSteps.ALL)) {
+        Set<PipelineSteps> keepSteps =
+            schema.accept(
+                new DeterminePipelineStepsThatCannotBeSkipped(
+                    featureQuery,
+                    featureType,
+                    Optional.of(propertyTransformations),
+                    featureProvider.crs().get().getNativeCrs(),
+                    featureQuery.getCrs().orElse(tileQuery.getTileMatrixSet().getCrs()),
+                    false,
+                    false,
+                    false,
+                    false));
+
+        ImmutableList.Builder<PipelineSteps> skipSteps = ImmutableList.builder();
+        skipSteps.addAll(featureQuery.skipPipelineSteps());
+        for (PipelineSteps step : PipelineSteps.values()) {
+          if (step != PipelineSteps.ALL && !keepSteps.contains(step)) {
+            skipSteps.add(step);
+          }
+        }
+        featureQuery =
+            ImmutableFeatureQuery.builder()
+                .from(featureQuery)
+                .skipPipelineSteps(skipSteps.build())
+                .build();
+      }
+
+      if (LOGGER.isDebugEnabled() && !featureQuery.skipPipelineSteps().isEmpty()) {
+        LOGGER.debug("Skipping pipeline steps: {}", featureQuery.skipPipelineSteps().toString());
+      }
 
       FeatureStream tileSource = featureProvider.queries().get().getFeatureStream(featureQuery);
 
@@ -142,22 +194,6 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
 
       FeatureTokenEncoder<?> encoder =
           ENCODERS.get(tileQuery.getMediaType()).apply(tileGenerationContext);
-
-      String featureType = tileset.getFeatureType().orElse(tileset.getId());
-      FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
-
-      if (Objects.isNull(schema)) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Unknown feature type '%s' in tileset '%s'", featureType, tileset.getId()));
-      }
-
-      PropertyTransformations propertyTransformations =
-          tileQuery
-              .getGenerationParameters()
-              .flatMap(TileGenerationParameters::getPropertyTransformations)
-              .map(pt -> pt.mergeInto(baseTransformations))
-              .orElse(baseTransformations);
 
       ResultReduced<byte[]> resultReduced =
           generateTile(tileSource, encoder, Map.of(featureType, propertyTransformations));

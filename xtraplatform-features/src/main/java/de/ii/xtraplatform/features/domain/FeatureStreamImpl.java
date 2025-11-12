@@ -94,7 +94,7 @@ public class FeatureStreamImpl implements FeatureStream {
       CompletableFuture<CollectionMetadata> onCollectionMetadata) {
 
     Map<String, PropertyTransformations> mergedTransformations =
-        getMergedTransformations(propertyTransformations);
+        getMergedTransformations(data.getTypes(), query, propertyTransformations);
 
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
@@ -161,7 +161,7 @@ public class FeatureStreamImpl implements FeatureStream {
       CompletableFuture<CollectionMetadata> onCollectionMetadata) {
 
     Map<String, PropertyTransformations> mergedTransformations =
-        getMergedTransformations(propertyTransformations);
+        getMergedTransformations(data.getTypes(), query, propertyTransformations);
 
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
@@ -273,27 +273,27 @@ public class FeatureStreamImpl implements FeatureStream {
     return tokenSourceTransformed;
   }
 
-  private Map<String, PropertyTransformations> getMergedTransformations(
+  static Map<String, PropertyTransformations> getMergedTransformations(
+      Map<String, FeatureSchema> featureSchemas,
+      Query query,
       Map<String, PropertyTransformations> propertyTransformations) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
-
+    if (query instanceof FeatureQuery featureQuery) {
       return ImmutableMap.of(
           featureQuery.getType(),
           getPropertyTransformations(
-              (FeatureQuery) query,
+              featureSchemas,
+              featureQuery,
               Optional.ofNullable(propertyTransformations.get(featureQuery.getType()))));
     }
 
-    if (query instanceof MultiFeatureQuery) {
-      MultiFeatureQuery multiFeatureQuery = (MultiFeatureQuery) query;
-
+    if (query instanceof MultiFeatureQuery multiFeatureQuery) {
       return multiFeatureQuery.getQueries().stream()
           .map(
               typeQuery ->
                   new SimpleImmutableEntry<>(
                       typeQuery.getType(),
                       getPropertyTransformations(
+                          featureSchemas,
                           typeQuery,
                           Optional.ofNullable(propertyTransformations.get(typeQuery.getType())))))
           .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -302,17 +302,21 @@ public class FeatureStreamImpl implements FeatureStream {
     return ImmutableMap.of();
   }
 
-  private PropertyTransformations getPropertyTransformations(
-      TypeQuery typeQuery, Optional<PropertyTransformations> propertyTransformations) {
-    FeatureSchema featureSchema = data.getTypes().get(typeQuery.getType());
-
+  private static PropertyTransformations getPropertyTransformations(
+      Map<String, FeatureSchema> featureSchemas,
+      TypeQuery typeQuery,
+      Optional<PropertyTransformations> propertyTransformations) {
     if (typeQuery instanceof FeatureQuery
         && ((FeatureQuery) typeQuery).getSchemaScope() == SchemaBase.Scope.RECEIVABLE) {
-      return () -> getProviderTransformations(featureSchema, SchemaBase.Scope.RECEIVABLE);
+      return () ->
+          getProviderTransformations(
+              featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RECEIVABLE);
     }
 
     PropertyTransformations providerTransformations =
-        () -> getProviderTransformations(featureSchema, SchemaBase.Scope.RETURNABLE);
+        () ->
+            getProviderTransformations(
+                featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RETURNABLE);
 
     PropertyTransformations merged =
         propertyTransformations
@@ -322,7 +326,8 @@ public class FeatureStreamImpl implements FeatureStream {
     return applyRename(merged);
   }
 
-  private PropertyTransformations applyRename(PropertyTransformations propertyTransformations) {
+  private static PropertyTransformations applyRename(
+      PropertyTransformations propertyTransformations) {
     if (propertyTransformations.getTransformations().values().stream()
         .flatMap(Collection::stream)
         .anyMatch(propertyTransformation -> propertyTransformation.getRename().isPresent())) {
@@ -362,7 +367,7 @@ public class FeatureStreamImpl implements FeatureStream {
     return propertyTransformations;
   }
 
-  private Map<String, List<PropertyTransformation>> getProviderTransformations(
+  private static Map<String, List<PropertyTransformation>> getProviderTransformations(
       FeatureSchema featureSchema, SchemaBase.Scope scope) {
     return featureSchema
         .accept(
@@ -377,7 +382,7 @@ public class FeatureStreamImpl implements FeatureStream {
                     .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
   }
 
-  private java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
+  private static java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
       getProviderTransformationsForProperty(FeatureSchema schema, SchemaBase.Scope scope) {
     if (schema.getTransformations().isEmpty()) {
       if (schema.isTemporal()) {
