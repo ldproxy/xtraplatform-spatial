@@ -66,24 +66,25 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
+
     this.stepMapping =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.MAPPING)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.MAPPING)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepGeometry =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.GEOMETRY)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.GEOMETRY)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepCoordinates =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.COORDINATES)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.COORDINATES)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepClean =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.CLEAN)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.CLEAN)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepEtag =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.ETAG)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.ETAG)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepMetadata =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.METADATA)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
   @Override
