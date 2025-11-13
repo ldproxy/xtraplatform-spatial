@@ -179,8 +179,8 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
                 .build();
       }
 
-      if (LOGGER.isDebugEnabled() && !featureQuery.skipPipelineSteps().isEmpty()) {
-        LOGGER.debug("Skipping pipeline steps: {}", featureQuery.skipPipelineSteps().toString());
+      if (LOGGER.isTraceEnabled() && !featureQuery.skipPipelineSteps().isEmpty()) {
+        LOGGER.trace("Skipping pipeline steps: {}", featureQuery.skipPipelineSteps().toString());
       }
 
       FeatureStream tileSource = featureProvider.queries().get().getFeatureStream(featureQuery);
