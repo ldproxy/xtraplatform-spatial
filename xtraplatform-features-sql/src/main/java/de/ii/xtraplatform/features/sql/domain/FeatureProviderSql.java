@@ -175,6 +175,9 @@ import org.threeten.extra.Interval;
  *     <p>### Query Generation
  *     <p>Options for query generation.
  *     <p>{@docTable:queryGeneration}
+ *     <p>### Query Processing
+ *     <p>Options for query processing.
+ *     <p>{@docTable:queryProcessing}
  *     <p>### Source Path Defaults
  *     <p>Defaults for the path expressions in `sourcePath`, also see [Source Path
  *     Syntax](#path-syntax).
@@ -265,6 +268,9 @@ import org.threeten.extra.Interval;
  *     <p>### Query-Generierung
  *     <p>Optionen für die Query-Generierung in `queryGeneration`.
  *     <p>{@docTable:queryGeneration}
+ *     <p>### Query-Verarbeitung
+ *     <p>Optionen für die Query-Verarbeitung in `queryProcessing`.
+ *     <p>{@docTable:queryProcessing}
  *     <p>### SQL-Pfad-Defaults
  *     <p>Defaults für die Pfad-Ausdrücke in `sourcePath`, siehe auch
  *     [SQL-Pfad-Syntax](#path-syntax).
