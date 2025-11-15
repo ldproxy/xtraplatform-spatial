@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.domain;
 
 import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerDateFormat.DATETIME_FORMAT;
-import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerDateFormat.DATE_FORMAT;
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
 import com.google.common.collect.ImmutableMap;
@@ -385,16 +384,13 @@ public class FeatureStreamImpl implements FeatureStream {
   private static java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
       getProviderTransformationsForProperty(FeatureSchema schema, SchemaBase.Scope scope) {
     if (schema.getTransformations().isEmpty()) {
-      if (schema.isTemporal()) {
+      if (schema.isTemporal() && schema.getType() == SchemaBase.Type.DATETIME) {
         return java.util.stream.Stream.of(
             Map.entry(
                 schema.getFullPathAsString(),
                 List.of(
                     new ImmutablePropertyTransformation.Builder()
-                        .dateFormat(
-                            schema.getType() == SchemaBase.Type.DATETIME
-                                ? DATETIME_FORMAT
-                                : DATE_FORMAT)
+                        .dateFormat(DATETIME_FORMAT)
                         .build())));
       }
       return java.util.stream.Stream.empty();
