@@ -12,9 +12,12 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.FeatureStream.PipelineSteps;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
+import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 
@@ -102,13 +105,26 @@ public class DeterminePipelineStepsThatCannotBeSkipped
 
       // mapping is also needed, if specific property transformations are applied (the ones with a
       // wildcard are handled otherwise: nulls are removed in the CLEAN step and flattening is
-      // already handled by including MAPPING for any objects or arrays)
-      if (!intermediateResult.contains(PipelineSteps.MAPPING)) {
-        if (mergedTransformations.getTransformations().entrySet().stream()
-                .anyMatch(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))
-            || requiresPropertiesInSequence) {
-          steps.add(PipelineSteps.MAPPING);
+      // already handled by including MAPPING for any objects or arrays);
+      // if only value transformations are applied, and no other mapping is needed, just execute
+      // the value transformations, but skip schema transformations and token slice transformers
+      if (!intermediateResult.contains(PipelineSteps.MAPPING_SCHEMA)) {
+        if (requiresPropertiesInSequence) {
+          steps.add(PipelineSteps.MAPPING_SCHEMA);
+          steps.add(PipelineSteps.MAPPING_VALUES);
+        } else if (mergedTransformations.getTransformations().entrySet().stream()
+            .filter(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))
+            .map(Entry::getValue)
+            .flatMap(Collection::stream)
+            .allMatch(PropertyTransformation::onlyValueTransformations)) {
+          steps.add(PipelineSteps.MAPPING_VALUES);
+        } else if (mergedTransformations.getTransformations().entrySet().stream()
+            .anyMatch(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))) {
+          steps.add(PipelineSteps.MAPPING_SCHEMA);
+          steps.add(PipelineSteps.MAPPING_VALUES);
         }
+      } else {
+        steps.add(PipelineSteps.MAPPING_VALUES);
       }
 
     } else {
@@ -125,7 +141,7 @@ public class DeterminePipelineStepsThatCannotBeSkipped
               .getSourcePath()
               .filter(sourcePath -> sourcePath.matches(".+?\\[[^=\\]]+].+"))
               .isPresent()) {
-        steps.add(PipelineSteps.MAPPING);
+        steps.add(PipelineSteps.MAPPING_SCHEMA);
       }
 
       // geometry processing is needed for geometries with constraints that require special handling

@@ -43,7 +43,8 @@ public class FeatureStreamImpl implements FeatureStream {
   private final Map<String, Codelist> codelists;
   private final QueryRunner runner;
   private final boolean doTransform;
-  private final boolean stepMapping;
+  private final boolean stepMappingSchema;
+  private final boolean stepMappingValues;
   private final boolean stepGeometry;
   private final boolean stepCoordinates;
   private final boolean stepClean;
@@ -66,9 +67,11 @@ public class FeatureStreamImpl implements FeatureStream {
     this.runner = runner;
     this.doTransform = doTransform;
 
-    this.stepMapping =
-        !query.skipPipelineSteps().contains(PipelineSteps.MAPPING)
+    this.stepMappingSchema =
+        !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepMappingValues =
+        stepMappingSchema || !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_VALUES);
     this.stepGeometry =
         !query.skipPipelineSteps().contains(PipelineSteps.GEOMETRY)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
@@ -223,46 +226,50 @@ public class FeatureStreamImpl implements FeatureStream {
   private FeatureTokenSource getFeatureTokenSourceTransformed(
       FeatureTokenSource featureTokenSource,
       Map<String, PropertyTransformations> propertyTransformations) {
-    FeatureTokenTransformerMappings schemaMapper =
-        new FeatureTokenTransformerMappings(
-            propertyTransformations, codelists, data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
-
-    Optional<CrsTransformer> crsTransformer =
-        query
-            .getCrs()
-            .flatMap(
-                targetCrs ->
-                    crsTransformerFactory.getTransformer(
-                        data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
-
-    Optional<CrsTransformer> crsTransformerWgs84 =
-        query
-            .getCrs()
-            .flatMap(
-                targetCrs ->
-                    crsTransformerFactory.getTransformer(
-                        data.getNativeCrs().orElse(OgcCrs.CRS84),
-                        nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
-    FeatureTokenTransformerGeometry geometryMapper = new FeatureTokenTransformerGeometry();
-
-    FeatureTokenTransformerCoordinates coordinatesMapper =
-        new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
-
-    FeatureTokenTransformerRemoveEmptyOptionals cleaner =
-        new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);
-
     FeatureTokenSource tokenSourceTransformed = featureTokenSource;
 
-    if (stepMapping) {
+    if (stepMappingSchema) {
+      FeatureTokenTransformerMappings schemaMapper =
+          new FeatureTokenTransformerMappings(
+              propertyTransformations,
+              codelists,
+              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
       tokenSourceTransformed = tokenSourceTransformed.via(schemaMapper);
+    } else if (stepMappingValues) {
+      FeatureTokenTransformerMappingValuesOnly valueMapper =
+          new FeatureTokenTransformerMappingValuesOnly(
+              propertyTransformations,
+              codelists,
+              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
+      tokenSourceTransformed = tokenSourceTransformed.via(valueMapper);
     }
     if (stepGeometry) {
+      FeatureTokenTransformerGeometry geometryMapper = new FeatureTokenTransformerGeometry();
       tokenSourceTransformed = tokenSourceTransformed.via(geometryMapper);
     }
     if (stepCoordinates) {
+      Optional<CrsTransformer> crsTransformer =
+          query
+              .getCrs()
+              .flatMap(
+                  targetCrs ->
+                      crsTransformerFactory.getTransformer(
+                          data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
+      Optional<CrsTransformer> crsTransformerWgs84 =
+          query
+              .getCrs()
+              .flatMap(
+                  targetCrs ->
+                      crsTransformerFactory.getTransformer(
+                          data.getNativeCrs().orElse(OgcCrs.CRS84),
+                          nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
+      FeatureTokenTransformerCoordinates coordinatesMapper =
+          new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
       tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
     }
     if (stepClean) {
+      FeatureTokenTransformerRemoveEmptyOptionals cleaner =
+          new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);
       tokenSourceTransformed = tokenSourceTransformed.via(cleaner);
     }
     if (FeatureTokenValidator.LOGGER.isTraceEnabled()) {

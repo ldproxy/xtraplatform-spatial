@@ -55,6 +55,12 @@ public interface PropertyTransformations {
         && getTransformations().get(key).stream().anyMatch(predicate);
   }
 
+  default boolean onlyValueTransformations() {
+    return getTransformations().values().stream()
+        .flatMap(List::stream)
+        .allMatch(PropertyTransformation::onlyValueTransformations);
+  }
+
   default Map<String, List<PropertyTransformation>> withTransformation(
       String key, PropertyTransformation transformation) {
     Map<String, List<PropertyTransformation>> transformations =
