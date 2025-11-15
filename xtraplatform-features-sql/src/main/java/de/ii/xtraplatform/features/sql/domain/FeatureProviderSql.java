@@ -531,6 +531,7 @@ public class FeatureProviderSql
     this.scheduler = scheduler;
     this.subdecoders = subdecoders;
     this.cronJob = null;
+    this.tableSchemas = null;
   }
 
   private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
@@ -823,14 +824,19 @@ public class FeatureProviderSql
   public Map<String, List<SchemaSql>> getSourceSchemas() {
     QuerySchemaDeriver querySchemaDeriver = new QuerySchemaDeriver(pathParser3);
 
-    this.tableSchemas =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    Map.entry(
-                        entry.getKey(),
-                        entry.getValue().accept(WITH_SCOPE_RETURNABLE).accept(querySchemaDeriver)))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    if (this.tableSchemas == null) {
+      this.tableSchemas =
+          getData().getTypes().entrySet().stream()
+              .map(
+                  entry ->
+                      Map.entry(
+                          entry.getKey(),
+                          entry
+                              .getValue()
+                              .accept(WITH_SCOPE_RETURNABLE)
+                              .accept(querySchemaDeriver)))
+              .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    }
 
     return this.tableSchemas;
   }
