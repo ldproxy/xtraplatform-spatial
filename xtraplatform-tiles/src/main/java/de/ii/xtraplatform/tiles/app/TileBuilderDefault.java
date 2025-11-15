@@ -163,7 +163,8 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
                     false,
                     false,
                     false,
-                    false));
+                    false,
+                    true));
 
         ImmutableList.Builder<PipelineSteps> skipSteps = ImmutableList.builder();
         skipSteps.addAll(featureQuery.skipPipelineSteps());

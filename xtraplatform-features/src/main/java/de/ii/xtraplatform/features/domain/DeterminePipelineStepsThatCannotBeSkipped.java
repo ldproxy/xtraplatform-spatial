@@ -26,8 +26,9 @@ public class DeterminePipelineStepsThatCannotBeSkipped
 
   private final EpsgCrs nativeCrs;
   private final EpsgCrs targetCrs;
-  private final Query query;
+  private final TypeQuery query;
   private final Optional<PropertyTransformations> propertyTransformations;
+  private final boolean simplifyGeometries;
   private final boolean deriveMetadataFromContent;
   private final boolean requiresPropertiesInSequence;
   private final boolean supportSecondaryGeometry;
@@ -35,7 +36,7 @@ public class DeterminePipelineStepsThatCannotBeSkipped
   private final String featureType;
 
   public DeterminePipelineStepsThatCannotBeSkipped(
-      Query query,
+      TypeQuery query,
       String featureType,
       Optional<PropertyTransformations> propertyTransformations,
       EpsgCrs nativeCrs,
@@ -43,7 +44,8 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       boolean deriveMetadataFromContent,
       boolean requiresPropertiesInSequence,
       boolean supportSecondaryGeometry,
-      boolean distinguishNullAndMissing) {
+      boolean distinguishNullAndMissing,
+      boolean simplifyGeometries) {
     this.query = query;
     this.propertyTransformations = propertyTransformations;
     this.nativeCrs = nativeCrs;
@@ -53,6 +55,7 @@ public class DeterminePipelineStepsThatCannotBeSkipped
     this.supportSecondaryGeometry = supportSecondaryGeometry;
     this.distinguishNullAndMissing = distinguishNullAndMissing;
     this.featureType = featureType;
+    this.simplifyGeometries = simplifyGeometries;
   }
 
   @Override
@@ -68,7 +71,7 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       // coordinate processing is needed if a target CRS differs from the native CRS or geometries
       // are simplified
       if (!targetCrs.equals(nativeCrs)
-          || (query.getMaxAllowableOffset() > 0)
+          || (simplifyGeometries)
           || (!(OgcCrs.CRS84.equals(nativeCrs) || OgcCrs.CRS84h.equals(nativeCrs))
               && supportSecondaryGeometry
               && schema.isSecondaryGeometry())) {
@@ -88,11 +91,8 @@ public class DeterminePipelineStepsThatCannotBeSkipped
 
       // include transformations from the feature provider as in the feature stream
       PropertyTransformations mergedTransformations =
-          FeatureStreamImpl.getMergedTransformations(
-                  Map.of(featureType, schema),
-                  query,
-                  Map.of(featureType, propertyTransformations.orElse(Map::of)))
-              .get(featureType);
+          FeatureStreamImpl.getPropertyTransformations(
+              Map.of(featureType, schema), query, propertyTransformations);
 
       // if null values are not removed, cleaning is not needed
       if (intermediateResult.contains(PipelineSteps.CLEAN)

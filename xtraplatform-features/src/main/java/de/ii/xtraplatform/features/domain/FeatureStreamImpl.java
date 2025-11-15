@@ -308,7 +308,7 @@ public class FeatureStreamImpl implements FeatureStream {
     return ImmutableMap.of();
   }
 
-  private static PropertyTransformations getPropertyTransformations(
+  static PropertyTransformations getPropertyTransformations(
       Map<String, FeatureSchema> featureSchemas,
       TypeQuery typeQuery,
       Optional<PropertyTransformations> propertyTransformations) {
