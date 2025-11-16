@@ -112,16 +112,22 @@ public class DeterminePipelineStepsThatCannotBeSkipped
         if (requiresPropertiesInSequence) {
           steps.add(PipelineSteps.MAPPING_SCHEMA);
           steps.add(PipelineSteps.MAPPING_VALUES);
-        } else if (mergedTransformations.getTransformations().entrySet().stream()
-            .filter(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))
-            .map(Entry::getValue)
-            .flatMap(Collection::stream)
-            .allMatch(PropertyTransformation::onlyValueTransformations)) {
-          steps.add(PipelineSteps.MAPPING_VALUES);
-        } else if (mergedTransformations.getTransformations().entrySet().stream()
-            .anyMatch(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))) {
-          steps.add(PipelineSteps.MAPPING_SCHEMA);
-          steps.add(PipelineSteps.MAPPING_VALUES);
+        } else {
+          List<PropertyTransformation> transformations =
+              mergedTransformations.getTransformations().entrySet().stream()
+                  .filter(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))
+                  .map(Entry::getValue)
+                  .flatMap(Collection::stream)
+                  .toList();
+          if (!transformations.isEmpty()) {
+            if (transformations.stream()
+                .allMatch(PropertyTransformation::onlyValueTransformations)) {
+              steps.add(PipelineSteps.MAPPING_VALUES);
+            } else {
+              steps.add(PipelineSteps.MAPPING_SCHEMA);
+              steps.add(PipelineSteps.MAPPING_VALUES);
+            }
+          }
         }
       } else {
         steps.add(PipelineSteps.MAPPING_VALUES);
