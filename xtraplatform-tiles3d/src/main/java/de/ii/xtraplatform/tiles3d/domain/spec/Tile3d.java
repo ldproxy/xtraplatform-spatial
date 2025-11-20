@@ -10,6 +10,7 @@ package de.ii.xtraplatform.tiles3d.domain.spec;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -17,26 +18,54 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableTile3d.Builder.class)
 public interface Tile3d {
 
+  default Tile3d withUris(String uriPrefix) {
+    return new ImmutableTile3d.Builder()
+        .from(this)
+        .content(
+            getContent()
+                .map(
+                    content ->
+                        new ImmutableWithUri.Builder()
+                            .uri(uriPrefix + flattenUri(content.getUri()))
+                            .build()))
+        .children(getChildren().stream().map(child -> child.withUris(uriPrefix)).toList())
+        .build();
+  }
+
   @SuppressWarnings("UnstableApiUsage")
   Funnel<Tile3d> FUNNEL =
       (from, into) -> {
         BoundingVolume.FUNNEL.funnel(from.getBoundingVolume(), into);
         from.getGeometricError().ifPresent(into::putFloat);
         into.putString(from.getRefine(), StandardCharsets.UTF_8);
-        WithUri.FUNNEL.funnel(from.getContent(), into);
-        ImplicitTiling.FUNNEL.funnel(from.getImplicitTiling(), into);
+        from.getContent().ifPresent(content -> WithUri.FUNNEL.funnel(content, into));
+        from.getImplicitTiling()
+            .ifPresent(implicit -> ImplicitTiling.FUNNEL.funnel(implicit, into));
       };
 
   BoundingVolume getBoundingVolume();
 
   Optional<Float> getGeometricError();
 
+  List<Double> getTransform();
+
   @Value.Default
   default String getRefine() {
     return "REPLACE";
   }
 
-  WithUri getContent();
+  Optional<WithUri> getContent();
 
-  ImplicitTiling getImplicitTiling();
+  Optional<ImplicitTiling> getImplicitTiling();
+
+  List<Tile3d> getChildren();
+
+  default void accept(Tile3dVisitor visitor) {
+    visitor.visit(this);
+    getChildren().forEach(child -> child.accept(visitor));
+  }
+
+  static String flattenUri(String uri) {
+    return uri.replaceAll("/", "_");
+  }
 }

@@ -17,20 +17,41 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableTileset3d.Builder.class)
 public interface Tileset3d {
 
-  default Tileset3d withUris(String contentUri, String subtreeUri) {
+  default Tileset3d withUris(
+      String uriPrefix, String implicitContentUri, String implicitSubtreeUri) {
+    if (getRoot().getImplicitTiling().isEmpty()) {
+      return withUris(uriPrefix);
+    }
+
     return new ImmutableTileset3d.Builder()
         .from(this)
         .root(
             new ImmutableTile3d.Builder()
                 .from(getRoot())
-                .content(new ImmutableWithUri.Builder().uri(contentUri).build())
+                .content(
+                    getRoot()
+                        .getContent()
+                        .map(
+                            content ->
+                                new ImmutableWithUri.Builder().uri(implicitContentUri).build()))
                 .implicitTiling(
-                    new ImmutableImplicitTiling.Builder()
-                        .from(getRoot().getImplicitTiling())
-                        .subtrees(new ImmutableWithUri.Builder().uri(subtreeUri).build())
-                        .build())
+                    getRoot()
+                        .getImplicitTiling()
+                        .map(
+                            implicitTiling ->
+                                new ImmutableImplicitTiling.Builder()
+                                    .from(implicitTiling)
+                                    .subtrees(
+                                        new ImmutableWithUri.Builder()
+                                            .uri(implicitSubtreeUri)
+                                            .build())
+                                    .build()))
                 .build())
         .build();
+  }
+
+  default Tileset3d withUris(String uriPrefix) {
+    return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(uriPrefix)).build();
   }
 
   String SCHEMA_REF = "#/components/schemas/Tileset3dTiles";

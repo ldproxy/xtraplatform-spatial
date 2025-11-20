@@ -27,14 +27,15 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFilesData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dQuery;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dStoreReadOnly;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFiles;
+import de.ii.xtraplatform.tiles3d.domain.spec.Tile3d;
 import de.ii.xtraplatform.tiles3d.domain.spec.Tileset3d;
+import de.ii.xtraplatform.tiles3d.domain.spec.WithUri;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,28 +105,10 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
 
         metadata.put(entry.getKey(), tileset);
 
-        if (Objects.isNull(tileset)
-            || Objects.isNull(tileset.getRoot())
-            || Objects.isNull(tileset.getRoot().getContent())
-            || Objects.isNull(tileset.getRoot().getContent().getUri())) {
-          throw new IllegalStateException(
-              "No root content URI found in 3D Tiles tileset file: " + source);
-        }
-
-        if (Objects.isNull(tileset)
-            || Objects.isNull(tileset.getRoot())
-            || Objects.isNull(tileset.getRoot().getImplicitTiling())
-            || Objects.isNull(tileset.getRoot().getImplicitTiling().getSubtrees())
-            || Objects.isNull(tileset.getRoot().getImplicitTiling().getSubtrees().getUri())) {
-          throw new IllegalStateException(
-              "No implicit tiling subtree URI found in 3D Tiles tileset file: " + source);
-        }
-
         Tile3dStoreReadOnly store =
-            Tile3dStorePlain.readOnly(
-                rootStore,
-                tileset.getRoot().getContent().getUri(),
-                tileset.getRoot().getImplicitTiling().getSubtrees().getUri());
+            tileset.getRoot().getImplicitTiling().isPresent()
+                ? loadStoreImplicit(tileset, source)
+                : loadStoreExplicit(tileset, source);
 
         stores.put(entry.getKey(), store);
 
@@ -156,6 +139,51 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
     // loadMetadata(tilesetSources);
 
     return true;
+  }
+
+  private Tile3dStoreReadOnly loadStoreImplicit(Tileset3d tileset, Path source) {
+    if (tileset.getRoot().getContent().isEmpty()
+        || tileset.getRoot().getContent().get().getUri().isBlank()) {
+      throw new IllegalStateException(
+          "No root content URI found in 3D Tiles tileset file: " + source);
+    }
+
+    if (tileset.getRoot().getImplicitTiling().isEmpty()
+        || tileset.getRoot().getImplicitTiling().get().getSubtrees().getUri().isBlank()) {
+      throw new IllegalStateException(
+          "No implicit tiling subtree URI found in 3D Tiles tileset file: " + source);
+    }
+
+    return Tile3dStorePlain.readOnly(
+        rootStore,
+        tileset.getRoot().getContent().map(WithUri::getUri).orElse(""),
+        tileset
+            .getRoot()
+            .getImplicitTiling()
+            .map(implicitTiling -> implicitTiling.getSubtrees().getUri())
+            .orElse(""));
+  }
+
+  private Tile3dStoreReadOnly loadStoreExplicit(Tileset3d tileset, Path source) {
+    Map<String, Path> contentUris = new LinkedHashMap<>();
+
+    tileset
+        .getRoot()
+        .accept(
+            tile -> {
+              tile.getContent()
+                  .map(WithUri::getUri)
+                  .ifPresent(
+                      uri ->
+                          contentUris.put(
+                              Tile3d.flattenUri(uri), Path.of(source.getParent().toString(), uri)));
+            });
+
+    if (contentUris.isEmpty()) {
+      throw new IllegalStateException("No content URIs found in 3D Tiles tileset file: " + source);
+    }
+
+    return Tile3dStorePlainExplicit.readOnly(rootStore, contentUris);
   }
 
   @Override

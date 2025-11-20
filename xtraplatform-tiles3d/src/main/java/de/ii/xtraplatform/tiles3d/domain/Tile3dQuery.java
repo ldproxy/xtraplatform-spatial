@@ -7,12 +7,20 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
+import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @Value.Style(deepImmutablesDetection = true, attributeBuilderDetection = true)
 public interface Tile3dQuery extends Tile3dCoordinates {
   String getTileset();
+
+  Optional<String> getFileName();
+
+  @Value.Derived
+  default boolean isExplicit() {
+    return getFileName().isPresent();
+  }
 
   // TODO MediaType getMediaType();
 
