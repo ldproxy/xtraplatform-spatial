@@ -51,6 +51,7 @@ public class FeatureDecoderSql
   private final Map<String, DecoderFactory> subDecoderFactories;
   private final Map<String, Decoder> subDecoders;
   private final boolean geometryAsWkb;
+  private final boolean sourceIsOracle;
 
   private boolean started;
   private boolean featureStarted;
@@ -68,10 +69,12 @@ public class FeatureDecoderSql
       List<SqlQueryMapping> sqlQueryMappings,
       Query query,
       Map<String, DecoderFactory> subDecoderFactories,
-      boolean geometryAsWkb) {
+      boolean geometryAsWkb,
+      boolean sourceIsOracle) {
     this.mappings = mappings;
     this.query = query;
     this.geometryAsWkb = geometryAsWkb;
+    this.sourceIsOracle = sourceIsOracle;
 
     this.mainTablePaths =
         sqlQueryMappings.stream().map(s -> s.getMainTable().getFullPath()).toList();
@@ -94,7 +97,8 @@ public class FeatureDecoderSql
   protected void init() {
     this.context = createContext().setMappings(mappings).setQuery(query);
     if (geometryAsWkb) {
-      this.geometryDecoderWkb = new GeometryDecoderWkb();
+      this.geometryDecoderWkb =
+          sourceIsOracle ? new GeometryDecoderWkb(true) : new GeometryDecoderWkb();
     } else {
       this.geometryDecoderWkt = new GeometryDecoderWkt();
     }

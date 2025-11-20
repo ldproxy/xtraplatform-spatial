@@ -25,20 +25,42 @@ import java.util.Set;
 
 public class GeometryDecoderWkb extends AbstractGeometryDecoder {
 
+  private final boolean isOracle;
+
+  public GeometryDecoderWkb() {
+    this.isOracle = false;
+  }
+
+  // Oracle WKB differs in two aspects from standard WKB:
+  // 1) CIRCULARSTRING, COMPOUNDCURVE, CURVEPOLYGON, MULTICURVE, and MULTISURFACE have a different
+  // geometry type code.
+  // 2) The embedded geometries do not repeat the endian byte for COMPOUNDCURVE, CURVEPOLYGON,
+  // MULTICURVE, MULTISURFACE.
+  public GeometryDecoderWkb(boolean isOracle) {
+    this.isOracle = isOracle;
+  }
+
   public Geometry<?> decode(byte[] wkb) throws IOException {
     return decode(wkb, Optional.empty());
   }
 
   public Geometry<?> decode(byte[] wkb, Optional<EpsgCrs> crs) throws IOException {
     try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(wkb))) {
-      return decode(dis, crs, Set.of(), null);
+      return decode(dis, crs, Set.of(), null, Optional.empty());
     }
   }
 
   public Geometry<?> decode(
-      DataInputStream dis, Optional<EpsgCrs> crs, Set<GeometryType> allowedTypes, Axes allowedAxes)
+      DataInputStream dis,
+      Optional<EpsgCrs> crs,
+      Set<GeometryType> allowedTypes,
+      Axes allowedAxes,
+      Optional<Boolean> isLittleEndianOracle)
       throws IOException {
-    boolean isLittleEndian = (dis.readByte() == 1);
+    boolean isLittleEndian =
+        isOracle && isLittleEndianOracle.isPresent()
+            ? isLittleEndianOracle.get()
+            : dis.readByte() == 1;
     long typeCode = readUnsignedInt(dis, isLittleEndian);
     Axes axes = Axes.fromWkbCode(typeCode);
     GeometryType type = WktWkbGeometryType.fromWkbType((int) typeCode).toGeometryType();
@@ -185,7 +207,13 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     long num = readUnsignedInt(dis, isLittleEndian);
     ImmutableList.Builder<Geometry<?>> builder = ImmutableList.builder();
     for (int i = 0; i < num; i++) {
-      Geometry<?> g = decode(dis, crs, allowedTypes, axes);
+      Geometry<?> g =
+          decode(
+              dis,
+              crs,
+              allowedTypes,
+              axes,
+              isOracle && allowedTypes.size() > 1 ? Optional.of(isLittleEndian) : Optional.empty());
       if (g != null) builder.add(g);
     }
     return builder.build();

@@ -52,6 +52,7 @@ class FeatureDecoderSqlSpec extends Specification {
                 ImmutableFeatureQuery.builder()
                         .type("biotop")
                         .build(),
+                false,
                 false)
         singleDecoder = new FeatureDecoderSql(
                 SqlRowFixtures.TYPE_INFOS, ImmutableList.of(),
@@ -60,6 +61,7 @@ class FeatureDecoderSqlSpec extends Specification {
                         .type("biotop")
                         .returnsSingleFeature(true)
                         .build(),
+                false,
                 false)
     }
 
