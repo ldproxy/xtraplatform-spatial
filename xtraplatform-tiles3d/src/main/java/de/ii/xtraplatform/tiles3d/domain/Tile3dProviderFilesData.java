@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.google.common.base.Preconditions;
 import de.ii.xtraplatform.docs.DocFile;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.docs.DocStep;
@@ -119,13 +118,5 @@ public interface Tile3dProviderFilesData extends Tile3dProviderData {
           .providerType(EntityDataDefaults.PLACEHOLDER)
           .providerSubType(EntityDataDefaults.PLACEHOLDER);
     }
-  }
-
-  @Value.Check
-  default void checkSingleTileset() {
-    Preconditions.checkState(
-        getTilesets().size() <= 1,
-        "There can only be one tileset in an MBTiles provider. Found: %s.",
-        getTilesets().size());
   }
 }
