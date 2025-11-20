@@ -28,6 +28,17 @@ public enum WktWkbGeometryType {
   NONE;
 
   public static WktWkbGeometryType fromWkbType(int type) {
+    if (type > Axes.SPECIAL_SHIFT) {
+      // Special encoding used by Oracle; For example, 1000003 is a CURVEPOLYGON
+      return switch (type % Axes.SPECIAL_SHIFT) {
+        case 1 -> CIRCULARSTRING;
+        case 2 -> COMPOUNDCURVE;
+        case 3 -> CURVEPOLYGON;
+        case 4 -> MULTICURVE;
+        case 5 -> MULTISURFACE;
+        default -> NONE;
+      };
+    }
     return switch (type % 1000) {
       case 0 -> GEOMETRY;
       case 1 -> POINT;

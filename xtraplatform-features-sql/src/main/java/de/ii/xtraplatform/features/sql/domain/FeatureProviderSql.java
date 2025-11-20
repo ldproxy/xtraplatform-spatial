@@ -873,7 +873,8 @@ public class FeatureProviderSql
           sqlQueryMappings,
           query,
           subdecoders,
-          getData().getQueryGeneration().getGeometryAsWkb());
+          getData().getQueryGeneration().getGeometryAsWkb(),
+          "ORACLE".equals(getData().getProviderSubType()));
     }
 
     if (query instanceof MultiFeatureQuery) {
@@ -890,7 +891,8 @@ public class FeatureProviderSql
           sqlQueryMappings,
           query,
           subdecoders,
-          getData().getQueryGeneration().getGeometryAsWkb());
+          getData().getQueryGeneration().getGeometryAsWkb(),
+          "ORACLE".equals(getData().getProviderSubType()));
     }
 
     throw new IllegalArgumentException();
