@@ -24,8 +24,14 @@ import org.slf4j.LoggerFactory;
 class Tile3dStorePlain implements Tile3dStoreReadOnly {
 
   static Tile3dStoreReadOnly readOnly(
-      ResourceStore blobStore, String contentPathTemplate, String subtreePathTemplate) {
-    return new Tile3dStorePlain(blobStore, contentPathTemplate, subtreePathTemplate);
+      ResourceStore blobStore,
+      String prefix,
+      String contentPathTemplate,
+      String subtreePathTemplate) {
+    return new Tile3dStorePlain(
+        blobStore,
+        Path.of(prefix, contentPathTemplate).toString(),
+        Path.of(prefix, subtreePathTemplate).toString());
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dStorePlain.class);
@@ -117,7 +123,7 @@ class Tile3dStorePlain implements Tile3dStoreReadOnly {
 
   @Override
   public boolean has(String tileset, String tms, int level, int row, int col) throws IOException {
-    return blobStore.has(path(contentPathTemplate, tileset, level, row, col));
+    return blobStore.has(path(contentPathTemplate, level, row, col));
   }
 
   /*@Override
@@ -198,12 +204,11 @@ class Tile3dStorePlain implements Tile3dStoreReadOnly {
   }*/
 
   private static Path path(String template, Tile3dQuery tile) {
-    return path(template, tile.getTileset(), tile.getLevel(), tile.getRow(), tile.getCol());
+    return path(template, tile.getLevel(), tile.getRow(), tile.getCol());
   }
 
-  private static Path path(String template, String tileset, int level, int row, int col) {
+  private static Path path(String template, int level, int row, int col) {
     return Path.of(
-        tileset,
         template
             .replace("{level}", String.valueOf(level))
             .replace("{x}", String.valueOf(col))

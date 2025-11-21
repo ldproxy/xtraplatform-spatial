@@ -156,6 +156,7 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
 
     return Tile3dStorePlain.readOnly(
         rootStore,
+        source.getParent().toString(),
         tileset.getRoot().getContent().map(WithUri::getUri).orElse(""),
         tileset
             .getRoot()
