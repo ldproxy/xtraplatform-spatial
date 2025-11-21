@@ -9,7 +9,10 @@ package de.ii.xtraplatform.tiles3d.domain.spec;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
 import java.util.List;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -23,4 +26,21 @@ public interface BoundingVolume {
       };
 
   List<Double> getRegion();
+
+  default Optional<BoundingBox> toBoundingBox() {
+    List<Double> region = getRegion();
+    if (region.size() != 6) {
+      return Optional.empty();
+    }
+    BoundingBox bbox =
+        BoundingBox.of(
+            Math.toDegrees(region.get(0)),
+            Math.toDegrees(region.get(1)),
+            region.get(4),
+            Math.toDegrees(region.get(2)),
+            Math.toDegrees(region.get(3)),
+            region.get(5),
+            OgcCrs.CRS84h);
+    return Optional.of(bbox);
+  }
 }
