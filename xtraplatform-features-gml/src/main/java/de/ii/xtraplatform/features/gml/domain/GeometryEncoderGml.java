@@ -119,6 +119,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   public enum Options {
     WITH_GML_ID,
     WITH_SRS_NAME,
+    WITH_SRS_DIMENSION,
     LINE_STRING_AS_SEGMENT,
     POLYGON_AS_PATCH
   }
@@ -255,6 +256,10 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     writeStartTag(tagName, Map.of(), false, true);
   }
 
+  private void writeStartTagProperty(String tagName, Map<String, String> attributes) {
+    writeStartTag(tagName, attributes, false, true);
+  }
+
   private void writeStartTag(
       String tagName, Map<String, String> attributes, boolean isObject, boolean suppressSrsName) {
     write(OPEN);
@@ -311,13 +316,29 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   private void writePosition(double[] coordinates, Axes axes) {
-    writeStartTagProperty(version != GmlVersion.GML21 ? POS : COORDINATES);
+    if (version != GmlVersion.GML21) {
+      if (options.contains(Options.WITH_SRS_DIMENSION)) {
+        writeStartTagProperty(POS, Map.of("srsDimension", String.valueOf(axes.size())));
+      } else {
+        writeStartTagProperty(POS);
+      }
+    } else {
+      writeStartTagProperty(COORDINATES);
+    }
     writeCoordinates(coordinates, axes);
     writeEndTag(version != GmlVersion.GML21 ? POS : COORDINATES);
   }
 
   private void writePositionList(double[] coordinates, Axes axes) {
-    writeStartTagProperty(version != GmlVersion.GML21 ? POS_LIST : COORDINATES);
+    if (version != GmlVersion.GML21) {
+      if (options.contains(Options.WITH_SRS_DIMENSION)) {
+        writeStartTagProperty(POS_LIST, Map.of("srsDimension", String.valueOf(axes.size())));
+      } else {
+        writeStartTagProperty(POS_LIST);
+      }
+    } else {
+      writeStartTagProperty(COORDINATES);
+    }
     writeCoordinates(coordinates, axes);
     writeEndTag(version != GmlVersion.GML21 ? POS_LIST : COORDINATES);
   }
