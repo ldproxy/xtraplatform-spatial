@@ -71,7 +71,7 @@ public interface Tileset3d {
 
   Tile3d getRoot();
 
-  Optional<Map<String, String>> getSchema();
+  Optional<Map<String, Object>> getSchema();
 
   Optional<String> getSchemaUri();
 
