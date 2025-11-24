@@ -10,6 +10,7 @@ package de.ii.xtraplatform.tiles3d.domain.spec;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -69,6 +70,8 @@ public interface Tileset3d {
   Optional<Float> getGeometricError();
 
   Tile3d getRoot();
+
+  Optional<Map<String, String>> getSchema();
 
   Optional<String> getSchemaUri();
 
