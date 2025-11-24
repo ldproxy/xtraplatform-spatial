@@ -25,10 +25,10 @@ import java.util.Set;
 
 public class GeometryDecoderWkb extends AbstractGeometryDecoder {
 
-  private final boolean isOracle;
+  private final WkbDialect dialect;
 
   public GeometryDecoderWkb() {
-    this.isOracle = false;
+    this.dialect = WkbDialect.SQL_MM;
   }
 
   // Oracle WKB differs in two aspects from standard WKB:
@@ -36,8 +36,8 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
   // geometry type code.
   // 2) The embedded geometries do not repeat the endian byte for COMPOUNDCURVE, CURVEPOLYGON,
   // MULTICURVE, MULTISURFACE.
-  public GeometryDecoderWkb(boolean isOracle) {
-    this.isOracle = isOracle;
+  public GeometryDecoderWkb(WkbDialect wkbDialect) {
+    this.dialect = wkbDialect;
   }
 
   public Geometry<?> decode(byte[] wkb) throws IOException {
@@ -55,11 +55,11 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
       Optional<EpsgCrs> crs,
       Set<GeometryType> allowedTypes,
       Axes allowedAxes,
-      Optional<Boolean> isLittleEndianOracle)
+      Optional<Boolean> isLittleEndianRootGeometry)
       throws IOException {
     boolean isLittleEndian =
-        isOracle && isLittleEndianOracle.isPresent()
-            ? isLittleEndianOracle.get()
+        dialect == WkbDialect.ORACLE && isLittleEndianRootGeometry.isPresent()
+            ? isLittleEndianRootGeometry.get()
             : dis.readByte() == 1;
     long typeCode = readUnsignedInt(dis, isLittleEndian);
     Axes axes = Axes.fromWkbCode(typeCode);
@@ -213,7 +213,9 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               crs,
               allowedTypes,
               axes,
-              isOracle && allowedTypes.size() > 1 ? Optional.of(isLittleEndian) : Optional.empty());
+              dialect == WkbDialect.ORACLE && allowedTypes.size() > 1
+                  ? Optional.of(isLittleEndian)
+                  : Optional.empty());
       if (g != null) builder.add(g);
     }
     return builder.build();
