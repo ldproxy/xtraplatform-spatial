@@ -52,7 +52,7 @@ public class SqlDialectOras implements SqlDialect {
       queryBuilder.append(",0.001)");
     }
     if (linearizeCurves) {
-      queryBuilder.append(",0.001,'arc_tolerance=0.1 unit=m')");
+      queryBuilder.append(",0.001,'arc_tolerance=0.1')");
     }
     return queryBuilder.append(")").toString();
   }
@@ -76,7 +76,7 @@ public class SqlDialectOras implements SqlDialect {
       queryBuilder.append(",0.001)");
     }
     if (linearizeCurves) {
-      queryBuilder.append(",0.001,'arc_tolerance=0.1 unit=m')");
+      queryBuilder.append(",0.001,'arc_tolerance=0.1')");
     }
     return queryBuilder.append(")").toString();
   }
