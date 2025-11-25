@@ -70,11 +70,17 @@ public class CqlImpl implements Cql {
 
   @Override
   public Cql2Expression read(String cql, Format format) throws CqlParseException {
-    return read(cql, format, OgcCrs.CRS84);
+    return read(cql, format, OgcCrs.CRS84, false);
   }
 
   @Override
   public Cql2Expression read(String cql, Format format, EpsgCrs crs) throws CqlParseException {
+    return read(cql, format, crs, false);
+  }
+
+  @Override
+  public Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters)
+      throws CqlParseException {
     switch (format) {
       case TEXT:
         return cqlTextParser.parse(cql, crs);
@@ -86,7 +92,8 @@ public class CqlImpl implements Cql {
 
           // parameters are a CQL2-JSON extension used in stored queries; they must not appear in
           // normal CQL2 expressions
-          if (!expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
+          if (!allowParameters
+              && !expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
             throw new CqlParseException(
                 "Parameters are not allowed in CQL2 filter expressions, except in stored queries.");
           }
