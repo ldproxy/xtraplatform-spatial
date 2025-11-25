@@ -10,6 +10,7 @@ package de.ii.xtraplatform.cql.domain;
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -33,7 +34,7 @@ public interface Bbox extends CqlNode {
   List<Double> getCoordinates();
 
   @JsonIgnore
-  @JacksonInject("filterCrs")
+  @JacksonInject(value = "filterCrs", optional = OptBoolean.TRUE)
   Optional<EpsgCrs> getCrs();
 
   static Bbox of(BoundingBox boundingBox) {

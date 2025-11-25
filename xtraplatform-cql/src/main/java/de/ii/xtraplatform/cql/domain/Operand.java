@@ -163,9 +163,13 @@ public interface Operand extends CqlNode {
     private Optional<EpsgCrs> getFilterCrs(ObjectCodec oc) throws JsonMappingException {
       InjectableValues iv = ((ObjectMapper) oc).getInjectableValues();
       if (Objects.nonNull(iv)) {
-        Object value = iv.findInjectableValue("filterCrs", null, null, null);
-        if (value instanceof EpsgCrs) {
-          return Optional.of((EpsgCrs) value);
+        try {
+          Object value = iv.findInjectableValue("filterCrs", null, null, null);
+          if (value instanceof EpsgCrs) {
+            return Optional.of((EpsgCrs) value);
+          }
+        } catch (Throwable e) {
+          // continue if filterCrs not found
         }
       }
       return Optional.of(OgcCrs.CRS84);
