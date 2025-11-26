@@ -26,6 +26,9 @@ public interface Cql {
 
   Cql2Expression read(String cql, Format format, EpsgCrs crs) throws CqlParseException;
 
+  Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters)
+      throws CqlParseException;
+
   String write(Cql2Expression cql, Format format);
 
   List<String> findInvalidProperties(
