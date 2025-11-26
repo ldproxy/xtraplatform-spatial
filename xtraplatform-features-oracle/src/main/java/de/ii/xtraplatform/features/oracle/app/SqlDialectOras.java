@@ -40,10 +40,21 @@ public class SqlDialectOras implements SqlDialect {
 
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    if (!forcePolygonCCW) {
-      return String.format("SDO_UTIL.TO_WKTGEOMETRY(%s)", column);
+    StringBuilder queryBuilder = new StringBuilder("SDO_UTIL.TO_WKTGEOMETRY(");
+    if (linearizeCurves) {
+      queryBuilder.append("SDO_GEOM.SDO_ARC_DENSIFY(");
     }
-    return String.format("SDO_UTIL.TO_WKTGEOMETRY(SDO_UTIL.RECTIFY_GEOMETRY(%s, 0.001))", column);
+    if (forcePolygonCCW) {
+      queryBuilder.append("SDO_UTIL.RECTIFY_GEOMETRY(");
+    }
+    queryBuilder.append(column);
+    if (forcePolygonCCW) {
+      queryBuilder.append(",0.001)");
+    }
+    if (linearizeCurves) {
+      queryBuilder.append(",0.001,'arc_tolerance=0.1')");
+    }
+    return queryBuilder.append(")").toString();
   }
 
   @Override
@@ -53,10 +64,21 @@ public class SqlDialectOras implements SqlDialect {
 
   @Override
   public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    if (!forcePolygonCCW) {
-      return String.format("SDO_UTIL.TO_WKBGEOMETRY(%s)", column);
+    StringBuilder queryBuilder = new StringBuilder("SDO_UTIL.TO_WKBGEOMETRY(");
+    if (linearizeCurves) {
+      queryBuilder.append("SDO_GEOM.SDO_ARC_DENSIFY(");
     }
-    return String.format("SDO_UTIL.TO_WKBGEOMETRY(SDO_UTIL.RECTIFY_GEOMETRY(%s, 0.001))", column);
+    if (forcePolygonCCW) {
+      queryBuilder.append("SDO_UTIL.RECTIFY_GEOMETRY(");
+    }
+    queryBuilder.append(column);
+    if (forcePolygonCCW) {
+      queryBuilder.append(",0.001)");
+    }
+    if (linearizeCurves) {
+      queryBuilder.append(",0.001,'arc_tolerance=0.1')");
+    }
+    return queryBuilder.append(")").toString();
   }
 
   @Override
