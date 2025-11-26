@@ -99,6 +99,7 @@ import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
@@ -878,37 +879,41 @@ public class FeatureProviderSql
   protected FeatureTokenDecoder<
           SqlRow, FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
-
+    if (query instanceof FeatureQuery featureQuery) {
       List<SqlQueryMapping> sqlQueryMappings = queryMappings.get(featureQuery.getType());
 
-      return new FeatureDecoderSql(
-          mappings,
-          sqlQueryMappings,
-          query,
-          subdecoders,
-          getData().getQueryGeneration().getGeometryAsWkb());
+      return createDecoder(query, mappings, sqlQueryMappings);
     }
 
-    if (query instanceof MultiFeatureQuery) {
-      MultiFeatureQuery multiFeatureQuery = (MultiFeatureQuery) query;
-
+    if (query instanceof MultiFeatureQuery multiFeatureQuery) {
       List<SqlQueryMapping> sqlQueryMappings =
           multiFeatureQuery.getQueries().stream()
               .flatMap(typeQuery -> queryMappings.get(typeQuery.getType()).stream())
               .collect(Collectors.toList());
-      ;
 
-      return new FeatureDecoderSql(
-          mappings,
-          sqlQueryMappings,
-          query,
-          subdecoders,
-          getData().getQueryGeneration().getGeometryAsWkb());
+      return createDecoder(query, mappings, sqlQueryMappings);
     }
 
     throw new IllegalArgumentException();
+  }
+
+  private FeatureTokenDecoder<
+          SqlRow, FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
+      createDecoder(
+          Query query,
+          Map<String, SchemaMapping> mappings,
+          List<SqlQueryMapping> sqlQueryMappings) {
+    return new FeatureDecoderSql(
+        mappings,
+        sqlQueryMappings,
+        query,
+        subdecoders,
+        getData().getQueryGeneration().getGeometryAsWkb(),
+        getWkbDialect());
+  }
+
+  protected WkbDialect getWkbDialect() {
+    return WkbDialect.SQL_MM;
   }
 
   @Override
