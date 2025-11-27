@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.tiles3d.domain.spec;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
@@ -17,6 +19,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableBoundingVolume.Builder.class)
+@JsonInclude(Include.NON_EMPTY)
 public interface BoundingVolume {
 
   @SuppressWarnings("UnstableApiUsage")
@@ -26,6 +29,10 @@ public interface BoundingVolume {
       };
 
   List<Double> getRegion();
+
+  List<Double> getBox();
+
+  List<Double> getSphere();
 
   default Optional<BoundingBox> toBoundingBox() {
     List<Double> region = getRegion();

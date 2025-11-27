@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.tiles3d.domain.spec;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
 import java.nio.charset.StandardCharsets;
@@ -16,13 +18,14 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAssetMetadata.Builder.class)
+@JsonInclude(Include.NON_EMPTY)
 public interface AssetMetadata {
 
   @SuppressWarnings("UnstableApiUsage")
   Funnel<AssetMetadata> FUNNEL =
       (from, into) -> {
         into.putString(from.getVersion(), StandardCharsets.UTF_8);
-        into.putString(from.getGenerator(), StandardCharsets.UTF_8);
+        from.getGenerator().ifPresent(v -> into.putString(v, StandardCharsets.UTF_8));
         from.getCopyright().ifPresent(v -> into.putString(v, StandardCharsets.UTF_8));
         from.getExtras()
             .forEach(
@@ -34,15 +37,9 @@ public interface AssetMetadata {
                 });
       };
 
-  @Value.Default
-  default String getVersion() {
-    return "2.0";
-  }
+  String getVersion();
 
-  @Value.Default
-  default String getGenerator() {
-    return "ldproxy";
-  }
+  Optional<String> getGenerator();
 
   Optional<String> getCopyright();
 

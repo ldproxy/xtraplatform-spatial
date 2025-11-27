@@ -7,15 +7,19 @@
  */
 package de.ii.xtraplatform.tiles3d.domain.spec;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTile3d.Builder.class)
+@JsonInclude(Include.NON_EMPTY)
 public interface Tile3d {
 
   default Tile3d withUris(String uriPrefix) {
@@ -32,12 +36,26 @@ public interface Tile3d {
         .build();
   }
 
+  default Tile3d withUris(Path directory) {
+    return new ImmutableTile3d.Builder()
+        .from(this)
+        .content(
+            getContent()
+                .map(
+                    content ->
+                        new ImmutableWithUri.Builder()
+                            .uri(flattenUri(content.getUri(), directory))
+                            .build()))
+        .children(getChildren().stream().map(child -> child.withUris(directory)).toList())
+        .build();
+  }
+
   @SuppressWarnings("UnstableApiUsage")
   Funnel<Tile3d> FUNNEL =
       (from, into) -> {
         BoundingVolume.FUNNEL.funnel(from.getBoundingVolume(), into);
         from.getGeometricError().ifPresent(into::putFloat);
-        into.putString(from.getRefine(), StandardCharsets.UTF_8);
+        from.getRefine().ifPresent(v -> into.putString(v, StandardCharsets.UTF_8));
         from.getContent().ifPresent(content -> WithUri.FUNNEL.funnel(content, into));
         from.getImplicitTiling()
             .ifPresent(implicit -> ImplicitTiling.FUNNEL.funnel(implicit, into));
@@ -49,10 +67,7 @@ public interface Tile3d {
 
   List<Double> getTransform();
 
-  @Value.Default
-  default String getRefine() {
-    return "REPLACE";
-  }
+  Optional<String> getRefine();
 
   Optional<WithUri> getContent();
 
@@ -67,5 +82,9 @@ public interface Tile3d {
 
   static String flattenUri(String uri) {
     return uri.replaceAll("/", "_");
+  }
+
+  static String flattenUri(String uri, Path directory) {
+    return flattenUri(directory.resolve(uri).normalize().toString());
   }
 }

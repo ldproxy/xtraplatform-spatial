@@ -7,8 +7,11 @@
  */
 package de.ii.xtraplatform.tiles3d.domain.spec;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +19,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTileset3d.Builder.class)
+@JsonInclude(Include.NON_EMPTY)
 public interface Tileset3d {
 
   default Tileset3d withUris(
@@ -53,6 +57,10 @@ public interface Tileset3d {
 
   default Tileset3d withUris(String uriPrefix) {
     return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(uriPrefix)).build();
+  }
+
+  default Tileset3d withUris(Path directory) {
+    return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(directory)).build();
   }
 
   String SCHEMA_REF = "#/components/schemas/Tileset3dTiles";
