@@ -24,8 +24,11 @@ import org.slf4j.LoggerFactory;
 
 class Tile3dStorePlainExplicit implements Tile3dStoreReadOnly {
 
-  static Tile3dStoreReadOnly readOnly(ResourceStore blobStore, Map<String, Path> contentPaths) {
-    return new Tile3dStorePlainExplicit(blobStore, contentPaths);
+  static Tile3dStoreReadOnly readOnly(
+      ResourceStore blobStore,
+      Map<String, Path> contentPaths,
+      Map<String, byte[]> externalTilesets) {
+    return new Tile3dStorePlainExplicit(blobStore, contentPaths, externalTilesets);
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dStorePlainExplicit.class);
@@ -33,19 +36,29 @@ class Tile3dStorePlainExplicit implements Tile3dStoreReadOnly {
 
   private final ResourceStore blobStore;
   private final Map<String, Path> contentPaths;
+  private final Map<String, byte[]> externalTilesets;
 
-  private Tile3dStorePlainExplicit(ResourceStore blobStore, Map<String, Path> contentPaths) {
+  private Tile3dStorePlainExplicit(
+      ResourceStore blobStore,
+      Map<String, Path> contentPaths,
+      Map<String, byte[]> externalTilesets) {
     this.blobStore = blobStore;
     this.contentPaths = contentPaths;
+    this.externalTilesets = externalTilesets;
   }
 
   @Override
   public boolean has(Tile3dQuery tile) throws IOException {
-    return blobStore.has(path(contentPaths, tile));
+    return externalTilesets.containsKey(tile.getFileName().orElse(UNKNOWN_PATH))
+        || blobStore.has(path(contentPaths, tile));
   }
 
   @Override
   public TileResult get(Tile3dQuery tile) throws IOException {
+    if (externalTilesets.containsKey(tile.getFileName().orElse(UNKNOWN_PATH))) {
+      return TileResult.found(externalTilesets.get(tile.getFileName().orElse(UNKNOWN_PATH)));
+    }
+
     Optional<InputStream> content = blobStore.content(path(contentPaths, tile));
 
     if (content.isEmpty()) {
@@ -69,6 +82,11 @@ class Tile3dStorePlainExplicit implements Tile3dStoreReadOnly {
 
   @Override
   public Optional<Boolean> isEmpty(Tile3dQuery tile) throws IOException {
+    if (externalTilesets.containsKey(tile.getFileName().orElse(UNKNOWN_PATH))) {
+      byte[] data = externalTilesets.get(tile.getFileName().orElse(UNKNOWN_PATH));
+      return Optional.of(data.length == 0);
+    }
+
     long size = blobStore.size(path(contentPaths, tile));
 
     return size < 0 ? Optional.empty() : Optional.of(size == 0);

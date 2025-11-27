@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,7 +168,23 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
 
   private Tile3dStoreReadOnly loadStoreExplicit(Tileset3d tileset, Path source) {
     Map<String, Path> contentUris = new LinkedHashMap<>();
+    Map<String, byte[]> externalTilesets = new LinkedHashMap<>();
 
+    try {
+      rootStore
+          .walk(
+              source.getParent(),
+              32,
+              ((path, attributes) ->
+                  attributes.isValue() && !attributes.isHidden() && !Objects.equals(path, source)))
+          .forEach(
+              file ->
+                  contentUris.put(
+                      Tile3d.flattenUri(file.toString()),
+                      Path.of(source.getParent().toString(), file.toString())));
+    } catch (IOException e) {
+      // ignore
+    }
     tileset
         .getRoot()
         .accept(
@@ -175,16 +192,31 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
               tile.getContent()
                   .map(WithUri::getUri)
                   .ifPresent(
-                      uri ->
-                          contentUris.put(
-                              Tile3d.flattenUri(uri), Path.of(source.getParent().toString(), uri)));
+                      uri -> {
+                        if (uri.endsWith(".json")) {
+                          Path path = source.getParent().resolve(uri);
+                          Path dir = Path.of(uri).getParent();
+
+                          try {
+                            Tileset3d extTileset =
+                                objectMapper.readValue(
+                                    rootStore.content(path).orElseThrow(), Tileset3d.class);
+                            String extTilesetNew =
+                                objectMapper.writeValueAsString(extTileset.withUris(dir));
+
+                            externalTilesets.put(Tile3d.flattenUri(uri), extTilesetNew.getBytes());
+                          } catch (IOException e) {
+                            throw new RuntimeException(e);
+                          }
+                        }
+                      });
             });
 
     if (contentUris.isEmpty()) {
       throw new IllegalStateException("No content URIs found in 3D Tiles tileset file: " + source);
     }
 
-    return Tile3dStorePlainExplicit.readOnly(rootStore, contentUris);
+    return Tile3dStorePlainExplicit.readOnly(rootStore, contentUris, externalTilesets);
   }
 
   @Override
