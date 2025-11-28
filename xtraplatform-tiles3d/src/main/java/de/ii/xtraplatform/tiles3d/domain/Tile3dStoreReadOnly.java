@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
+import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import java.io.IOException;
 import java.util.Optional;
@@ -15,7 +16,7 @@ public interface Tile3dStoreReadOnly {
 
   boolean has(Tile3dQuery tile) throws IOException;
 
-  TileResult get(Tile3dQuery tile) throws IOException;
+  Optional<Blob> get(Tile3dQuery tile) throws IOException;
 
   boolean hasSubtree(Tile3dQuery tile) throws IOException;
 

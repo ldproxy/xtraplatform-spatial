@@ -24,9 +24,9 @@ public interface Tileset3d {
 
   default Tileset3d withUris(
       String uriPrefix, String implicitContentUri, String implicitSubtreeUri) {
-    if (getRoot().getImplicitTiling().isEmpty()) {
-      return withUris(uriPrefix);
-    }
+    // if (getRoot().getImplicitTiling().isEmpty()) {
+    return withUris(uriPrefix);
+    /*}
 
     return new ImmutableTileset3d.Builder()
         .from(this)
@@ -52,7 +52,7 @@ public interface Tileset3d {
                                             .build())
                                     .build()))
                 .build())
-        .build();
+        .build();*/
   }
 
   default Tileset3d withUris(String uriPrefix) {

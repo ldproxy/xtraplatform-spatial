@@ -7,8 +7,10 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
+import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles3d.domain.spec.Tileset3d;
+import java.io.IOException;
 import java.util.Optional;
 
 public interface Tile3dAccess {
@@ -18,7 +20,7 @@ public interface Tile3dAccess {
 
   TileResult getSubtree(Tile3dQuery tileQuery);
 
-  TileResult getTile(Tile3dQuery tileQuery);
+  Optional<Blob> getFile(Tile3dQuery tileQuery) throws IOException;
 
   default boolean tilesMayBeUnavailable() {
     return false;

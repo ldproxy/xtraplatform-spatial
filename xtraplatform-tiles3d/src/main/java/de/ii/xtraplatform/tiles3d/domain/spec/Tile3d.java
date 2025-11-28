@@ -29,8 +29,17 @@ public interface Tile3d {
             getContent()
                 .map(
                     content ->
-                        new ImmutableWithUri.Builder()
-                            .uri(uriPrefix + flattenUri(content.getUri()))
+                        new ImmutableWithUri.Builder().uri(uriPrefix + content.getUri()).build()))
+        .implicitTiling(
+            getImplicitTiling()
+                .map(
+                    implicitTiling ->
+                        new ImmutableImplicitTiling.Builder()
+                            .from(implicitTiling)
+                            .subtrees(
+                                new ImmutableWithUri.Builder()
+                                    .uri(uriPrefix + implicitTiling.getSubtrees().getUri())
+                                    .build())
                             .build()))
         .children(getChildren().stream().map(child -> child.withUris(uriPrefix)).toList())
         .build();

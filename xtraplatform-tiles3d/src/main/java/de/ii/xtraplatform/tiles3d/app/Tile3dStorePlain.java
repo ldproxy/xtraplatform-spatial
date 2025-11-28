@@ -9,6 +9,7 @@ package de.ii.xtraplatform.tiles3d.app;
 
 import com.google.common.io.Files;
 import de.ii.xtraplatform.base.domain.LogContext;
+import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dQuery;
@@ -53,16 +54,17 @@ class Tile3dStorePlain implements Tile3dStoreReadOnly {
   }
 
   @Override
-  public TileResult get(Tile3dQuery tile) throws IOException {
-    Optional<InputStream> content = blobStore.content(path(contentPathTemplate, tile));
+  public Optional<Blob> get(Tile3dQuery tile) throws IOException {
+    Optional<Blob> content = blobStore.get(path(contentPathTemplate, tile));
+    return content;
 
-    if (content.isEmpty()) {
+    /*if (content.isEmpty()) {
       return TileResult.notFound();
     }
 
     try (InputStream result = content.get()) {
       return TileResult.found(result.readAllBytes());
-    }
+    }*/
   }
 
   @Override
