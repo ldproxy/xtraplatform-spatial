@@ -821,10 +821,11 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Auxiliary
   default boolean is3dGeometry() {
     return getGeometryType().isPresent()
-        && getGeometryType().get() == GeometryType.MULTI_POLYGON
-        && getConstraints().isPresent()
-        && getConstraints().get().isClosed()
-        && getConstraints().get().isComposite();
+        && ((getGeometryType().get() == GeometryType.MULTI_POLYGON
+                && getConstraints().isPresent()
+                && getConstraints().get().isClosed()
+                && getConstraints().get().isComposite())
+            || getGeometryType().get() == GeometryType.POLYHEDRAL_SURFACE);
   }
 
   default <U> U accept(SchemaVisitor<T, U> visitor) {
