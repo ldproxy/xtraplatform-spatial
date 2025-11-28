@@ -6,11 +6,11 @@ staxmate = '2.4.1'
 rxjava-jdbc = '0.1.4-ii.1'
 hikaricp = '7.0.2'
 postgresql = '42.7.8'
-sqlite = '3.50.3.0'
+sqlite = '3.51.0.0'
 schemacrawler = '16.29.1'
 jsqlparser = '5.3'
 jts = '1.20.0'
-commonmark = '0.26.0'
+commonmark = '0.27.0'
 vectortile = '1.4.1'
 
 [libraries]

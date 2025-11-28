@@ -115,6 +115,8 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
         this.ymax = minMax[1][1];
       }
     }
+
+    super.onGeometry(context);
   }
 
   private boolean hasRole(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context, Role role) {

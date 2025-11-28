@@ -1684,13 +1684,9 @@ public class FilterEncoderSql {
       for (Operand op : operands) {
         if (op instanceof Property) {
           String name = ((Property) op).getName();
-          FeatureSchema tableSchema = getSchema(name, false, name.contains("."));
-          Optional<FeatureSchema> schema =
-              tableSchema.getProperties().stream()
-                  // TODO.filter(getPropertyNameMatcher(name, false))
-                  .findFirst();
+          FeatureSchema schema = getSchema(name, false, name.contains("."));
 
-          if (schema.isPresent() && schema.get().is3dGeometry()) {
+          if (schema.is3dGeometry()) {
             return true;
           }
         }
