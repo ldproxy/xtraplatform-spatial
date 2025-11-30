@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import de.ii.xtraplatform.blobs.domain.Blob;
-import de.ii.xtraplatform.tiles.domain.TileResult;
 import java.io.IOException;
 import java.util.Optional;
 
@@ -18,20 +17,7 @@ public interface Tile3dStoreReadOnly {
 
   Optional<Blob> get(Tile3dQuery tile) throws IOException;
 
-  boolean hasSubtree(Tile3dQuery tile) throws IOException;
-
-  TileResult getSubtree(Tile3dQuery tile) throws IOException;
-
   Optional<Boolean> isEmpty(Tile3dQuery tile) throws IOException;
 
   boolean isEmpty() throws IOException;
-
-  void walk(Walker walker);
-
-  boolean has(String tileset, String tms, int level, int row, int col) throws IOException;
-
-  @FunctionalInterface
-  interface Walker {
-    void walk(String tileset, String tms, int level, int row, int col);
-  }
 }

@@ -21,16 +21,12 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFilesData;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
 public class Tile3dProviderFilesFactory
     extends AbstractEntityFactory<Tile3dProviderFilesData, Tile3dProviderFiles>
     implements EntityFactory {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFilesFactory.class);
 
   private final boolean skipHydration;
 

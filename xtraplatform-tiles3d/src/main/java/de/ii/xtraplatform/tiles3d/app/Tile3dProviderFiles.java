@@ -8,18 +8,15 @@
 package de.ii.xtraplatform.tiles3d.app;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Range;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
 import de.ii.xtraplatform.base.domain.Jackson;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
-import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.ProviderData;
-import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
@@ -54,31 +51,24 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFiles.class);
 
   private final ResourceStore rootStore;
-  private final TileMatrixSetRepository tileMatrixSetRepository;
   private final VolatileRegistry volatileRegistry;
   private final Map<String, Tileset3d> metadata;
   private final Map<String, Tile3dStoreReadOnly> stores;
-  private final Map<String, Map<String, Range<Integer>>> tmsRanges;
   private final ObjectMapper objectMapper;
-
-  // private ChainedTile3dProvider providerChain;
 
   @AssistedInject
   public Tile3dProviderFiles(
       ResourceStore blobStore,
-      TileMatrixSetRepository tileMatrixSetRepository,
       VolatileRegistry volatileRegistry,
       Jackson jackson,
       @Assisted Tile3dProviderFilesData data) {
     super(volatileRegistry, data, "access");
 
-    this.rootStore = blobStore.with("3dtiles" /*TODO TileProviderFeatures.TILES_DIR_NAME*/);
-    this.tileMatrixSetRepository = tileMatrixSetRepository;
+    this.rootStore = blobStore.with(Tile3dProvider.STORE_DIR_NAME);
     this.volatileRegistry = volatileRegistry;
     this.objectMapper = jackson.getDefaultObjectMapper();
     this.metadata = new LinkedHashMap<>();
     this.stores = new LinkedHashMap<>();
-    this.tmsRanges = new LinkedHashMap<>();
   }
 
   @Override
@@ -86,7 +76,6 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
     onVolatileStart();
 
     addSubcomponent(rootStore, "access");
-    addSubcomponent(tileMatrixSetRepository, "access");
 
     volatileRegistry.onAvailable(rootStore).toCompletableFuture().join();
 
@@ -102,123 +91,21 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
         InputStream inputStream = rootStore.content(source).orElseThrow();
         Tileset3d tileset = objectMapper.readValue(inputStream, Tileset3d.class);
 
+        tileset.validate(source);
+
         metadata.put(entry.getKey(), tileset);
 
         Tile3dStoreReadOnly store =
-            tileset.getRoot().getImplicitTiling().isPresent()
-                ? loadStoreImplicit(tileset, source)
-                : loadStoreExplicit(tileset, source);
+            Tile3dStorePlain.readOnly(rootStore.with(source.getParent().toString()));
 
         stores.put(entry.getKey(), store);
 
       } catch (IOException e) {
         throw new IllegalStateException("Could not load 3D Tiles tileset file: " + source, e);
       }
-
-      // String tms = "default"; // tileset.getTileMatrixSet();
-
-      // return new SimpleImmutableEntry<>(toTilesetKey(entry.getKey(), tms), source);
     }
-
-    // Tile3dStoreReadOnly tileStore = null; // TODO TileStoreMbTiles.readOnly(tilesetSources);
-
-    /*this.providerChain =
-    new ChainedTile3dProvider() {
-      @Override
-      public Map<String, Map<String, Range<Integer>>> getTmsRanges() {
-        return tmsRanges;
-      }
-
-      @Override
-      public TileResult getTile(Tile3dQuery tile) throws IOException {
-        return tileStore.get(tile);
-      }
-    };*/
-
-    // loadMetadata(tilesetSources);
 
     return true;
-  }
-
-  private Tile3dStoreReadOnly loadStoreImplicit(Tileset3d tileset, Path source) {
-    if (tileset.getRoot().getContent().isEmpty()
-        || tileset.getRoot().getContent().get().getUri().isBlank()) {
-      throw new IllegalStateException(
-          "No root content URI found in 3D Tiles tileset file: " + source);
-    }
-
-    if (tileset.getRoot().getImplicitTiling().isEmpty()
-        || tileset.getRoot().getImplicitTiling().get().getSubtrees().getUri().isBlank()) {
-      throw new IllegalStateException(
-          "No implicit tiling subtree URI found in 3D Tiles tileset file: " + source);
-    }
-
-    return Tile3dStorePlainExplicit.readOnly(
-        rootStore.with(source.getParent().toString()), Map.of(), Map.of());
-
-    /*return Tile3dStorePlain.readOnly(
-    rootStore,
-    source.getParent().toString(),
-    tileset.getRoot().getContent().map(WithUri::getUri).orElse(""),
-    tileset
-        .getRoot()
-        .getImplicitTiling()
-        .map(implicitTiling -> implicitTiling.getSubtrees().getUri())
-        .orElse(""));*/
-  }
-
-  private Tile3dStoreReadOnly loadStoreExplicit(Tileset3d tileset, Path source) {
-    Map<String, Path> contentUris = new LinkedHashMap<>();
-    Map<String, byte[]> externalTilesets = new LinkedHashMap<>();
-
-    /*try {
-      rootStore
-          .walk(
-              source.getParent(),
-              32,
-              ((path, attributes) ->
-                  attributes.isValue() && !attributes.isHidden() && !Objects.equals(path, source)))
-          .forEach(
-              file ->
-                  contentUris.put(
-                      Tile3d.flattenUri(file.toString()),
-                      Path.of(source.getParent().toString(), file.toString())));
-    } catch (IOException e) {
-      // ignore
-    }
-    tileset
-        .getRoot()
-        .accept(
-            tile -> {
-              tile.getContent()
-                  .map(WithUri::getUri)
-                  .ifPresent(
-                      uri -> {
-                        if (uri.endsWith(".json")) {
-                          Path path = source.getParent().resolve(uri);
-                          Path dir = Path.of(uri).getParent();
-
-                          try {
-                            Tileset3d extTileset =
-                                objectMapper.readValue(
-                                    rootStore.content(path).orElseThrow(), Tileset3d.class);
-                            String extTilesetNew =
-                                objectMapper.writeValueAsString(extTileset.withUris(dir));
-
-                            externalTilesets.put(Tile3d.flattenUri(uri), extTilesetNew.getBytes());
-                          } catch (IOException e) {
-                            throw new RuntimeException(e);
-                          }
-                        }
-                      });
-            });
-
-    if (contentUris.isEmpty()) {
-      throw new IllegalStateException("No content URIs found in 3D Tiles tileset file: " + source);
-    }*/
-
-    return Tile3dStorePlainExplicit.readOnly(
-        rootStore.with(source.getParent().toString()), contentUris, externalTilesets);
   }
 
   @Override
@@ -227,117 +114,13 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
   }
 
   @Override
-  public TileResult getSubtree(Tile3dQuery tileQuery) {
-    Optional<TileResult> error = validate(tileQuery);
-
-    if (error.isPresent()) {
-      return error.get();
-    }
-
-    try {
-      return stores.get(tileQuery.getTileset()).getSubtree(tileQuery);
-    } catch (Throwable e) {
-      return TileResult.error(String.format("Could not access subtree: %s", e.getMessage()));
-    }
-  }
-
-  @Override
   public Optional<Blob> getFile(Tile3dQuery tileQuery) throws IOException {
     Optional<TileResult> error = validate(tileQuery);
 
     if (error.isPresent()) {
-      // return error.get();
       throw new IllegalArgumentException(error.get().getError().orElse("Invalid tile query."));
     }
 
-    // try {
     return stores.get(tileQuery.getTileset()).get(tileQuery);
-    /*} catch (Throwable e) {
-      return TileResult.error(String.format("Could not access subtree: %s", e.getMessage()));
-    }*/
-  }
-
-  @Override
-  public boolean tilesMayBeUnavailable() {
-    return true;
-  }
-
-  private void loadMetadata(Map<String, Path> tilesetSources) {
-    tilesetSources.forEach(
-        (key, path) -> {
-          Tuple<String, String> tilesetKey = toTuple(key);
-
-          metadata.put(tilesetKey.first(), loadMetadata(tilesetKey.second(), path));
-          // TODO tmsRanges.put(tilesetKey.first(),
-          // metadata.get(tilesetKey.first()).getTmsRanges());
-        });
-  }
-
-  private Tileset3d loadMetadata(String tms, Path path) {
-    try {
-      InputStream inputStream = rootStore.content(path).orElseThrow();
-      Tileset3d tileset = objectMapper.readValue(inputStream, Tileset3d.class);
-      return tileset;
-    } catch (Throwable e) {
-      throw new RuntimeException("Could not derive metadata from Mbtiles tile provider.", e);
-    }
-
-    /*try {
-      MbtilesMetadata metadata = new MbtilesTileset(path, false).getMetadata();
-      TileMatrixSet tileMatrixSet =
-          tileMatrixSetRepository
-              .get(tms)
-              .orElseThrow(
-                  () ->
-                      new IllegalStateException(
-                          String.format("Unknown tile matrix set: '%s'.", tms)));
-      int minzoom = metadata.getMinzoom().orElse(tileMatrixSet.getMinLevel());
-      int maxzoom = metadata.getMaxzoom().orElse(tileMatrixSet.getMaxLevel());
-      Optional<Integer> defzoom =
-          metadata.getCenter().size() == 3
-              ? Optional.of(Math.round(metadata.getCenter().get(2).floatValue()))
-              : Optional.empty();
-      Optional<LonLat> center =
-          metadata.getCenter().size() >= 2
-              ? Optional.of(
-                  LonLat.of(
-                      metadata.getCenter().get(0).doubleValue(),
-                      metadata.getCenter().get(1).doubleValue()))
-              : Optional.empty();
-      Map<String, MinMax> zoomLevels =
-          ImmutableMap.of(
-              tms,
-              new ImmutableMinMax.Builder().min(minzoom).max(maxzoom).getDefault(defzoom).build());
-      List<Double> bbox = metadata.getBounds();
-      Optional<BoundingBox> bounds =
-          bbox.size() == 4
-              ? Optional.of(
-                  BoundingBox.of(bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3), OgcCrs.CRS84))
-              : Optional.empty();
-      TilesFormat format = metadata.getFormat();
-      List<FeatureSchema> vectorSchemas =
-          metadata.getVectorLayers().stream()
-              .map(VectorLayer::toFeatureSchema)
-              .collect(Collectors.toList());
-
-      return ImmutableTilesetMetadata.builder()
-          .addEncodings(format)
-          .levels(zoomLevels)
-          .center(center)
-          .bounds(bounds)
-          .vectorSchemas(vectorSchemas)
-          .build();
-    } catch (Exception e) {
-      throw new RuntimeException("Could not derive metadata from Mbtiles tile provider.", e);
-    }*/
-  }
-
-  private String toTilesetKey(String tileset, String tms) {
-    return String.join("/", tileset, tms);
-  }
-
-  private Tuple<String, String> toTuple(String tilesetKey) {
-    String[] split = tilesetKey.split("/");
-    return Tuple.of(split[0], split[1]);
   }
 }

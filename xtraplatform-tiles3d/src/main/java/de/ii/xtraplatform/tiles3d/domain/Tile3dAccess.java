@@ -18,13 +18,7 @@ public interface Tile3dAccess {
 
   Optional<Tileset3d> getMetadata(String tilesetId);
 
-  TileResult getSubtree(Tile3dQuery tileQuery);
-
   Optional<Blob> getFile(Tile3dQuery tileQuery) throws IOException;
-
-  default boolean tilesMayBeUnavailable() {
-    return false;
-  }
 
   default Optional<TileResult> validate(Tile3dQuery tile) {
     Optional<Tileset3d> metadata = getMetadata(tile.getTileset());

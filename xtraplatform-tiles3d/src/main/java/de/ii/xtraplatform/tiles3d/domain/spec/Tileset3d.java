@@ -14,6 +14,7 @@ import com.google.common.hash.Funnel;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -22,45 +23,8 @@ import org.immutables.value.Value;
 @JsonInclude(Include.NON_EMPTY)
 public interface Tileset3d {
 
-  default Tileset3d withUris(
-      String uriPrefix, String implicitContentUri, String implicitSubtreeUri) {
-    // if (getRoot().getImplicitTiling().isEmpty()) {
-    return withUris(uriPrefix);
-    /*}
-
-    return new ImmutableTileset3d.Builder()
-        .from(this)
-        .root(
-            new ImmutableTile3d.Builder()
-                .from(getRoot())
-                .content(
-                    getRoot()
-                        .getContent()
-                        .map(
-                            content ->
-                                new ImmutableWithUri.Builder().uri(implicitContentUri).build()))
-                .implicitTiling(
-                    getRoot()
-                        .getImplicitTiling()
-                        .map(
-                            implicitTiling ->
-                                new ImmutableImplicitTiling.Builder()
-                                    .from(implicitTiling)
-                                    .subtrees(
-                                        new ImmutableWithUri.Builder()
-                                            .uri(implicitSubtreeUri)
-                                            .build())
-                                    .build()))
-                .build())
-        .build();*/
-  }
-
   default Tileset3d withUris(String uriPrefix) {
     return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(uriPrefix)).build();
-  }
-
-  default Tileset3d withUris(Path directory) {
-    return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(directory)).build();
   }
 
   String SCHEMA_REF = "#/components/schemas/Tileset3dTiles";
@@ -75,15 +39,40 @@ public interface Tileset3d {
 
   AssetMetadata getAsset();
 
+  Map<String, Object> getProperties();
+
+  Map<String, Object> getSchema();
+
+  Optional<String> getSchemaUri();
+
+  Map<String, Object> getStatistics();
+
+  List<Map<String, Object>> getGroups();
+
+  Map<String, Object> getMetadata();
+
   Optional<Float> getGeometricError();
 
   Tile3d getRoot();
 
-  Optional<Map<String, Object>> getSchema();
-
-  Optional<String> getSchemaUri();
-
   List<String> getExtensionsUsed();
 
   List<String> getExtensionsRequired();
+
+  Map<String, Object> getExtensions();
+
+  Map<String, Object> getExtras();
+
+  default void validate(Path source) {
+    if (Objects.isNull(getAsset())
+        || (!Objects.equals(getAsset().getVersion(), "1.0")
+            && !Objects.equals(getAsset().getVersion(), "1.1"))) {
+      throw new IllegalStateException("Invalid version found in 3D Tiles tileset file: " + source);
+    }
+
+    if (Objects.isNull(getRoot()) || Objects.isNull(getRoot().getBoundingVolume())) {
+      throw new IllegalStateException(
+          "Invalid root tile found in 3D Tiles tileset file: " + source);
+    }
+  }
 }

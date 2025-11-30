@@ -14,6 +14,8 @@ import de.ii.xtraplatform.features.domain.FeatureProvider.FeatureVolatileCapabil
 
 public interface Tile3dProvider extends PersistentEntity, VolatileComposed {
 
+  String STORE_DIR_NAME = "3dtiles";
+
   @Override
   Tile3dProviderData getData();
 
