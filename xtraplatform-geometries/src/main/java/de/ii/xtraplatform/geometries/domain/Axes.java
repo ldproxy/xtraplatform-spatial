@@ -13,6 +13,8 @@ public enum Axes {
   XYM(3, " M", 2000),
   XYZM(4, " ZM", 3000);
 
+  public static final int SPECIAL_SHIFT = 1000000;
+
   private final int size;
   private final String wktSuffix;
   private final int wkbShift;
@@ -32,6 +34,11 @@ public enum Axes {
   }
 
   public static Axes fromWkbCode(long geometryTypeCode) {
+    if (geometryTypeCode >= SPECIAL_SHIFT) {
+      // In Oracle, CIRCULARSTRING, COMPOUNDCURVE, CURVEPOLYGON, MULTICURVE, and MULTISURFACE
+      // with axes XY have a different geometry type code 100000x.
+      return Axes.XY;
+    }
     return (geometryTypeCode >= Axes.XYZM.wkbShift)
         ? Axes.XYZM
         : (geometryTypeCode >= Axes.XYM.wkbShift)

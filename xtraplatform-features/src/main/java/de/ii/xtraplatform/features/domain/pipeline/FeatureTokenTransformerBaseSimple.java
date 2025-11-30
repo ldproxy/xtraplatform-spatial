@@ -155,6 +155,11 @@ public abstract class FeatureTokenTransformerBaseSimple<T, U, V extends Modifiab
   }
 
   @Override
+  public void onGeometry(V context) {
+    getDownstream().onGeometry(context);
+  }
+
+  @Override
   public void onValue(V context) {
     getDownstream().onValue(context);
   }

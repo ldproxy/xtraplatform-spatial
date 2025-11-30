@@ -25,20 +25,42 @@ import java.util.Set;
 
 public class GeometryDecoderWkb extends AbstractGeometryDecoder {
 
+  private final WkbDialect dialect;
+
+  public GeometryDecoderWkb() {
+    this.dialect = WkbDialect.SQL_MM;
+  }
+
+  // Oracle WKB differs in two aspects from standard WKB:
+  // 1) CIRCULARSTRING, COMPOUNDCURVE, CURVEPOLYGON, MULTICURVE, and MULTISURFACE have a different
+  // geometry type code.
+  // 2) The embedded geometries do not repeat the endian byte for COMPOUNDCURVE, CURVEPOLYGON,
+  // MULTICURVE, MULTISURFACE.
+  public GeometryDecoderWkb(WkbDialect wkbDialect) {
+    this.dialect = wkbDialect;
+  }
+
   public Geometry<?> decode(byte[] wkb) throws IOException {
     return decode(wkb, Optional.empty());
   }
 
   public Geometry<?> decode(byte[] wkb, Optional<EpsgCrs> crs) throws IOException {
     try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(wkb))) {
-      return decode(dis, crs, Set.of(), null);
+      return decode(dis, crs, Set.of(), null, Optional.empty());
     }
   }
 
   public Geometry<?> decode(
-      DataInputStream dis, Optional<EpsgCrs> crs, Set<GeometryType> allowedTypes, Axes allowedAxes)
+      DataInputStream dis,
+      Optional<EpsgCrs> crs,
+      Set<GeometryType> allowedTypes,
+      Axes allowedAxes,
+      Optional<Boolean> isLittleEndianRootGeometry)
       throws IOException {
-    boolean isLittleEndian = (dis.readByte() == 1);
+    boolean isLittleEndian =
+        dialect == WkbDialect.ORACLE && isLittleEndianRootGeometry.isPresent()
+            ? isLittleEndianRootGeometry.get()
+            : dis.readByte() == 1;
     long typeCode = readUnsignedInt(dis, isLittleEndian);
     Axes axes = Axes.fromWkbCode(typeCode);
     GeometryType type = WktWkbGeometryType.fromWkbType((int) typeCode).toGeometryType();
@@ -53,24 +75,29 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     return switch (type) {
       case POINT -> point(readPosition(dis, isLittleEndian, axes), crs);
       case MULTI_POINT -> multiPoint2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POINT)), crs);
+          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POINT), false),
+          crs);
       case LINE_STRING -> lineString(readPositionList(dis, isLittleEndian, axes), crs);
       case MULTI_LINE_STRING -> multiLineString2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.LINE_STRING)),
+          readListOfGeometry(
+              dis, crs, axes, isLittleEndian, Set.of(GeometryType.LINE_STRING), false),
           crs);
       case POLYGON -> polygon(readListOfPositionList(dis, isLittleEndian, axes), crs);
       case MULTI_POLYGON -> multiPolygon2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON)), crs);
+          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
+          crs);
       case CIRCULAR_STRING -> circularString(readPositionList(dis, isLittleEndian, axes), crs);
       case POLYHEDRAL_SURFACE -> polyhedralSurface2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON)), crs);
+          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
+          crs);
       case COMPOUND_CURVE -> compoundCurve(
           readListOfGeometry(
               dis,
               crs,
               axes,
               isLittleEndian,
-              Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING)),
+              Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING),
+              true),
           crs);
       case CURVE_POLYGON -> curvePolygon(
           readListOfGeometry(
@@ -81,7 +108,8 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               Set.of(
                   GeometryType.LINE_STRING,
                   GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE)),
+                  GeometryType.COMPOUND_CURVE),
+              true),
           crs);
       case MULTI_CURVE -> multiCurve(
           readListOfGeometry(
@@ -92,7 +120,8 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               Set.of(
                   GeometryType.LINE_STRING,
                   GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE)),
+                  GeometryType.COMPOUND_CURVE),
+              false),
           crs);
       case MULTI_SURFACE -> multiSurface(
           readListOfGeometry(
@@ -100,7 +129,8 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               crs,
               axes,
               isLittleEndian,
-              Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON)),
+              Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON),
+              false),
           crs);
       case GEOMETRY_COLLECTION -> geometryCollection(
           readListOfGeometry(
@@ -115,7 +145,8 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
                   GeometryType.MULTI_POINT,
                   GeometryType.MULTI_LINE_STRING,
                   GeometryType.MULTI_POLYGON,
-                  GeometryType.GEOMETRY_COLLECTION)),
+                  GeometryType.GEOMETRY_COLLECTION),
+              false),
           crs);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
@@ -180,12 +211,21 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
       Optional<EpsgCrs> crs,
       Axes axes,
       boolean isLittleEndian,
-      Set<GeometryType> allowedTypes)
+      Set<GeometryType> allowedTypes,
+      boolean embeddedGeometriesDoNotHaveLittleEndianFlagInOracle)
       throws IOException {
     long num = readUnsignedInt(dis, isLittleEndian);
     ImmutableList.Builder<Geometry<?>> builder = ImmutableList.builder();
     for (int i = 0; i < num; i++) {
-      Geometry<?> g = decode(dis, crs, allowedTypes, axes);
+      Geometry<?> g =
+          decode(
+              dis,
+              crs,
+              allowedTypes,
+              axes,
+              dialect == WkbDialect.ORACLE && embeddedGeometriesDoNotHaveLittleEndianFlagInOracle
+                  ? Optional.of(isLittleEndian)
+                  : Optional.empty());
       if (g != null) builder.add(g);
     }
     return builder.build();
