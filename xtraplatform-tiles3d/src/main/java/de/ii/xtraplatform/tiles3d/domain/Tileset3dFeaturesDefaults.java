@@ -13,8 +13,6 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.MinMax;
-import de.ii.xtraplatform.tiles.domain.TileGenerationOptions;
-import de.ii.xtraplatform.tiles.domain.WithFeatureProvider;
 import org.immutables.value.Value;
 
 /**
@@ -27,7 +25,7 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableTileset3dFeaturesDefaults.Builder.class)
 public interface Tileset3dFeaturesDefaults
     extends Tileset3dCommonDefaults,
-        TileGenerationOptions,
+        Tile3dGenerationOptions,
         WithFeatureProvider,
         Buildable<Tileset3dFeaturesDefaults> {
   @Override

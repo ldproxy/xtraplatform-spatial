@@ -8,16 +8,13 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.google.common.base.Preconditions;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.MinMax;
-import java.util.Objects;
 import java.util.Optional;
-import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -40,23 +37,6 @@ public interface Tileset3dFiles extends Tileset3dCommon, Buildable<Tileset3dFile
    */
   String getSource();
 
-  /**
-   * @langEn Tile Matrix Set of the tiles in the MBTiles file.
-   * @langDe Kachelschema der Kacheln in der MBTiles-Datei.
-   * @default WebMercatorQuad
-   * @since v4.0
-   */
-  @Nullable
-  String getTileMatrixSet();
-
-  @Value.Check
-  default void checkSingleTileMatrixSet() {
-    Preconditions.checkState(
-        getLevels().size() <= 1,
-        "There must be no more than one tile matrix set associated with an MBTiles file. Found: %s.",
-        getLevels().size());
-  }
-
   @Override
   default ImmutableTileset3dFiles.Builder getBuilder() {
     return new ImmutableTileset3dFiles.Builder().from(this);
@@ -72,10 +52,6 @@ public interface Tileset3dFiles extends Tileset3dCommon, Buildable<Tileset3dFile
     }
     if (this.getCenter().isEmpty() && defaults.getCenter().isPresent()) {
       withDefaults.center(defaults.getCenter());
-    }
-
-    if (Objects.isNull(this.getTileMatrixSet())) {
-      withDefaults.tileMatrixSet(defaults.getTileMatrixSet());
     }
 
     return withDefaults.build();

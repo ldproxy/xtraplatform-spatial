@@ -16,15 +16,11 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeatures;
 import de.ii.xtraplatform.tiles.domain.LevelFilter;
-import de.ii.xtraplatform.tiles.domain.LevelTransformation;
 import de.ii.xtraplatform.tiles.domain.MinMax;
-import de.ii.xtraplatform.tiles.domain.TileGenerationOptions;
-import de.ii.xtraplatform.tiles.domain.WithFeatureProvider;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 /**
@@ -39,7 +35,7 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableTilesetFeatures.Builder.class)
 public interface Tileset3dFeatures
     extends Tileset3dCommon,
-        TileGenerationOptions,
+        Tile3dGenerationOptions,
         WithFeatureProvider,
         Buildable<Tileset3dFeatures> {
   String COMBINE_ALL = "*";
@@ -47,7 +43,6 @@ public interface Tileset3dFeatures
   @Override
   String getId();
 
-  @DocIgnore
   @Override
   BuildableMap<MinMax, ImmutableMinMax.Builder> getLevels();
 
@@ -55,37 +50,8 @@ public interface Tileset3dFeatures
   @Override
   Optional<LonLat> getCenter();
 
-  @DocIgnore
   @Override
   Optional<String> getFeatureProvider();
-
-  @DocIgnore
-  @Nullable
-  @Override
-  Integer getFeatureLimit();
-
-  @DocIgnore
-  @Nullable
-  @Override
-  Double getMinimumSizeInPixel();
-
-  @DocIgnore
-  @Nullable
-  @Override
-  Boolean getIgnoreInvalidGeometries();
-
-  @DocIgnore
-  @Nullable
-  @Override
-  Boolean getSparse();
-
-  @DocIgnore
-  @Override
-  Map<String, List<LevelTransformation>> getTransformations();
-
-  @DocIgnore
-  @Override
-  List<String> getProfiles();
 
   /**
    * @langEn The name of the feature type. By default the tileset id is used.
@@ -105,6 +71,8 @@ public interface Tileset3dFeatures
    * @default []
    * @since v3.4
    */
+  @DocIgnore
+  // TODO: combine gltf tilesets to b3dm tileset
   List<String> getCombine();
 
   /**
@@ -147,25 +115,9 @@ public interface Tileset3dFeatures
     if (this.getCenter().isEmpty() && defaults.getCenter().isPresent()) {
       withDefaults.center(defaults.getCenter());
     }
-    if (this.getTransformations().isEmpty()) {
-      withDefaults.transformations(defaults.getTransformations());
-    }
-    if (this.getProfiles().isEmpty()) {
-      withDefaults.profiles(defaults.getProfiles());
-    }
-    if (Objects.isNull(this.getFeatureLimit()) && Objects.nonNull(defaults.getFeatureLimit())) {
-      withDefaults.featureLimit(defaults.getFeatureLimit());
-    }
-    if (Objects.isNull(this.getMinimumSizeInPixel())
-        && Objects.nonNull(defaults.getMinimumSizeInPixel())) {
-      withDefaults.minimumSizeInPixel(defaults.getMinimumSizeInPixel());
-    }
-    if (Objects.isNull(this.getIgnoreInvalidGeometries())
-        && Objects.nonNull(defaults.getIgnoreInvalidGeometries())) {
-      withDefaults.ignoreInvalidGeometries(defaults.getIgnoreInvalidGeometries());
-    }
-    if (Objects.isNull(this.getSparse()) && Objects.nonNull(defaults.getSparse())) {
-      withDefaults.sparse(defaults.getSparse());
+    if (Objects.isNull(this.getClampToEllipsoid())
+        && !Objects.isNull(defaults.getClampToEllipsoid())) {
+      withDefaults.clampToEllipsoid(defaults.getClampToEllipsoid());
     }
 
     return withDefaults.build();

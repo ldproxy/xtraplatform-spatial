@@ -5,7 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.tiles.app;
+package de.ii.xtraplatform.tiles3d.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
 import de.ii.xtraplatform.base.domain.AppContext;
@@ -15,13 +15,13 @@ import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProcessor;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
+import de.ii.xtraplatform.tiles.domain.SeedingOptions.JobSize;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
-import de.ii.xtraplatform.tiles.domain.TileProvider;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,11 +29,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.slf4j.Logger;
@@ -42,22 +41,22 @@ import org.threeten.extra.AmountFormats;
 
 @Singleton
 @AutoBind
-public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJobSet> {
+public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeedingJobSet> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileSeedingJobCreator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dSeedingJobCreator.class);
 
   private final int concurrency;
   private final EntityRegistry entityRegistry;
 
   @Inject
-  TileSeedingJobCreator(AppContext appContext, EntityRegistry entityRegistry) {
+  Tile3dSeedingJobCreator(AppContext appContext, EntityRegistry entityRegistry) {
     this.concurrency = appContext.getConfiguration().getBackgroundTasks().getMaxThreads();
     this.entityRegistry = entityRegistry;
   }
 
   @Override
   public String getJobType() {
-    return TileSeedingJobSet.TYPE_SETUP;
+    return Tile3dSeedingJobSet.TYPE_SETUP;
   }
 
   @Override
@@ -73,12 +72,13 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
   @Override
   public JobResult process(Job job, JobSet jobSet, Consumer<Job> pushJob) {
-    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet);
+    Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet);
     boolean isCleanup = getDetails(job);
 
-    Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJobSet.getTileProvider());
+    Optional<Tile3dProvider> optionalTileProvider =
+        getTileProvider(seedingJobSet.getTileProvider());
     if (optionalTileProvider.isPresent()) {
-      TileProvider tileProvider = optionalTileProvider.get();
+      Tile3dProvider tileProvider = optionalTileProvider.get();
 
       if (!tileProvider.seeding().isSupported()) {
         LOGGER.error("Tile provider does not support seeding: {}", tileProvider.getId());
@@ -135,55 +135,30 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
             tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
-        Map<String, Map<String, Set<TileMatrixSetLimits>>> rasterCoverage =
-            tileProvider.seeding().get().getRasterCoverage(seedingJobSet.getTileSetParameters());
-        TileMatrixPartitions tileStorePartitions =
-            new TileMatrixPartitions(
-                tileProvider.seeding().get().getOptions().getEffectiveJobSize());
 
-        Map<String, List<String>> rasterForVector =
-            seedingJobSet.getTileSets().entrySet().stream()
-                .map(
-                    entry ->
-                        Map.entry(
-                            entry.getKey(),
-                            tileProvider.access().get().getMapStyles(entry.getKey()).stream()
-                                .map(
-                                    style ->
-                                        tileProvider
-                                            .access()
-                                            .get()
-                                            .getMapStyleTileset(entry.getKey(), style))
-                                .collect(Collectors.toList())))
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-
-        Map<String, TileGenerationParameters> rasterForVectorTilesets =
-            seedingJobSet.getTileSetParameters().entrySet().stream()
-                .flatMap(
-                    entry ->
-                        rasterForVector.get(entry.getKey()).stream()
-                            .map(rasterTileset -> Map.entry(rasterTileset, entry.getValue())))
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-        Map<String, Map<String, Set<TileMatrixSetLimits>>> rasterForVectorCoverage =
-            tileProvider.seeding().get().getRasterCoverage(rasterForVectorTilesets);
+        int jobSize = 4;
+        switch (Objects.requireNonNullElse(
+            tileProvider.seeding().get().getOptions().getJobSize(), JobSize.M)) {
+          case S:
+            jobSize = 1;
+            break;
+          case M:
+            jobSize = 4;
+            break;
+          case L:
+            jobSize = 16;
+            break;
+          case XL:
+            jobSize = 64;
+            break;
+        }
+        TileMatrixPartitions tileMatrixPartitions = new TileMatrixPartitions(jobSize);
 
         tileProvider.seeding().get().setupSeeding(seedingJobSet);
 
-        boolean allRaster = true;
-        boolean someRaster = false;
-
         for (String tileSet : seedingJobSet.getTileSets().keySet()) {
           Map<String, Set<TileMatrixSetLimits>> tileMatrixSets =
-              coverage.containsKey(tileSet)
-                  ? coverage.get(tileSet)
-                  : rasterCoverage.containsKey(tileSet) ? rasterCoverage.get(tileSet) : Map.of();
-          boolean isRaster = rasterCoverage.containsKey(tileSet);
-
-          if (isRaster) {
-            someRaster = true;
-          } else {
-            allRaster = false;
-          }
+              coverage.containsKey(tileSet) ? coverage.get(tileSet) : Map.of();
 
           tileMatrixSets.forEach(
               (tileMatrixSet, limits) -> {
@@ -191,33 +166,20 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
                 limits.forEach(
                     (limit) -> {
-                      subMatrices.addAll(tileStorePartitions.getSubMatrices(limit));
+                      subMatrices.addAll(tileMatrixPartitions.getSubMatrices(limit));
                     });
 
                 for (TileSubMatrix subMatrix : subMatrices) {
                   Job job2 =
-                      isRaster
-                          ? TileSeedingJob.raster(
-                              jobSet.getPriority(),
-                              tileProvider.getId(),
-                              tileSet,
-                              tileMatrixSet,
-                              seedingJobSet.isReseed(),
-                              Set.of(subMatrix),
-                              jobSet.getId(),
-                              tileProvider
-                                  .seeding()
-                                  .get()
-                                  .getRasterStorageInfo(tileSet, tileMatrixSet, subMatrix))
-                          : TileSeedingJob.of(
-                              jobSet.getPriority(),
-                              tileProvider.getId(),
-                              tileSet,
-                              tileMatrixSet,
-                              seedingJobSet.isReseed(),
-                              Set.of(subMatrix),
-                              Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
-                              jobSet.getId());
+                      Tile3dSeedingJob.of(
+                          jobSet.getPriority(),
+                          tileProvider.getId(),
+                          tileSet,
+                          tileMatrixSet,
+                          seedingJobSet.isReseed(),
+                          Set.of(subMatrix),
+                          Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
+                          jobSet.getId());
 
                   pushJob.accept(job2);
                   jobSet.init(job2.getTotal().get());
@@ -233,12 +195,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
         }
 
         if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
-          String processors =
-              allRaster
-                  ? "remote"
-                  : someRaster
-                      ? "remote and " + getConcurrency(jobSet) + " local"
-                      : getConcurrency(jobSet) + " local";
+          String processors = getConcurrency(jobSet) + " local";
           LOGGER.debug(
               MARKER.JOBS,
               "{}: processing {} tiles with {} processors",
@@ -260,12 +217,12 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   }
 
   @Override
-  public Class<TileSeedingJobSet> getSetDetailsType() {
-    return TileSeedingJobSet.class;
+  public Class<Tile3dSeedingJobSet> getSetDetailsType() {
+    return Tile3dSeedingJobSet.class;
   }
 
-  private Optional<TileProvider> getTileProvider(String id) {
-    return entityRegistry.getEntity(TileProvider.class, id);
+  private Optional<Tile3dProvider> getTileProvider(String id) {
+    return entityRegistry.getEntity(Tile3dProvider.class, id);
   }
 
   private static String pretty(long seconds) {

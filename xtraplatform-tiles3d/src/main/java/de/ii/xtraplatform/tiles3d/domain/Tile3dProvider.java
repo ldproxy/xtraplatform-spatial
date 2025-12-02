@@ -16,6 +16,10 @@ public interface Tile3dProvider extends PersistentEntity, VolatileComposed {
 
   String STORE_DIR_NAME = "3dtiles";
 
+  static String clean(String id) {
+    return id.replace("-3dtiles", "").replace("3dtiles-", "");
+  }
+
   @Override
   Tile3dProviderData getData();
 
@@ -28,7 +32,7 @@ public interface Tile3dProvider extends PersistentEntity, VolatileComposed {
     return new FeatureVolatileCapability<>(Tile3dAccess.class, Tile3dAccess.CAPABILITY, this);
   }
 
-  default OptionalVolatileCapability<TileSeeding> seeding() {
-    return new FeatureVolatileCapability<>(TileSeeding.class, TileSeeding.CAPABILITY, this);
+  default OptionalVolatileCapability<Tile3dSeeding> seeding() {
+    return new FeatureVolatileCapability<>(Tile3dSeeding.class, Tile3dSeeding.CAPABILITY, this);
   }
 }
