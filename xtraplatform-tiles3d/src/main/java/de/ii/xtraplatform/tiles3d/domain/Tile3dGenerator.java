@@ -11,6 +11,7 @@ import com.google.common.collect.Range;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileComposed;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
+import de.ii.xtraplatform.tiles3d.domain.spec.Subtree;
 import java.util.Optional;
 
 public interface Tile3dGenerator extends VolatileComposed {
@@ -24,4 +25,8 @@ public interface Tile3dGenerator extends VolatileComposed {
   Optional<BoundingBox> getBounds(String tilesetId);
 
   TileMatrixSetData getTileMatrixSetData(String tilesetId, String tmsId, Range<Integer> levels);
+
+  Subtree generateSubtree(String tilesetId, TileTree subtree);
+
+  byte[] getSubtreeAsBinary(Subtree subtree);
 }

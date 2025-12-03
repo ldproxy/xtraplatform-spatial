@@ -57,7 +57,7 @@ public class Tile3dProviderFeaturesFactory
 
   @Override
   public Class<? extends PersistentEntity> entityClass() {
-    return Tile3dProviderFiles.class;
+    return Tile3dProviderFeatures.class;
   }
 
   @Override

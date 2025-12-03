@@ -39,35 +39,12 @@ public interface Tile3dSeedingJob {
             .tileSet(tileSet)
             .tileMatrixSet(tileMatrixSet)
             .generationParameters(generationParameters)
-            .encoding(MediaType.WILDCARD_TYPE) // TODO
+            .encoding(MediaType.APPLICATION_OCTET_STREAM_TYPE) // TODO
             .isReseed(isReseed)
             .addAllSubMatrices(subMatrices)
             .build();
 
     return Job.of(TYPE_SUBTREE, priority, details, jobSetId, (int) details.getNumberOfTiles());
-  }
-
-  static Job raster(
-      int priority,
-      String tileProvider,
-      String tileSet,
-      String tileMatrixSet,
-      boolean isReseed,
-      Set<TileSubMatrix> subMatrices,
-      String jobSetId,
-      Map<String, String> storageInfo) {
-    ImmutableTile3dSeedingJob details =
-        new ImmutableTile3dSeedingJob.Builder()
-            .tileProvider(tileProvider)
-            .tileSet(tileSet)
-            .tileMatrixSet(tileMatrixSet)
-            .encoding(MediaType.valueOf("image/png"))
-            .isReseed(isReseed)
-            .addAllSubMatrices(subMatrices)
-            .storage(storageInfo)
-            .build();
-
-    return Job.of(TYPE_GLTF, priority, details, jobSetId, (int) details.getNumberOfTiles());
   }
 
   String getTileProvider();

@@ -19,6 +19,7 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
+import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
@@ -39,7 +40,9 @@ import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileSeeding;
+import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
+import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerator;
@@ -48,8 +51,10 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFeaturesData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dQuery;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeeding;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dStoreReadOnly;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dStore;
+import de.ii.xtraplatform.tiles3d.domain.TileTree;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dCommon;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
 import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableAssetMetadata;
@@ -58,9 +63,9 @@ import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableImplicitTiling;
 import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableTile3d;
 import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableTileset3d;
 import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableWithUri;
+import de.ii.xtraplatform.tiles3d.domain.spec.Subtree;
 import de.ii.xtraplatform.tiles3d.domain.spec.Tileset3d;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -71,7 +76,9 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,7 +100,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   private final ResourceStore rootStore;
   private final VolatileRegistry volatileRegistry;
   private final Map<String, Tileset3d> metadata;
-  private final Map<String, Tile3dStoreReadOnly> stores;
+  private final Map<String, Tile3dStore> stores;
   private final Tile3dGenerator tileGenerator;
   private final TileWalker tileWalker;
   private final List<TileCache> generatorCaches;
@@ -108,12 +115,13 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       AppContext appContext,
       EntityRegistry entityRegistry,
       VolatileRegistry volatileRegistry,
+      Cql cql,
       TileWalker tileWalker,
       Jackson jackson,
       @Assisted Tile3dProviderFeaturesData data) {
     super(volatileRegistry, data, "access", "seeding", "generation");
 
-    this.rootStore = blobStore.with(Tile3dProvider.STORE_DIR_NAME);
+    this.rootStore = blobStore.with(Tile3dProvider.STORE_DIR_NAME, data.getId(), "cache_dyn");
     this.volatileRegistry = volatileRegistry;
     this.objectMapper = jackson.getDefaultObjectMapper();
     this.metadata = new LinkedHashMap<>();
@@ -121,7 +129,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
     this.tileGenerator =
         new Tile3dGeneratorFeatures(
-            data, entityRegistry, volatileRegistry, appContext, asyncStartup);
+            data, cql, entityRegistry, volatileRegistry, appContext, asyncStartup);
     this.tileWalker = tileWalker;
     this.generatorCaches = new ArrayList<>();
   }
@@ -155,6 +163,10 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       Tileset3dFeatures tilesetCfg = entry.getValue().mergeDefaults(getData().getTilesetDefaults());
 
       metadata.put(tilesetCfg.getId(), getTileset(tilesetCfg));
+
+      Tile3dStore store = Tile3dStorePlain.readWrite(rootStore.with(tilesetCfg.getId()));
+
+      stores.put(tilesetCfg.getId(), store);
     }
 
     Cache cache =
@@ -189,6 +201,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
 
     generatorCaches.add(new Tile3dCacheDynamic(tileWalker, customTms, cacheRanges));
 
+    LOGGER.info("INITT3DP");
     // registerChangeHandlers();
   }
 
@@ -197,16 +210,6 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     // unregisterChangeHandlers();
 
     super.onStopped();
-  }
-
-  private Tile3dStoreReadOnly loadStore(Tileset3d tileset, Path source) {
-    if (tileset.getRoot().getContent().isEmpty()
-        || tileset.getRoot().getContent().get().getUri().isBlank()) {
-      throw new IllegalStateException(
-          "No root content URI found in 3D Tiles tileset file: " + source);
-    }
-
-    return Tile3dStorePlain.readOnly(rootStore.with(source.getParent().toString()));
   }
 
   @Override
@@ -266,6 +269,33 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
 
     // TODO: cleanup all orphaned tiles that are not within current cache limits
   }
+
+  @Override
+  public void seedSubtrees(Tile3dSeedingJob job, Consumer<Integer> updateProgress)
+      throws IOException {
+
+    AtomicInteger current = new AtomicInteger(0);
+    Runnable updateProgress2 =
+        () -> {
+          int cur = current.incrementAndGet();
+          updateProgress.accept(cur);
+        };
+
+    // TODO: only if not exists or reseed
+    // TODO: logging context
+    for (TileSubMatrix t : job.getSubMatrices()) {
+      Subtree subtree = tileGenerator.generateSubtree(job.getTileSet(), TileTree.fromSubMatrix(t));
+      byte[] subtreeAsBinary = tileGenerator.getSubtreeAsBinary(subtree);
+      stores
+          .get(job.getTileSet())
+          .putSubtree(t.getLevel(), t.getColMin(), t.getRowMin(), subtreeAsBinary);
+    }
+
+    updateProgress2.run();
+  }
+
+  @Override
+  public void seedTiles(TileSeedingJob job, Consumer<Integer> updateProgress) throws IOException {}
 
   private List<Tuple<TileCache, String>> getCaches(Tile3dSeedingJobSet jobSet) {
     List<Tuple<TileCache, String>> result = new ArrayList<>();

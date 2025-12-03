@@ -18,14 +18,14 @@ import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.SeedingOptions.JobSize;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
-import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
+import de.ii.xtraplatform.tiles3d.domain.TileTree;
+import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -75,10 +75,10 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
     Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet);
     boolean isCleanup = getDetails(job);
 
-    Optional<Tile3dProvider> optionalTileProvider =
+    Optional<Tile3dProviderFeatures> optionalTileProvider =
         getTileProvider(seedingJobSet.getTileProvider());
     if (optionalTileProvider.isPresent()) {
-      Tile3dProvider tileProvider = optionalTileProvider.get();
+      Tile3dProviderFeatures tileProvider = optionalTileProvider.get();
 
       if (!tileProvider.seeding().isSupported()) {
         LOGGER.error("Tile provider does not support seeding: {}", tileProvider.getId());
@@ -88,39 +88,7 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
       try {
 
         if (isCleanup) {
-          tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
-
-          long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
-          List<String> errors = jobSet.getErrors().get();
-
-          if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
-            LOGGER.warn(
-                MARKER.JOBS,
-                "{} had {} errors{}",
-                jobSet.getLabel(),
-                errors.size(),
-                jobSet.getDescription().orElse(""));
-
-            if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
-              for (String error : errors) {
-                LOGGER.debug(
-                    MARKER.JOBS,
-                    "{} error: {}{}",
-                    jobSet.getLabel(),
-                    error,
-                    jobSet.getDescription().orElse(""));
-              }
-            }
-          }
-
-          if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
-            LOGGER.info(
-                MARKER.JOBS,
-                "{} finished in {}{}",
-                jobSet.getLabel(),
-                pretty(duration),
-                jobSet.getDescription().orElse(""));
-          }
+          cleanup(jobSet, tileProvider, seedingJobSet);
 
           return JobResult.success(); // early return
         }
@@ -157,34 +125,42 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
         tileProvider.seeding().get().setupSeeding(seedingJobSet);
 
         for (String tileSet : seedingJobSet.getTileSets().keySet()) {
+          Tileset3dFeatures cfg = tileProvider.getData().getTilesets().get(tileSet);
           Map<String, Set<TileMatrixSetLimits>> tileMatrixSets =
               coverage.containsKey(tileSet) ? coverage.get(tileSet) : Map.of();
 
           tileMatrixSets.forEach(
               (tileMatrixSet, limits) -> {
-                Set<TileSubMatrix> subMatrices = new LinkedHashSet<>();
+                TileTree tileTree = null;
 
-                limits.forEach(
-                    (limit) -> {
-                      subMatrices.addAll(tileMatrixPartitions.getSubMatrices(limit));
-                    });
+                for (TileMatrixSetLimits limit : limits) {
+                  TileTree next = TileTree.from(limit, cfg.getSubtreeLevels());
+                  tileTree = tileTree == null ? next : tileTree.merge(next);
+                }
 
-                for (TileSubMatrix subMatrix : subMatrices) {
-                  Job job2 =
-                      Tile3dSeedingJob.of(
-                          jobSet.getPriority(),
-                          tileProvider.getId(),
-                          tileSet,
-                          tileMatrixSet,
-                          seedingJobSet.isReseed(),
-                          Set.of(subMatrix),
-                          Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
-                          jobSet.getId());
+                if (Objects.nonNull(tileTree)) {
+                  Job job3 =
+                      tileTree.accept(
+                          (tt, followUps) -> {
+                            Job job2 =
+                                Tile3dSeedingJob.of(
+                                    jobSet.getPriority(),
+                                    tileProvider.getId(),
+                                    tileSet,
+                                    tileMatrixSet,
+                                    seedingJobSet.isReseed(),
+                                    Set.of(tt.toSubMatrix()),
+                                    Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
+                                    jobSet.getId());
 
-                  pushJob.accept(job2);
-                  jobSet.init(job2.getTotal().get());
-                  seedingJobSet.init(
-                      tileSet, tileMatrixSet, subMatrix.getLevel(), job2.getTotal().get());
+                            jobSet.init(job2.getTotal().get());
+                            seedingJobSet.init(
+                                tileSet, tileMatrixSet, tt.getLevel(), job2.getTotal().get());
+
+                            return job2.with(followUps);
+                          });
+
+                  pushJob.accept(job3);
                 }
               });
         }
@@ -211,6 +187,44 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
     return JobResult.success();
   }
 
+  private void cleanup(
+      JobSet jobSet, Tile3dProvider tileProvider, Tile3dSeedingJobSet seedingJobSet)
+      throws IOException {
+    tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
+
+    long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
+    List<String> errors = jobSet.getErrors().get();
+
+    if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
+      LOGGER.warn(
+          MARKER.JOBS,
+          "{} had {} errors{}",
+          jobSet.getLabel(),
+          errors.size(),
+          jobSet.getDescription().orElse(""));
+
+      if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
+        for (String error : errors) {
+          LOGGER.debug(
+              MARKER.JOBS,
+              "{} error: {}{}",
+              jobSet.getLabel(),
+              error,
+              jobSet.getDescription().orElse(""));
+        }
+      }
+    }
+
+    if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
+      LOGGER.info(
+          MARKER.JOBS,
+          "{} finished in {}{}",
+          jobSet.getLabel(),
+          pretty(duration),
+          jobSet.getDescription().orElse(""));
+    }
+  }
+
   @Override
   public Class<Boolean> getDetailsType() {
     return Boolean.class;
@@ -221,8 +235,8 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
     return Tile3dSeedingJobSet.class;
   }
 
-  private Optional<Tile3dProvider> getTileProvider(String id) {
-    return entityRegistry.getEntity(Tile3dProvider.class, id);
+  private Optional<Tile3dProviderFeatures> getTileProvider(String id) {
+    return entityRegistry.getEntity(Tile3dProviderFeatures.class, id);
   }
 
   private static String pretty(long seconds) {

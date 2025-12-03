@@ -8,9 +8,11 @@ dependencies {
     provided 'de.interactive_instruments:xtraplatform-entities'
     provided 'de.interactive_instruments:xtraplatform-blobs'
     provided 'de.interactive_instruments:xtraplatform-jobs'
+    provided 'de.interactive_instruments:xtraplatform-streams'
     provided 'de.interactive_instruments:xtraplatform-values'
     provided project(':xtraplatform-cql')
     provided project(':xtraplatform-crs')
     provided project(':xtraplatform-features')
+    provided project(':xtraplatform-geometries')
     provided project(':xtraplatform-tiles')
 }

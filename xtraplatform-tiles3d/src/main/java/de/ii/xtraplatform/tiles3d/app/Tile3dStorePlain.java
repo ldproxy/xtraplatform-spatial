@@ -11,15 +11,25 @@ import com.google.common.io.Files;
 import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dQuery;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dStore;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dStoreReadOnly;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-class Tile3dStorePlain implements Tile3dStoreReadOnly {
+class Tile3dStorePlain implements Tile3dStore {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dStorePlain.class);
 
   static Tile3dStoreReadOnly readOnly(ResourceStore blobStore) {
+    return new Tile3dStorePlain(blobStore);
+  }
+
+  static Tile3dStore readWrite(ResourceStore blobStore) {
     return new Tile3dStorePlain(blobStore);
   }
 
@@ -57,6 +67,12 @@ class Tile3dStorePlain implements Tile3dStoreReadOnly {
     }
 
     return false;
+  }
+
+  @Override
+  public void putSubtree(int level, int x, int y, byte[] subtree) throws IOException {
+    String fileName = String.format("%d_%d_%d.%s", level, x, y, "subtree");
+    blobStore.put(Path.of(fileName), new ByteArrayInputStream(subtree));
   }
 
   private static Path path(Tile3dQuery tile) {
