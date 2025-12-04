@@ -8,24 +8,11 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import de.ii.xtraplatform.docs.DocIgnore;
-import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
-import de.ii.xtraplatform.tiles.domain.ImmutableMinMax.Builder;
-import de.ii.xtraplatform.tiles.domain.MinMax;
-import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTileset3dFilesDefaults.Builder.class)
 public interface Tileset3dFilesDefaults extends Tileset3dCommonDefaults {
-
-  @DocIgnore
-  @Override
-  Optional<LonLat> getCenter();
-
-  @DocIgnore
-  @Override
-  BuildableMap<MinMax, Builder> getLevels();
 
   /**
    * @langEn Tile Matrix Set of the tiles in the MBTiles file.

@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.tiles3d.app;
 
 import de.ii.xtraplatform.base.domain.LogContext;
+import de.ii.xtraplatform.base.domain.LogContext.CONTEXT;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.entities.domain.AbstractPersistentEntity;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
@@ -17,6 +18,7 @@ import de.ii.xtraplatform.tiles3d.domain.spec.Tileset3d;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 public abstract class AbstractTile3dProvider<T extends Tile3dProviderData>
     extends AbstractPersistentEntity<T> implements Tile3dProvider, Tile3dAccess {
@@ -39,7 +41,10 @@ public abstract class AbstractTile3dProvider<T extends Tile3dProviderData>
 
     onStateChange(
         (from, to) -> {
-          LOGGER.info("3dTile provider with id '{}' state changed: {}", getId(), getState());
+          try (MDC.MDCCloseable closeable =
+              LogContext.putCloseable(CONTEXT.SERVICE, getData().getId())) {
+            LOGGER.info("3dTile provider with id '{}' state changed: {}", getId(), getState());
+          }
         },
         true);
 

@@ -8,26 +8,13 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
-import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
-import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
-import de.ii.xtraplatform.tiles.domain.MinMax;
-import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTileset3dFiles.Builder.class)
 public interface Tileset3dFiles extends Tileset3dCommon, Buildable<Tileset3dFiles> {
-
-  @DocIgnore
-  @Override
-  BuildableMap<MinMax, ImmutableMinMax.Builder> getLevels();
-
-  @DocIgnore
-  @Override
-  Optional<LonLat> getCenter();
 
   /**
    * @langEn Relative path of the root `tileset.json` file in the store under `resources/3dtiles`.
@@ -46,13 +33,6 @@ public interface Tileset3dFiles extends Tileset3dCommon, Buildable<Tileset3dFile
 
   default Tileset3dFiles mergeDefaults(Tileset3dFilesDefaults defaults) {
     ImmutableTileset3dFiles.Builder withDefaults = getBuilder();
-
-    if (this.getLevels().isEmpty()) {
-      withDefaults.levels(defaults.getLevels());
-    }
-    if (this.getCenter().isEmpty() && defaults.getCenter().isPresent()) {
-      withDefaults.center(defaults.getCenter());
-    }
 
     return withDefaults.build();
   }

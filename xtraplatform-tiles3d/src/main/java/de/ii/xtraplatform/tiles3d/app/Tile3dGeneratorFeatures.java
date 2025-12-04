@@ -29,6 +29,9 @@ import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.SIntersects;
 import de.ii.xtraplatform.cql.domain.SpatialLiteral;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.CrsTransformationException;
+import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.features.domain.CollectionMetadata;
@@ -38,15 +41,26 @@ import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureStream;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileMatrix;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileMatrixSetData;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileMatrixSetData.Builder;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesBoundingBox;
+import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
+import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
+import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
+import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dQuery;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerator;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFeaturesData;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
 import de.ii.xtraplatform.tiles3d.domain.TileTree;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
 import de.ii.xtraplatform.tiles3d.domain.spec.Availability;
@@ -61,13 +75,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.shape.fractal.MortonCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,28 +104,36 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           .setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
 
   private final Cql cql;
+  private final CrsTransformerFactory crsTransformerFactory;
   private final EntityRegistry entityRegistry;
+  private final Set<Tile3dBuilder> tileBuilders;
   private final Tile3dProviderFeaturesData data;
   private final Map<String, Tileset3dFeatures> tilesets;
   private final Map<String, DelayedVolatile<FeatureProvider>> featureProviders;
   private final boolean async;
   private final String label;
+  private Optional<Tile3dBuilder> tileBuilder;
 
   public Tile3dGeneratorFeatures(
       Tile3dProviderFeaturesData data,
       Cql cql,
+      CrsTransformerFactory crsTransformerFactory,
       EntityRegistry entityRegistry,
       VolatileRegistry volatileRegistry,
+      Set<Tile3dBuilder> tileBuilders,
       AppContext appContext,
       boolean asyncStartup) {
     super("generator", volatileRegistry, true);
     this.data = data;
     this.cql = cql;
+    this.crsTransformerFactory = crsTransformerFactory;
     this.entityRegistry = entityRegistry;
+    this.tileBuilders = tileBuilders;
     this.tilesets = new LinkedHashMap<>();
     this.featureProviders = new LinkedHashMap<>();
     this.async = asyncStartup;
     this.label = String.format("%s v%s", appContext.getName(), appContext.getVersion());
+    this.tileBuilder = Optional.empty();
   }
 
   @Override
@@ -154,19 +180,18 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           FeatureProviderEntity.class,
           fp -> {
             if (Objects.equals(fp.getId(), featureProviderId)) {
-
-              LOGGER.info("INITT3DG - FeatureProvider available: {}", featureProviderId);
               delayedVolatile.set(fp);
             }
           },
           true);
     }
 
+    this.tileBuilder =
+        tileBuilders.stream().min(Comparator.comparingInt(Tile3dBuilder::getPriority));
+
     // init();
 
     onVolatileStarted();
-
-    LOGGER.info("INITT3DG");
   }
 
   /*private void init() {
@@ -186,30 +211,6 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
               .orElseThrow(() -> new IllegalStateException("No applicable tile builder found")));
     }
   }*/
-
-  private FeatureProvider getFeatureProvider(Tileset3dFeatures tileset) {
-    String featureProviderId =
-        tileset.getFeatureProvider().orElse(Tile3dProvider.clean(data.getId()));
-
-    if (async) {
-      DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
-
-      // TODO: only crs, extents, queries needed
-      if (!provider.isAvailable()) {
-        throw new VolatileUnavailableException(
-            String.format("Feature provider with id '%s' is not available.", featureProviderId));
-      }
-
-      return provider.get();
-    }
-
-    return entityRegistry
-        .getEntity(FeatureProviderEntity.class, featureProviderId)
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    String.format("Feature provider with id '%s' not found.", featureProviderId)));
-  }
 
   @Override
   public Optional<BoundingBox> getBounds(String tilesetId) {
@@ -310,7 +311,78 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
   }
 
   @Override
-  public byte[] getSubtreeAsBinary(Subtree subtree) {
+  public List<Tile3dCoordinates> getAvailableTiles(
+      Tileset3dFeatures tileset, TileTree parent, TileSubMatrix area, Subtree subtree) {
+    List<Tile3dCoordinates> tiles = new ArrayList<>();
+    final Availability contentAvailability = subtree.getContentAvailability().get(0);
+
+    final byte[] buffer =
+        contentAvailability.getBitstream().isPresent()
+            ? subtree.getContentAvailabilityBin()
+            : Subtree.EMPTY;
+    boolean always =
+        buffer.length == 0 && contentAvailability.getConstant().filter(c -> c == 1).isPresent();
+
+    if (always || buffer.length > 0) {
+      int xl = parent.getCol();
+      int yl = parent.getRow();
+      for (int il = 0; il < tileset.getSubtreeLevels(); il++) {
+        for (int idx = 0; idx < MortonCode.size(il); idx++) {
+          if (always || getAvailability(buffer, il, idx)) {
+            Coordinate coord = MortonCode.decode(idx);
+            int level = parent.getLevel() + il;
+            int col = xl + (int) coord.x;
+            int row = yl + (int) coord.y;
+
+            if (area.contains(level, row, col)) {
+              tiles.add(
+                  ImmutableTile3dQuery.builder()
+                      .tileset(tileset.getId())
+                      .level(level)
+                      .col(col)
+                      .row(row)
+                      .build());
+            }
+          }
+        }
+        xl *= 2;
+        yl *= 2;
+      }
+    }
+
+    return tiles;
+  }
+
+  @Override
+  public byte[] generateTile(
+      Tileset3dFeatures tileset,
+      Tile3dCoordinates tile,
+      Tile3dSeedingJob job,
+      Tile3dSeedingJobSet jobSet,
+      TileMatrixSetBase tileMatrixSet) {
+    FeatureProvider featureProvider = getFeatureProvider(tileset);
+    Tile3dBuilder builder =
+        tileBuilder.orElseThrow(
+            () -> new IllegalStateException("No applicable tile builder found"));
+
+    BoundingBox tilesetBoundingBox = getBounds(tileset.getId()).orElseThrow();
+    BoundingBox tileBoundingBox =
+        computeTileBbox(tilesetBoundingBox, tile.getLevel(), tile.getCol(), tile.getRow());
+    BoundingBox clipBoundingBox =
+        getClipBoundingBox(
+                jobSet.getTileSets().get(tileset.getId()).getParameters(),
+                tileBoundingBox.getEpsgCrs())
+            .orElse(tilesetBoundingBox);
+    Optional<Polygon> exclusionPolygon = computeExclusionPolygon(tile, clipBoundingBox);
+    String apiId = jobSet.getApi();
+    String collectionId = jobSet.getTileSets().get(tileset.getId()).getCollection();
+
+    return builder.generateTile(
+        tile, tileset, tileBoundingBox, exclusionPolygon, featureProvider, apiId, collectionId);
+  }
+
+  @Override
+  public byte[] subtreeToBinary(Subtree subtree) {
     byte[] json;
     try {
       json = MAPPER.writeValueAsBytes(subtree);
@@ -360,6 +432,91 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     return outputStream.toByteArray();
   }
 
+  @Override
+  public Subtree subtreeFromBinary(byte[] subtreeBytes) {
+    if (!Arrays.equals(Arrays.copyOfRange(subtreeBytes, 0, 4), Subtree.MAGIC_SUBT)) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid 3D Tiles subtree, invalid magic number. Found: %s",
+              Arrays.toString(Arrays.copyOfRange(subtreeBytes, 0, 4))));
+    }
+
+    final int version = littleEndianIntToInt(subtreeBytes, 4);
+    if (version != 1) {
+      throw new IllegalStateException(
+          String.format(
+              "Unsupported 3D Tiles subtree, only version 1 is supported. Found: %d", version));
+    }
+
+    final int jsonLength = littleEndianLongToInt(subtreeBytes, 8);
+    final byte[] jsonContent = Arrays.copyOfRange(subtreeBytes, 24, 24 + jsonLength);
+
+    try {
+      Subtree subtreeWithEmptyBuffers = MAPPER.readValue(jsonContent, Subtree.class);
+
+      int jsonPadding = (8 - jsonLength % 8) % 8;
+      int bufferOffset = 24 + jsonLength + jsonPadding;
+
+      ImmutableSubtree.Builder builder = ImmutableSubtree.builder().from(subtreeWithEmptyBuffers);
+
+      subtreeWithEmptyBuffers
+          .getTileAvailability()
+          .getBitstream()
+          .ifPresent(
+              i ->
+                  builder.tileAvailabilityBin(
+                      getBufferViewContent(
+                          subtreeBytes, subtreeWithEmptyBuffers, bufferOffset, i)));
+
+      subtreeWithEmptyBuffers
+          .getContentAvailability()
+          .get(0)
+          .getBitstream()
+          .ifPresent(
+              i ->
+                  builder.contentAvailabilityBin(
+                      getBufferViewContent(
+                          subtreeBytes, subtreeWithEmptyBuffers, bufferOffset, i)));
+
+      subtreeWithEmptyBuffers
+          .getChildSubtreeAvailability()
+          .getBitstream()
+          .ifPresent(
+              i ->
+                  builder.childSubtreeAvailabilityBin(
+                      getBufferViewContent(
+                          subtreeBytes, subtreeWithEmptyBuffers, bufferOffset, i)));
+
+      return builder.build();
+    } catch (Exception e) {
+      throw new IllegalStateException("Could not read 3D Tiles Subtree output", e);
+    }
+  }
+
+  private FeatureProvider getFeatureProvider(Tileset3dFeatures tileset) {
+    String featureProviderId =
+        tileset.getFeatureProvider().orElse(Tile3dProvider.clean(data.getId()));
+
+    if (async) {
+      DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
+
+      // TODO: only crs, extents, queries needed
+      if (!provider.isAvailable()) {
+        throw new VolatileUnavailableException(
+            String.format("Feature provider with id '%s' is not available.", featureProviderId));
+      }
+
+      return provider.get();
+    }
+
+    return entityRegistry
+        .getEntity(FeatureProviderEntity.class, featureProviderId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    String.format("Feature provider with id '%s' not found.", featureProviderId)));
+  }
+
   private void processZ(
       FeatureProvider featureProvider,
       Tileset3dFeatures tileset,
@@ -373,7 +530,8 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       byte[] contentAvailability,
       byte[] childSubtreeAvailability) {
 
-    if (level > tileset.getMaxLevel() || level - baseLevel > tileset.getSubtreeLevels()) {
+    if (level > tileset.getContentLevels().getMax()
+        || level - baseLevel > tileset.getSubtreeLevels()) {
       return;
     }
 
@@ -391,7 +549,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       int y1 = y0 + (i / 2);
 
       BoundingBox bbox = computeTileBbox(fullBbox, level, x1, y1);
-      int relativeLevel = level - tileset.getFirstLevelWithContent();
+      int relativeLevel = level - tileset.getContentLevels().getMin();
       additionalFilter =
           relativeLevel >= 0 && tileset.getTileFilters().size() > relativeLevel
               ? Optional.ofNullable(tileset.getTileFilters().get(relativeLevel))
@@ -438,6 +596,27 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
         }
       }
     }
+  }
+
+  private Optional<BoundingBox> getClipBoundingBox(
+      TileGenerationParameters tileGenerationParameters, EpsgCrs targetCrs) {
+    return tileGenerationParameters
+        .getClipBoundingBox()
+        .flatMap(
+            clipBoundingBox ->
+                Objects.equals(targetCrs, clipBoundingBox.getEpsgCrs())
+                    ? Optional.of(clipBoundingBox)
+                    : crsTransformerFactory
+                        .getTransformer(clipBoundingBox.getEpsgCrs(), targetCrs)
+                        .map(
+                            transformer -> {
+                              try {
+                                return transformer.transformBoundingBox(clipBoundingBox);
+                              } catch (CrsTransformationException e) {
+                                // ignore
+                                return clipBoundingBox;
+                              }
+                            }));
   }
 
   private static BoundingBox computeTileBbox(BoundingBox fullBbox, int level, int x, int y) {
@@ -621,6 +800,62 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     return builder.build();
   }
 
+  private static Optional<Polygon> computeExclusionPolygon(
+      Tile3dCoordinates tile, BoundingBox bbox) {
+    double dx = bbox.getXmax() - bbox.getXmin();
+    double dy = bbox.getYmax() - bbox.getYmin();
+    double factor = Math.pow(2, tile.getLevel());
+
+    /* The exclusion polygon is the area west and north of the tile. If T is the tile,
+      any building that intersects the tiles TW, TN, and TNW, the tiles to the west,
+      north, and northwest of T, is excluded.
+      Special cases are: In the northwest corner, there is no tile to the north or west,
+      so no area is excluded. For the western or nothern boundaries, only the northern
+      or western are excluded, respectively.
+
+         x ---- x ---- x
+         |      |      |
+         | TNW  |  TN  |
+         |      |      |
+         x ---- x ---- x
+         |      |      |
+         |  TW  |  T   |
+         |      |      |
+         x ---- x ---- x
+    */
+
+    // handle the special cases first
+    if (tile.getCol() == 0 && tile.getRow() == (factor - 1)) {
+      return Optional.empty();
+    } else if (tile.getCol() == 0) {
+      double xmin = bbox.getXmin() + dx / factor * tile.getCol();
+      double xmax = xmin + dx / factor;
+      double ymin = bbox.getYmin() + dy / factor * (tile.getRow() + 1);
+      double ymax = ymin + dy / factor;
+      return Optional.of(Polygon.ofBbox(xmin, ymin, xmax, ymax, OgcCrs.CRS84));
+    } else if (tile.getRow() == (factor - 1)) {
+      double xmin = bbox.getXmin() + dx / factor * (tile.getCol() - 1);
+      double xmax = xmin + dx / factor;
+      double ymin = bbox.getYmin() + dy / factor * tile.getRow();
+      double ymax = ymin + dy / factor;
+      return Optional.of(Polygon.ofBbox(xmin, ymin, xmax, ymax, OgcCrs.CRS84));
+    }
+
+    double x0 = bbox.getXmin() + dx / factor * (tile.getCol() - 1);
+    double y0 = bbox.getYmin() + dy / factor * tile.getRow();
+    double x1 = x0 + dx / factor;
+    double y1 = y0 + dy / factor;
+    double x2 = x0 + 2 * dx / factor;
+    double y2 = y0 + 2 * dy / factor;
+    return Optional.of(
+        Polygon.of(
+            List.of(
+                PositionList.of(
+                    Axes.XY,
+                    new double[] {x0, y0, x1, y0, x1, y1, x2, y1, x2, y2, x0, y2, x0, y0})),
+            Optional.of(OgcCrs.CRS84)));
+  }
+
   private static BufferView getBufferView(byte[] tileAvailability, int byteOffset) {
     return ImmutableBufferView.builder()
         .buffer(0)
@@ -692,10 +927,63 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     return count;
   }
 
+  private static byte[] getBufferViewContent(
+      byte[] subtreeBytes, Subtree subtreeWithEmptyBuffers, int bufferOffset, Integer i) {
+    BufferView bv = subtreeWithEmptyBuffers.getBufferViews().get(i);
+    checkBuffer(bv);
+    final int offset = bufferOffset + bv.getByteOffset();
+    return Arrays.copyOfRange(subtreeBytes, offset, offset + bv.getByteLength());
+  }
+
+  private static void checkBuffer(BufferView bv) {
+    if (bv.getBuffer() != 0) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid 3D Tiles subtree, only subtrees with a single buffer are supported. Found index: %d",
+              bv.getBuffer()));
+    }
+  }
+
+  private static boolean getAvailability(byte[] availability, int level, int idxLevel) {
+    int idx = idxLevel;
+    // add shift from previous levels
+    for (int i = 0; i < level; i++) {
+      idx += MortonCode.size(i);
+    }
+    return isSet(availability, idx);
+  }
+
+  private static boolean isSet(byte[] availability, int idx) {
+    int byteIndex = idx / 8;
+    int bitIndex = idx % 8;
+    int bitValue = (availability[byteIndex] >> bitIndex) & 1;
+    return bitValue == 1;
+  }
+
   private static byte[] intToLittleEndianLong(int v) {
     ByteBuffer bb = ByteBuffer.allocate(8);
     bb.order(ByteOrder.LITTLE_ENDIAN);
     bb.putInt(v);
     return bb.array();
+  }
+
+  private static int littleEndianIntToInt(byte[] array, int offset) {
+    ByteBuffer bb = ByteBuffer.allocate(4);
+    bb.order(ByteOrder.LITTLE_ENDIAN);
+    for (int i = 0; i < 4; i++) {
+      bb.put(array[offset + i]);
+    }
+    bb.rewind();
+    return bb.getInt();
+  }
+
+  private static int littleEndianLongToInt(byte[] array, int offset) {
+    ByteBuffer bb = ByteBuffer.allocate(8);
+    bb.order(ByteOrder.LITTLE_ENDIAN);
+    for (int i = 0; i < 8; i++) {
+      bb.put(array[offset + i]);
+    }
+    bb.rewind();
+    return (int) bb.getLong();
   }
 }

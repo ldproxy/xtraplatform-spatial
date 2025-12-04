@@ -7,9 +7,6 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Range;
 import de.ii.xtraplatform.docs.DocFile;
 import de.ii.xtraplatform.docs.DocStep;
 import de.ii.xtraplatform.docs.DocStep.Step;
@@ -17,10 +14,7 @@ import de.ii.xtraplatform.docs.DocTable;
 import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.features.domain.ProviderData;
-import java.util.AbstractMap.SimpleImmutableEntry;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import org.immutables.value.Value;
 
 /**
  * @langEn # Tiles
@@ -90,21 +84,6 @@ public interface Tile3dProviderData extends ProviderData {
    * @default {}
    */
   Map<String, ? extends Tileset3dCommon> getTilesets();
-
-  @JsonIgnore
-  @Value.Lazy
-  default Map<String, Map<String, Range<Integer>>> getTmsRanges() {
-    return getTilesets().entrySet().stream()
-        .map(
-            entry -> {
-              LinkedHashMap<String, Range<Integer>> ranges =
-                  new LinkedHashMap<>(getTilesetDefaults().getTmsRanges());
-              ranges.putAll(entry.getValue().getTmsRanges());
-
-              return new SimpleImmutableEntry<>(entry.getKey(), ranges);
-            })
-        .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
-  }
 
   abstract class Builder<T extends Tile3dProviderData.Builder<T>>
       implements EntityDataBuilder<Tile3dProviderData> {

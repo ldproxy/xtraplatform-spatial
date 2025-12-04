@@ -12,15 +12,12 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
-import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
-import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeatures;
-import de.ii.xtraplatform.tiles.domain.LevelFilter;
 import de.ii.xtraplatform.tiles.domain.MinMax;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 /**
@@ -43,13 +40,7 @@ public interface Tileset3dFeatures
   @Override
   String getId();
 
-  @Override
-  BuildableMap<MinMax, ImmutableMinMax.Builder> getLevels();
-
   @DocIgnore
-  @Override
-  Optional<LonLat> getCenter();
-
   @Override
   Optional<String> getFeatureProvider();
 
@@ -57,9 +48,40 @@ public interface Tileset3dFeatures
    * @langEn The name of the feature type. By default the tileset id is used.
    * @langDe Der Name des Feature-Types. Standardmäßig wird die Tileset-Id verwendet.
    * @default null
-   * @since v3.4
+   * @since v4.6
    */
   Optional<String> getFeatureType();
+
+  @DocIgnore
+  @Nullable
+  @Override
+  Float getGeometricErrorRoot();
+
+  @DocIgnore
+  @Nullable
+  @Override
+  Boolean getClampToEllipsoid();
+
+  @DocIgnore
+  @Nullable
+  @Override
+  Integer getSubtreeLevels();
+
+  @DocIgnore
+  @Nullable
+  @Override
+  MinMax getContentLevels();
+
+  @DocIgnore
+  @Override
+  List<String> getContentFilters();
+
+  @DocIgnore
+  @Value.Default
+  @Override
+  default List<String> getTileFilters() {
+    return Tile3dGenerationOptions.super.getTileFilters();
+  }
 
   /**
    * @langEn Instead of being generated using a `featureType`, a tileset may be composed of multiple
@@ -69,22 +91,11 @@ public interface Tileset3dFeatures
    *     anderen Tilesets kombiniert werden. Der Wert ist eine Liste von Tileset-Ids oder eine Liste
    *     mit einem einzelnen Eintrag `*` um alle anderen Tilesets zu kombinieren.
    * @default []
-   * @since v3.4
+   * @since v4.6
    */
   @DocIgnore
-  // TODO: combine gltf tilesets to b3dm tileset
+  // TODO: combine gltf tilesets to b3dm tileset?
   List<String> getCombine();
-
-  /**
-   * @langEn Filters to select a subset of feature for certain zoom levels using a CQL filter
-   *     expression, see example below.
-   * @langDe Über Filter kann gesteuert werden, welche Features auf welchen Zoomstufen selektiert
-   *     werden sollen. Dazu dient ein CQL-Filterausdruck, der in `filter` angegeben wird. Siehe das
-   *     Beispiel unten.
-   * @default {}
-   * @since v3.4
-   */
-  Map<String, List<LevelFilter>> getFilters();
 
   @JsonIgnore
   @Value.Derived
@@ -109,15 +120,22 @@ public interface Tileset3dFeatures
     if (this.getFeatureProvider().isEmpty() && defaults.getFeatureProvider().isPresent()) {
       withDefaults.featureProvider(defaults.getFeatureProvider());
     }
-    if (this.getLevels().isEmpty()) {
-      withDefaults.levels(defaults.getLevels());
-    }
-    if (this.getCenter().isEmpty() && defaults.getCenter().isPresent()) {
-      withDefaults.center(defaults.getCenter());
+    if (Objects.isNull(this.getGeometricErrorRoot())
+        && !Objects.isNull(defaults.getGeometricErrorRoot())) {
+      withDefaults.geometricErrorRoot(defaults.getGeometricErrorRoot());
     }
     if (Objects.isNull(this.getClampToEllipsoid())
         && !Objects.isNull(defaults.getClampToEllipsoid())) {
       withDefaults.clampToEllipsoid(defaults.getClampToEllipsoid());
+    }
+    if (Objects.isNull(this.getSubtreeLevels()) && !Objects.isNull(defaults.getSubtreeLevels())) {
+      withDefaults.subtreeLevels(defaults.getSubtreeLevels());
+    }
+    if (Objects.isNull(this.getContentLevels()) && !Objects.isNull(defaults.getContentLevels())) {
+      withDefaults.contentLevels(defaults.getContentLevels());
+    }
+    if (this.getContentFilters().isEmpty() && !defaults.getContentFilters().isEmpty()) {
+      withDefaults.contentFilters(defaults.getContentFilters());
     }
 
     return withDefaults.build();

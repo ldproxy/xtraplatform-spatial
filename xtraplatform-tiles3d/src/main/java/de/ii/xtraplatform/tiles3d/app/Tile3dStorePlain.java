@@ -70,13 +70,45 @@ class Tile3dStorePlain implements Tile3dStore {
   }
 
   @Override
+  public boolean hasSubtree(int level, int x, int y) throws IOException {
+    return blobStore.has(pathSubtree(level, x, y));
+  }
+
+  @Override
+  public byte[] getSubtree(int level, int x, int y) throws IOException {
+    return blobStore
+        .get(pathSubtree(level, x, y))
+        .orElseThrow(() -> new IOException("Subtree not found"))
+        .content();
+  }
+
+  @Override
   public void putSubtree(int level, int x, int y, byte[] subtree) throws IOException {
-    String fileName = String.format("%d_%d_%d.%s", level, x, y, "subtree");
-    blobStore.put(Path.of(fileName), new ByteArrayInputStream(subtree));
+    blobStore.put(pathSubtree(level, x, y), new ByteArrayInputStream(subtree));
+  }
+
+  @Override
+  public boolean hasContent(int level, int x, int y) throws IOException {
+    return blobStore.has(pathContent(level, x, y));
+  }
+
+  @Override
+  public void putContent(int level, int x, int y, byte[] tile) throws IOException {
+    blobStore.put(pathContent(level, x, y), new ByteArrayInputStream(tile));
   }
 
   private static Path path(Tile3dQuery tile) {
     return Path.of(tile.getFileName().orElse(UNKNOWN_PATH));
+  }
+
+  private static Path pathSubtree(int level, int x, int y) {
+    String fileName = String.format("%d_%d_%d.%s", level, x, y, "subtree");
+    return Path.of(fileName);
+  }
+
+  private static Path pathContent(int level, int x, int y) {
+    String fileName = String.format("%d_%d_%d.%s", level, x, y, "glb");
+    return Path.of(fileName);
   }
 
   private static Blob applyContentType(Blob blob) {

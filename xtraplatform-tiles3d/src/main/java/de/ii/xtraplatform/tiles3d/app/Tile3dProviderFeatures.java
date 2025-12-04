@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.tiles3d.app;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
 import dagger.assisted.Assisted;
@@ -21,6 +20,7 @@ import de.ii.xtraplatform.blobs.domain.Blob;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
@@ -40,11 +40,12 @@ import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileSeeding;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerator;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderData;
@@ -55,7 +56,6 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dStore;
 import de.ii.xtraplatform.tiles3d.domain.TileTree;
-import de.ii.xtraplatform.tiles3d.domain.Tileset3dCommon;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
 import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableAssetMetadata;
 import de.ii.xtraplatform.tiles3d.domain.spec.ImmutableBoundingVolume;
@@ -98,14 +98,13 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFeatures.class);
 
   private final ResourceStore rootStore;
-  private final VolatileRegistry volatileRegistry;
   private final Map<String, Tileset3d> metadata;
   private final Map<String, Tile3dStore> stores;
   private final Tile3dGenerator tileGenerator;
   private final TileWalker tileWalker;
   private final List<TileCache> generatorCaches;
+  private final Map<String, Map<String, TileMatrixSetBase>> customTms;
   private final boolean asyncStartup;
-  private final ObjectMapper objectMapper;
 
   // private ChainedTile3dProvider providerChain;
 
@@ -116,22 +115,30 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       EntityRegistry entityRegistry,
       VolatileRegistry volatileRegistry,
       Cql cql,
+      CrsTransformerFactory crsTransformerFactory,
       TileWalker tileWalker,
+      Set<Tile3dBuilder> tileBuilders,
       Jackson jackson,
       @Assisted Tile3dProviderFeaturesData data) {
     super(volatileRegistry, data, "access", "seeding", "generation");
 
     this.rootStore = blobStore.with(Tile3dProvider.STORE_DIR_NAME, data.getId(), "cache_dyn");
-    this.volatileRegistry = volatileRegistry;
-    this.objectMapper = jackson.getDefaultObjectMapper();
     this.metadata = new LinkedHashMap<>();
     this.stores = new LinkedHashMap<>();
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
     this.tileGenerator =
         new Tile3dGeneratorFeatures(
-            data, cql, entityRegistry, volatileRegistry, appContext, asyncStartup);
+            data,
+            cql,
+            crsTransformerFactory,
+            entityRegistry,
+            volatileRegistry,
+            tileBuilders,
+            appContext,
+            asyncStartup);
     this.tileWalker = tileWalker;
     this.generatorCaches = new ArrayList<>();
+    this.customTms = new LinkedHashMap<>();
   }
 
   @Override
@@ -200,8 +207,8 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
             .collect(MapStreams.toMap());
 
     generatorCaches.add(new Tile3dCacheDynamic(tileWalker, customTms, cacheRanges));
+    this.customTms.putAll(customTms);
 
-    LOGGER.info("INITT3DP");
     // registerChangeHandlers();
   }
 
@@ -274,6 +281,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   public void seedSubtrees(Tile3dSeedingJob job, Consumer<Integer> updateProgress)
       throws IOException {
 
+    Tile3dStore store = stores.get(job.getTileSet());
     AtomicInteger current = new AtomicInteger(0);
     Runnable updateProgress2 =
         () -> {
@@ -281,21 +289,65 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
           updateProgress.accept(cur);
         };
 
-    // TODO: only if not exists or reseed
     // TODO: logging context
     for (TileSubMatrix t : job.getSubMatrices()) {
-      Subtree subtree = tileGenerator.generateSubtree(job.getTileSet(), TileTree.fromSubMatrix(t));
-      byte[] subtreeAsBinary = tileGenerator.getSubtreeAsBinary(subtree);
-      stores
-          .get(job.getTileSet())
-          .putSubtree(t.getLevel(), t.getColMin(), t.getRowMin(), subtreeAsBinary);
+      if (job.isReseed() || !store.hasSubtree(t.getLevel(), t.getColMin(), t.getRowMin())) {
+        Subtree subtree =
+            tileGenerator.generateSubtree(job.getTileSet(), TileTree.fromSubMatrix(t));
+        byte[] subtreeAsBinary = tileGenerator.subtreeToBinary(subtree);
+        store.putSubtree(t.getLevel(), t.getColMin(), t.getRowMin(), subtreeAsBinary);
+      } else {
+        LOGGER.debug(
+            "Subtree {}/{}/{} already exists, skipping",
+            t.getLevel(),
+            t.getColMin(),
+            t.getRowMin());
+      }
     }
 
-    updateProgress2.run();
+    // updateProgress2.run();
   }
 
   @Override
-  public void seedTiles(TileSeedingJob job, Consumer<Integer> updateProgress) throws IOException {}
+  public void seedTiles(
+      Tile3dSeedingJob job, Tile3dSeedingJobSet jobSet, Consumer<Integer> updateProgress)
+      throws IOException {
+    Tileset3dFeatures tileset =
+        getData().getTilesets().get(job.getTileSet()).mergeDefaults(getData().getTilesetDefaults());
+    Tile3dStore store = stores.get(job.getTileSet());
+    TileMatrixSetBase tileMatrixSet = customTms.get(job.getTileSet()).get(job.getTileMatrixSet());
+
+    AtomicInteger current = new AtomicInteger(0);
+    Runnable updateProgress2 =
+        () -> {
+          int cur = current.incrementAndGet();
+          updateProgress.accept(cur);
+        };
+
+    for (TileSubMatrix subMatrix : job.getSubMatrices()) {
+      TileTree parent = TileTree.fromSubMatrix(subMatrix).parent(tileset.getSubtreeLevels());
+
+      byte[] subtreeBytes = store.getSubtree(parent.getLevel(), parent.getCol(), parent.getRow());
+      Subtree subtree = tileGenerator.subtreeFromBinary(subtreeBytes);
+
+      List<Tile3dCoordinates> availableTiles =
+          tileGenerator.getAvailableTiles(tileset, parent, subMatrix, subtree);
+
+      for (Tile3dCoordinates t : availableTiles) {
+        try {
+          if (job.isReseed() || !store.hasContent(t.getLevel(), t.getCol(), t.getRow())) {
+            byte[] tileBytes = tileGenerator.generateTile(tileset, t, job, jobSet, tileMatrixSet);
+            store.putContent(t.getLevel(), t.getCol(), t.getRow(), tileBytes);
+          } else {
+            LOGGER.debug(
+                "Tile {}/{}/{} already exists, skipping", t.getLevel(), t.getCol(), t.getRow());
+          }
+        } finally {
+          updateProgress2.run();
+        }
+      }
+    }
+  }
 
   private List<Tuple<TileCache, String>> getCaches(Tile3dSeedingJobSet jobSet) {
     List<Tuple<TileCache, String>> result = new ArrayList<>();
@@ -385,7 +437,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
                     .implicitTiling(
                         new ImmutableImplicitTiling.Builder()
                             .subdivisionScheme("QUADTREE")
-                            .availableLevels(cfg.getMaxLevel() + 1)
+                            .availableLevels(cfg.getContentLevels().getMax() + 1)
                             .subtreeLevels(Objects.requireNonNull(cfg.getSubtreeLevels()))
                             .subtrees(
                                 new ImmutableWithUri.Builder()
@@ -456,7 +508,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
         .collect(MapStreams.toMap());
   }
 
-  private Map<String, MinMax> getTilesetLevels(Tileset3dCommon tileset) {
+  private Map<String, MinMax> getTilesetLevels(Tileset3dFeatures tileset) {
     return tileset.getLevels().isEmpty()
         ? getData().getTilesetDefaults().getLevels()
         : tileset.getLevels();

@@ -21,16 +21,16 @@ import javax.inject.Singleton;
 
 @Singleton
 @AutoBind
-public class Tile3dJobProcessorSubtree extends Tile3dJobProcessor {
+public class Tile3dJobProcessorContent extends Tile3dJobProcessor {
 
   @Inject
-  Tile3dJobProcessorSubtree(AppContext appContext, EntityRegistry entityRegistry) {
+  Tile3dJobProcessorContent(AppContext appContext, EntityRegistry entityRegistry) {
     super(appContext, entityRegistry);
   }
 
   @Override
   public String getJobType() {
-    return Tile3dSeedingJob.TYPE_SUBTREE;
+    return Tile3dSeedingJob.TYPE_GLTF;
   }
 
   @Override
@@ -41,6 +41,6 @@ public class Tile3dJobProcessorSubtree extends Tile3dJobProcessor {
       Tile3dSeedingJobSet seedingJobSet,
       Consumer<Integer> updateProgress)
       throws IOException {
-    tileProvider.seeding().get().seedSubtrees(seedingJob, updateProgress);
+    tileProvider.seeding().get().seedTiles(seedingJob, seedingJobSet, updateProgress);
   }
 }

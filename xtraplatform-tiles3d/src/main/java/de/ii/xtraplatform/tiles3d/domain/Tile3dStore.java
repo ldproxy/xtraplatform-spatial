@@ -11,5 +11,13 @@ import java.io.IOException;
 
 public interface Tile3dStore extends Tile3dStoreReadOnly {
 
+  boolean hasSubtree(int level, int x, int y) throws IOException;
+
+  byte[] getSubtree(int level, int x, int y) throws IOException;
+
   void putSubtree(int level, int x, int y, byte[] subtree) throws IOException;
+
+  boolean hasContent(int level, int x, int y) throws IOException;
+
+  void putContent(int level, int x, int y, byte[] tile) throws IOException;
 }

@@ -27,6 +27,20 @@ public interface Tileset3d {
     return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(uriPrefix)).build();
   }
 
+  default Tileset3d withCopyright(Optional<String> copyright) {
+    if (copyright.isEmpty()) {
+      return this;
+    }
+    return new ImmutableTileset3d.Builder()
+        .from(this)
+        .asset(new ImmutableAssetMetadata.Builder().from(getAsset()).copyright(copyright).build())
+        .build();
+  }
+
+  default Tileset3d withSchemaUri(String schemaUri) {
+    return new ImmutableTileset3d.Builder().from(this).schemaUri(schemaUri).build();
+  }
+
   String SCHEMA_REF = "#/components/schemas/Tileset3dTiles";
 
   @SuppressWarnings("UnstableApiUsage")

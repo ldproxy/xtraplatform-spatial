@@ -36,7 +36,9 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
 
   static JobSet of(
       String tileProvider,
+      String apiId,
       Map<String, TileGenerationParameters> tileSets,
+      Map<String, String> collectionIds,
       boolean reseed,
       int priority) {
     return JobSet.of(
@@ -47,22 +49,16 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
             String.format(" (Tilesets: %s)", tileSets.keySet()),
             new ImmutableTile3dSeedingJobSet.Builder()
                 .tileProvider(tileProvider)
-                .tileSets(Tileset3dDetails.of(tileSets))
+                .api(apiId)
+                .tileSets(Tileset3dDetails.of(tileSets, collectionIds))
                 .isReseed(reseed)
                 .build())
         .with(Job.of(TYPE_SETUP, priority, false), Job.of(TYPE_SETUP, priority, true));
   }
 
-  static JobSet with(JobSet jobSet, Map<String, TileGenerationParameters> tileSets) {
-    Tile3dSeedingJobSet details =
-        new ImmutableTile3dSeedingJobSet.Builder()
-            .from((Tile3dSeedingJobSet) jobSet.getDetails())
-            .putAllTileSets(Tileset3dDetails.of(tileSets))
-            .build();
-    return jobSet.with(String.format(" (Tilesets: %s)", details.getTileSets().keySet()), details);
-  }
-
   String getTileProvider();
+
+  String getApi();
 
   Map<String, Tileset3dDetails> getTileSets();
 
@@ -145,19 +141,26 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   @Value.Immutable
   interface Tileset3dDetails {
 
-    static Map<String, Tileset3dDetails> of(Map<String, TileGenerationParameters> tilesets) {
+    static Map<String, Tileset3dDetails> of(
+        Map<String, TileGenerationParameters> tilesets, Map<String, String> collectionIds) {
       return tilesets.entrySet().stream()
           .collect(
               ImmutableMap.toImmutableMap(
-                  Map.Entry::getKey, e -> Tileset3dDetails.of(e.getValue())));
+                  Map.Entry::getKey,
+                  e ->
+                      Tileset3dDetails.of(
+                          e.getValue(), collectionIds.getOrDefault(e.getKey(), "UNKNOWN"))));
     }
 
-    static Tileset3dDetails of(TileGenerationParameters parameters) {
+    static Tileset3dDetails of(TileGenerationParameters parameters, String collectionId) {
       return new ImmutableTileset3dDetails.Builder()
+          .collection(collectionId)
           .parameters(parameters)
           .progress(new ImmutableTileset3dProgress.Builder().levels(new LinkedHashMap<>()).build())
           .build();
     }
+
+    String getCollection();
 
     TileGenerationParameters getParameters();
 

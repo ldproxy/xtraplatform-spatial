@@ -7,7 +7,4 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
-import de.ii.xtraplatform.tiles.domain.WithCenter;
-import de.ii.xtraplatform.tiles.domain.WithTmsLevelsMergeable;
-
-public interface Tileset3dCommonDefaults extends WithTmsLevelsMergeable, WithCenter {}
+public interface Tileset3dCommonDefaults {}

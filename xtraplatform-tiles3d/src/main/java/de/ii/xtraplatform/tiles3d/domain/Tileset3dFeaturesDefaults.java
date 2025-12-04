@@ -10,9 +10,6 @@ package de.ii.xtraplatform.tiles3d.domain;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
-import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
-import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
-import de.ii.xtraplatform.tiles.domain.MinMax;
 import org.immutables.value.Value;
 
 /**
@@ -28,8 +25,6 @@ public interface Tileset3dFeaturesDefaults
         Tile3dGenerationOptions,
         WithFeatureProvider,
         Buildable<Tileset3dFeaturesDefaults> {
-  @Override
-  BuildableMap<MinMax, ImmutableMinMax.Builder> getLevels();
 
   @Override
   default ImmutableTileset3dFeaturesDefaults.Builder getBuilder() {

@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
+import com.google.common.collect.Streams;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
@@ -32,6 +33,8 @@ public interface TileTree {
   int getCol();
 
   List<TileTree> getSubTrees();
+
+  List<TileSubMatrix> getContent();
 
   @Value.Derived
   @Value.Auxiliary
@@ -80,7 +83,59 @@ public interface TileTree {
       mergedSubTrees.compute(child.getCoordinates(), (k, v) -> v == null ? child : v.merge(child));
     }
 
-    return new ImmutableTileTree.Builder().from(this).subTrees(mergedSubTrees.values()).build();
+    List<TileSubMatrix> mergedContent = merge(this.getContent(), other.getContent());
+
+    return new ImmutableTileTree.Builder()
+        .from(this)
+        .subTrees(mergedSubTrees.values())
+        .content(optimize(mergedContent))
+        .build();
+  }
+
+  static List<TileSubMatrix> merge(List<TileSubMatrix> content, List<TileSubMatrix> otherContent) {
+    return optimize(Streams.concat(content.stream(), otherContent.stream()).toList());
+  }
+
+  static List<TileSubMatrix> optimize(List<TileSubMatrix> content) {
+    if (content.size() <= 1) {
+      return content;
+    }
+
+    List<TileSubMatrix> mergedContent = new ArrayList<>();
+
+    for (TileSubMatrix otherContent : content) {
+      boolean handled = false;
+      for (int i = 0; i < mergedContent.size(); i++) {
+        if (mergedContent.get(i).contains(otherContent)) {
+          handled = true;
+          break;
+        }
+        if (mergedContent.get(i).canMergeWith(otherContent)) {
+          mergedContent.set(i, mergedContent.get(i).mergeWith(otherContent));
+          handled = true;
+          break;
+        }
+      }
+      if (!handled) {
+        mergedContent.add(otherContent);
+      }
+    }
+
+    return mergedContent;
+  }
+
+  default TileTree parent(int subtreeLevels) {
+    List<Integer> rootLevels = new ArrayList<>();
+
+    for (int l = 0; l <= getLevel(); l += subtreeLevels) {
+      rootLevels.add(l);
+    }
+
+    if (rootLevels.contains(getLevel())) {
+      return this;
+    }
+
+    return getParent(this, null, rootLevels);
   }
 
   TileTree ROOT = of(0, 0, 0, List.of());
@@ -105,6 +160,7 @@ public interface TileTree {
 
     for (int row = limits.getMinTileRow(); row <= limits.getMaxTileRow(); row++) {
       for (int col = limits.getMinTileCol(); col <= limits.getMaxTileCol(); col++) {
+        // TODO: content from limits?
         TileTree parentTree = getParentTree(level, row, col, rootLevels);
         treeRoots.compute(
             parentTree.getCoordinates(), (k, v) -> v == null ? parentTree : v.merge(parentTree));
@@ -120,7 +176,9 @@ public interface TileTree {
           "rootLevels must not be empty and level must be >= the lowest root level");
     }
 
-    TileTree treeRoot = new ImmutableTileTree.Builder().level(level).row(row).col(col).build();
+    TileSubMatrix content = TileSubMatrix.of(level, row, row, col, col);
+    TileTree treeRoot =
+        new ImmutableTileTree.Builder().level(level).row(row).col(col).addContent(content).build();
     TileTree lastParent = rootLevels.contains(level) ? treeRoot : null;
 
     int maxRounds = rootLevels.size();
@@ -143,7 +201,7 @@ public interface TileTree {
     }
 
     for (int l = treeRoot.getLevel() - 1; l >= 0; l--) {
-      treeRoot = getParent(treeRoot);
+      treeRoot = getParent(treeRoot, rootLevels);
       if (rootLevels.contains(l)) {
         return Objects.nonNull(subTree)
             ? new ImmutableTileTree.Builder().from(treeRoot).addSubTrees(subTree).build()
@@ -154,7 +212,7 @@ public interface TileTree {
     return treeRoot;
   }
 
-  static TileTree getParent(TileTree tree) {
+  static TileTree getParent(TileTree tree, List<Integer> rootLevels) {
     if (tree.getLevel() == 0) {
       return tree;
     }
@@ -163,6 +221,11 @@ public interface TileTree {
     int parentRow = tree.getRow() / 2;
     int parentCol = tree.getCol() / 2;
 
-    return new ImmutableTileTree.Builder().level(parentLevel).row(parentRow).col(parentCol).build();
+    return new ImmutableTileTree.Builder()
+        .level(parentLevel)
+        .row(parentRow)
+        .col(parentCol)
+        .content(rootLevels.contains(tree.getLevel()) ? List.of() : tree.getContent())
+        .build();
   }
 }

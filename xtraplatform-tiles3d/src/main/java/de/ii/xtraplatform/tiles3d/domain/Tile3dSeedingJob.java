@@ -24,7 +24,7 @@ public interface Tile3dSeedingJob {
   String TYPE_SUBTREE = Tile3dSeedingJobSet.type("subtree", "binary");
   String TYPE_GLTF = Tile3dSeedingJobSet.type("content", "glb");
 
-  static Job of(
+  static Job subtree(
       int priority,
       String tileProvider,
       String tileSet,
@@ -45,6 +45,29 @@ public interface Tile3dSeedingJob {
             .build();
 
     return Job.of(TYPE_SUBTREE, priority, details, jobSetId, (int) details.getNumberOfTiles());
+  }
+
+  static Job content(
+      int priority,
+      String tileProvider,
+      String tileSet,
+      String tileMatrixSet,
+      boolean isReseed,
+      Set<TileSubMatrix> subMatrices,
+      Optional<TileGenerationParameters> generationParameters,
+      String jobSetId) {
+    ImmutableTile3dSeedingJob details =
+        new ImmutableTile3dSeedingJob.Builder()
+            .tileProvider(tileProvider)
+            .tileSet(tileSet)
+            .tileMatrixSet(tileMatrixSet)
+            .generationParameters(generationParameters)
+            .encoding(new MediaType("model", "gltf-binary")) // TODO
+            .isReseed(isReseed)
+            .addAllSubMatrices(subMatrices)
+            .build();
+
+    return Job.of(TYPE_GLTF, priority, details, jobSetId, (int) details.getNumberOfTiles());
   }
 
   String getTileProvider();

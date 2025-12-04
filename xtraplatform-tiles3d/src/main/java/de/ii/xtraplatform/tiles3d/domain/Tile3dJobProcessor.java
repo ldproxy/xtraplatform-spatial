@@ -5,7 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.tiles3d.app;
+package de.ii.xtraplatform.tiles3d.domain;
 
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
@@ -15,9 +15,7 @@ import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProcessor;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
+import de.ii.xtraplatform.tiles3d.app.Tile3dProviderFeatures;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,7 +31,7 @@ public abstract class Tile3dJobProcessor
   private final int concurrency;
   private final EntityRegistry entityRegistry;
 
-  Tile3dJobProcessor(AppContext appContext, EntityRegistry entityRegistry) {
+  protected Tile3dJobProcessor(AppContext appContext, EntityRegistry entityRegistry) {
     this.concurrency = appContext.getConfiguration().getBackgroundTasks().getMaxThreads();
     this.entityRegistry = entityRegistry;
   }
@@ -61,9 +59,10 @@ public abstract class Tile3dJobProcessor
     Tile3dSeedingJob seedingJob = getDetails(job);
     Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet);
 
-    Optional<Tile3dProvider> optionalTileProvider = getTileProvider(seedingJob.getTileProvider());
+    Optional<Tile3dProviderFeatures> optionalTileProvider =
+        getTileProvider(seedingJob.getTileProvider());
     if (optionalTileProvider.isPresent()) {
-      Tile3dProvider tileProvider = optionalTileProvider.get();
+      Tile3dProviderFeatures tileProvider = optionalTileProvider.get();
 
       if (!tileProvider.seeding().isSupported()) {
         LOGGER.error("Tile provider does not support seeding: {}", tileProvider.getId());
@@ -133,7 +132,7 @@ public abstract class Tile3dJobProcessor
     return Tile3dSeedingJobSet.class;
   }
 
-  private Optional<Tile3dProvider> getTileProvider(String id) {
-    return entityRegistry.getEntity(Tile3dProvider.class, id);
+  private Optional<Tile3dProviderFeatures> getTileProvider(String id) {
+    return entityRegistry.getEntity(Tile3dProviderFeatures.class, id);
   }
 }

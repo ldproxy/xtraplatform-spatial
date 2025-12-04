@@ -10,7 +10,6 @@ package de.ii.xtraplatform.tiles3d.domain;
 import de.ii.xtraplatform.tiles.domain.SeedingOptions;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
@@ -31,5 +30,7 @@ public interface Tile3dSeeding {
 
   void seedSubtrees(Tile3dSeedingJob job, Consumer<Integer> updateProgress) throws IOException;
 
-  void seedTiles(TileSeedingJob job, Consumer<Integer> updateProgress) throws IOException;
+  void seedTiles(
+      Tile3dSeedingJob job, Tile3dSeedingJobSet seedingJobSet, Consumer<Integer> updateProgress)
+      throws IOException;
 }

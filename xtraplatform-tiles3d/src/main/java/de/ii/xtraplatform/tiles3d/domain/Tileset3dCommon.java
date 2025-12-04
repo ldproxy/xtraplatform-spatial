@@ -7,22 +7,11 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
-import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
-import de.ii.xtraplatform.tiles.domain.ImmutableMinMax.Builder;
-import de.ii.xtraplatform.tiles.domain.MinMax;
-import java.util.Optional;
-
 public interface Tileset3dCommon extends Tileset3dCommonDefaults {
   /**
    * @langEn The tileset id.
    * @langDe Die Tileset-Id.
-   * @since v3.4
+   * @since v4.6
    */
   String getId();
-
-  @Override
-  BuildableMap<MinMax, Builder> getLevels();
-
-  @Override
-  Optional<LonLat> getCenter();
 }
