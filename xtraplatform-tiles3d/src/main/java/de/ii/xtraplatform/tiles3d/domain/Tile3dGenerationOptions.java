@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
 import de.ii.xtraplatform.tiles.domain.MinMax;
 import java.util.List;
 import java.util.Map;
@@ -122,8 +123,14 @@ public interface Tile3dGenerationOptions {
    * @default [ ... ]
    * @since v4.6
    */
-  @Value.Default
-  default List<String> getTileFilters() {
+  List<String> getTileFilters();
+
+  @JsonIgnore
+  @Value.Lazy
+  default List<String> getTileFiltersOrDefault() {
+    if (Objects.nonNull(getTileFilters()) && !getTileFilters().isEmpty()) {
+      return getTileFilters();
+    }
     int levels = getContentFilters().size();
     return IntStream.range(0, levels)
         .mapToObj(
@@ -133,6 +140,20 @@ public interface Tile3dGenerationOptions {
                     IntStream.range(i, levels)
                         .mapToObj(j -> getContentFilters().get(j))
                         .collect(Collectors.joining(") OR ("))))
-        .collect(Collectors.toUnmodifiableList());
+        .toList();
+  }
+
+  @Value.Check
+  default void check() {
+    int minLevel = Objects.requireNonNullElse(getContentLevels(), MinMax.of(0, 0)).getMin();
+    int maxLevel = Objects.requireNonNullElse(getContentLevels(), MinMax.of(0, 0)).getMax();
+    Preconditions.checkState(
+        maxLevel <= 16, "The maximum level that is supported is 16. Found: %s.", maxLevel);
+    //noinspection ConstantConditions
+    Preconditions.checkState(
+        getContentFilters().isEmpty() || getContentFilters().size() == maxLevel - minLevel + 1,
+        "The length of 'contentFilters' must be the same as the levels with content. Found: %s filters and %s levels with content.",
+        getContentFilters().size(),
+        maxLevel - minLevel + 1);
   }
 }

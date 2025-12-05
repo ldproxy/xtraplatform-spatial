@@ -12,7 +12,6 @@ import com.google.common.collect.Range;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
 import de.ii.xtraplatform.base.domain.AppContext;
-import de.ii.xtraplatform.base.domain.Jackson;
 import de.ii.xtraplatform.base.domain.MapStreams;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.util.Tuple;
@@ -40,7 +39,6 @@ import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileSeeding;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
@@ -118,7 +116,6 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       CrsTransformerFactory crsTransformerFactory,
       TileWalker tileWalker,
       Set<Tile3dBuilder> tileBuilders,
-      Jackson jackson,
       @Assisted Tile3dProviderFeaturesData data) {
     super(volatileRegistry, data, "access", "seeding", "generation");
 
@@ -268,7 +265,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
 
   @Override
   public void cleanupSeeding(Tile3dSeedingJobSet jobSet) throws IOException {
-    LOGGER.debug("{}: cleaning up tile caches", TileSeedingJobSet.LABEL);
+    LOGGER.debug("{}: cleaning up tile caches", Tile3dSeedingJobSet.LABEL);
 
     /*for (Tuple<TileCache, String> cache : getCaches(jobSet)) {
       cache.first().cleanupSeeding(jobSet, cache.second());

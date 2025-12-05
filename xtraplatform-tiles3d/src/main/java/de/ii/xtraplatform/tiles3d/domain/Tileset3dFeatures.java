@@ -77,11 +77,8 @@ public interface Tileset3dFeatures
   List<String> getContentFilters();
 
   @DocIgnore
-  @Value.Default
   @Override
-  default List<String> getTileFilters() {
-    return Tile3dGenerationOptions.super.getTileFilters();
-  }
+  List<String> getTileFilters();
 
   /**
    * @langEn Instead of being generated using a `featureType`, a tileset may be composed of multiple

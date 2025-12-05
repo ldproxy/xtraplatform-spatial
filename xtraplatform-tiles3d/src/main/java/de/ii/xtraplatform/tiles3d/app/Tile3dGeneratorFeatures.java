@@ -142,7 +142,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       initAsync(volatileRegistry);
     } else {
       setState(State.AVAILABLE);
-      // init();
+      init2();
     }
   }
 
@@ -156,7 +156,6 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
 
     for (Tileset3dFeatures tileset : data.getTilesets().values()) {
       Tileset3dFeatures tileset3dFeatures = tileset.mergeDefaults(data.getTilesetDefaults());
-      tilesets.put(tileset3dFeatures.getId(), tileset3dFeatures);
 
       String featureProviderId =
           tileset3dFeatures.getFeatureProvider().orElse(Tile3dProvider.clean(data.getId()));
@@ -186,31 +185,20 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           true);
     }
 
-    this.tileBuilder =
-        tileBuilders.stream().min(Comparator.comparingInt(Tile3dBuilder::getPriority));
-
-    // init();
+    init2();
 
     onVolatileStarted();
   }
 
-  /*private void init() {
-    for (TilesetFeatures tileset : data.getTilesets().values()) {
-      String featureProviderId =
-          tileset
-              .mergeDefaults(data.getTilesetDefaults())
-              .getFeatureProvider()
-              .orElse(TileProviderFeatures.clean(data.getId()));
-
-      tileBuilderForProvider.putIfAbsent(
-          featureProviderId,
-          tileBuilders.stream()
-              .sorted(Comparator.comparingInt(TileBuilder::getPriority))
-              .filter(tb -> tb.isApplicable(featureProviderId))
-              .findFirst()
-              .orElseThrow(() -> new IllegalStateException("No applicable tile builder found")));
+  private void init2() {
+    for (Tileset3dFeatures tileset : data.getTilesets().values()) {
+      Tileset3dFeatures tileset3dFeatures = tileset.mergeDefaults(data.getTilesetDefaults());
+      tilesets.put(tileset3dFeatures.getId(), tileset3dFeatures);
     }
-  }*/
+
+    this.tileBuilder =
+        tileBuilders.stream().min(Comparator.comparingInt(Tile3dBuilder::getPriority));
+  }
 
   @Override
   public Optional<BoundingBox> getBounds(String tilesetId) {
@@ -551,8 +539,8 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       BoundingBox bbox = computeTileBbox(fullBbox, level, x1, y1);
       int relativeLevel = level - tileset.getContentLevels().getMin();
       additionalFilter =
-          relativeLevel >= 0 && tileset.getTileFilters().size() > relativeLevel
-              ? Optional.ofNullable(tileset.getTileFilters().get(relativeLevel))
+          relativeLevel >= 0 && tileset.getTileFiltersOrDefault().size() > relativeLevel
+              ? Optional.ofNullable(tileset.getTileFiltersOrDefault().get(relativeLevel))
                   .map(filter -> cql.read(filter, Format.TEXT))
               : Optional.empty();
       boolean hasData = hasData(featureProvider, tileset, bbox, additionalFilter);
