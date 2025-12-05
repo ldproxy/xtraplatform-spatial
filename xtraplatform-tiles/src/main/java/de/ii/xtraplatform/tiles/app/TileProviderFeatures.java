@@ -17,6 +17,7 @@ import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.base.domain.LogContext.MdcCloseable;
+import de.ii.xtraplatform.base.domain.MapStreams;
 import de.ii.xtraplatform.base.domain.resiliency.OptionalVolatileCapability;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.util.Tuple;
@@ -52,6 +53,7 @@ import de.ii.xtraplatform.tiles.domain.TileCache;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
 import de.ii.xtraplatform.tiles.domain.TileGenerator;
+import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
@@ -91,7 +93,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -333,10 +334,10 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
         .computeIfAbsent(
             cache.getStorage(),
             storage -> {
-              Optional<TileStorePartitions> partitions =
+              Optional<TileMatrixPartitions> partitions =
                   cache.getStorage() == Storage.PER_JOB
                       ? Optional.of(
-                          new TileStorePartitions(
+                          new TileMatrixPartitions(
                               seeding().get().getOptions().getEffectiveJobSize()))
                       : Optional.empty();
 
@@ -477,20 +478,6 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
                             entry.getValue().upperEndpoint(),
                             capRanges.get(entry.getKey()).upperEndpoint()))))
         .collect(MapStreams.toMap());
-  }
-
-  interface MapStreams {
-    static <T, U> Collector<Map.Entry<T, U>, ?, Map<T, U>> toMap() {
-      return Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue);
-    }
-
-    static <T, U> Collector<Map.Entry<T, U>, ?, Map<T, U>> toUnmodifiableMap() {
-      return Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue);
-    }
-
-    static <T, U> Collector<Map.Entry<T, U>, ?, ImmutableMap<T, U>> toImmutableMap() {
-      return ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue);
-    }
   }
 
   static String clean(String id) {
@@ -647,14 +634,14 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
     if (!sourcedTilesets.isEmpty()) {
       for (TileCache cache : generatorCaches) {
         if (cache.isSeeded()) {
-          mergeCoverageInto(cache.getCoverage(sourcedTilesets), coverage);
+          TileSeeding.mergeCoverageInto(cache.getCoverage(sourcedTilesets), coverage);
         }
       }
     }
     if (!combinedTilesets.isEmpty()) {
       for (TileCache cache : combinerCaches) {
         if (cache.isSeeded()) {
-          mergeCoverageInto(cache.getCoverage(combinedTilesets), coverage);
+          TileSeeding.mergeCoverageInto(cache.getCoverage(combinedTilesets), coverage);
         }
       }
     }
@@ -671,12 +658,12 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
 
     for (TileCache cache : generatorCaches) {
       if (cache.isSeeded()) {
-        mergeCoverageInto(cache.getRasterCoverage(validTilesets), coverage);
+        TileSeeding.mergeCoverageInto(cache.getRasterCoverage(validTilesets), coverage);
       }
     }
     for (TileCache cache : combinerCaches) {
       if (cache.isSeeded()) {
-        mergeCoverageInto(cache.getRasterCoverage(validTilesets), coverage);
+        TileSeeding.mergeCoverageInto(cache.getRasterCoverage(validTilesets), coverage);
       }
     }
 
@@ -787,24 +774,6 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             });
 
     return result;
-  }
-
-  private static void mergeCoverageInto(
-      Map<String, Map<String, Set<TileMatrixSetLimits>>> source,
-      Map<String, Map<String, Set<TileMatrixSetLimits>>> target) {
-    source.forEach(
-        (tileset, tms) -> {
-          if (!target.containsKey(tileset)) {
-            target.put(tileset, new LinkedHashMap<>());
-          }
-          tms.forEach(
-              (tmsId, limits) -> {
-                if (!target.get(tileset).containsKey(tmsId)) {
-                  target.get(tileset).put(tmsId, new LinkedHashSet<>());
-                }
-                target.get(tileset).get(tmsId).addAll(limits);
-              });
-        });
   }
 
   @Override

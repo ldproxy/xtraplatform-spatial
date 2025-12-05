@@ -149,6 +149,33 @@ public interface TileCache {
     return coverage;
   }
 
+  default Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
+      Map<String, TileGenerationParameters> tilesets,
+      TileWalker tileWalker,
+      Map<String, Map<String, Range<Integer>>> tmsRanges,
+      Map<String, Map<String, TileMatrixSetBase>> customTileMatrixSets)
+      throws IOException {
+    Map<String, Optional<BoundingBox>> boundingBoxes = getBoundingBoxes(tilesets);
+    Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage = new LinkedHashMap<>();
+
+    tileWalker.walkTilesetsAndLimits(
+        tilesets.keySet(),
+        tmsRanges,
+        boundingBoxes,
+        customTileMatrixSets,
+        (tileset, tms, limits) -> {
+          if (!coverage.containsKey(tileset)) {
+            coverage.put(tileset, new LinkedHashMap<>());
+          }
+          if (!coverage.get(tileset).containsKey(tms.getId())) {
+            coverage.get(tileset).put(tms.getId(), new LinkedHashSet<>());
+          }
+          coverage.get(tileset).get(tms.getId()).add(limits);
+        });
+
+    return coverage;
+  }
+
   default Map<String, Optional<BoundingBox>> getBoundingBoxes(
       Map<String, TileGenerationParameters> tilesets) {
     return tilesets.entrySet().stream()

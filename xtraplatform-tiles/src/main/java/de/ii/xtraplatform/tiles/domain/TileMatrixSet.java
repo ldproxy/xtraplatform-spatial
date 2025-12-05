@@ -12,6 +12,7 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.tiles.app.TileMatrixSetImpl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
@@ -23,6 +24,10 @@ import org.slf4j.LoggerFactory;
 
 /** This class provides derived information from a tile matrix set. */
 public interface TileMatrixSet extends TileMatrixSetBase {
+
+  static TileMatrixSet custom(TileMatrixSetData data) {
+    return new TileMatrixSetImpl(data);
+  }
 
   Logger LOGGER = LoggerFactory.getLogger(TileMatrixSet.class);
 

@@ -56,6 +56,14 @@ public interface TileWalker extends Volatile2 {
       LimitsVisitor limitsVisitor)
       throws IOException;
 
+  void walkTilesetsAndLimits(
+      Set<String> tilesets,
+      Map<String, Map<String, Range<Integer>>> tmsRanges,
+      Map<String, Optional<BoundingBox>> boundingBoxes,
+      Map<String, Map<String, TileMatrixSetBase>> customTileMatrixSets,
+      LimitsVisitor limitsVisitor)
+      throws IOException;
+
   void walkTileSeedingJob(
       TileSeedingJob job,
       Map<String, Map<String, Range<Integer>>> tmsRanges,

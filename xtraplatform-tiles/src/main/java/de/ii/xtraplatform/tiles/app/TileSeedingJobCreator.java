@@ -16,6 +16,7 @@ import de.ii.xtraplatform.jobs.domain.JobProcessor;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
+import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
@@ -136,8 +137,8 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
             tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
         Map<String, Map<String, Set<TileMatrixSetLimits>>> rasterCoverage =
             tileProvider.seeding().get().getRasterCoverage(seedingJobSet.getTileSetParameters());
-        TileStorePartitions tileStorePartitions =
-            new TileStorePartitions(
+        TileMatrixPartitions tileStorePartitions =
+            new TileMatrixPartitions(
                 tileProvider.seeding().get().getOptions().getEffectiveJobSize());
 
         Map<String, List<String>> rasterForVector =

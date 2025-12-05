@@ -5,20 +5,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package de.ii.xtraplatform.tiles.app;
+package de.ii.xtraplatform.tiles.domain;
 
-import de.ii.xtraplatform.tiles.domain.ImmutableTileSubMatrix;
-import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
-import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public class TileStorePartitions {
+public class TileMatrixPartitions {
   final int maxTilesPerPartition;
   final int singlePartitionLevel;
   final int singleRowCol;
 
-  public TileStorePartitions(int maxTilesPerPartition) {
+  public TileMatrixPartitions(int maxTilesPerPartition) {
     this.maxTilesPerPartition = maxTilesPerPartition;
     this.singleRowCol = (int) Math.sqrt(maxTilesPerPartition);
     this.singlePartitionLevel = (int) (Math.log(singleRowCol) / Math.log(2));
