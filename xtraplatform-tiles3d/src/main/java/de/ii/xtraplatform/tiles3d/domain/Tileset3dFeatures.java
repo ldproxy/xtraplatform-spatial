@@ -91,7 +91,7 @@ public interface Tileset3dFeatures
    * @since v4.6
    */
   @DocIgnore
-  // TODO: combine gltf tilesets to b3dm tileset?
+  // NOTE: combine gltf tilesets to b3dm tileset?
   List<String> getCombine();
 
   @JsonIgnore

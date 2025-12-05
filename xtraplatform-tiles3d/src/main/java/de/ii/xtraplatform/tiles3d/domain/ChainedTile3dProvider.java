@@ -98,7 +98,7 @@ public interface ChainedTile3dProvider {
   }
 
   default boolean canProvide(Tile3dQuery tile) {
-    return true; /*TODO getTmsRanges().containsKey(tile.getTileset())
+    return true; /*getTmsRanges().containsKey(tile.getTileset())
                  && getTmsRanges().get(tile.getTileset()).containsKey(tile.getTileMatrixSet().getId())
                  && getTmsRanges()
                      .get(tile.getTileset())

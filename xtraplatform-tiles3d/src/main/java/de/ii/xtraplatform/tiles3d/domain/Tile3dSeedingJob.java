@@ -39,7 +39,7 @@ public interface Tile3dSeedingJob {
             .tileSet(tileSet)
             .tileMatrixSet(tileMatrixSet)
             .generationParameters(generationParameters)
-            .encoding(MediaType.APPLICATION_OCTET_STREAM_TYPE) // TODO
+            .encoding(MediaType.APPLICATION_OCTET_STREAM_TYPE)
             .isReseed(isReseed)
             .addAllSubMatrices(subMatrices)
             .build();
@@ -62,7 +62,7 @@ public interface Tile3dSeedingJob {
             .tileSet(tileSet)
             .tileMatrixSet(tileMatrixSet)
             .generationParameters(generationParameters)
-            .encoding(new MediaType("model", "gltf-binary")) // TODO
+            .encoding(new MediaType("model", "gltf-binary"))
             .isReseed(isReseed)
             .addAllSubMatrices(subMatrices)
             .build();

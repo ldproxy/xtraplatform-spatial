@@ -270,8 +270,6 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     /*for (Tuple<TileCache, String> cache : getCaches(jobSet)) {
       cache.first().cleanupSeeding(jobSet, cache.second());
     }*/
-
-    // TODO: cleanup all orphaned tiles that are not within current cache limits
   }
 
   @Override
@@ -286,7 +284,6 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
           updateProgress.accept(cur);
         };
 
-    // TODO: logging context
     for (TileSubMatrix t : job.getSubMatrices()) {
       if (job.isReseed() || !store.hasSubtree(t.getLevel(), t.getColMin(), t.getRowMin())) {
         Subtree subtree =
@@ -412,7 +409,6 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
                 new ImmutableAssetMetadata.Builder()
                     .version("1.1")
                     .generator(tileGenerator.getLabel())
-                    // TODO.copyright(api.getData().getMetadata().flatMap(ApiMetadata::getAttribution))
                     .build())
             .geometricError(10_000)
             .root(

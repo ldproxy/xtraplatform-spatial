@@ -160,7 +160,6 @@ public interface TileTree {
 
     for (int row = limits.getMinTileRow(); row <= limits.getMaxTileRow(); row++) {
       for (int col = limits.getMinTileCol(); col <= limits.getMaxTileCol(); col++) {
-        // TODO: content from limits?
         TileTree parentTree = getParentTree(level, row, col, rootLevels);
         treeRoots.compute(
             parentTree.getCoordinates(), (k, v) -> v == null ? parentTree : v.merge(parentTree));

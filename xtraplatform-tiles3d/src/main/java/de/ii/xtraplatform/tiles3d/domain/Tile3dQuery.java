@@ -21,8 +21,4 @@ public interface Tile3dQuery extends Tile3dCoordinates {
   default boolean isExplicit() {
     return getFileName().isPresent();
   }
-
-  // TODO MediaType getMediaType();
-
-  // TODO Optional<TileGenerationParameters> getGenerationParameters();
 }
