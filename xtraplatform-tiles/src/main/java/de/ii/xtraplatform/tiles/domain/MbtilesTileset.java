@@ -113,7 +113,7 @@ public class MbtilesTileset {
         partitions,
         isRaster,
         false,
-        partitions.isPresent() && seeded ? Mutex.createNoOp() : Mutex.create());
+        partitions.isPresent() && seeded && isRaster ? Mutex.createNoOp() : Mutex.create());
   }
 
   private MbtilesTileset(
