@@ -96,30 +96,31 @@ public class MbtilesTileset {
   private final String tileMapTable;
   private final String tileBlobsTable;
 
-  public MbtilesTileset(Path tilesetPath, boolean isXtratiler) {
-    this(tilesetPath, null, Optional.empty(), isXtratiler, true, Mutex.create());
+  public MbtilesTileset(Path tilesetPath, boolean isRaster) {
+    this(tilesetPath, null, Optional.empty(), isRaster, true, Mutex.create());
   }
 
   public MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
       Optional<TileStorePartitions> partitions,
-      boolean isXtratiler)
+      boolean isRaster,
+      boolean seeded)
       throws IOException {
     this(
         tilesetPath,
         metadata,
         partitions,
-        isXtratiler,
+        isRaster,
         false,
-        partitions.isPresent() ? Mutex.createNoOp() : Mutex.create());
+        partitions.isPresent() && seeded ? Mutex.createNoOp() : Mutex.create());
   }
 
   private MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
       Optional<TileStorePartitions> partitions,
-      boolean isXtratiler,
+      boolean isRaster,
       boolean mustExist,
       Mutex mutex) {
     if (mustExist && !Files.exists(tilesetPath)) {
@@ -130,9 +131,9 @@ public class MbtilesTileset {
     this.tilesetPath = tilesetPath;
     this.partitions = partitions;
     this.mutex = mutex;
-    this.numericTileIds = !isXtratiler;
-    this.tileMapTable = isXtratiler ? "map" : "tile_map";
-    this.tileBlobsTable = isXtratiler ? "images" : "tile_blobs";
+    this.numericTileIds = !isRaster;
+    this.tileMapTable = isRaster ? "map" : "tile_map";
+    this.tileBlobsTable = isRaster ? "images" : "tile_blobs";
 
     if (Objects.isNull(metadata)) {
       try {
