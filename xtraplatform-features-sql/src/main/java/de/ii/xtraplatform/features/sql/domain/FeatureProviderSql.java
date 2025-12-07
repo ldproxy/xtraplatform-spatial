@@ -1340,10 +1340,14 @@ public class FeatureProviderSql
             .withResult((Builder) builder)
             .handleError(
                 (result, throwable) -> {
-                  Throwable error =
-                      throwable instanceof PSQLException || throwable instanceof JsonParseException
-                          ? new IllegalArgumentException(throwable.getMessage())
-                          : throwable;
+                  Throwable error = throwable;
+
+                  if (throwable instanceof PSQLException
+                      || throwable instanceof JsonParseException) {
+                    error = new IllegalArgumentException("Invalid feature data");
+                    LogContext.errorAsDebug(LOGGER, throwable, "Error during feature mutation");
+                  }
+
                   return result.error(error);
                 })
             .handleItem((Builder::addIds))
