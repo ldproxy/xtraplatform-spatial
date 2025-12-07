@@ -931,9 +931,6 @@ public class FeatureProviderSql
       return false;
     }
     if (!getData().getDatasetChanges().isModeCrud()) {
-      LOGGER.warn(
-          "Feature provider with id '{}' does not support mutations: datasetChanges.mode is not 'CRUD'",
-          getId());
       return false;
     }
 
