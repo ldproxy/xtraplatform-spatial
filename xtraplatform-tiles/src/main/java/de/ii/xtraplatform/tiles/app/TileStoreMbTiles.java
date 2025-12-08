@@ -64,7 +64,8 @@ public class TileStoreMbTiles implements TileStore {
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
       Map<String, Set<String>> tileMatrixSets,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository,
-      Optional<TileStorePartitions> partitions) {
+      Optional<TileStorePartitions> partitions,
+      boolean seeded) {
     Map<String, MbtilesTileset> tileSets = new ConcurrentHashMap<>();
     try {
       for (String tileset : tileSchemas.keySet()) {
@@ -78,7 +79,8 @@ public class TileStoreMbTiles implements TileStore {
                   tms,
                   getVectorLayers(tileSchemas, tileset),
                   partitions,
-                  tileSchemas.get(tileset).isEmpty()));
+                  tileSchemas.get(tileset).isEmpty(),
+                  seeded));
         }
       }
     } catch (IOException e) {
@@ -215,6 +217,7 @@ public class TileStoreMbTiles implements TileStore {
                 tile.getTileMatrixSet().getId(),
                 getVectorLayers(tileSchemas, tile.getTileset()),
                 partitions,
+                false,
                 false));
       }
     }
@@ -431,7 +434,8 @@ public class TileStoreMbTiles implements TileStore {
       String tileMatrixSet,
       List<VectorLayer> vectorLayers,
       Optional<TileStorePartitions> partitions,
-      boolean isXtratiler)
+      boolean isRaster,
+      boolean seeded)
       throws IOException {
     Path relPath =
         Path.of(tileset).resolve(tileMatrixSet + (partitions.isEmpty() ? MBTILES_SUFFIX : ""));
@@ -451,20 +455,20 @@ public class TileStoreMbTiles implements TileStore {
     MbtilesMetadata md =
         ImmutableMbtilesMetadata.builder()
             .name(name)
-            .format(isXtratiler ? TilesFormat.PNG : TilesFormat.MVT)
+            .format(isRaster ? TilesFormat.PNG : TilesFormat.MVT)
             .vectorLayers(vectorLayers)
             .build();
 
     if (partitions.isPresent()) {
-      return new MbtilesTileset(filePath.get(), md, partitions, isXtratiler);
+      return new MbtilesTileset(filePath.get(), md, partitions, isRaster, seeded);
     }
 
     if (rootStore.has(relPath)) {
-      return new MbtilesTileset(filePath.get(), isXtratiler);
+      return new MbtilesTileset(filePath.get(), isRaster);
     }
 
     try {
-      return new MbtilesTileset(filePath.get(), md, Optional.empty(), isXtratiler);
+      return new MbtilesTileset(filePath.get(), md, Optional.empty(), isRaster, seeded);
     } catch (FileAlreadyExistsException e) {
       throw new IllegalStateException(
           "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.");
