@@ -17,22 +17,20 @@ import de.ii.xtraplatform.features.domain.ProviderData;
 import java.util.Map;
 
 /**
- * @langEn # Tiles
- *     <p>There are currently three types of Tile providers:
+ * @langEn # 3D Tiles
+ *     <p>There are currently two types of 3D Tiles providers:
  *     <p><code>
  * - [Features](10-features.md): The tiles are derived from a feature provider.
- * - [MbTiles](30-mbtiles.md): The tiles are retrieved from one or more MBTiles files.
- * - [HTTP](60-http.md): The tiles are retrieved via HTTP, e.g. from a TileServer GL instance.
+ * - [Files](20-files.md): The tiles are retrieved from the store.
  *     </code>
  *     <p>## Configuration
  *     <p>These are common configuration options for all provider types.
  *     <p>{@docTable:cfgProperties}
  * @langDe # Tiles
- *     <p>Es werden aktuell drei Arten von Tile-Providern unterstützt:
+ *     <p>Es werden aktuell zwei Arten von 3D Tile-Providern unterstützt:
  *     <p><code>
  * - [Features](10-features.md): Die Kacheln werden aus einem Feature-Provider abgeleitet.
- * - [MbTiles](30-mbtiles.md): Die Kacheln liegen in einer oder mehreren MBTiles-Dateien vor.
- * - [HTTP](60-http.md): Die Kacheln werden via HTTP abgerufen, z.B. von einer TileServer GL Instanz.
+ * - [Files](20-files.md): Die Kacheln liegen im Store vor.
  *     </code>
  *     <p>## Konfiguration
  *     <p>Dies sind gemeinsame Konfigurations-Optionen für alle Provider-Typen.
@@ -40,7 +38,7 @@ import java.util.Map;
  * @ref:cfgProperties {@link de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dProviderCommonData}
  */
 @DocFile(
-    path = "providers/3dtile",
+    path = "providers/tile3d",
     name = "README.md",
     tables = {
       @DocTable(
@@ -73,14 +71,14 @@ public interface Tile3dProviderData extends ProviderData {
   /**
    * @langEn Defaults for all `tilesets`.
    * @langDe Defaults für alle `tilesets`.
-   * @since v3.4
+   * @since v4.6
    */
   Tileset3dCommonDefaults getTilesetDefaults();
 
   /**
    * @langEn Definition of tilesets.
    * @langDe Definition von Tilesets.
-   * @since v3.4
+   * @since v4.6
    * @default {}
    */
   Map<String, ? extends Tileset3dCommon> getTilesets();

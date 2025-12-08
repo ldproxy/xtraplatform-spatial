@@ -21,22 +21,20 @@ import java.util.Map;
 import org.immutables.value.Value;
 
 /**
- * # MBTiles
+ * # Files
  *
- * @langEn With this tile provider, the tiles are provided via an [MBTiles
- *     file](https://github.com/mapbox/mbtiles-spec). The tile format and all other properties of
- *     the tileset are derived from the contents of the MBTiles file. Only the `WebMercatorQuad`
- *     tiling scheme is supported.
+ * @langEn With this 3D tile provider, the tilesets are retrieved from the store. For each tileset
+ *     the root `tileset.json` has to be configured. Version 1.0 and 1.1 of the 3D Tiles
+ *     specification are supported.
  *     <p>## Configuration
  *     <p>{@docTable:properties}
  *     <p>### Tileset
  *     <p>{@docTable:tileset}
  *     <p>## Example
  *     <p>{@docVar:examples}
- * @langDe Bei diesem Tile-Provider werden die Kacheln über eine
- *     [MBTiles-Datei](https://github.com/mapbox/mbtiles-spec) bereitgestellt. Das Kachelformat und
- *     alle anderen Eigenschaften des Tileset ergeben sich aus dem Inhalt der MBTiles-Datei.
- *     Unterstützt wird nur das Kachelschema `WebMercatorQuad`.
+ * @langDe Bei diesem 3D Tile-Provider werden die Tilesets aus dem Store abgerufen. Für jeden
+ *     Kachelsatz muss die Root-`tileset.json` konfiguriert werden. Version 1.0 und 1.1 der 3D Tiles
+ *     Spezifikation werden unterstützt.
  *     <p>## Konfiguration
  *     <p>{@docTable:properties}
  *     <p>### Tileset
@@ -47,19 +45,19 @@ import org.immutables.value.Value;
  * @ref:tilesetTable {@link de.ii.xtraplatform.tiles3d.domain.ImmutableTileset3dFiles}
  * @examplesAll <code>
  * ```yaml
- * id: zoomstack-tiles
- * providerType: TILE
- * providerSubType: MBTILES
+ * id: lod-3dtiles
+ * providerType: 3DTILE
+ * providerSubType: FILES
  * tilesets:
- *   __all__:
- *     id: __all__
- *     source: zoomstack/OS_Open_Zoomstack.mbtiles
+ *   lod:
+ *     id: lod
+ *     source: lod/tileset.json
  * ```
  * </code>
  */
 @DocFile(
-    path = "providers/tile",
-    name = "30-mbtiles.md",
+    path = "providers/tile3d",
+    name = "20-files.md",
     tables = {
       @DocTable(
           name = "properties",
@@ -79,10 +77,7 @@ import org.immutables.value.Value;
     vars = {
       @DocVar(
           name = "examples",
-          value = {
-            // @DocStep(type = Step.TAG_REFS, params = "{@ref:cfg}"),
-            @DocStep(type = Step.TAG, params = "{@examples}")
-          }),
+          value = {@DocStep(type = Step.TAG, params = "{@examples}")}),
     })
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTile3dProviderFilesData.Builder.class)

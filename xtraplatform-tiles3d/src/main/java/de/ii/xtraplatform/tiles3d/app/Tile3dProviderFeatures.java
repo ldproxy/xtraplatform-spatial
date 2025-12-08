@@ -28,9 +28,7 @@ import de.ii.xtraplatform.tiles.domain.Cache;
 import de.ii.xtraplatform.tiles.domain.Cache.Storage;
 import de.ii.xtraplatform.tiles.domain.Cache.Type;
 import de.ii.xtraplatform.tiles.domain.ImmutableCache;
-import de.ii.xtraplatform.tiles.domain.ImmutableSeedingOptions;
 import de.ii.xtraplatform.tiles.domain.MinMax;
-import de.ii.xtraplatform.tiles.domain.SeedingOptions;
 import de.ii.xtraplatform.tiles.domain.TileCache;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSet;
@@ -41,6 +39,8 @@ import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileSeeding;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
+import de.ii.xtraplatform.tiles3d.domain.ImmutableSeedingOptions3d;
+import de.ii.xtraplatform.tiles3d.domain.SeedingOptions3d;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
@@ -233,8 +233,8 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   }
 
   @Override
-  public SeedingOptions getOptions() {
-    return getData().getSeeding().orElseGet(() -> new ImmutableSeedingOptions.Builder().build());
+  public SeedingOptions3d getOptions() {
+    return getData().getSeeding().orElseGet(() -> new ImmutableSeedingOptions3d.Builder().build());
   }
 
   @Override

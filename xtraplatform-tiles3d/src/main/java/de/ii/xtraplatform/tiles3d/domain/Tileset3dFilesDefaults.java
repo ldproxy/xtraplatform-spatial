@@ -12,16 +12,4 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTileset3dFilesDefaults.Builder.class)
-public interface Tileset3dFilesDefaults extends Tileset3dCommonDefaults {
-
-  /**
-   * @langEn Tile Matrix Set of the tiles in the MBTiles file.
-   * @langDe Kachelschema der Kacheln in der MBTiles-Datei.
-   * @default WebMercatorQuad
-   * @since v4.0
-   */
-  @Value.Default
-  default String getTileMatrixSet() {
-    return "WebMercatorQuad";
-  }
-}
+public interface Tileset3dFilesDefaults extends Tileset3dCommonDefaults {}
