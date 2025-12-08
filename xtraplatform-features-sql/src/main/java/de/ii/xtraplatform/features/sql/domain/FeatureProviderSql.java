@@ -1341,7 +1341,10 @@ public class FeatureProviderSql
 
                   if (throwable instanceof PSQLException
                       || throwable instanceof JsonParseException) {
-                    error = new IllegalArgumentException("Invalid feature data");
+                    error =
+                        new IllegalArgumentException(
+                            "Invalid feature data. You may be able to obtain more information about the problem by adding the header ‘Prefer: handling=strict’ to the request.",
+                            throwable);
                     LogContext.errorAsDebug(LOGGER, throwable, "Error during feature mutation");
                   }
 
