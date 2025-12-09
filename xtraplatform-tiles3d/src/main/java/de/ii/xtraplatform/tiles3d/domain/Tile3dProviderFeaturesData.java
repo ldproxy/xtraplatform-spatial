@@ -25,8 +25,19 @@ import org.immutables.value.Value;
 /**
  * # Features
  *
- * @langEn In this 3D tile provider, the 3D Tiles 1.1 in glTF format are derived from a [Feature
- *     Provider](../feature/README.md).
+ * @langEn In this 3D tile provider, the [3D Tiles
+ *     1.1](https://docs.ogc.org/cs/22-025r4/22-025r4.html) in glTF format are derived from a
+ *     [Feature Provider](../feature/README.md). The tilesets use implicit quadtree tiling, subtrees
+ *     are encoded using the binary format for compactness.
+ *     <p>The only [refinement strategy](https://docs.ogc.org/cs/22-025r4/22-025r4.html#toc19) that
+ *     * is supported is `ADD`. Use the `contentFilters` configuration option to specify at which *
+ *     level of the tile hierarchy a building will be represented. Each building should be included
+ *     * on exactly one level.
+ *     <p>## Limitations
+ *     <p>The provider currently depends on the building block [Features -
+ *     glTF](features_-_gltf.md#limitations) and inherits its limitations.
+ *     <p>In addition, the following information in Subtrees is not supported: property tables, tile
+ *     metadata, content metadata, and subtree metadata.
  *     <p>## Configuration
  *     <p>{@docTable:properties}
  *     <p>{@docVar:tilesetDefaults}
@@ -35,10 +46,26 @@ import org.immutables.value.Value;
  *     <p>{@docTable:tileset}
  *     <p>{@docVar:seeding}
  *     <p>{@docTable:seeding}
+ *     <p>## Storage
+ *     <p>The files of the tilesets are stored in the resource store in the * directory
+ *     `3dtiles/{apiId}/cache_dyn/{tileset}/`.
  *     <p>## Example
  *     <p>{@docVar:examples}
- * @langDe Bei diesem 3D Tile-Provider werden die 3D Tiles 1.1 im Format glTF aus einem [Feature
- *     Provider](../feature/README.md) abgeleitet.
+ * @langDe Bei diesem 3D Tile-Provider werden die [3D Tiles
+ *     1.1](https://docs.ogc.org/cs/22-025r4/22-025r4.html) im Format glTF aus einem [Feature
+ *     Provider](../feature/README.md) abgeleitet. Die Tilesets verwenden implizite
+ *     Quadtree-Kachelung, Subtrees werden aus Gründen der Kompaktheit im Binärformat kodiert.
+ *     <p>Die einzige unterstützte
+ *     [Refinement-Strategie](https://docs.ogc.org/cs/22-025r4/22-025r4.html#toc19) ist `ADD`.
+ *     Verwenden Sie die Konfigurationsoption `contentFilters`, um anzugeben, auf welcher Ebene der
+ *     Kachel-Hierarchie ein Gebäude dargestellt werden soll. Jedes Gebäude sollte genau auf einer
+ *     Ebene enthalten sein.
+ *     <p>## Limitierungen
+ *     <p>Der Provider hat aktuell noch eine Abhängigkeit auf den Baustein [Features -
+ *     glTF](features_-_gltf.md#limitierungen) und erbt dessen Limitierungen.
+ *     <p>Darüber hinaus werden die folgenden Informationen in Subtrees nicht unterstützt:
+ *     Eigenschaftstabellen (Property Tables), Kachel-Metadaten (Tile Metadata), Inhalts-Metadaten
+ *     (Content Metadata) und Metadaten von Subtrees.
  *     <p>## Konfiguration
  *     <p>{@docTable:properties}
  *     <p>{@docVar:tilesetDefaults}
@@ -47,6 +74,9 @@ import org.immutables.value.Value;
  *     <p>{@docTable:tileset}
  *     <p>{@docVar:seeding}
  *     <p>{@docTable:seeding}
+ *     <p>## Speicherung
+ *     <p>Die Dateien der Tilesets werden im Ressourcen-Store im Verzeichnis
+ *     `3dtiles/{apiId}/cache_dyn/{tileset}/` abgelegt.
  *     <p>## Beispiel
  *     <p>{@docVar:examples}
  * @ref:cfgProperties {@link de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dProviderFeaturesData}
