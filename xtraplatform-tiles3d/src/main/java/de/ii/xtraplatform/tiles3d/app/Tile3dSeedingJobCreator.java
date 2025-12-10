@@ -104,6 +104,7 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
 
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
             tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
+        final int[] numSubtrees = {0};
 
         tileProvider.seeding().get().setupSeeding(seedingJobSet);
 
@@ -139,8 +140,10 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
                                     Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
                                     jobSet.getId());
 
-                            int total = 0; // subtreeJob.getTotal().get();
-                            Map<Integer, Integer> levelTotal = new HashMap<>();
+                            int total = subtreeJob.getTotal().get();
+                            Map<Integer, Integer> levelTotal =
+                                new HashMap<>(Map.of(tt.getLevel(), total));
+                            numSubtrees[0] += total;
                             subtreeJob = subtreeJob.with(followUps);
 
                             for (TileSubMatrix content : tt.getContent()) {
@@ -192,9 +195,10 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
           String processors = getConcurrency(jobSet) + " local";
           LOGGER.debug(
               MARKER.JOBS,
-              "{}: processing {} tiles with {} processors",
+              "{}: processing {} subtrees and {} tiles with {} processors",
               jobSet.getLabel(),
-              jobSet.getTotal().get(),
+              numSubtrees[0],
+              Math.max(jobSet.getTotal().get() - numSubtrees[0], 0),
               processors);
         }
       } catch (IOException e) {

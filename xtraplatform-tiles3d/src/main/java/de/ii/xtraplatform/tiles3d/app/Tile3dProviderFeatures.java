@@ -117,7 +117,9 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       @Assisted Tile3dProviderFeaturesData data) {
     super(volatileRegistry, data, "access", "seeding", "generation");
 
-    this.rootStore = blobStore.with(Tile3dProvider.STORE_DIR_NAME, data.getId(), "cache_dyn");
+    this.rootStore =
+        blobStore.with(
+            Tile3dProvider.STORE_DIR_NAME, Tile3dProvider.clean(data.getId()), "cache_dyn");
     this.metadata = new LinkedHashMap<>();
     this.stores = new LinkedHashMap<>();
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
@@ -285,49 +287,56 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
         };
 
     for (TileSubMatrix t : job.getSubMatrices()) {
-      if (job.isReseed() || !store.hasSubtree(t.getLevel(), t.getColMin(), t.getRowMin())) {
-        TileTree child = TileTree.fromSubMatrix(t);
+      try {
+        if (job.isReseed() || !store.hasSubtree(t.getLevel(), t.getColMin(), t.getRowMin())) {
+          TileTree child = TileTree.fromSubMatrix(t);
 
-        if (child.getLevel() > 0) {
-          TileTree parent = child.parent(tileset.getSubtreeLevels());
+          if (child.getLevel() > 0) {
+            TileTree parent = child.parent(tileset.getSubtreeLevels());
 
-          if (!store.hasSubtree(parent.getLevel(), parent.getCol(), parent.getRow())) {
-            LOGGER.debug(
-                "Parent subtree {}/{}/{} not available, skipping subtree {}/{}/{}",
-                parent.getLevel(),
-                parent.getCol(),
-                parent.getRow(),
-                child.getLevel(),
-                child.getCol(),
-                child.getRow());
+            if (!store.hasSubtree(parent.getLevel(), parent.getCol(), parent.getRow())) {
+              if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(
+                    "Parent subtree {}/{}/{} not available, skipping subtree {}/{}/{}",
+                    parent.getLevel(),
+                    parent.getCol(),
+                    parent.getRow(),
+                    child.getLevel(),
+                    child.getCol(),
+                    child.getRow());
+              }
+              return;
+            }
 
-            // updateProgress2.run();
-            return;
+            byte[] subtreeBytes =
+                store.getSubtree(parent.getLevel(), parent.getCol(), parent.getRow());
+            Subtree subtreeParent = tileGenerator.subtreeFromBinary(subtreeBytes);
+
+            if (!tileGenerator.isSubtreeAvailable(
+                subtreeParent, child, tileset.getSubtreeLevels())) {
+              if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(
+                    "Subtree {}/{}/{} not available, skipping",
+                    t.getLevel(),
+                    t.getColMin(),
+                    t.getRowMin());
+              }
+              return;
+            }
           }
 
-          byte[] subtreeBytes =
-              store.getSubtree(parent.getLevel(), parent.getCol(), parent.getRow());
-          Subtree subtreeParent = tileGenerator.subtreeFromBinary(subtreeBytes);
-
-          if (!tileGenerator.isSubtreeAvailable(subtreeParent, child, tileset.getSubtreeLevels())) {
-            LOGGER.debug(
-                "Subtree {}/{}/{} not available, skipping",
-                t.getLevel(),
-                t.getColMin(),
-                t.getRowMin());
-            return;
-          }
+          Subtree subtree = tileGenerator.generateSubtree(job.getTileSet(), child);
+          byte[] subtreeAsBinary = tileGenerator.subtreeToBinary(subtree);
+          store.putSubtree(t.getLevel(), t.getColMin(), t.getRowMin(), subtreeAsBinary);
+        } else if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace(
+              "Subtree {}/{}/{} already exists, skipping",
+              t.getLevel(),
+              t.getColMin(),
+              t.getRowMin());
         }
-
-        Subtree subtree = tileGenerator.generateSubtree(job.getTileSet(), child);
-        byte[] subtreeAsBinary = tileGenerator.subtreeToBinary(subtree);
-        store.putSubtree(t.getLevel(), t.getColMin(), t.getRowMin(), subtreeAsBinary);
-      } else {
-        LOGGER.debug(
-            "Subtree {}/{}/{} already exists, skipping",
-            t.getLevel(),
-            t.getColMin(),
-            t.getRowMin());
+      } finally {
+        updateProgress2.run();
       }
     }
 
@@ -354,12 +363,14 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       TileTree parent = TileTree.parentOf(subMatrix, tileset.getSubtreeLevels());
 
       if (!store.hasSubtree(parent.getLevel(), parent.getCol(), parent.getRow())) {
-        LOGGER.debug(
-            "Subtree {}/{}/{} not available, skipping content {}",
-            parent.getLevel(),
-            parent.getCol(),
-            parent.getRow(),
-            subMatrix.asString());
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace(
+              "Subtree {}/{}/{} not available, skipping content {}",
+              parent.getLevel(),
+              parent.getCol(),
+              parent.getRow(),
+              subMatrix.asStringXY());
+        }
 
         updateProgress2.accept((int) subMatrix.getNumberOfTiles());
         return;
@@ -383,12 +394,12 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
                 byte[] tileBytes =
                     tileGenerator.generateTile(tileset, t, job, jobSet, tileMatrixSet);
                 store.putContent(subMatrix.getLevel(), col, row, tileBytes);
-              } else {
-                LOGGER.debug(
+              } else if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(
                     "Tile {}/{}/{} already exists, skipping", subMatrix.getLevel(), col, row);
               }
-            } else {
-              LOGGER.debug(
+            } else if (LOGGER.isTraceEnabled()) {
+              LOGGER.trace(
                   "Tile {}/{}/{} not available in subtree, skipping",
                   subMatrix.getLevel(),
                   col,

@@ -82,6 +82,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import org.locationtech.jts.shape.fractal.MortonCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +107,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
   private final Tile3dProviderFeaturesData data;
   private final Map<String, Tileset3dFeatures> tilesets;
   private final Map<String, DelayedVolatile<FeatureProvider>> featureProviders;
+  private final Map<String, BoundingBox> extents;
   private final boolean async;
   private final String label;
   private Optional<Tile3dBuilder> tileBuilder;
@@ -127,6 +129,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     this.tileBuilders = tileBuilders;
     this.tilesets = new LinkedHashMap<>();
     this.featureProviders = new LinkedHashMap<>();
+    this.extents = new ConcurrentHashMap<>();
     this.async = asyncStartup;
     this.label = String.format("%s v%s", appContext.getName(), appContext.getVersion());
     this.tileBuilder = Optional.empty();
@@ -176,12 +179,11 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           fp -> {
             if (Objects.equals(fp.getId(), featureProviderId)) {
               delayedVolatile.set(fp);
+              init2();
             }
           },
           true);
     }
-
-    init2();
 
     onVolatileStarted();
   }
@@ -190,6 +192,8 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     for (Tileset3dFeatures tileset : data.getTilesets().values()) {
       Tileset3dFeatures tileset3dFeatures = tileset.mergeDefaults(data.getTilesetDefaults());
       tilesets.put(tileset3dFeatures.getId(), tileset3dFeatures);
+
+      getBounds(tileset3dFeatures).ifPresent(bbox -> extents.put(tileset3dFeatures.getId(), bbox));
     }
 
     this.tileBuilder =
@@ -204,16 +208,27 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       throw new IllegalArgumentException(String.format("Unknown tileset '%s'", tilesetId));
     }
 
-    FeatureProvider featureProvider =
-        getFeatureProvider(tileset.mergeDefaults(data.getTilesetDefaults()));
+    return getBounds(tileset);
+  }
+
+  private Optional<BoundingBox> getBounds(Tileset3dFeatures tileset) {
+    if (extents.containsKey(tileset.getId())) {
+      return Optional.of(extents.get(tileset.getId()));
+    }
+
+    FeatureProvider featureProvider = getFeatureProvider(tileset);
 
     if (!featureProvider.extents().isAvailable()) {
       return Optional.empty();
     }
 
     String featureType = tileset.getFeatureType().orElse(tileset.getId());
+    Optional<BoundingBox> extent =
+        featureProvider.extents().get().getSpatialExtent(featureType, OgcCrs.CRS84h);
 
-    return featureProvider.extents().get().getSpatialExtent(featureType, OgcCrs.CRS84h);
+    extent.ifPresent(bbox -> extents.put(tileset.getId(), bbox));
+
+    return extent;
   }
 
   @Override
@@ -260,12 +275,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     Tileset3dFeatures tileset =
         data.getTilesets().get(tilesetId).mergeDefaults(data.getTilesetDefaults());
     FeatureProvider featureProvider = getFeatureProvider(tileset);
-    BoundingBox fullBbox =
-        featureProvider
-            .extents()
-            .get()
-            .getSpatialExtent(tileset.getFeatureType().orElse(tileset.getId()), OgcCrs.CRS84h)
-            .orElseThrow();
+    BoundingBox fullBbox = getBounds(tileset).orElseThrow();
 
     int size = 0;
     for (int i = 0; i < tileset.getSubtreeLevels(); i++) {

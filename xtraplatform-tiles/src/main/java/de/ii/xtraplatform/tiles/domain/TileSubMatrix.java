@@ -69,6 +69,13 @@ public interface TileSubMatrix extends Comparable<TileSubMatrix> {
         "%d/%d-%d/%d-%d", getLevel(), getRowMin(), getRowMax(), getColMin(), getColMax());
   }
 
+  @Value.Lazy
+  @JsonIgnore
+  default String asStringXY() {
+    return String.format(
+        "%d/%d-%d/%d-%d", getLevel(), getColMin(), getColMax(), getRowMin(), getRowMax());
+  }
+
   default boolean contains(TileSubMatrix other) {
     return getLevel() == other.getLevel()
         && getRowMin() <= other.getRowMin()
