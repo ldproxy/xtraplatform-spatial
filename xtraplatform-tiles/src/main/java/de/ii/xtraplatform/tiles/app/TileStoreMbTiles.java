@@ -65,7 +65,7 @@ public class TileStoreMbTiles implements TileStore {
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
       Map<String, Set<String>> tileMatrixSets,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean seeded) {
     Map<String, MbtilesTileset> tileSets = new ConcurrentHashMap<>();
     try {
@@ -434,7 +434,7 @@ public class TileStoreMbTiles implements TileStore {
       String tileset,
       String tileMatrixSet,
       List<VectorLayer> vectorLayers,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
       boolean seeded)
       throws IOException {

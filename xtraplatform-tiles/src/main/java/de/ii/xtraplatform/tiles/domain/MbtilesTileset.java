@@ -102,7 +102,7 @@ public class MbtilesTileset {
   public MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
       boolean seeded)
       throws IOException {
@@ -118,7 +118,7 @@ public class MbtilesTileset {
   private MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
       boolean mustExist,
       Mutex mutex) {
