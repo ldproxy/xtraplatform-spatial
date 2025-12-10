@@ -280,7 +280,8 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
             tileSchemas,
             tileMatrixSets,
             tileMatrixSetRepository,
-            partitions)
+            partitions,
+            false)
         : new TileStorePlain(blobStore);
   }
 
