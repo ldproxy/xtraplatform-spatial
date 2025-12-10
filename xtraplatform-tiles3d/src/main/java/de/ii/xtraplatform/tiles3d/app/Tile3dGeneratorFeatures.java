@@ -20,6 +20,7 @@ import de.ii.xtraplatform.base.domain.resiliency.AbstractVolatileComposed;
 import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileUnavailableException;
+import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -170,7 +171,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
               false,
               "generation");
 
-      addSubcomponent(delayedVolatile);
+      addSubcomponent(delayedVolatile, true);
 
       featureProviders.putIfAbsent(featureProviderId, delayedVolatile);
 
@@ -179,13 +180,20 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           fp -> {
             if (Objects.equals(fp.getId(), featureProviderId)) {
               delayedVolatile.set(fp);
-              init2();
             }
           },
           true);
     }
 
     onVolatileStarted();
+  }
+
+  @Override
+  protected Tuple<State, String> volatileInit() {
+    if (async) {
+      init2();
+    }
+    return super.volatileInit();
   }
 
   private void init2() {
