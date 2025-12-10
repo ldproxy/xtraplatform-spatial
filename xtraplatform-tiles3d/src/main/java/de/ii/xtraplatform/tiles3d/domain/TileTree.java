@@ -9,18 +9,26 @@ package de.ii.xtraplatform.tiles3d.domain;
 
 import com.google.common.collect.Streams;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSubMatrix;
-import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
+import de.ii.xtraplatform.tiles3d.domain.ImmutableTileTree.Builder;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.shape.fractal.MortonCode;
 
 @Value.Immutable
 public interface TileTree {
+
+  TileTree ROOT = of(0, 0, 0);
+
+  static TileTree of(int level, int col, int row) {
+    return new ImmutableTileTree.Builder().level(level).col(col).row(row).build();
+  }
 
   interface TileTreeVisitor<T> {
     T visit(TileTree tileTree, List<T> childResults);
@@ -36,28 +44,24 @@ public interface TileTree {
 
   List<TileSubMatrix> getContent();
 
-  @Value.Derived
-  @Value.Auxiliary
+  @Value.Default
+  default int getMaxContentLevel() {
+    return getLevel();
+  }
+
+  @Value.Default
+  default long getNumberOfSubtrees() {
+    return 0;
+  }
+
+  @Value.Default
+  default long getNumberOfTiles() {
+    return 0;
+  }
+
+  @Value.Lazy
   default String getCoordinates() {
     return String.format("%d/%d/%d", getLevel(), getRow(), getCol());
-  }
-
-  default TileSubMatrix toSubMatrix() {
-    return new ImmutableTileSubMatrix.Builder()
-        .level(getLevel())
-        .rowMin(getRow())
-        .rowMax(getRow())
-        .colMin(getCol())
-        .colMax(getCol())
-        .build();
-  }
-
-  static TileTree fromSubMatrix(TileSubMatrix subMatrix) {
-    return new ImmutableTileTree.Builder()
-        .level(subMatrix.getLevel())
-        .row(subMatrix.getRowMin())
-        .col(subMatrix.getColMin())
-        .build();
   }
 
   default <T> T accept(TileTreeVisitor<T> visitor) {
@@ -88,7 +92,30 @@ public interface TileTree {
     return new ImmutableTileTree.Builder()
         .from(this)
         .subTrees(mergedSubTrees.values())
+        .numberOfSubtrees(
+            mergedSubTrees.size()
+                + mergedSubTrees.values().stream().mapToLong(TileTree::getNumberOfSubtrees).sum())
+        .numberOfTiles(mergedSubTrees.values().stream().mapToLong(TileTree::getNumberOfTiles).sum())
         .content(optimize(mergedContent))
+        .maxContentLevel(Math.max(this.getMaxContentLevel(), other.getMaxContentLevel()))
+        .build();
+  }
+
+  default TileSubMatrix toSubMatrix() {
+    return new ImmutableTileSubMatrix.Builder()
+        .level(getLevel())
+        .rowMin(getRow())
+        .rowMax(getRow())
+        .colMin(getCol())
+        .colMax(getCol())
+        .build();
+  }
+
+  static TileTree fromSubMatrix(TileSubMatrix subMatrix) {
+    return new ImmutableTileTree.Builder()
+        .level(subMatrix.getLevel())
+        .row(subMatrix.getRowMin())
+        .col(subMatrix.getColMin())
         .build();
   }
 
@@ -125,106 +152,98 @@ public interface TileTree {
   }
 
   default TileTree parent(int subtreeLevels) {
-    List<Integer> rootLevels = new ArrayList<>();
-
-    for (int l = 0; l <= getLevel(); l += subtreeLevels) {
-      rootLevels.add(l);
-    }
-
-    if (rootLevels.contains(getLevel())) {
+    if (getLevel() == 0) {
       return this;
     }
 
-    return getParent(this, null, rootLevels);
+    return parentOf(getLevel(), subtreeLevels, getCol(), getRow());
   }
 
-  TileTree ROOT = of(0, 0, 0, List.of());
+  static TileTree parentOf(TileSubMatrix tile, int subtreeLevels) {
+    return parentOf(
+        tile.getLevel(), tile.getLevel() % subtreeLevels, tile.getColMin(), tile.getRowMin());
+  }
 
-  static TileTree of(int level, int row, int col, List<TileTree> subTrees) {
+  static TileTree parentOf(int globalLevel, int localLevel, int col, int row) {
+    int parentLevel = globalLevel - localLevel;
+    int size = 1 << localLevel;
+    int parentCol = col / size;
+    int parentRow = row / size;
+
+    return new ImmutableTileTree.Builder().level(parentLevel).col(parentCol).row(parentRow).build();
+  }
+
+  default int getMortonCurveIndex(int subtreeLevels) {
+    return getMortonCurveIndex(subtreeLevels, getCol(), getRow());
+  }
+
+  static int getMortonCurveIndex(int localLevel, int col, int row) {
+    int size = 1 << localLevel;
+    int localCol = col % size;
+    int localRow = row % size;
+
+    return MortonCode.encode(localCol, localRow);
+  }
+
+  static TileTree from(TileSubMatrix contents, int subtreeLevels) {
+    List<TileTree> subtrees = subtrees(subtreeLevels /* - 1*/, 0, 0, contents, subtreeLevels);
+
     return new ImmutableTileTree.Builder()
-        .level(level)
-        .row(row)
-        .col(col)
-        .subTrees(subTrees)
+        .from(ROOT)
+        .subTrees(subtrees)
+        .numberOfSubtrees(
+            subtrees.size() + subtrees.stream().mapToLong(TileTree::getNumberOfSubtrees).sum())
+        .numberOfTiles(subtrees.stream().mapToLong(TileTree::getNumberOfTiles).sum())
+        .maxContentLevel(contents.getLevel())
         .build();
   }
 
-  static TileTree from(TileMatrixSetLimits limits, int subtreeLevels) {
-    int level = Integer.parseInt(limits.getTileMatrix());
-    List<Integer> rootLevels = new ArrayList<>();
-    Map<String, TileTree> treeRoots = new LinkedHashMap<>();
-
-    for (int l = 0; l <= level; l += subtreeLevels) {
-      rootLevels.add(l);
+  static List<TileTree> subtrees(
+      int level, int row, int col, TileSubMatrix contents, int subtreeLevels) {
+    if (level > contents.getLevel()) {
+      return List.of();
     }
 
-    for (int row = limits.getMinTileRow(); row <= limits.getMaxTileRow(); row++) {
-      for (int col = limits.getMinTileCol(); col <= limits.getMaxTileCol(); col++) {
-        TileTree parentTree = getParentTree(level, row, col, rootLevels);
-        treeRoots.compute(
-            parentTree.getCoordinates(), (k, v) -> v == null ? parentTree : v.merge(parentTree));
+    int deltaSub = subtreeLevels; // - 1;
+    int deltaCon = contents.getLevel() - level;
+    List<TileTree> trees = new ArrayList<>();
+
+    int size = 1 << deltaSub;
+    int sizeCon = 1 << deltaCon;
+    for (int i = 0; i < size * size; i++) {
+      Coordinate coords = MortonCode.decode(i);
+      int r = (int) (row + coords.getY());
+      int c = (int) (col + coords.getX());
+
+      Builder builder =
+          new Builder().level(level).row(r).col(c).maxContentLevel(contents.getLevel());
+
+      if (level + deltaSub > contents.getLevel()) {
+        Optional<TileSubMatrix> content =
+            TileSubMatrix.of(
+                    contents.getLevel(),
+                    r * sizeCon,
+                    (r * sizeCon) + (sizeCon) - 1,
+                    c * sizeCon,
+                    (c * sizeCon) + (sizeCon) - 1)
+                .intersection(contents);
+
+        if (content.isPresent()) {
+          builder.addContent(content.get()).numberOfTiles(content.get().getNumberOfTiles());
+        }
+      } else {
+        List<TileTree> children =
+            subtrees(level + deltaSub, r * size, c * size, contents, subtreeLevels);
+        builder
+            .subTrees(children)
+            .numberOfSubtrees(
+                children.size() + children.stream().mapToLong(TileTree::getNumberOfSubtrees).sum())
+            .numberOfTiles(children.stream().mapToLong(TileTree::getNumberOfTiles).sum());
       }
+
+      trees.add(builder.build());
     }
 
-    return treeRoots.getOrDefault(ROOT.getCoordinates(), ROOT);
-  }
-
-  static TileTree getParentTree(int level, int row, int col, List<Integer> rootLevels) {
-    if (rootLevels.isEmpty() || level < rootLevels.get(0)) {
-      throw new IllegalArgumentException(
-          "rootLevels must not be empty and level must be >= the lowest root level");
-    }
-
-    TileSubMatrix content = TileSubMatrix.of(level, row, row, col, col);
-    TileTree treeRoot =
-        new ImmutableTileTree.Builder().level(level).row(row).col(col).addContent(content).build();
-    TileTree lastParent = rootLevels.contains(level) ? treeRoot : null;
-
-    int maxRounds = rootLevels.size();
-
-    while (treeRoot.getLevel() > rootLevels.get(0) && maxRounds-- >= 0) {
-      treeRoot = getParent(treeRoot, lastParent, rootLevels);
-      if (rootLevels.contains(treeRoot.getLevel())) {
-        lastParent = treeRoot;
-      }
-    }
-
-    return treeRoot;
-  }
-
-  static TileTree getParent(TileTree tree, TileTree subTree, List<Integer> rootLevels) {
-    TileTree treeRoot = tree;
-
-    if (treeRoot.getLevel() == 0) {
-      return treeRoot;
-    }
-
-    for (int l = treeRoot.getLevel() - 1; l >= 0; l--) {
-      treeRoot = getParent(treeRoot, rootLevels);
-      if (rootLevels.contains(l)) {
-        return Objects.nonNull(subTree)
-            ? new ImmutableTileTree.Builder().from(treeRoot).addSubTrees(subTree).build()
-            : treeRoot;
-      }
-    }
-
-    return treeRoot;
-  }
-
-  static TileTree getParent(TileTree tree, List<Integer> rootLevels) {
-    if (tree.getLevel() == 0) {
-      return tree;
-    }
-
-    int parentLevel = tree.getLevel() - 1;
-    int parentRow = tree.getRow() / 2;
-    int parentCol = tree.getCol() / 2;
-
-    return new ImmutableTileTree.Builder()
-        .level(parentLevel)
-        .row(parentRow)
-        .col(parentCol)
-        .content(rootLevels.contains(tree.getLevel()) ? List.of() : tree.getContent())
-        .build();
+    return trees;
   }
 }

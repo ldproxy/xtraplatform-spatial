@@ -52,8 +52,6 @@ import de.ii.xtraplatform.tiles.domain.ImmutableTilesBoundingBox;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
-import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
-import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dQuery;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerator;
@@ -75,7 +73,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -85,7 +82,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.shape.fractal.MortonCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -264,6 +260,12 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     Tileset3dFeatures tileset =
         data.getTilesets().get(tilesetId).mergeDefaults(data.getTilesetDefaults());
     FeatureProvider featureProvider = getFeatureProvider(tileset);
+    BoundingBox fullBbox =
+        featureProvider
+            .extents()
+            .get()
+            .getSpatialExtent(tileset.getFeatureType().orElse(tileset.getId()), OgcCrs.CRS84h)
+            .orElseThrow();
 
     int size = 0;
     for (int i = 0; i < tileset.getSubtreeLevels(); i++) {
@@ -280,6 +282,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     processZ(
         featureProvider,
         tileset,
+        fullBbox,
         subtree.getLevel(),
         subtree.getCol(),
         subtree.getRow(),
@@ -299,46 +302,38 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
   }
 
   @Override
-  public List<Tile3dCoordinates> getAvailableTiles(
-      Tileset3dFeatures tileset, TileTree parent, TileSubMatrix area, Subtree subtree) {
-    List<Tile3dCoordinates> tiles = new ArrayList<>();
-    final Availability contentAvailability = subtree.getContentAvailability().get(0);
+  public boolean isTileAvailable(Subtree parent, Tile3dCoordinates tile, int subtreeLevels) {
+    final Availability contentAvailability = parent.getContentAvailability().get(0);
 
     final byte[] buffer =
         contentAvailability.getBitstream().isPresent()
-            ? subtree.getContentAvailabilityBin()
+            ? parent.getContentAvailabilityBin()
             : Subtree.EMPTY;
     boolean always =
         buffer.length == 0 && contentAvailability.getConstant().filter(c -> c == 1).isPresent();
+    int localLevel = tile.getLevel() % subtreeLevels;
 
-    if (always || buffer.length > 0) {
-      int xl = parent.getCol();
-      int yl = parent.getRow();
-      for (int il = 0; il < tileset.getSubtreeLevels(); il++) {
-        for (int idx = 0; idx < MortonCode.size(il); idx++) {
-          if (always || getAvailability(buffer, il, idx)) {
-            Coordinate coord = MortonCode.decode(idx);
-            int level = parent.getLevel() + il;
-            int col = xl + (int) coord.x;
-            int row = yl + (int) coord.y;
+    return always
+        || (buffer.length > 0
+            && getAvailability(
+                buffer,
+                localLevel,
+                TileTree.getMortonCurveIndex(localLevel, tile.getCol(), tile.getRow())));
+  }
 
-            if (area.contains(level, row, col)) {
-              tiles.add(
-                  ImmutableTile3dQuery.builder()
-                      .tileset(tileset.getId())
-                      .level(level)
-                      .col(col)
-                      .row(row)
-                      .build());
-            }
-          }
-        }
-        xl *= 2;
-        yl *= 2;
-      }
-    }
+  @Override
+  public boolean isSubtreeAvailable(Subtree parent, TileTree child, int subtreeLevels) {
+    final Availability childSubtreeAvailability = parent.getChildSubtreeAvailability();
+    final byte[] buffer =
+        childSubtreeAvailability.getBitstream().isPresent()
+            ? parent.getChildSubtreeAvailabilityBin()
+            : Subtree.EMPTY;
+    boolean always =
+        buffer.length == 0
+            && childSubtreeAvailability.getConstant().filter(c -> c == 1).isPresent();
 
-    return tiles;
+    return always
+        || (buffer.length > 0 && getAvailability(buffer, child.getMortonCurveIndex(subtreeLevels)));
   }
 
   @Override
@@ -508,6 +503,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
   private void processZ(
       FeatureProvider featureProvider,
       Tileset3dFeatures tileset,
+      BoundingBox fullBbox,
       int baseLevel,
       int xBase,
       int yBase,
@@ -522,13 +518,6 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
         || level - baseLevel > tileset.getSubtreeLevels()) {
       return;
     }
-
-    BoundingBox fullBbox =
-        featureProvider
-            .extents()
-            .get()
-            .getSpatialExtent(tileset.getFeatureType().orElse(tileset.getId()), OgcCrs.CRS84h)
-            .orElseThrow();
     Optional<Cql2Expression> additionalFilter;
     int i0 = MortonCode.encode(x0 - xBase, y0 - yBase);
 
@@ -566,6 +555,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           processZ(
               featureProvider,
               tileset,
+              fullBbox,
               baseLevel,
               xBase * 2,
               yBase * 2,
@@ -930,6 +920,10 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
               "Invalid 3D Tiles subtree, only subtrees with a single buffer are supported. Found index: %d",
               bv.getBuffer()));
     }
+  }
+
+  private static boolean getAvailability(byte[] availability, int idx) {
+    return isSet(availability, idx);
   }
 
   private static boolean getAvailability(byte[] availability, int level, int idxLevel) {

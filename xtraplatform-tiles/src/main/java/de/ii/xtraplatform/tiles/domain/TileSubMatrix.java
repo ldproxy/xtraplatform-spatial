@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -21,6 +22,15 @@ public interface TileSubMatrix extends Comparable<TileSubMatrix> {
         .colMin(colMin)
         .colMax(colMax)
         .build();
+  }
+
+  static TileSubMatrix of(TileMatrixSetLimits limits) {
+    int level = Integer.parseInt(limits.getTileMatrix());
+    int rowMin = limits.getMinTileRow();
+    int rowMax = limits.getMaxTileRow();
+    int colMin = limits.getMinTileCol();
+    int colMax = limits.getMaxTileCol();
+    return of(level, rowMin, rowMax, colMin, colMax);
   }
 
   int getLevel();
@@ -141,5 +151,20 @@ public interface TileSubMatrix extends Comparable<TileSubMatrix> {
         .colMin(subMatrix.getColMin() / (2 * levelDelta))
         .colMax((subMatrix.getColMax() - 1) / (2 * levelDelta))
         .build();
+  }
+
+  default Optional<TileSubMatrix> intersection(TileSubMatrix other) {
+    if (!intersects(other)) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        new ImmutableTileSubMatrix.Builder()
+            .level(getLevel())
+            .rowMin(Math.max(getRowMin(), other.getRowMin()))
+            .rowMax(Math.min(getRowMax(), other.getRowMax()))
+            .colMin(Math.max(getColMin(), other.getColMin()))
+            .colMax(Math.min(getColMax(), other.getColMax()))
+            .build());
   }
 }

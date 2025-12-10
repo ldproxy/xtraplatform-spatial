@@ -36,6 +36,7 @@ public interface SeedingOptions3d extends SeedingOptions {
    *     wird in mehrere Jobs aufgeteilt, um die Arbeit auf Threads und Knoten zu verteilen.
    * @default M
    */
+  @JsonIgnore
   @Nullable
   @Override
   JobSize getJobSize();

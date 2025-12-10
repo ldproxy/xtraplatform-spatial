@@ -15,7 +15,6 @@ import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProcessor;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
-import de.ii.xtraplatform.tiles.domain.SeedingOptions.JobSize;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
@@ -105,8 +104,6 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
 
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
             tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
-        int jobSize = getJobSize(tileProvider);
-        TileMatrixPartitions tileMatrixPartitions = new TileMatrixPartitions(jobSize);
 
         tileProvider.seeding().get().setupSeeding(seedingJobSet);
 
@@ -120,11 +117,14 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
                 TileTree tileTree = null;
 
                 for (TileMatrixSetLimits limit : limits) {
-                  TileTree next = TileTree.from(limit, cfg.getSubtreeLevels());
+                  TileTree next = TileTree.from(TileSubMatrix.of(limit), cfg.getSubtreeLevels());
                   tileTree = tileTree == null ? next : tileTree.merge(next);
                 }
 
                 if (Objects.nonNull(tileTree)) {
+                  int jobSize = getJobSize(tileTree);
+                  TileMatrixPartitions tileMatrixPartitions = new TileMatrixPartitions(jobSize);
+
                   Job rootJob =
                       tileTree.accept(
                           (tt, followUps) -> {
@@ -205,14 +205,22 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
     return JobResult.success();
   }
 
-  private static int getJobSize(Tile3dProviderFeatures tileProvider) {
-    return switch (Objects.requireNonNullElse(
-        tileProvider.seeding().get().getOptions().getJobSize(), JobSize.M)) {
-      case S -> 1;
-      case M -> 4;
-      case L -> 16;
-      case XL -> 64;
-    };
+  private static int getJobSize(TileTree tileTree) {
+    long numberOfTiles = tileTree.getNumberOfTiles();
+    if (numberOfTiles <= 32) {
+      return 1;
+    } else if (numberOfTiles <= 128) {
+      return 2;
+    } else if (numberOfTiles <= 512) {
+      return 4;
+    } else if (numberOfTiles <= 1024) {
+      return 8;
+    } else if (numberOfTiles <= 4096) {
+      return 16;
+    } else if (numberOfTiles <= 16384) {
+      return 64;
+    }
+    return 256;
   }
 
   private void cleanup(
