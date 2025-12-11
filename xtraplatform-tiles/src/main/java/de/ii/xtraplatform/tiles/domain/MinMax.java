@@ -26,6 +26,10 @@ public interface MinMax extends Buildable<MinMax> {
         .build();
   }
 
+  static MinMax of(int min, int max) {
+    return new ImmutableMinMax.Builder().min(min).max(max).build();
+  }
+
   int getMin();
 
   int getMax();

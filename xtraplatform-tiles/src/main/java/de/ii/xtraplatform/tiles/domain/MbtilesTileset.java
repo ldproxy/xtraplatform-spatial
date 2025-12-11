@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.tiles.app.FeatureEncoderMVT;
 import de.ii.xtraplatform.tiles.app.SqlHelper;
-import de.ii.xtraplatform.tiles.app.TileStorePartitions;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -91,7 +90,7 @@ public class MbtilesTileset {
   private final Path tilesetPath;
   private final Mutex mutex;
   private final MbtilesMetadata metadata;
-  private final Optional<TileStorePartitions> partitions;
+  private final Optional<TileMatrixPartitions> partitions;
   private final boolean numericTileIds;
   private final String tileMapTable;
   private final String tileBlobsTable;
@@ -103,7 +102,7 @@ public class MbtilesTileset {
   public MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
       boolean seeded)
       throws IOException {
@@ -119,7 +118,7 @@ public class MbtilesTileset {
   private MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
       boolean mustExist,
       Mutex mutex) {

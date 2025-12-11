@@ -15,6 +15,7 @@ import de.ii.xtraplatform.tiles.domain.ImmutableVectorLayer;
 import de.ii.xtraplatform.tiles.domain.MbtilesMetadata;
 import de.ii.xtraplatform.tiles.domain.MbtilesTileset;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
+import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
@@ -64,7 +65,7 @@ public class TileStoreMbTiles implements TileStore {
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
       Map<String, Set<String>> tileMatrixSets,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean seeded) {
     Map<String, MbtilesTileset> tileSets = new ConcurrentHashMap<>();
     try {
@@ -99,7 +100,7 @@ public class TileStoreMbTiles implements TileStore {
   private final ResourceStore rootStore;
   private final Map<String, Map<String, TileGenerationSchema>> tileSchemas;
   private final Map<String, MbtilesTileset> tileSets;
-  private final Optional<TileStorePartitions> partitions;
+  private final Optional<TileMatrixPartitions> partitions;
   // the tile matrix set is only necessary for writable MBTiles files,
   // i.e., caches that are used for seeding
   private final Optional<TileMatrixSetRepository> tileMatrixSetRepository;
@@ -109,7 +110,7 @@ public class TileStoreMbTiles implements TileStore {
       ResourceStore rootStore,
       Map<String, MbtilesTileset> tileSets,
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository) {
     this.providerId = providerId;
     this.rootStore = rootStore;
@@ -433,7 +434,7 @@ public class TileStoreMbTiles implements TileStore {
       String tileset,
       String tileMatrixSet,
       List<VectorLayer> vectorLayers,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
       boolean seeded)
       throws IOException {

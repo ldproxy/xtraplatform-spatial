@@ -105,6 +105,29 @@ public class TileWalkerImpl extends AbstractVolatileComposed implements TileWalk
   }
 
   @Override
+  public void walkTilesetsAndLimits(
+      Set<String> tilesets,
+      Map<String, Map<String, Range<Integer>>> tmsRanges,
+      Map<String, Optional<BoundingBox>> boundingBoxes,
+      Map<String, Map<String, TileMatrixSetBase>> customTileMatrixSets,
+      LimitsVisitor limitsVisitor)
+      throws IOException {
+    for (Map.Entry<String, Map<String, Range<Integer>>> entry : tmsRanges.entrySet()) {
+      String tileset = entry.getKey();
+
+      if (tilesets.contains(tileset)) {
+        Map<String, Range<Integer>> ranges = entry.getValue();
+        Optional<BoundingBox> boundingBox = boundingBoxes.get(tileset);
+
+        if (boundingBox.isPresent()) {
+          walkLimits(
+              tileset, ranges, boundingBox.get(), customTileMatrixSets.get(tileset), limitsVisitor);
+        }
+      }
+    }
+  }
+
+  @Override
   public void walkTileSeedingJob(
       TileSeedingJob job,
       Map<String, Map<String, Range<Integer>>> tmsRanges,
@@ -165,6 +188,26 @@ public class TileWalkerImpl extends AbstractVolatileComposed implements TileWalk
       throws IOException {
     for (Map.Entry<String, Range<Integer>> entry : tmsRanges.entrySet()) {
       TileMatrixSetBase tileMatrixSet = getTileMatrixSetById(entry.getKey());
+      BoundingBox bbox = getBbox(boundingBox, tileMatrixSet);
+
+      List<? extends TileMatrixSetLimits> allLimits =
+          tileMatrixSet.getLimitsList(MinMax.of(entry.getValue()), bbox);
+
+      for (TileMatrixSetLimits limits : allLimits) {
+        limitsVisitor.visit(tileset, tileMatrixSet, limits);
+      }
+    }
+  }
+
+  private void walkLimits(
+      String tileset,
+      Map<String, Range<Integer>> tmsRanges,
+      BoundingBox boundingBox,
+      Map<String, TileMatrixSetBase> customTileMatrixSets,
+      LimitsVisitor limitsVisitor)
+      throws IOException {
+    for (Map.Entry<String, Range<Integer>> entry : tmsRanges.entrySet()) {
+      TileMatrixSetBase tileMatrixSet = customTileMatrixSets.get(entry.getKey());
       BoundingBox bbox = getBbox(boundingBox, tileMatrixSet);
 
       List<? extends TileMatrixSetLimits> allLimits =

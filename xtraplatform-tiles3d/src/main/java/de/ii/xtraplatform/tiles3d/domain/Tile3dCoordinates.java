@@ -1,0 +1,36 @@
+/*
+ * Copyright 2022 interactive instruments GmbH
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+package de.ii.xtraplatform.tiles3d.domain;
+
+public interface Tile3dCoordinates {
+  // TileMatrixSetBase getTileMatrixSet();
+
+  int getLevel();
+
+  int getRow();
+
+  int getCol();
+
+  /*@Value.Lazy
+  default BoundingBox getBoundingBox() {
+    return getTileMatrixSet().getTileBoundingBox(getLevel(), getCol(), getRow());
+  }
+
+  default BoundingBox getBoundingBox(EpsgCrs crs, CrsTransformerFactory crsTransformerFactory)
+      throws CrsTransformationException {
+    BoundingBox bboxTileMatrixSetCrs = getBoundingBox();
+    Optional<CrsTransformer> transformer =
+        crsTransformerFactory.getTransformer(getTileMatrixSet().getCrs(), crs, true);
+
+    if (transformer.isEmpty()) {
+      return bboxTileMatrixSetCrs;
+    }
+
+    return transformer.get().transformBoundingBox(bboxTileMatrixSetCrs);
+  }*/
+}

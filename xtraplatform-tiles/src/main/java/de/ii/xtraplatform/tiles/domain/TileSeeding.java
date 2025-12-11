@@ -8,6 +8,8 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -42,4 +44,22 @@ public interface TileSeeding {
 
   default void deleteFromCache(
       String tileset, TileMatrixSetBase tileMatrixSet, TileMatrixSetLimits limits) {}
+
+  static void mergeCoverageInto(
+      Map<String, Map<String, Set<TileMatrixSetLimits>>> source,
+      Map<String, Map<String, Set<TileMatrixSetLimits>>> target) {
+    source.forEach(
+        (tileset, tms) -> {
+          if (!target.containsKey(tileset)) {
+            target.put(tileset, new LinkedHashMap<>());
+          }
+          tms.forEach(
+              (tmsId, limits) -> {
+                if (!target.get(tileset).containsKey(tmsId)) {
+                  target.get(tileset).put(tmsId, new LinkedHashSet<>());
+                }
+                target.get(tileset).get(tmsId).addAll(limits);
+              });
+        });
+  }
 }
