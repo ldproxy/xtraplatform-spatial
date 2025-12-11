@@ -176,6 +176,9 @@ import org.threeten.extra.Interval;
  *     <p>### Query Generation
  *     <p>Options for query generation.
  *     <p>{@docTable:queryGeneration}
+ *     <p>### Query Processing
+ *     <p>Options for query processing.
+ *     <p>{@docTable:queryProcessing}
  *     <p>### Source Path Defaults
  *     <p>Defaults for the path expressions in `sourcePath`, also see [Source Path
  *     Syntax](#path-syntax).
@@ -266,6 +269,9 @@ import org.threeten.extra.Interval;
  *     <p>### Query-Generierung
  *     <p>Optionen für die Query-Generierung in `queryGeneration`.
  *     <p>{@docTable:queryGeneration}
+ *     <p>### Query-Verarbeitung
+ *     <p>Optionen für die Query-Verarbeitung in `queryProcessing`.
+ *     <p>{@docTable:queryProcessing}
  *     <p>### SQL-Pfad-Defaults
  *     <p>Defaults für die Pfad-Ausdrücke in `sourcePath`, siehe auch
  *     [SQL-Pfad-Syntax](#path-syntax).
@@ -363,6 +369,8 @@ import org.threeten.extra.Interval;
  * @ref:sourcePathDefaults {@link de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults}
  * @ref:queryGeneration {@link
  *     de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings}
+ * @ref:queryProcessing {@link
+ *     de.ii.xtraplatform.features.sql.domain.ImmutableQueryProcessorSettings}
  * @ref:datasetChanges2 {@link
  *     de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.DatasetChangeSettings}
  */
@@ -400,6 +408,13 @@ import org.threeten.extra.Interval;
           name = "queryGeneration",
           rows = {
             @DocStep(type = Step.TAG_REFS, params = "{@ref:queryGeneration}"),
+            @DocStep(type = Step.JSON_PROPERTIES)
+          },
+          columnSet = ColumnSet.JSON_PROPERTIES),
+      @DocTable(
+          name = "queryProcessing",
+          rows = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:queryProcessing}"),
             @DocStep(type = Step.JSON_PROPERTIES)
           },
           columnSet = ColumnSet.JSON_PROPERTIES),
@@ -1465,6 +1480,14 @@ public class FeatureProviderSql
   @Override
   public boolean supportsIsNull() {
     return true;
+  }
+
+  @Override
+  public boolean skipUnusedPipelineSteps() {
+    if (Objects.nonNull(getData().getQueryProcessing())) {
+      return getData().getQueryProcessing().getSkipUnusedPipelineSteps();
+    }
+    return false;
   }
 
   @Override
