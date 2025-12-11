@@ -31,8 +31,8 @@ public interface TilesetMbTiles extends TilesetCommon, Buildable<TilesetMbTiles>
   Optional<LonLat> getCenter();
 
   /**
-   * @langEn Filename of the MBTiles file in the `api-resources/tiles` directory.
-   * @langDe Dateiname der MBTiles-Datei im Verzeichnis `api-resources/tiles`.
+   * @langEn Filename of the MBTiles file in the store under `resources/tiles` directory.
+   * @langDe Dateiname der MBTiles-Datei im Store unter `resources/tiles`.
    * @default null
    * @since v3.4
    */
