@@ -194,6 +194,7 @@ public interface TileTree {
         .numberOfSubtrees(
             subtrees.size() + subtrees.stream().mapToLong(TileTree::getNumberOfSubtrees).sum())
         .numberOfTiles(subtrees.stream().mapToLong(TileTree::getNumberOfTiles).sum())
+        .content(contents.getLevel() < subtreeLevels ? List.of(contents) : List.of())
         .maxContentLevel(contents.getLevel())
         .build();
   }
@@ -204,7 +205,7 @@ public interface TileTree {
       return List.of();
     }
 
-    int deltaSub = subtreeLevels; // - 1;
+    int deltaSub = subtreeLevels;
     int deltaCon = contents.getLevel() - level;
     List<TileTree> trees = new ArrayList<>();
 
