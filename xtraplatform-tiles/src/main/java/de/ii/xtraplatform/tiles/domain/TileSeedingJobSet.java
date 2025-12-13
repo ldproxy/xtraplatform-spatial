@@ -19,7 +19,9 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicIntegerArray;
+import java.util.stream.IntStream;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -28,6 +30,7 @@ public interface TileSeedingJobSet extends JobSetDetails {
   String TYPE = "tile-seeding";
   String TYPE_SETUP = type("setup");
   String LABEL = "Tile cache seeding";
+  List<Integer> INITIAL_LEVELS = IntStream.range(0, 24).map(i -> -1).boxed().toList();
 
   static String type(String... parts) {
     return String.join(":", TYPE, String.join(":", parts));
@@ -98,6 +101,60 @@ public interface TileSeedingJobSet extends JobSetDetails {
         .getAndUpdate(level, old -> old == -1 ? count : old + count);
   }
 
+  @Override
+  default void init(Map<String, Object> parameters) {
+    if (parameters.containsKey("tileSet")
+        && parameters.containsKey("tileMatrixSet")
+        && parameters.containsKey("level")
+        && parameters.containsKey("count")) {
+      init(
+          (String) parameters.get("tileSet"),
+          (String) parameters.get("tileMatrixSet"),
+          parameters.get("level") instanceof Integer
+              ? (Integer) parameters.get("level")
+              : Integer.parseInt((String) parameters.get("level")),
+          parameters.get("count") instanceof Integer
+              ? (Integer) parameters.get("count")
+              : Integer.parseInt((String) parameters.get("count")));
+    }
+  }
+
+  @Override
+  default Map<String, Object> initJson(Map<String, Object> params) {
+    Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
+
+    if (params.containsKey("tileSet") && params.containsKey("count")) {
+      int delta = (Integer) params.get("count");
+      boolean isFirstTileset = Objects.equals(params.get("isFirstTileset"), true);
+      int tilesetDelta = isFirstTileset ? 1 : 0;
+
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.total".formatted(params.get("tileSet")),
+          delta + tilesetDelta);
+
+      if (params.containsKey("tileMatrixSet")) {
+        if (isFirstTileset) {
+          jsonPathUpdates.put(
+              "$.details.tileSets.%s.progress.levels.%s"
+                  .formatted(params.get("tileSet"), params.get("tileMatrixSet")),
+              INITIAL_LEVELS);
+        }
+
+        if (params.containsKey("level")) {
+          int levelDelta = Objects.equals(params.get("isFirstLevel"), true) ? 1 : 0;
+
+          jsonPathUpdates.put(
+              "$.details.tileSets.%s.progress.levels.%s[%s]"
+                  .formatted(
+                      params.get("tileSet"), params.get("tileMatrixSet"), params.get("level")),
+              delta + levelDelta);
+        }
+      }
+    }
+
+    return jsonPathUpdates;
+  }
+
   default void update(String tileSet, String tileMatrixSet, int level, int delta) {
     TilesetProgress progress = getTileSets().get(tileSet).getProgress();
 
@@ -109,17 +166,47 @@ public interface TileSeedingJobSet extends JobSetDetails {
   }
 
   @Override
-  default void update(Map<String, String> parameters) {
+  default void update(Map<String, Object> parameters) {
     if (parameters.containsKey("tileSet")
         && parameters.containsKey("tileMatrixSet")
         && parameters.containsKey("level")
         && parameters.containsKey("delta")) {
       update(
-          parameters.get("tileSet"),
-          parameters.get("tileMatrixSet"),
-          Integer.parseInt(parameters.get("level")),
-          Integer.parseInt(parameters.get("delta")));
+          (String) parameters.get("tileSet"),
+          (String) parameters.get("tileMatrixSet"),
+          parameters.get("level") instanceof Integer
+              ? (Integer) parameters.get("level")
+              : Integer.parseInt((String) parameters.get("level")),
+          parameters.get("delta") instanceof Integer
+              ? (Integer) parameters.get("delta")
+              : Integer.parseInt((String) parameters.get("delta")));
     }
+  }
+
+  @Override
+  default Map<String, Object> updateJson(Map<String, Object> detailParameters) {
+    Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
+
+    if (detailParameters.containsKey("tileSet")
+        && detailParameters.get("delta") instanceof Integer) {
+      int delta = (Integer) detailParameters.get("delta");
+
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.current".formatted(detailParameters.get("tileSet")),
+          delta);
+
+      if (detailParameters.containsKey("tileMatrixSet") && detailParameters.containsKey("level")) {
+        jsonPathUpdates.put(
+            "$.details.tileSets.%s.progress.levels.%s[%s]"
+                .formatted(
+                    detailParameters.get("tileSet"),
+                    detailParameters.get("tileMatrixSet"),
+                    detailParameters.get("level")),
+            -1 * delta);
+      }
+    }
+
+    return jsonPathUpdates;
   }
 
   @Override

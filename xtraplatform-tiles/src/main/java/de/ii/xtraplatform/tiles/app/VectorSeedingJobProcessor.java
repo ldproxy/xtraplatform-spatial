@@ -14,12 +14,14 @@ import de.ii.xtraplatform.base.domain.resiliency.Volatile2.State;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProcessor;
+import de.ii.xtraplatform.jobs.domain.JobQueueMin;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -39,7 +41,7 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
 
   @Inject
   VectorSeedingJobProcessor(AppContext appContext, EntityRegistry entityRegistry) {
-    this.concurrency = appContext.getConfiguration().getBackgroundTasks().getMaxThreads();
+    this.concurrency = appContext.getConfiguration().getJobConcurrency();
     this.entityRegistry = entityRegistry;
   }
 
@@ -59,9 +61,9 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
   }
 
   @Override
-  public JobResult process(Job job, JobSet jobSet, Consumer<Job> pushJob) {
-    TileSeedingJob seedingJob = getDetails(job);
-    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet);
+  public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
+    TileSeedingJob seedingJob = getDetails(job, jobQueue);
+    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
 
     Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJob.getTileProvider());
     if (optionalTileProvider.isPresent()) {
@@ -91,7 +93,7 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
                           tileProvider.getId(),
                           job.getId());
                     }
-                    pushJob.accept(job);
+                    jobQueue.push(job);
                   }
                 },
                 true);
@@ -102,14 +104,15 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
       Consumer<Integer> updateProgress =
           (current) -> {
             int delta = current - last.getAndSet(current);
+            Map<String, Object> detailParameters =
+                Map.of(
+                    "tileSet", seedingJob.getTileSet(),
+                    "tileMatrixSet", seedingJob.getTileMatrixSet(),
+                    "level", seedingJob.getSubMatrices().get(0).getLevel(),
+                    "delta", delta);
 
-            job.update(delta);
-            jobSet.update(delta);
-            seedingJobSet.update(
-                seedingJob.getTileSet(),
-                seedingJob.getTileMatrixSet(),
-                seedingJob.getSubMatrices().get(0).getLevel(),
-                delta);
+            jobQueue.updateJob(job, delta);
+            jobQueue.updateJobSet(jobSet, delta, detailParameters);
           };
 
       try {
@@ -133,6 +136,15 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
   @Override
   public Class<TileSeedingJobSet> getSetDetailsType() {
     return TileSeedingJobSet.class;
+  }
+
+  @Override
+  public Map<String, Class<?>> getJobTypes() {
+    return Map.of(
+        TileSeedingJob.TYPE_MVT,
+        TileSeedingJob.class,
+        TileSeedingJob.TYPE_PNG,
+        TileSeedingJob.class);
   }
 
   private Optional<TileProvider> getTileProvider(String id) {

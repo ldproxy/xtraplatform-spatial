@@ -20,6 +20,7 @@ class TileTreeSpec extends Specification {
         when:
         TileTree result = TileTree.from(TileSubMatrix.of(9, 0, 511, 0, 511), 2)
         TileTree result2 = TileTree.from(TileSubMatrix.of(9, 0, 511, 0, 510), 3)
+        TileTree result3 = TileTree.from(TileSubMatrix.of(2, 0, 3, 0, 3), 3)
 
         then:
         result.getLevel() == 0
