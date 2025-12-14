@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import java.io.IOException;
 import java.util.Map;
@@ -21,7 +20,7 @@ public interface Tile3dSeeding {
   SeedingOptions3d getOptions();
 
   Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException;
+      Map<String, Tile3dGenerationParameters> tilesets) throws IOException;
 
   void setupSeeding(Tile3dSeedingJobSet jobSet) throws IOException;
 

@@ -10,7 +10,6 @@ package de.ii.xtraplatform.tiles3d.domain;
 import com.google.common.collect.Range;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileComposed;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
-import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
 import de.ii.xtraplatform.tiles3d.domain.spec.Subtree;
 import java.util.Optional;
@@ -34,11 +33,7 @@ public interface Tile3dGenerator extends VolatileComposed {
   boolean isSubtreeAvailable(Subtree parent, TileTree child, int subtreeLevels);
 
   byte[] generateTile(
-      Tileset3dFeatures tileset,
-      Tile3dCoordinates tile,
-      Tile3dSeedingJob job,
-      Tile3dSeedingJobSet jobSet,
-      TileMatrixSetBase tileMatrixSet);
+      Tileset3dFeatures tileset, Tile3dCoordinates tile, Tile3dGenerationParameters parameters);
 
   byte[] subtreeToBinary(Subtree subtree);
 

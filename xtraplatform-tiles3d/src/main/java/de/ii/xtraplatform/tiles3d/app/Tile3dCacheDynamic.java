@@ -9,8 +9,8 @@ package de.ii.xtraplatform.tiles3d.app;
 
 import com.google.common.collect.Range;
 import de.ii.xtraplatform.tiles.domain.Cache.Storage;
+import de.ii.xtraplatform.tiles.domain.GenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileCache;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
@@ -26,14 +26,17 @@ public class Tile3dCacheDynamic implements TileCache {
   private final TileWalker tileWalker;
   private final Map<String, Map<String, TileMatrixSetBase>> customTileMatrixSets;
   private final Map<String, Map<String, Range<Integer>>> tmsRanges;
+  private final boolean seeded;
 
   public Tile3dCacheDynamic(
       TileWalker tileWalker,
       Map<String, Map<String, TileMatrixSetBase>> customTileMatrixSets,
-      Map<String, Map<String, Range<Integer>>> tmsRanges) {
+      Map<String, Map<String, Range<Integer>>> tmsRanges,
+      boolean seeded) {
     this.tileWalker = tileWalker;
     this.customTileMatrixSets = customTileMatrixSets;
     this.tmsRanges = tmsRanges;
+    this.seeded = seeded;
   }
 
   @Override
@@ -43,7 +46,7 @@ public class Tile3dCacheDynamic implements TileCache {
 
   @Override
   public boolean isSeeded() {
-    return true;
+    return seeded;
   }
 
   @Override
@@ -58,13 +61,13 @@ public class Tile3dCacheDynamic implements TileCache {
 
   @Override
   public Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException {
+      Map<String, ? extends GenerationParameters> tilesets) throws IOException {
     return getCoverage(tilesets, tileWalker, getTmsRanges(), customTileMatrixSets);
   }
 
   @Override
   public Map<String, Map<String, Set<TileMatrixSetLimits>>> getRasterCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException {
+      Map<String, ? extends GenerationParameters> tilesets) throws IOException {
     return Map.of();
   }
 

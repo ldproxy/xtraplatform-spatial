@@ -15,8 +15,9 @@ import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
-public interface TileGenerationParameters {
+public interface TileGenerationParameters extends GenerationParameters {
 
+  @Override
   Optional<BoundingBox> getClipBoundingBox();
 
   Map<String, String> getSubstitutions();
