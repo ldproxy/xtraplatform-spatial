@@ -13,10 +13,12 @@ import de.ii.xtraplatform.base.domain.resiliency.Volatile2.State;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProcessor;
+import de.ii.xtraplatform.jobs.domain.JobQueueMin;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles3d.app.Tile3dProviderFeatures;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -32,7 +34,7 @@ public abstract class Tile3dJobProcessor
   private final EntityRegistry entityRegistry;
 
   protected Tile3dJobProcessor(AppContext appContext, EntityRegistry entityRegistry) {
-    this.concurrency = appContext.getConfiguration().getBackgroundTasks().getMaxThreads();
+    this.concurrency = appContext.getConfiguration().getJobConcurrency();
     this.entityRegistry = entityRegistry;
   }
 
@@ -55,9 +57,9 @@ public abstract class Tile3dJobProcessor
       throws IOException;
 
   @Override
-  public JobResult process(Job job, JobSet jobSet, Consumer<Job> pushJob) {
-    Tile3dSeedingJob seedingJob = getDetails(job);
-    Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet);
+  public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
+    Tile3dSeedingJob seedingJob = getDetails(job, jobQueue);
+    Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
 
     Optional<Tile3dProviderFeatures> optionalTileProvider =
         getTileProvider(seedingJob.getTileProvider());
@@ -88,7 +90,7 @@ public abstract class Tile3dJobProcessor
                           tileProvider.getId(),
                           job.getId());
                     }
-                    pushJob.accept(job);
+                    jobQueue.push(job);
                   }
                 },
                 true);
@@ -99,14 +101,15 @@ public abstract class Tile3dJobProcessor
       Consumer<Integer> updateProgress =
           (current) -> {
             int delta = current - last.getAndSet(current);
+            Map<String, Object> detailParameters =
+                Map.of(
+                    "tileSet", seedingJob.getTileSet(),
+                    "tileMatrixSet", seedingJob.getTileMatrixSet(),
+                    "level", seedingJob.getSubMatrices().get(0).getLevel(),
+                    "delta", delta);
 
-            job.update(delta);
-            jobSet.update(delta);
-            seedingJobSet.update(
-                seedingJob.getTileSet(),
-                seedingJob.getTileMatrixSet(),
-                seedingJob.getSubMatrices().get(0).getLevel(),
-                delta);
+            jobQueue.updateJob(job, delta);
+            jobQueue.updateJobSet(jobSet, delta, detailParameters);
           };
 
       try {
@@ -130,6 +133,15 @@ public abstract class Tile3dJobProcessor
   @Override
   public Class<Tile3dSeedingJobSet> getSetDetailsType() {
     return Tile3dSeedingJobSet.class;
+  }
+
+  @Override
+  public Map<String, Class<?>> getJobTypes() {
+    return Map.of(
+        Tile3dSeedingJob.TYPE_SUBTREE,
+        Tile3dSeedingJob.class,
+        Tile3dSeedingJob.TYPE_GLTF,
+        Tile3dSeedingJob.class);
   }
 
   private Optional<Tile3dProviderFeatures> getTileProvider(String id) {

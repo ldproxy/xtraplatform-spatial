@@ -9,6 +9,8 @@ package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonProperty.Access;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProgress;
@@ -19,15 +21,20 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicIntegerArray;
+import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@JsonDeserialize(builder = ImmutableTile3dSeedingJobSet.Builder.class)
 public interface Tile3dSeedingJobSet extends JobSetDetails {
 
   String TYPE = "tile3d-seeding";
   String TYPE_SETUP = type("setup");
   String LABEL = "3D Tiles cache seeding";
+  List<Integer> INITIAL_LEVELS = IntStream.range(0, 24).map(i -> -1).boxed().toList();
 
   static String type(String... parts) {
     return String.join(":", TYPE, String.join(":", parts));
@@ -89,6 +96,60 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
         .getAndUpdate(level, old -> old == -1 ? count : old + count);
   }
 
+  @Override
+  default void init(Map<String, Object> parameters) {
+    if (parameters.containsKey("tileSet")
+        && parameters.containsKey("tileMatrixSet")
+        && parameters.containsKey("level")
+        && parameters.containsKey("count")) {
+      init(
+          (String) parameters.get("tileSet"),
+          (String) parameters.get("tileMatrixSet"),
+          parameters.get("level") instanceof Integer
+              ? (Integer) parameters.get("level")
+              : Integer.parseInt((String) parameters.get("level")),
+          parameters.get("count") instanceof Integer
+              ? (Integer) parameters.get("count")
+              : Integer.parseInt((String) parameters.get("count")));
+    }
+  }
+
+  @Override
+  default Map<String, Object> initJson(Map<String, Object> params) {
+    Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
+
+    if (params.containsKey("tileSet") && params.get("count") instanceof Integer) {
+      int delta = (Integer) params.get("count");
+      boolean isFirstTileset = Objects.equals(params.get("isFirstTileset"), true);
+      int tilesetDelta = isFirstTileset ? 1 : 0;
+
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.total".formatted(params.get("tileSet")),
+          delta + tilesetDelta);
+
+      if (params.containsKey("tileMatrixSet")) {
+        if (isFirstTileset) {
+          jsonPathUpdates.put(
+              "$.details.tileSets.%s.progress.levels.%s"
+                  .formatted(params.get("tileSet"), params.get("tileMatrixSet")),
+              INITIAL_LEVELS);
+        }
+
+        if (params.containsKey("level")) {
+          int levelDelta = Objects.equals(params.get("isFirstLevel"), true) ? 1 : 0;
+
+          jsonPathUpdates.put(
+              "$.details.tileSets.%s.progress.levels.%s[%s]"
+                  .formatted(
+                      params.get("tileSet"), params.get("tileMatrixSet"), params.get("level")),
+              delta + levelDelta);
+        }
+      }
+    }
+
+    return jsonPathUpdates;
+  }
+
   default void update(String tileSet, String tileMatrixSet, int level, int delta) {
     Tileset3dProgress progress = getTileSets().get(tileSet).getProgress();
 
@@ -100,17 +161,47 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   }
 
   @Override
-  default void update(Map<String, String> parameters) {
+  default void update(Map<String, Object> parameters) {
     if (parameters.containsKey("tileSet")
         && parameters.containsKey("tileMatrixSet")
         && parameters.containsKey("level")
         && parameters.containsKey("delta")) {
       update(
-          parameters.get("tileSet"),
-          parameters.get("tileMatrixSet"),
-          Integer.parseInt(parameters.get("level")),
-          Integer.parseInt(parameters.get("delta")));
+          (String) parameters.get("tileSet"),
+          (String) parameters.get("tileMatrixSet"),
+          parameters.get("level") instanceof Integer
+              ? (Integer) parameters.get("level")
+              : Integer.parseInt((String) parameters.get("level")),
+          parameters.get("delta") instanceof Integer
+              ? (Integer) parameters.get("delta")
+              : Integer.parseInt((String) parameters.get("delta")));
     }
+  }
+
+  @Override
+  default Map<String, Object> updateJson(Map<String, Object> detailParameters) {
+    Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
+
+    if (detailParameters.containsKey("tileSet")
+        && detailParameters.get("delta") instanceof Integer) {
+      int delta = (Integer) detailParameters.get("delta");
+
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.current".formatted(detailParameters.get("tileSet")),
+          delta);
+
+      if (detailParameters.containsKey("tileMatrixSet") && detailParameters.containsKey("level")) {
+        jsonPathUpdates.put(
+            "$.details.tileSets.%s.progress.levels.%s[%s]"
+                .formatted(
+                    detailParameters.get("tileSet"),
+                    detailParameters.get("tileMatrixSet"),
+                    detailParameters.get("level")),
+            -1 * delta);
+      }
+    }
+
+    return jsonPathUpdates;
   }
 
   @Override
@@ -133,6 +224,7 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   }
 
   @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTileset3dDetails.Builder.class)
   interface Tileset3dDetails {
 
     static Map<String, Tileset3dDetails> of(Map<String, Tile3dGenerationParameters> tilesets) {
@@ -155,12 +247,20 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   }
 
   @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTileset3dProgress.Builder.class)
   interface Tileset3dProgress extends JobProgress {
     @JsonIgnore
+    @Nullable
     LinkedHashMap<String, AtomicIntegerArray> getLevels();
 
-    @JsonProperty("levels")
-    default Map<String, List<Integer>> getLevelsArray() {
+    @JsonProperty(value = "levels", access = Access.WRITE_ONLY)
+    Map<String, List<Integer>> getLevelsInput();
+
+    @JsonProperty(value = "levels", access = Access.READ_ONLY)
+    default Map<String, List<Integer>> getLevelsOutput() {
+      if (getLevels() == null) {
+        return Map.of();
+      }
 
       return getLevels().entrySet().stream()
           .map(
@@ -172,6 +272,25 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
                 return Map.entry(e.getKey(), levels);
               })
           .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    @Value.Check
+    default Tileset3dProgress deser() {
+      // Ensure that levels is initialized
+      if (getLevels() == null) {
+        LinkedHashMap<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : getLevelsInput().entrySet()) {
+          List<Integer> levelList = entry.getValue();
+          AtomicIntegerArray atomicArray = new AtomicIntegerArray(levelList.size());
+          for (int i = 0; i < levelList.size(); i++) {
+            atomicArray.set(i, levelList.get(i));
+          }
+          levelsMap.put(entry.getKey(), atomicArray);
+        }
+
+        return new ImmutableTileset3dProgress.Builder().from(this).levels(levelsMap).build();
+      }
+      return this;
     }
   }
 }
