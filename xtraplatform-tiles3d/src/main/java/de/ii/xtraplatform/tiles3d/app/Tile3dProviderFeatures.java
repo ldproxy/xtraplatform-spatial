@@ -181,7 +181,11 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
             : List.of(
                 new ImmutableCache3d.Builder()
                     .type(Cache3d.Type.DYNAMIC)
-                    .levels(getData().getTilesetDefaults().getLevels().get("default"))
+                    .levels(
+                        getData()
+                            .getTilesetDefaults()
+                            .getLevels()
+                            .getOrDefault("default", MinMax.of(0, 0)))
                     .tilesetLevels(
                         getData().getTilesets().entrySet().stream()
                             .collect(

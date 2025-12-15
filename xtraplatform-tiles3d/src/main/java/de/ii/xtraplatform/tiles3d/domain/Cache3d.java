@@ -98,7 +98,7 @@ public interface Cache3d {
         .collect(MapStreams.toMap());
   }
 
-  default Map<String, Range<Integer>> getTmsRanges(MinMax levels) {
-    return Map.of("default", Range.closed(getLevels().getMin(), getLevels().getMax()));
+  static Map<String, Range<Integer>> getTmsRanges(MinMax levels) {
+    return Map.of("default", Range.closed(levels.getMin(), levels.getMax()));
   }
 }
