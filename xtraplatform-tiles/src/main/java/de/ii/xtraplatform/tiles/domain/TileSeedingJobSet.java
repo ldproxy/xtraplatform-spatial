@@ -9,6 +9,8 @@ package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonProperty.Access;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProgress;
@@ -22,9 +24,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@JsonDeserialize(builder = ImmutableTileSeedingJobSet.Builder.class)
 public interface TileSeedingJobSet extends JobSetDetails {
 
   String TYPE = "tile-seeding";
@@ -123,7 +127,7 @@ public interface TileSeedingJobSet extends JobSetDetails {
   default Map<String, Object> initJson(Map<String, Object> params) {
     Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
 
-    if (params.containsKey("tileSet") && params.containsKey("count")) {
+    if (params.containsKey("tileSet") && params.get("count") instanceof Integer) {
       int delta = (Integer) params.get("count");
       boolean isFirstTileset = Objects.equals(params.get("isFirstTileset"), true);
       int tilesetDelta = isFirstTileset ? 1 : 0;
@@ -229,6 +233,7 @@ public interface TileSeedingJobSet extends JobSetDetails {
   }
 
   @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTilesetDetails.Builder.class)
   interface TilesetDetails {
 
     static Map<String, TilesetDetails> of(Map<String, TileGenerationParameters> tilesets) {
@@ -250,12 +255,20 @@ public interface TileSeedingJobSet extends JobSetDetails {
   }
 
   @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTilesetProgress.Builder.class)
   interface TilesetProgress extends JobProgress {
     @JsonIgnore
+    @Nullable
     LinkedHashMap<String, AtomicIntegerArray> getLevels();
 
-    @JsonProperty("levels")
-    default Map<String, List<Integer>> getLevelsArray() {
+    @JsonProperty(value = "levels", access = Access.WRITE_ONLY)
+    Map<String, List<Integer>> getLevelsInput();
+
+    @JsonProperty(value = "levels", access = Access.READ_ONLY)
+    default Map<String, List<Integer>> getLevelsOutput() {
+      if (getLevels() == null) {
+        return Map.of();
+      }
 
       return getLevels().entrySet().stream()
           .map(
@@ -267,6 +280,25 @@ public interface TileSeedingJobSet extends JobSetDetails {
                 return Map.entry(e.getKey(), levels);
               })
           .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    @Value.Check
+    default TilesetProgress deser() {
+      // Ensure that levels is initialized
+      if (getLevels() == null) {
+        LinkedHashMap<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : getLevelsInput().entrySet()) {
+          List<Integer> levelList = entry.getValue();
+          AtomicIntegerArray atomicArray = new AtomicIntegerArray(levelList.size());
+          for (int i = 0; i < levelList.size(); i++) {
+            atomicArray.set(i, levelList.get(i));
+          }
+          levelsMap.put(entry.getKey(), atomicArray);
+        }
+
+        return new ImmutableTilesetProgress.Builder().from(this).levels(levelsMap).build();
+      }
+      return this;
     }
   }
 }
