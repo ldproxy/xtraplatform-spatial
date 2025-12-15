@@ -115,17 +115,17 @@ public interface TileCache {
   default void purge(TileSeedingJob job, String tileSourceLabel) throws IOException {}
 
   Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException;
+      Map<String, ? extends GenerationParameters> tilesets) throws IOException;
 
   Map<String, Map<String, Set<TileMatrixSetLimits>>> getRasterCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException;
+      Map<String, ? extends GenerationParameters> tilesets) throws IOException;
 
   Storage getStorageType();
 
   Optional<String> getStorageInfo(String tileset, String tileMatrixSet, TileMatrixSetLimits limits);
 
   default Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
-      Map<String, TileGenerationParameters> tilesets,
+      Map<String, ? extends GenerationParameters> tilesets,
       TileWalker tileWalker,
       Map<String, Map<String, Range<Integer>>> tmsRanges)
       throws IOException {
@@ -150,7 +150,7 @@ public interface TileCache {
   }
 
   default Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
-      Map<String, TileGenerationParameters> tilesets,
+      Map<String, ? extends GenerationParameters> tilesets,
       TileWalker tileWalker,
       Map<String, Map<String, Range<Integer>>> tmsRanges,
       Map<String, Map<String, TileMatrixSetBase>> customTileMatrixSets)
@@ -177,7 +177,7 @@ public interface TileCache {
   }
 
   default Map<String, Optional<BoundingBox>> getBoundingBoxes(
-      Map<String, TileGenerationParameters> tilesets) {
+      Map<String, ? extends GenerationParameters> tilesets) {
     return tilesets.entrySet().stream()
         .map(
             entry ->

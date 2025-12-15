@@ -16,6 +16,7 @@ import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dProviderFeaturesData;
+import de.ii.xtraplatform.tiles3d.domain.ImmutableTileset3dFeaturesDefaults;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFeaturesData;
 import java.util.Optional;
@@ -62,7 +63,8 @@ public class Tile3dProviderFeaturesFactory
 
   @Override
   public EntityDataBuilder<Tile3dProviderData> dataBuilder() {
-    return new ImmutableTile3dProviderFeaturesData.Builder();
+    return new ImmutableTile3dProviderFeaturesData.Builder()
+        .tilesetDefaultsBuilder(new ImmutableTileset3dFeaturesDefaults.Builder());
   }
 
   @Override

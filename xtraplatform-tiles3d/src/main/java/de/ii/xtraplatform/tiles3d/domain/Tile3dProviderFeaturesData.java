@@ -17,6 +17,7 @@ import de.ii.xtraplatform.docs.DocVar;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -44,6 +45,8 @@ import org.immutables.value.Value;
  *     <p>{@docTable:tilesetDefaults}
  *     <p>{@docVar:tileset}
  *     <p>{@docTable:tileset}
+ *     <p>{@docVar:cache}
+ *     <p>{@docTable:cache}
  *     <p>{@docVar:seeding}
  *     <p>{@docTable:seeding}
  *     <p>## Storage
@@ -72,6 +75,8 @@ import org.immutables.value.Value;
  *     <p>{@docTable:tilesetDefaults}
  *     <p>{@docVar:tileset}
  *     <p>{@docTable:tileset}
+ *     <p>{@docVar:cache}
+ *     <p>{@docTable:cache}
  *     <p>{@docVar:seeding}
  *     <p>{@docTable:seeding}
  *     <p>## Speicherung
@@ -87,6 +92,8 @@ import org.immutables.value.Value;
  * @ref:tilesetTable {@link de.ii.xtraplatform.tiles3d.domain.ImmutableTileset3dFeatures}
  * @ref:seeding {@link de.ii.xtraplatform.tiles3d.domain.SeedingOptions3d}
  * @ref:seedingTable {@link de.ii.xtraplatform.tiles3d.domain.ImmutableSeedingOptions3d}
+ * @ref:cache {@link de.ii.xtraplatform.tiles3d.domain.Cache3d}
+ * @ref:cacheTable {@link de.ii.xtraplatform.tiles3d.domain.ImmutableCache3d}
  * @examplesAll <code>
  * ```yaml
  * id: cologne_lod2-3dtiles
@@ -96,6 +103,12 @@ import org.immutables.value.Value;
  *   runOnStartup: true
  *   purge: true
  *   jobSize: S
+ * caches:
+ * - type: DYNAMIC
+ *   seeded: true
+ *   levels:
+ *     min: 0
+ *     max: 2
  * tilesetDefaults:
  *   featureProvider: cologne_lod2
  *   clampToEllipsoid: true
@@ -143,6 +156,13 @@ import org.immutables.value.Value;
             @DocStep(type = Step.JSON_PROPERTIES)
           },
           columnSet = ColumnSet.JSON_PROPERTIES),
+      @DocTable(
+          name = "cache",
+          rows = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:cacheTable}"),
+            @DocStep(type = Step.JSON_PROPERTIES)
+          },
+          columnSet = ColumnSet.JSON_PROPERTIES),
     },
     vars = {
       @DocVar(
@@ -161,6 +181,12 @@ import org.immutables.value.Value;
           name = "seeding",
           value = {
             @DocStep(type = Step.TAG_REFS, params = "{@ref:seeding}"),
+            @DocStep(type = Step.TAG, params = "{@bodyBlock}")
+          }),
+      @DocVar(
+          name = "cache",
+          value = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:cache}"),
             @DocStep(type = Step.TAG, params = "{@bodyBlock}")
           }),
       @DocVar(
@@ -195,6 +221,14 @@ public interface Tile3dProviderFeaturesData extends Tile3dProviderData {
    * @default {}
    */
   Optional<SeedingOptions3d> getSeeding();
+
+  /**
+   * @langEn List of cache definitions, see [Cache](#cache).
+   * @langDe Liste von Cache-Definitionen, siehe [Cache](#cache).
+   * @since v4.6
+   * @default []
+   */
+  List<Cache3d> getCaches();
 
   abstract class Builder
       extends Tile3dProviderData.Builder<ImmutableTile3dProviderFeaturesData.Builder>

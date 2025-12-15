@@ -11,7 +11,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.Job.JobDetails;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,7 @@ public interface Tile3dSeedingJob extends JobDetails {
       String tileMatrixSet,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
-      Optional<TileGenerationParameters> generationParameters,
+      Optional<Tile3dGenerationParameters> generationParameters,
       String jobSetId) {
     ImmutableTile3dSeedingJob details =
         new ImmutableTile3dSeedingJob.Builder()
@@ -57,7 +56,7 @@ public interface Tile3dSeedingJob extends JobDetails {
       String tileMatrixSet,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
-      Optional<TileGenerationParameters> generationParameters,
+      Optional<Tile3dGenerationParameters> generationParameters,
       String jobSetId) {
     ImmutableTile3dSeedingJob details =
         new ImmutableTile3dSeedingJob.Builder()
@@ -77,7 +76,7 @@ public interface Tile3dSeedingJob extends JobDetails {
 
   String getTileSet();
 
-  Optional<TileGenerationParameters> getGenerationParameters();
+  Optional<Tile3dGenerationParameters> getGenerationParameters();
 
   String getTileMatrixSet();
 

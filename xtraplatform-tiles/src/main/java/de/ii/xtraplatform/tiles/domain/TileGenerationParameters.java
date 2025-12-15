@@ -17,8 +17,9 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTileGenerationParameters.Builder.class)
-public interface TileGenerationParameters {
+public interface TileGenerationParameters extends GenerationParameters {
 
+  @Override
   Optional<BoundingBox> getClipBoundingBox();
 
   Map<String, String> getSubstitutions();

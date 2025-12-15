@@ -10,8 +10,8 @@ package de.ii.xtraplatform.tiles.app;
 import com.google.common.collect.Range;
 import de.ii.xtraplatform.tiles.domain.Cache.Storage;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
+import de.ii.xtraplatform.tiles.domain.GenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileCache;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
@@ -69,13 +69,13 @@ public class TileCacheImmutable implements ChainedTileProvider, TileCache {
 
   @Override
   public Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException {
+      Map<String, ? extends GenerationParameters> tilesets) throws IOException {
     return getCoverage(tilesets, tileWalker, getTmsRanges());
   }
 
   @Override
   public Map<String, Map<String, Set<TileMatrixSetLimits>>> getRasterCoverage(
-      Map<String, TileGenerationParameters> tilesets) throws IOException {
+      Map<String, ? extends GenerationParameters> tilesets) throws IOException {
     return getCoverage(tilesets, tileWalker, rasterTmsRanges);
   }
 
