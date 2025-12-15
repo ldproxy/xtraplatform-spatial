@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
 public interface FeatureStream {
 
   enum PipelineSteps {
-    MAPPING,
+    MAPPING_SCHEMA,
+    MAPPING_VALUES,
     GEOMETRY,
     COORDINATES,
     CLEAN,

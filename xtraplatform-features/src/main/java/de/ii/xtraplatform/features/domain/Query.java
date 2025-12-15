@@ -49,7 +49,7 @@ public interface Query {
   }
 
   @Value.Default
-  default List<PipelineSteps> debugSkipPipelineSteps() {
+  default List<PipelineSteps> skipPipelineSteps() {
     return List.of();
   }
 }
