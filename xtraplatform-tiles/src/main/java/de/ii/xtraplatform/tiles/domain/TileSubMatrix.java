@@ -8,10 +8,12 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@JsonDeserialize(builder = ImmutableTileSubMatrix.Builder.class)
 public interface TileSubMatrix extends Comparable<TileSubMatrix> {
 
   static TileSubMatrix of(int level, int rowMin, int rowMax, int colMin, int colMax) {

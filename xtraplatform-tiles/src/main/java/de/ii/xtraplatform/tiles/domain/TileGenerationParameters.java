@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import java.util.Map;
@@ -15,8 +16,10 @@ import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
-public interface TileGenerationParameters {
+@JsonDeserialize(builder = ImmutableTileGenerationParameters.Builder.class)
+public interface TileGenerationParameters extends GenerationParameters {
 
+  @Override
   Optional<BoundingBox> getClipBoundingBox();
 
   Map<String, String> getSubstitutions();

@@ -8,8 +8,9 @@
 package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.jobs.domain.Job;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
+import de.ii.xtraplatform.jobs.domain.Job.JobDetails;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,8 @@ import javax.ws.rs.core.MediaType;
 import org.immutables.value.Value;
 
 @Value.Immutable
-public interface Tile3dSeedingJob {
+@JsonDeserialize(builder = ImmutableTile3dSeedingJob.Builder.class)
+public interface Tile3dSeedingJob extends JobDetails {
 
   String TYPE_SUBTREE = Tile3dSeedingJobSet.type("subtree", "binary");
   String TYPE_GLTF = Tile3dSeedingJobSet.type("content", "glb");
@@ -31,7 +33,7 @@ public interface Tile3dSeedingJob {
       String tileMatrixSet,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
-      Optional<TileGenerationParameters> generationParameters,
+      Optional<Tile3dGenerationParameters> generationParameters,
       String jobSetId) {
     ImmutableTile3dSeedingJob details =
         new ImmutableTile3dSeedingJob.Builder()
@@ -54,7 +56,7 @@ public interface Tile3dSeedingJob {
       String tileMatrixSet,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
-      Optional<TileGenerationParameters> generationParameters,
+      Optional<Tile3dGenerationParameters> generationParameters,
       String jobSetId) {
     ImmutableTile3dSeedingJob details =
         new ImmutableTile3dSeedingJob.Builder()
@@ -74,7 +76,7 @@ public interface Tile3dSeedingJob {
 
   String getTileSet();
 
-  Optional<TileGenerationParameters> getGenerationParameters();
+  Optional<Tile3dGenerationParameters> getGenerationParameters();
 
   String getTileMatrixSet();
 

@@ -13,6 +13,7 @@ import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.JobProcessor;
+import de.ii.xtraplatform.jobs.domain.JobQueueMin;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
@@ -25,6 +26,7 @@ import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -32,7 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -51,7 +52,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
   @Inject
   TileSeedingJobCreator(AppContext appContext, EntityRegistry entityRegistry) {
-    this.concurrency = appContext.getConfiguration().getBackgroundTasks().getMaxThreads();
+    this.concurrency = appContext.getConfiguration().getJobConcurrency();
     this.entityRegistry = entityRegistry;
   }
 
@@ -72,9 +73,9 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   }
 
   @Override
-  public JobResult process(Job job, JobSet jobSet, Consumer<Job> pushJob) {
-    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet);
-    boolean isCleanup = getDetails(job);
+  public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
+    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
+    boolean isCleanup = getDetails(job, jobQueue);
 
     Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJobSet.getTileProvider());
     if (optionalTileProvider.isPresent()) {
@@ -171,6 +172,8 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
         boolean allRaster = true;
         boolean someRaster = false;
+        Set<String> tilesets = new HashSet<>();
+        Set<Integer> levels = new HashSet<>();
 
         for (String tileSet : seedingJobSet.getTileSets().keySet()) {
           Map<String, Set<TileMatrixSetLimits>> tileMatrixSets =
@@ -219,16 +222,30 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
                               Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
                               jobSet.getId());
 
-                  pushJob.accept(job2);
-                  jobSet.init(job2.getTotal().get());
-                  seedingJobSet.init(
-                      tileSet, tileMatrixSet, subMatrix.getLevel(), job2.getTotal().get());
+                  jobQueue.initJobSet(
+                      jobSet,
+                      job2.getTotal().get(),
+                      Map.<String, Object>of(
+                          "tileSet",
+                          tileSet,
+                          "tileMatrixSet",
+                          tileMatrixSet,
+                          "level",
+                          subMatrix.getLevel(),
+                          "count",
+                          job2.getTotal().get(),
+                          "isFirstTileset",
+                          tilesets.add(tileSet),
+                          "isFirstLevel",
+                          levels.add(subMatrix.getLevel())));
+
+                  jobQueue.push(job2);
                 }
               });
         }
 
         if (jobSet.isDone()) {
-          jobSet.getCleanup().ifPresent(pushJob);
+          jobSet.getCleanup().ifPresent(jobQueue::push);
           return JobResult.success(); // early return
         }
 
@@ -262,6 +279,15 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   @Override
   public Class<TileSeedingJobSet> getSetDetailsType() {
     return TileSeedingJobSet.class;
+  }
+
+  @Override
+  public Map<String, Class<?>> getJobTypes() {
+    return Map.of(
+        TileSeedingJobSet.TYPE,
+        TileSeedingJobSet.class,
+        TileSeedingJobSet.TYPE_SETUP,
+        Boolean.class);
   }
 
   private Optional<TileProvider> getTileProvider(String id) {

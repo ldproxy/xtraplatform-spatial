@@ -50,16 +50,13 @@ import de.ii.xtraplatform.tiles.domain.ImmutableTileMatrix;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileMatrixSetData;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileMatrixSetData.Builder;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesBoundingBox;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
-import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerationParameters;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerator;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFeaturesData;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
 import de.ii.xtraplatform.tiles3d.domain.TileTree;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
 import de.ii.xtraplatform.tiles3d.domain.spec.Availability;
@@ -356,11 +353,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
 
   @Override
   public byte[] generateTile(
-      Tileset3dFeatures tileset,
-      Tile3dCoordinates tile,
-      Tile3dSeedingJob job,
-      Tile3dSeedingJobSet jobSet,
-      TileMatrixSetBase tileMatrixSet) {
+      Tileset3dFeatures tileset, Tile3dCoordinates tile, Tile3dGenerationParameters parameters) {
     FeatureProvider featureProvider = getFeatureProvider(tileset);
     Tile3dBuilder builder =
         tileBuilder.orElseThrow(
@@ -370,16 +363,17 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     BoundingBox tileBoundingBox =
         computeTileBbox(tilesetBoundingBox, tile.getLevel(), tile.getCol(), tile.getRow());
     BoundingBox clipBoundingBox =
-        getClipBoundingBox(
-                jobSet.getTileSets().get(tileset.getId()).getParameters(),
-                tileBoundingBox.getEpsgCrs())
-            .orElse(tilesetBoundingBox);
+        getClipBoundingBox(parameters, tileBoundingBox.getEpsgCrs()).orElse(tilesetBoundingBox);
     Optional<Polygon> exclusionPolygon = computeExclusionPolygon(tile, clipBoundingBox);
-    String apiId = jobSet.getApi();
-    String collectionId = jobSet.getTileSets().get(tileset.getId()).getCollection();
 
     return builder.generateTile(
-        tile, tileset, tileBoundingBox, exclusionPolygon, featureProvider, apiId, collectionId);
+        tile,
+        tileset,
+        tileBoundingBox,
+        exclusionPolygon,
+        featureProvider,
+        parameters.getApiId(),
+        parameters.getCollectionId());
   }
 
   @Override
@@ -595,7 +589,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
   }
 
   private Optional<BoundingBox> getClipBoundingBox(
-      TileGenerationParameters tileGenerationParameters, EpsgCrs targetCrs) {
+      Tile3dGenerationParameters tileGenerationParameters, EpsgCrs targetCrs) {
     return tileGenerationParameters
         .getClipBoundingBox()
         .flatMap(
