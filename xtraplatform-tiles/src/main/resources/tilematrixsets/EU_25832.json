@@ -2,6 +2,7 @@
   "title":"Tiling scheme using ETRS89/UTM32N covering Europe",
   "id":"EU_25832",
   "crs":"http://www.opengis.net/def/crs/EPSG/0/25832",
+  "orderedAxes": ["E", "N"],
   "boundingBox":{
     "lowerLeft":[
       -3803165.98427,

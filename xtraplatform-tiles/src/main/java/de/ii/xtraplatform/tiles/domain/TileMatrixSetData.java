@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.values.domain.StoredValue;
 import de.ii.xtraplatform.values.domain.ValueBuilder;
@@ -20,6 +22,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 @Value.Style(deepImmutablesDetection = true, builder = "new")
 @FromValueStore(type = "tile-matrix-sets")
+@JsonInclude(Include.NON_EMPTY)
 @JsonDeserialize(builder = ImmutableTileMatrixSetData.Builder.class)
 public interface TileMatrixSetData extends StoredValue {
 
