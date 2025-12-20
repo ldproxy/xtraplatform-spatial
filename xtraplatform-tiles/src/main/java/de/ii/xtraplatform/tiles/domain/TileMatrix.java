@@ -8,6 +8,8 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.math.BigDecimal;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@JsonInclude(Include.NON_EMPTY)
 @JsonDeserialize(builder = ImmutableTileMatrix.Builder.class)
 public interface TileMatrix {
 
