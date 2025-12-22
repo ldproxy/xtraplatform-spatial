@@ -182,7 +182,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                         .add(Options.LINE_STRING_AS_SEGMENT, Options.POLYGON_AS_PATCH)
                         .build(),
                     gmlPrefix,
-                    gmlIdPrefix,
+                    Optional.of(this.gmlIdPrefix + "seg_"),
                     precision));
     this.encodeAsEmbeddedGeometry =
         options.contains(Options.WITH_SRS_NAME)
@@ -197,7 +197,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                                 .toList())
                         .build(),
                     gmlPrefix,
-                    gmlIdPrefix,
+                    Optional.of(this.gmlIdPrefix + "embed_"),
                     precision))
             : Optional.empty();
     this.precision =
