@@ -80,6 +80,7 @@ public interface FeatureProviderSqlData
    *     Processing](10-sql.md#query-processing) below.
    * @langDe Einstellungen für die Query-Verarbeitung, für Details siehe
    *     [Query-Verarbeitung](10-sql.md#query-processing).
+   * @since v4.6
    */
   @DocMarker("specific")
   @Nullable
@@ -240,6 +241,7 @@ public interface FeatureProviderSqlData
      *     Feature-Provider verwendeten Möglichkeiten verbessern. Derzeit ist die
      *     Standardeinstellung `false`, aber die Standardeinstellung kann sich zu `true` ändern,
      *     wenn die Erfahrung zeigt, dass die Option keine Nebenwirkungen hat.
+     * @since v4.6
      * @default false
      */
     @Value.Default
