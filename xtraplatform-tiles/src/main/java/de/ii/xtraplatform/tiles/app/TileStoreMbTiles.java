@@ -15,6 +15,7 @@ import de.ii.xtraplatform.tiles.domain.ImmutableVectorLayer;
 import de.ii.xtraplatform.tiles.domain.MbtilesMetadata;
 import de.ii.xtraplatform.tiles.domain.MbtilesTileset;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
+import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
@@ -64,7 +65,8 @@ public class TileStoreMbTiles implements TileStore {
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
       Map<String, Set<String>> tileMatrixSets,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository,
-      Optional<TileStorePartitions> partitions) {
+      Optional<TileMatrixPartitions> partitions,
+      boolean seeded) {
     Map<String, MbtilesTileset> tileSets = new ConcurrentHashMap<>();
     try {
       for (String tileset : tileSchemas.keySet()) {
@@ -78,7 +80,8 @@ public class TileStoreMbTiles implements TileStore {
                   tms,
                   getVectorLayers(tileSchemas, tileset),
                   partitions,
-                  tileSchemas.get(tileset).isEmpty()));
+                  tileSchemas.get(tileset).isEmpty(),
+                  seeded));
         }
       }
     } catch (IOException e) {
@@ -97,7 +100,7 @@ public class TileStoreMbTiles implements TileStore {
   private final ResourceStore rootStore;
   private final Map<String, Map<String, TileGenerationSchema>> tileSchemas;
   private final Map<String, MbtilesTileset> tileSets;
-  private final Optional<TileStorePartitions> partitions;
+  private final Optional<TileMatrixPartitions> partitions;
   // the tile matrix set is only necessary for writable MBTiles files,
   // i.e., caches that are used for seeding
   private final Optional<TileMatrixSetRepository> tileMatrixSetRepository;
@@ -107,7 +110,7 @@ public class TileStoreMbTiles implements TileStore {
       ResourceStore rootStore,
       Map<String, MbtilesTileset> tileSets,
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
-      Optional<TileStorePartitions> partitions,
+      Optional<TileMatrixPartitions> partitions,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository) {
     this.providerId = providerId;
     this.rootStore = rootStore;
@@ -215,6 +218,7 @@ public class TileStoreMbTiles implements TileStore {
                 tile.getTileMatrixSet().getId(),
                 getVectorLayers(tileSchemas, tile.getTileset()),
                 partitions,
+                false,
                 false));
       }
     }
@@ -430,8 +434,9 @@ public class TileStoreMbTiles implements TileStore {
       String tileset,
       String tileMatrixSet,
       List<VectorLayer> vectorLayers,
-      Optional<TileStorePartitions> partitions,
-      boolean isXtratiler)
+      Optional<TileMatrixPartitions> partitions,
+      boolean isRaster,
+      boolean seeded)
       throws IOException {
     Path relPath =
         Path.of(tileset).resolve(tileMatrixSet + (partitions.isEmpty() ? MBTILES_SUFFIX : ""));
@@ -451,20 +456,20 @@ public class TileStoreMbTiles implements TileStore {
     MbtilesMetadata md =
         ImmutableMbtilesMetadata.builder()
             .name(name)
-            .format(isXtratiler ? TilesFormat.PNG : TilesFormat.MVT)
+            .format(isRaster ? TilesFormat.PNG : TilesFormat.MVT)
             .vectorLayers(vectorLayers)
             .build();
 
     if (partitions.isPresent()) {
-      return new MbtilesTileset(filePath.get(), md, partitions, isXtratiler);
+      return new MbtilesTileset(filePath.get(), md, partitions, isRaster, seeded);
     }
 
     if (rootStore.has(relPath)) {
-      return new MbtilesTileset(filePath.get(), isXtratiler);
+      return new MbtilesTileset(filePath.get(), isRaster);
     }
 
     try {
-      return new MbtilesTileset(filePath.get(), md, Optional.empty(), isXtratiler);
+      return new MbtilesTileset(filePath.get(), md, Optional.empty(), isRaster, seeded);
     } catch (FileAlreadyExistsException e) {
       throw new IllegalStateException(
           "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.");

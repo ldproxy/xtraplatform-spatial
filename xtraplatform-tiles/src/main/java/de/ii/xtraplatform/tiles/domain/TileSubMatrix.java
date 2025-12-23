@@ -8,10 +8,13 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
-public interface TileSubMatrix {
+@JsonDeserialize(builder = ImmutableTileSubMatrix.Builder.class)
+public interface TileSubMatrix extends Comparable<TileSubMatrix> {
 
   static TileSubMatrix of(int level, int rowMin, int rowMax, int colMin, int colMax) {
     return new ImmutableTileSubMatrix.Builder()
@@ -21,6 +24,15 @@ public interface TileSubMatrix {
         .colMin(colMin)
         .colMax(colMax)
         .build();
+  }
+
+  static TileSubMatrix of(TileMatrixSetLimits limits) {
+    int level = Integer.parseInt(limits.getTileMatrix());
+    int rowMin = limits.getMinTileRow();
+    int rowMax = limits.getMaxTileRow();
+    int colMin = limits.getMinTileCol();
+    int colMax = limits.getMaxTileCol();
+    return of(level, rowMin, rowMax, colMin, colMax);
   }
 
   int getLevel();
@@ -40,6 +52,8 @@ public interface TileSubMatrix {
     return ((long) getRowMax() - getRowMin() + 1) * (getColMax() - getColMin() + 1);
   }
 
+  @Value.Lazy
+  @JsonIgnore
   default TileMatrixSetLimits toLimits() {
     return new ImmutableTileMatrixSetLimits.Builder()
         .tileMatrix(String.valueOf(getLevel()))
@@ -50,9 +64,18 @@ public interface TileSubMatrix {
         .build();
   }
 
+  @Value.Lazy
+  @JsonIgnore
   default String asString() {
     return String.format(
         "%d/%d-%d/%d-%d", getLevel(), getRowMin(), getRowMax(), getColMin(), getColMax());
+  }
+
+  @Value.Lazy
+  @JsonIgnore
+  default String asStringXY() {
+    return String.format(
+        "%d/%d-%d/%d-%d", getLevel(), getColMin(), getColMax(), getRowMin(), getRowMax());
   }
 
   default boolean contains(TileSubMatrix other) {
@@ -63,8 +86,70 @@ public interface TileSubMatrix {
         && getColMax() >= other.getColMax();
   }
 
+  default boolean canMergeWith(TileSubMatrix other) {
+    return getLevel() == other.getLevel()
+        && ((getRowMin() <= other.getRowMax() + 1
+                && getRowMax() >= other.getRowMin() - 1
+                && (getColMin() == other.getColMin() && getColMax() == other.getColMax()))
+            || (getColMin() <= other.getColMax() + 1
+                && getColMax() >= other.getColMin() - 1
+                && (getRowMin() == other.getRowMin() && getRowMax() == other.getRowMax())));
+  }
+
+  default boolean intersects(TileSubMatrix other) {
+    return getLevel() == other.getLevel()
+        && getRowMin() <= other.getRowMax()
+        && getRowMax() >= other.getRowMin()
+        && getColMin() <= other.getColMax()
+        && getColMax() >= other.getColMin();
+  }
+
+  default TileSubMatrix mergeWith(TileSubMatrix other) {
+    if (!canMergeWith(other)) {
+      throw new IllegalArgumentException("TileSubMatrices are not mergeable");
+    }
+
+    return new ImmutableTileSubMatrix.Builder()
+        .level(getLevel())
+        .rowMin(Math.min(getRowMin(), other.getRowMin()))
+        .rowMax(Math.max(getRowMax(), other.getRowMax()))
+        .colMin(Math.min(getColMin(), other.getColMin()))
+        .colMax(Math.max(getColMax(), other.getColMax()))
+        .build();
+  }
+
+  default boolean contains(int level, int row, int col) {
+    return getLevel() == level
+        && getRowMin() <= row
+        && getRowMax() >= row
+        && getColMin() <= col
+        && getColMax() >= col;
+  }
+
+  @Value.Lazy
+  @JsonIgnore
   default TileSubMatrix toLowerLevelSubMatrix() {
     return getLowerLevelSubMatrix(this, 1);
+  }
+
+  @Override
+  default int compareTo(TileSubMatrix o) {
+    if (this.getLevel() != o.getLevel()) {
+      return Integer.compare(this.getLevel(), o.getLevel());
+    }
+    if (this.getColMin() != o.getColMin()) {
+      return Integer.compare(this.getColMin(), o.getColMin());
+    }
+    if (this.getRowMin() != o.getRowMin()) {
+      return Integer.compare(this.getRowMin(), o.getRowMin());
+    }
+    if (this.getColMax() != o.getColMax()) {
+      return Integer.compare(this.getColMax(), o.getColMax());
+    }
+    if (this.getRowMax() != o.getRowMax()) {
+      return Integer.compare(this.getRowMax(), o.getRowMax());
+    }
+    return 0;
   }
 
   static TileSubMatrix getLowerLevelSubMatrix(TileSubMatrix subMatrix, int levelDelta) {
@@ -75,5 +160,20 @@ public interface TileSubMatrix {
         .colMin(subMatrix.getColMin() / (2 * levelDelta))
         .colMax((subMatrix.getColMax() - 1) / (2 * levelDelta))
         .build();
+  }
+
+  default Optional<TileSubMatrix> intersection(TileSubMatrix other) {
+    if (!intersects(other)) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        new ImmutableTileSubMatrix.Builder()
+            .level(getLevel())
+            .rowMin(Math.max(getRowMin(), other.getRowMin()))
+            .rowMax(Math.min(getRowMax(), other.getRowMax()))
+            .colMin(Math.max(getColMin(), other.getColMin()))
+            .colMax(Math.min(getColMax(), other.getColMax()))
+            .build());
   }
 }

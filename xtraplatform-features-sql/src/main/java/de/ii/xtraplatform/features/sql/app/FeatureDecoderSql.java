@@ -23,6 +23,10 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.features.sql.domain.SqlRowMeta;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryDecoderWkb;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryDecoderWkt;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -48,6 +52,7 @@ public class FeatureDecoderSql
   private final Map<String, DecoderFactory> subDecoderFactories;
   private final Map<String, Decoder> subDecoders;
   private final boolean geometryAsWkb;
+  private final WkbDialect wkbDialect;
 
   private boolean started;
   private boolean featureStarted;
@@ -65,10 +70,12 @@ public class FeatureDecoderSql
       List<SqlQueryMapping> sqlQueryMappings,
       Query query,
       Map<String, DecoderFactory> subDecoderFactories,
-      boolean geometryAsWkb) {
+      boolean geometryAsWkb,
+      WkbDialect wkbDialect) {
     this.mappings = mappings;
     this.query = query;
     this.geometryAsWkb = geometryAsWkb;
+    this.wkbDialect = wkbDialect;
 
     this.mainTablePaths =
         sqlQueryMappings.stream().map(s -> s.getMainTable().getFullPath()).toList();
@@ -91,9 +98,9 @@ public class FeatureDecoderSql
   protected void init() {
     this.context = createContext().setMappings(mappings).setQuery(query);
     if (geometryAsWkb) {
-      this.geometryDecoderWkb = new GeometryDecoderWkb(getDownstream(), context);
+      this.geometryDecoderWkb = new GeometryDecoderWkb(wkbDialect);
     } else {
-      this.geometryDecoderWkt = new GeometryDecoderWkt(getDownstream(), context);
+      this.geometryDecoderWkt = new GeometryDecoderWkt();
     }
     this.nestingTracker =
         new NestingTracker(getDownstream(), context, mainTablePaths, false, false, false);
@@ -256,16 +263,18 @@ public class FeatureDecoderSql
 
       if (sqlRow.isSpatialColumn(i)) {
         if (Objects.nonNull(sqlRow.getValues().get(i))) {
+          Geometry<?> geometry;
           try {
             context.setSchemaIndex(sqlRow.getSchemaIndex(i));
-            if (geometryAsWkb) {
-              geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i));
-            } else {
-              geometryDecoderWkt.decode((String) sqlRow.getValues().get(i));
-            }
+            geometry =
+                geometryAsWkb
+                    ? geometryDecoderWkb.decode((byte[]) sqlRow.getValues().get(i), query.getCrs())
+                    : geometryDecoderWkt.decode((String) sqlRow.getValues().get(i), query.getCrs());
           } catch (IOException e) {
             throw new IllegalStateException("Error parsing WKT or WKB geometry", e);
           }
+          context.setGeometry(geometry);
+          getDownstream().onGeometry(context);
         }
       } else {
         context.setValueType(Type.STRING);

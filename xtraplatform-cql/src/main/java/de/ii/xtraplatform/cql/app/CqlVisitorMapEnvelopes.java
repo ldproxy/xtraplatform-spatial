@@ -7,20 +7,23 @@
  */
 package de.ii.xtraplatform.cql.app;
 
-import com.google.common.collect.ImmutableList;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.CqlNode;
-import de.ii.xtraplatform.cql.domain.Geometry;
-import de.ii.xtraplatform.cql.domain.Geometry.Coordinate;
-import de.ii.xtraplatform.cql.domain.ImmutableLineString;
-import de.ii.xtraplatform.cql.domain.ImmutableMultiPolygon;
-import de.ii.xtraplatform.cql.domain.ImmutablePoint;
-import de.ii.xtraplatform.cql.domain.ImmutablePolygon;
+import de.ii.xtraplatform.cql.domain.CqlVisitorCopy;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.SpatialLiteral;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
+import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.LineString;
+import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.Point;
+import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.PositionList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
 
@@ -32,31 +35,27 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
 
   @Override
   public CqlNode visit(SpatialLiteral spatialLiteral, List<CqlNode> children) {
-    if (spatialLiteral.getType() == Geometry.class
-        && spatialLiteral.getValue() instanceof Geometry.Bbox)
+    if (spatialLiteral.getType() == Bbox.class && spatialLiteral.getValue() instanceof Bbox)
       return SpatialLiteral.of(
-          (Geometry<?>) visit((Geometry.Bbox) spatialLiteral.getValue(), children));
+          ((GeometryNode) visit((Bbox) spatialLiteral.getValue(), children)).getGeometry());
 
     return super.visit(spatialLiteral, children);
   }
 
   @Override
-  public CqlNode visit(Geometry.Bbox bbox, List<CqlNode> children) {
+  public CqlNode visit(Bbox bbox, List<CqlNode> children) {
     List<Double> c = bbox.getCoordinates();
     EpsgCrs crs = bbox.getCrs().orElse(OgcCrs.CRS84);
 
     // if the bbox is degenerate (vertical or horizontal line, point), reduce
     // the geometry
     if (c.get(0).equals(c.get(2)) && c.get(1).equals(c.get(3))) {
-      return new ImmutablePoint.Builder()
-          .addCoordinates(Coordinate.of(c.get(0), c.get(1)))
-          .crs(crs)
-          .build();
+      return GeometryNode.of(Point.of(c.get(0), c.get(1), crs));
     } else if (c.get(0).equals(c.get(2)) || c.get(1).equals(c.get(3))) {
-      return new ImmutableLineString.Builder()
-          .addCoordinates(Coordinate.of(c.get(0), c.get(1)), Coordinate.of(c.get(2), c.get(3)))
-          .crs(crs)
-          .build();
+      return GeometryNode.of(
+          LineString.of(
+              PositionList.of(Axes.XY, new double[] {c.get(0), c.get(1), c.get(2), c.get(3)}),
+              Optional.of(crs)));
     }
 
     // if the bbox crosses the antimeridian, we create a MultiPolygon with a polygon
@@ -65,51 +64,62 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
       int axisWithWraparaound = crsInfo.getAxisWithWraparound(crs).orElse(-1);
       if (axisWithWraparaound == 0 && c.get(0) > c.get(2)) {
         // x axis is longitude
-        List<Geometry.Coordinate> coordinates1 =
-            ImmutableList.of(
-                Geometry.Coordinate.of(c.get(0), c.get(1)),
-                Geometry.Coordinate.of(180.0, c.get(1)),
-                Geometry.Coordinate.of(180.0, c.get(3)),
-                Geometry.Coordinate.of(c.get(0), c.get(3)),
-                Geometry.Coordinate.of(c.get(0), c.get(1)));
-        List<Geometry.Coordinate> coordinates2 =
-            ImmutableList.of(
-                Geometry.Coordinate.of(-180, c.get(1)),
-                Geometry.Coordinate.of(c.get(2), c.get(1)),
-                Geometry.Coordinate.of(c.get(2), c.get(3)),
-                Geometry.Coordinate.of(-180, c.get(3)),
-                Geometry.Coordinate.of(-180, c.get(1)));
-        return createMultiPolygon(coordinates1, coordinates2, crs);
+        return GeometryNode.of(
+            MultiPolygon.of(
+                List.of(
+                    Polygon.of(
+                        List.of(
+                            PositionList.of(
+                                Axes.XY,
+                                new double[] {
+                                  c.get(0), c.get(1), 180.0, c.get(1), 180.0, c.get(3), c.get(0),
+                                  c.get(3), c.get(0), c.get(1)
+                                })),
+                        Optional.of(crs)),
+                    Polygon.of(
+                        List.of(
+                            PositionList.of(
+                                Axes.XY,
+                                new double[] {
+                                  -180, c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), -180,
+                                  c.get(3), -180, c.get(1)
+                                })),
+                        Optional.of(crs))),
+                Optional.of(crs)));
       } else if (axisWithWraparaound == 1 && c.get(1) > c.get(3)) {
         // y axis is longitude
-        List<Geometry.Coordinate> coordinates1 =
-            ImmutableList.of(
-                Geometry.Coordinate.of(c.get(0), c.get(1)),
-                Geometry.Coordinate.of(c.get(2), c.get(1)),
-                Geometry.Coordinate.of(c.get(2), 180),
-                Geometry.Coordinate.of(c.get(0), 180),
-                Geometry.Coordinate.of(c.get(0), c.get(1)));
-        List<Geometry.Coordinate> coordinates2 =
-            ImmutableList.of(
-                Geometry.Coordinate.of(c.get(0), -180),
-                Geometry.Coordinate.of(c.get(2), -180),
-                Geometry.Coordinate.of(c.get(2), c.get(3)),
-                Geometry.Coordinate.of(c.get(0), c.get(3)),
-                Geometry.Coordinate.of(c.get(0), -180));
-        return createMultiPolygon(coordinates1, coordinates2, crs);
+        return GeometryNode.of(
+            MultiPolygon.of(
+                List.of(
+                    Polygon.of(
+                        List.of(
+                            PositionList.of(
+                                Axes.XY,
+                                new double[] {
+                                  c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), 180, c.get(0),
+                                  180, c.get(0), c.get(1)
+                                })),
+                        Optional.of(crs)),
+                    Polygon.of(
+                        List.of(
+                            PositionList.of(
+                                Axes.XY,
+                                new double[] {
+                                  c.get(0), -180, c.get(2), -180, c.get(2), c.get(3), c.get(0),
+                                  c.get(3), c.get(0), -180
+                                })),
+                        Optional.of(crs))),
+                Optional.of(crs)));
       }
     }
 
-    // standard case, nothing to do
-    return super.visit(bbox, children);
-  }
-
-  private Geometry.MultiPolygon createMultiPolygon(
-      List<Geometry.Coordinate> coordinates1, List<Geometry.Coordinate> coordinates2, EpsgCrs crs) {
-    Geometry.Polygon polygon1 =
-        new ImmutablePolygon.Builder().addCoordinates(coordinates1).crs(crs).build();
-    Geometry.Polygon polygon2 =
-        new ImmutablePolygon.Builder().addCoordinates(coordinates2).crs(crs).build();
-    return new ImmutableMultiPolygon.Builder().addCoordinates(polygon1, polygon2).crs(crs).build();
+    // standard case, convert to polygon
+    return GeometryNode.of(
+        Polygon.of(
+            new double[] {
+              c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0), c.get(3),
+              c.get(0), c.get(1)
+            },
+            crs));
   }
 }

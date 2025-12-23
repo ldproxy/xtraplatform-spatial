@@ -14,7 +14,9 @@ import org.immutables.value.Value;
 public interface MultiFeatureQuery extends Query {
 
   @Value.Immutable
-  interface SubQuery extends TypeQuery {}
+  interface SubQuery extends TypeQuery {
+    String getCollectionId();
+  }
 
   List<SubQuery> getQueries();
 }

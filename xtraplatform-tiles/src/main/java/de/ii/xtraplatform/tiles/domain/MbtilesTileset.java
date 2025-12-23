@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.tiles.app.FeatureEncoderMVT;
 import de.ii.xtraplatform.tiles.app.SqlHelper;
-import de.ii.xtraplatform.tiles.app.TileStorePartitions;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -91,35 +90,36 @@ public class MbtilesTileset {
   private final Path tilesetPath;
   private final Mutex mutex;
   private final MbtilesMetadata metadata;
-  private final Optional<TileStorePartitions> partitions;
+  private final Optional<TileMatrixPartitions> partitions;
   private final boolean numericTileIds;
   private final String tileMapTable;
   private final String tileBlobsTable;
 
-  public MbtilesTileset(Path tilesetPath, boolean isXtratiler) {
-    this(tilesetPath, null, Optional.empty(), isXtratiler, true, Mutex.create());
+  public MbtilesTileset(Path tilesetPath, boolean isRaster) {
+    this(tilesetPath, null, Optional.empty(), isRaster, true, Mutex.create());
   }
 
   public MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
-      Optional<TileStorePartitions> partitions,
-      boolean isXtratiler)
+      Optional<TileMatrixPartitions> partitions,
+      boolean isRaster,
+      boolean seeded)
       throws IOException {
     this(
         tilesetPath,
         metadata,
         partitions,
-        isXtratiler,
+        isRaster,
         false,
-        partitions.isPresent() ? Mutex.createNoOp() : Mutex.create());
+        partitions.isPresent() && seeded && isRaster ? Mutex.createNoOp() : Mutex.create());
   }
 
   private MbtilesTileset(
       Path tilesetPath,
       MbtilesMetadata metadata,
-      Optional<TileStorePartitions> partitions,
-      boolean isXtratiler,
+      Optional<TileMatrixPartitions> partitions,
+      boolean isRaster,
       boolean mustExist,
       Mutex mutex) {
     if (mustExist && !Files.exists(tilesetPath)) {
@@ -130,9 +130,9 @@ public class MbtilesTileset {
     this.tilesetPath = tilesetPath;
     this.partitions = partitions;
     this.mutex = mutex;
-    this.numericTileIds = !isXtratiler;
-    this.tileMapTable = isXtratiler ? "map" : "tile_map";
-    this.tileBlobsTable = isXtratiler ? "images" : "tile_blobs";
+    this.numericTileIds = !isRaster;
+    this.tileMapTable = isRaster ? "map" : "tile_map";
+    this.tileBlobsTable = isRaster ? "images" : "tile_blobs";
 
     if (Objects.isNull(metadata)) {
       try {

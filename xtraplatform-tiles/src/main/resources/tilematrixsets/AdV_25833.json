@@ -2,6 +2,7 @@
   "title":"AdV tiling scheme using ETRS89/UTM33N covering Germany",
   "id":"AdV_25833",
   "crs":"http://www.opengis.net/def/crs/EPSG/0/25833",
+  "orderedAxes": ["E", "N"],
   "boundingBox":{
     "lowerLeft":[
       -464849.38,

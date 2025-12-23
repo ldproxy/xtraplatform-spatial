@@ -7,37 +7,36 @@
  */
 package de.ii.xtraplatform.features.sql.domain;
 
-import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
-import de.ii.xtraplatform.features.domain.FeatureTokenContext;
-import de.ii.xtraplatform.features.domain.FeatureTokenTransformerBase;
-import de.ii.xtraplatform.features.sql.app.ModifiableSqlMutationContext;
-import de.ii.xtraplatform.features.sql.app.SqlMutationContext;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenContextSimple;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenTransformerBaseSimple;
 import java.util.Objects;
 
 public abstract class FeatureTokenTransformerSql
-    extends FeatureTokenTransformerBase<
-        SchemaSql, SchemaMappingSql, ModifiableContext<SchemaSql, SchemaMappingSql>> {
+    extends FeatureTokenTransformerBaseSimple<
+        SqlQuerySchema, SqlQueryMapping, ModifiableContext<SqlQuerySchema, SqlQueryMapping>> {
 
-  private ModifiableContext<SchemaSql, SchemaMappingSql> context;
+  private ModifiableContext<SqlQuerySchema, SqlQueryMapping> context;
 
   @Override
-  public Class<? extends ModifiableContext<SchemaSql, SchemaMappingSql>> getContextInterface() {
-    if (getDownstream() instanceof FeatureTokenContext<?>) {
-      return ((FeatureTokenContext<ModifiableContext<SchemaSql, SchemaMappingSql>>) getDownstream())
+  public Class<? extends ModifiableContext<SqlQuerySchema, SqlQueryMapping>> getContextInterface() {
+    if (getDownstream() instanceof FeatureTokenContextSimple<?>) {
+      return ((FeatureTokenContextSimple<ModifiableContext<SqlQuerySchema, SqlQueryMapping>>)
+              getDownstream())
           .getContextInterface();
     }
 
-    return SqlMutationContext.class;
+    return null;
   }
 
   @Override
-  public final ModifiableContext<SchemaSql, SchemaMappingSql> createContext() {
-    ModifiableContext<SchemaSql, SchemaMappingSql> context =
-        getDownstream() instanceof FeatureTokenContext<?>
-            ? ((FeatureTokenContext<ModifiableContext<SchemaSql, SchemaMappingSql>>)
+  public final ModifiableContext<SqlQuerySchema, SqlQueryMapping> createContext() {
+    ModifiableContext<SqlQuerySchema, SqlQueryMapping> context =
+        getDownstream() instanceof FeatureTokenContextSimple<?>
+            ? ((FeatureTokenContextSimple<ModifiableContext<SqlQuerySchema, SqlQueryMapping>>)
                     getDownstream())
                 .createContext()
-            : ModifiableSqlMutationContext.create();
+            : null;
 
     if (Objects.isNull(this.context)) {
       this.context = context;
@@ -46,7 +45,7 @@ public abstract class FeatureTokenTransformerSql
     return context;
   }
 
-  protected final ModifiableContext<SchemaSql, SchemaMappingSql> getContext() {
+  protected final ModifiableContext<SqlQuerySchema, SqlQueryMapping> getContext() {
     if (Objects.isNull(context)) {
       return createContext();
     }

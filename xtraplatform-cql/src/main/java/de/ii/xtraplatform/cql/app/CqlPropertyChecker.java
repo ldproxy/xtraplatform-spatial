@@ -12,6 +12,7 @@ import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
 import de.ii.xtraplatform.cql.domain.Property;
 import java.util.ArrayList;
 import java.util.Collection;

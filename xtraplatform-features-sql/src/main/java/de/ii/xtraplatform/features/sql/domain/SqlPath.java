@@ -61,6 +61,8 @@ public interface SqlPath extends SourcePath {
 
   Map<String, String> getStaticInserts();
 
+  Optional<Boolean> getGenerated();
+
   // TODO: not needed any more? should be based on primary key detection
   boolean getJunction();
 

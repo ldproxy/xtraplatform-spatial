@@ -22,12 +22,9 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.util.LambdaWithException;
-import de.ii.xtraplatform.cql.domain.Geometry.Coordinate;
-import de.ii.xtraplatform.cql.domain.Geometry.LineString;
-import de.ii.xtraplatform.cql.domain.Geometry.Point;
-import de.ii.xtraplatform.cql.domain.Geometry.Polygon;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
+import de.ii.xtraplatform.geometries.domain.transcode.json.GeometryDecoderJson;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,17 +43,11 @@ public interface Operand extends CqlNode {
   class OperandDeserializer extends StdDeserializer<Operand> {
 
     private static final List<String> ARRAY =
-        Arrays.stream(ArrayFunction.values())
-            .map(op -> op.toString().toLowerCase())
-            .collect(Collectors.toUnmodifiableList());
+        Arrays.stream(ArrayFunction.values()).map(op -> op.toString().toLowerCase()).toList();
     private static final List<String> SPATIAL =
-        Arrays.stream(SpatialFunction.values())
-            .map(op -> op.toString().toLowerCase())
-            .collect(Collectors.toUnmodifiableList());
+        Arrays.stream(SpatialFunction.values()).map(op -> op.toString().toLowerCase()).toList();
     private static final List<String> TEMPORAL =
-        Arrays.stream(TemporalFunction.values())
-            .map(op -> op.toString().toLowerCase())
-            .collect(Collectors.toUnmodifiableList());
+        Arrays.stream(TemporalFunction.values()).map(op -> op.toString().toLowerCase()).toList();
     private static final List<String> SCALAR =
         ImmutableList.of(
             "value", "list", "args", "eq", "neq", "gt", "gte", "lt", "lte", "between", "in",
@@ -98,37 +89,14 @@ public interface Operand extends CqlNode {
           }
           throw new JsonParseException(parser, "Interval has to be an array.");
         } else if (Objects.nonNull(node.get("bbox"))) {
-          return SpatialLiteral.of(oc.treeToValue(node, Geometry.Bbox.class));
+          return SpatialLiteral.of(oc.treeToValue(node, Bbox.class));
         } else if (Objects.nonNull(node.get("type"))) {
           final Optional<EpsgCrs> filterCrs = getFilterCrs(oc);
-          switch (node.get("type").asText()) {
-            case "Point":
-              final Coordinate coord1 = oc.treeToValue(node.get("coordinates"), Coordinate.class);
-              return SpatialLiteral.of(
-                  filterCrs.map(crs -> Point.of(crs, coord1)).orElse(Point.of(coord1)));
-            case "MultiPoint":
-              return SpatialLiteral.of(
-                  new ImmutableMultiPoint.Builder()
-                      .coordinates(
-                          getMultiPointCoordinates(oc, (ArrayNode) node.get("coordinates")))
-                      .crs(filterCrs)
-                      .build());
-            case "MultiLineString":
-              return SpatialLiteral.of(
-                  new ImmutableMultiLineString.Builder()
-                      .coordinates(
-                          getMultiLineStringCoordinates(oc, (ArrayNode) node.get("coordinates")))
-                      .crs(filterCrs)
-                      .build());
-            case "MultiPolygon":
-              return SpatialLiteral.of(
-                  new ImmutableMultiPolygon.Builder()
-                      .coordinates(
-                          getMultiPolygonCoordinates(oc, (ArrayNode) node.get("coordinates")))
-                      .crs(filterCrs)
-                      .build());
-            default:
-              return SpatialLiteral.of(oc.treeToValue(node, Geometry.class));
+          try {
+            return SpatialLiteral.of(
+                new GeometryDecoderJson().decode(node, filterCrs, Optional.empty()));
+          } catch (IOException e) {
+            throw new IllegalArgumentException("Error parsing CQL2-JSON geometry.", e);
           }
         } else if (Objects.nonNull(node.get("casei"))) {
           return Casei.of(getOperand(parser, node.get("casei"), parent));
@@ -144,8 +112,8 @@ public interface Operand extends CqlNode {
             list.add(getOperand(parser, listNode, "args"));
           }
           return Function.of(node.get("function").get("name").textValue(), list);
-        } else if (SPATIAL.contains(parent)) {
-          return SpatialLiteral.of(oc.treeToValue(node, Geometry.class));
+        } else if (Objects.nonNull(node.get("$parameter"))) {
+          return oc.treeToValue(node.get("$parameter"), Parameter.class);
         }
       } else if (node.isArray()) {
         if (TEMPORAL.contains(parent)) {
@@ -187,7 +155,7 @@ public interface Operand extends CqlNode {
       JsonStreamContext parent = parser.getParsingContext().getParent();
 
       // Get name of the parent key
-      String parentName = parent.getCurrentName().toLowerCase();
+      String parentName = Objects.requireNonNullElse(parent.getCurrentName(), "null").toLowerCase();
 
       return getOperand(parser, node, parentName);
     }
@@ -195,57 +163,16 @@ public interface Operand extends CqlNode {
     private Optional<EpsgCrs> getFilterCrs(ObjectCodec oc) throws JsonMappingException {
       InjectableValues iv = ((ObjectMapper) oc).getInjectableValues();
       if (Objects.nonNull(iv)) {
-        Object value = iv.findInjectableValue("filterCrs", null, null, null);
-        if (value instanceof EpsgCrs) {
-          return Optional.of((EpsgCrs) value);
+        try {
+          Object value = iv.findInjectableValue("filterCrs", null, null, null);
+          if (value instanceof EpsgCrs) {
+            return Optional.of((EpsgCrs) value);
+          }
+        } catch (Throwable e) {
+          // continue if filterCrs not found
         }
       }
       return Optional.of(OgcCrs.CRS84);
-    }
-
-    private Iterable<Point> getMultiPointCoordinates(ObjectCodec oc, ArrayNode coordinates)
-        throws JsonProcessingException {
-      Iterator<JsonNode> iter = coordinates.elements();
-      ImmutableList.Builder<Point> builder = ImmutableList.builder();
-      while (iter.hasNext()) {
-        builder.add(Point.of(oc.treeToValue(iter.next(), Coordinate.class)));
-      }
-      return builder.build();
-    }
-
-    private Iterable<LineString> getMultiLineStringCoordinates(
-        ObjectCodec oc, ArrayNode coordinates) throws JsonProcessingException {
-      Iterator<JsonNode> iter = coordinates.elements();
-      ImmutableList.Builder<LineString> builder = ImmutableList.builder();
-      while (iter.hasNext()) {
-        ImmutableLineString.Builder geomBuilder = new ImmutableLineString.Builder();
-        Iterator<JsonNode> iter2 = iter.next().elements();
-        while (iter2.hasNext()) {
-          geomBuilder.addCoordinates(oc.treeToValue(iter2.next(), Coordinate.class));
-        }
-        builder.add(geomBuilder.build());
-      }
-      return builder.build();
-    }
-
-    private Iterable<Polygon> getMultiPolygonCoordinates(ObjectCodec oc, ArrayNode coordinates)
-        throws JsonProcessingException {
-      Iterator<JsonNode> iter = coordinates.elements();
-      ImmutableList.Builder<Polygon> builder = ImmutableList.builder();
-      while (iter.hasNext()) {
-        ImmutablePolygon.Builder geomBuilder = new ImmutablePolygon.Builder();
-        Iterator<JsonNode> iter2 = iter.next().elements();
-        while (iter2.hasNext()) {
-          ImmutableList.Builder<Coordinate> coordBuilder = ImmutableList.builder();
-          Iterator<JsonNode> iter3 = iter2.next().elements();
-          while (iter3.hasNext()) {
-            coordBuilder.add(oc.treeToValue(iter3.next(), Coordinate.class));
-          }
-          geomBuilder.addCoordinates(coordBuilder.build());
-        }
-        builder.add(geomBuilder.build());
-      }
-      return builder.build();
     }
   }
 }

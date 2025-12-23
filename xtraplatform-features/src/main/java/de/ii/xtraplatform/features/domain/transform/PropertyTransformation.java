@@ -106,6 +106,26 @@ public interface PropertyTransformation
     return new ImmutablePropertyTransformation.Builder().from(this);
   }
 
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean onlyValueTransformations() {
+    return getRename().isEmpty()
+        && getRenamePathOnly().isEmpty()
+        && getRemove().isEmpty()
+        && getFlatten().isEmpty()
+        && getObjectReduceFormat().isEmpty()
+        && getObjectReduceSelect().isEmpty()
+        && getObjectRemoveSelect().isEmpty()
+        && getObjectMapFormat().isEmpty()
+        && getObjectMapDuplicate().isEmpty()
+        && getObjectAddConstants().isEmpty()
+        && getArrayReduceFormat().isEmpty()
+        && getCoalesce().isEmpty()
+        && getConcat().isEmpty()
+        && getWrap().isEmpty();
+  }
+
   /**
    * @langEn Rename a property.
    * @langDe Benennt die Eigenschaft auf den angegebenen Namen um.
@@ -278,6 +298,12 @@ public interface PropertyTransformation
    *     `null` ab. Diese Transformation ist nicht bei objektwertigen Eigenschaften anwendbar.
    */
   List<String> getNullify();
+
+  @JsonIgnore
+  @Value.Derived
+  default boolean isInternal() {
+    return getWrap().isPresent();
+  }
 
   @Override
   default PropertyTransformation mergeInto(PropertyTransformation source) {

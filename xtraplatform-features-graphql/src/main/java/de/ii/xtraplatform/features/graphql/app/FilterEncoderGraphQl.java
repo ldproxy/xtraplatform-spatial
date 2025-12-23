@@ -12,6 +12,7 @@ import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import com.google.common.primitives.Doubles;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
 import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
@@ -24,20 +25,14 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlVisitor;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry.Bbox;
-import de.ii.xtraplatform.cql.domain.Geometry.Coordinate;
-import de.ii.xtraplatform.cql.domain.Geometry.GeometryCollection;
-import de.ii.xtraplatform.cql.domain.Geometry.LineString;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiLineString;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiPoint;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiPolygon;
-import de.ii.xtraplatform.cql.domain.Geometry.Point;
-import de.ii.xtraplatform.cql.domain.Geometry.Polygon;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
+import de.ii.xtraplatform.cql.domain.Parameter;
+import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.SIntersects;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -314,54 +309,15 @@ public class FilterEncoderGraphQl {
     }
 
     @Override
-    public Map<String, String> visit(Coordinate coordinate, List<Map<String, String>> children) {
+    public Map<String, String> visit(PositionNode position, List<Map<String, String>> children) {
       throw new IllegalArgumentException(
           "Coordinates are not supported in filter expressions for GraphQL feature providers.");
     }
 
     @Override
-    public Map<String, String> visit(Point point, List<Map<String, String>> children) {
+    public Map<String, String> visit(GeometryNode geometry, List<Map<String, String>> children) {
       throw new IllegalArgumentException(
-          "Point geometries are not supported in filter expressions for GraphQL feature providers.");
-    }
-
-    @Override
-    public Map<String, String> visit(LineString lineString, List<Map<String, String>> children) {
-      throw new IllegalArgumentException(
-          "LineString geometries are not supported in filter expressions for GraphQL feature providers.");
-    }
-
-    @Override
-    public Map<String, String> visit(Polygon polygon, List<Map<String, String>> children) {
-      throw new IllegalArgumentException(
-          "Polygon geometries are not supported in filter expressions for GraphQL feature providers.");
-    }
-
-    @Override
-    public Map<String, String> visit(MultiPoint multiPoint, List<Map<String, String>> children) {
-      throw new IllegalArgumentException(
-          "MultiPoint geometries are not supported in filter expressions for GraphQL feature providers.");
-    }
-
-    @Override
-    public Map<String, String> visit(
-        GeometryCollection geometryCollection, List<Map<String, String>> children) {
-      throw new IllegalArgumentException(
-          "GeometryCollection geometries are not supported in filter expressions for GraphQL feature providers.");
-    }
-
-    @Override
-    public Map<String, String> visit(
-        MultiLineString multiLineString, List<Map<String, String>> children) {
-      throw new IllegalArgumentException(
-          "MultiLineString geometries are not supported in filter expressions for GraphQL feature providers.");
-    }
-
-    @Override
-    public Map<String, String> visit(
-        MultiPolygon multiPolygon, List<Map<String, String>> children) {
-      throw new IllegalArgumentException(
-          "MultiPolygon geometries are not supported in filter expressions for GraphQL feature providers.");
+          "Geometries are not supported in filter expressions for GraphQL feature providers.");
     }
 
     @Override
@@ -413,6 +369,14 @@ public class FilterEncoderGraphQl {
           String.format(
               "Booleans are not supported in filter expressions for GraphQL feature providers. Found: %s",
               booleanValue));
+    }
+
+    @Override
+    public Map<String, String> visit(Parameter parameter, List<Map<String, String>> children) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Parameters are not supported in filter expressions for GraphQL feature providers. Found: %s",
+              parameter.getName()));
     }
   }
 

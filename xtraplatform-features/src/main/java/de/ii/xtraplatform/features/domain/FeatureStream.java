@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nullable;
 import javax.ws.rs.BadRequestException;
@@ -29,7 +30,9 @@ import org.slf4j.LoggerFactory;
 public interface FeatureStream {
 
   enum PipelineSteps {
-    MAPPING,
+    MAPPING_SCHEMA,
+    MAPPING_VALUES,
+    GEOMETRY,
     COORDINATES,
     CLEAN,
     ETAG,
@@ -143,11 +146,25 @@ public interface FeatureStream {
     Optional<Throwable> getError();
   }
 
+  default CompletionStage<Result> runWith(
+      Sink<Object> sink, Map<String, PropertyTransformations> propertyTransformations) {
+    return runWith(sink, propertyTransformations, new CompletableFuture<>());
+  }
+
   CompletionStage<Result> runWith(
-      Sink<Object> sink, Map<String, PropertyTransformations> propertyTransformations);
+      Sink<Object> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata);
+
+  default <X> CompletionStage<ResultReduced<X>> runWith(
+      SinkReduced<Object, X> sink, Map<String, PropertyTransformations> propertyTransformations) {
+    return runWith(sink, propertyTransformations, new CompletableFuture<>());
+  }
 
   <X> CompletionStage<ResultReduced<X>> runWith(
-      SinkReduced<Object, X> sink, Map<String, PropertyTransformations> propertyTransformations);
+      SinkReduced<Object, X> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata);
 
   // CompletionStage<Result> runWith(SinkTransformed<Object, byte[]> sink,
   // Optional<PropertyTransformations> propertyTransformations);

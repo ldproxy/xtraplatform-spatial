@@ -12,7 +12,6 @@ import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureTokenType;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.MappingOperationResolver;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,13 +51,12 @@ public abstract class FeaturePropertyTransformerFlatten
   public List<Object> transform(String currentPropertyPath, List<Object> slice) {
     List<Object> transformed = new ArrayList<>();
     boolean isValue = false;
+    boolean isGeometry = false;
     int contextIndex = 0;
     boolean isArray = false;
     boolean isArrayEnd = false;
     boolean inArray = false;
     boolean isObject = false;
-    boolean isObjectEnd = false;
-    boolean inGeometry = false;
     Map<List<String>, Integer> arrays = new HashMap<>();
     List<String> arrayPath = null;
     List<String> currentPath = null;
@@ -66,26 +64,15 @@ public abstract class FeaturePropertyTransformerFlatten
     for (Object token : slice) {
       if (token instanceof FeatureTokenType) {
         isValue = Objects.equals(token, FeatureTokenType.VALUE);
+        isGeometry = Objects.equals(token, FeatureTokenType.GEOMETRY);
         contextIndex = 0;
         isArray = Objects.equals(token, FeatureTokenType.ARRAY);
         isArrayEnd = Objects.equals(token, FeatureTokenType.ARRAY_END);
         isObject = Objects.equals(token, FeatureTokenType.OBJECT);
-        isObjectEnd = Objects.equals(token, FeatureTokenType.OBJECT_END);
-      }
-
-      if (isObject && contextIndex == 2 && token instanceof SimpleFeatureGeometry) {
-        inGeometry = true;
-        transformed.add(FeatureTokenType.OBJECT);
-        transformed.add(currentPath);
       }
 
       if (contextIndex == 1 && token instanceof List) {
         currentPath = (List<String>) token;
-
-        if (inGeometry && isObjectEnd) {
-          transformed.add(currentPath);
-          inGeometry = false;
-        }
 
         if (isArray) {
           arrayPath = currentPath;
@@ -112,8 +99,8 @@ public abstract class FeaturePropertyTransformerFlatten
         }
       }
 
-      if (isValue || inGeometry) {
-        if (!inGeometry && contextIndex == 1 && token instanceof List) {
+      if (isValue || isGeometry) {
+        if (contextIndex == 1 && token instanceof List) {
           transformed.add(currentPath);
         } else {
           transformed.add(token);

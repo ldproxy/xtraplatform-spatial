@@ -10,12 +10,11 @@ package de.ii.xtraplatform.features.domain;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -30,20 +29,14 @@ public interface FeatureEventHandler<
 
     String pathAsString();
 
-    Optional<SimpleFeatureGeometry> geometryType();
-
-    OptionalInt geometryDimension();
-
     @Nullable
     String value();
 
     @Nullable
     Type valueType();
 
-    @Value.Default
-    default boolean inGeometry() {
-      return false;
-    }
+    @Nullable
+    Geometry<?> geometry();
 
     @Value.Default
     default boolean inObject() {
@@ -107,12 +100,7 @@ public interface FeatureEventHandler<
               : mapping().getSchemasForSourcePath(path);
 
       if (targetSchemas.isEmpty()) {
-        // LOGGER.warn("No mapping found for path {}.", path);
-
-        if (inGeometry()) {
-          return mapping().getTargetSchema().getPrimaryGeometry();
-        }
-
+        // No mapping found for path
         return Optional.empty();
       }
 
@@ -291,19 +279,11 @@ public interface FeatureEventHandler<
 
     ModifiableContext<T, U> setPathTracker(FeaturePathTracker pathTracker);
 
-    ModifiableContext<T, U> setGeometryType(SimpleFeatureGeometry geometryType);
-
-    ModifiableContext<T, U> setGeometryType(Optional<SimpleFeatureGeometry> geometryType);
-
-    ModifiableContext<T, U> setGeometryDimension(int geometryDimension);
-
-    ModifiableContext<T, U> setGeometryDimension(OptionalInt geometryDimension);
-
     ModifiableContext<T, U> setValue(String value);
 
     ModifiableContext<T, U> setValueType(SchemaBase.Type valueType);
 
-    ModifiableContext<T, U> setInGeometry(boolean inGeometry);
+    ModifiableContext<T, U> setGeometry(Geometry<?> geometry);
 
     ModifiableContext<T, U> setInObject(boolean inObject);
 
@@ -343,6 +323,8 @@ public interface FeatureEventHandler<
   void onArrayStart(V context);
 
   void onArrayEnd(V context);
+
+  void onGeometry(V context);
 
   void onValue(V context);
 }

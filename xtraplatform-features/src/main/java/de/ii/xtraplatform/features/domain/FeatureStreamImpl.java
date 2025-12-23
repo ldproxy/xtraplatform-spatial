@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.domain;
 
 import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerDateFormat.DATETIME_FORMAT;
-import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransformerDateFormat.DATE_FORMAT;
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
 import com.google.common.collect.ImmutableMap;
@@ -31,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 
@@ -43,7 +43,9 @@ public class FeatureStreamImpl implements FeatureStream {
   private final Map<String, Codelist> codelists;
   private final QueryRunner runner;
   private final boolean doTransform;
-  private final boolean stepMapping;
+  private final boolean stepMappingSchema;
+  private final boolean stepMappingValues;
+  private final boolean stepGeometry;
   private final boolean stepCoordinates;
   private final boolean stepClean;
   private final boolean stepEtag;
@@ -64,29 +66,37 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
-    this.stepMapping =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.MAPPING)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+
+    this.stepMappingSchema =
+        !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepMappingValues =
+        stepMappingSchema || !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_VALUES);
+    this.stepGeometry =
+        !query.skipPipelineSteps().contains(PipelineSteps.GEOMETRY)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepCoordinates =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.COORDINATES)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.COORDINATES)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepClean =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.CLEAN)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.CLEAN)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepEtag =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.ETAG)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.ETAG)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepMetadata =
-        !query.debugSkipPipelineSteps().contains(PipelineSteps.METADATA)
-            && !query.debugSkipPipelineSteps().contains(PipelineSteps.ALL);
+        !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
   @Override
   public CompletionStage<Result> runWith(
-      Sink<Object> sink, Map<String, PropertyTransformations> propertyTransformations) {
+      Sink<Object> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
 
     Map<String, PropertyTransformations> mergedTransformations =
-        getMergedTransformations(propertyTransformations);
+        getMergedTransformations(data.getTypes(), query, propertyTransformations);
 
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
@@ -116,7 +126,8 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
-          source = source.via(new FeatureTokenTransformerHasFeatures(resultBuilder));
+          source =
+              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
           Reactive.BasicStream<?, Void> basicStream =
               sink instanceof Reactive.SinkTransformed
@@ -147,10 +158,12 @@ public class FeatureStreamImpl implements FeatureStream {
 
   @Override
   public <X> CompletionStage<ResultReduced<X>> runWith(
-      SinkReduced<Object, X> sink, Map<String, PropertyTransformations> propertyTransformations) {
+      SinkReduced<Object, X> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
 
     Map<String, PropertyTransformations> mergedTransformations =
-        getMergedTransformations(propertyTransformations);
+        getMergedTransformations(data.getTypes(), query, propertyTransformations);
 
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
@@ -178,7 +191,8 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
-          source = source.via(new FeatureTokenTransformerHasFeatures(resultBuilder));
+          source =
+              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
           Reactive.BasicStream<?, X> basicStream =
               sink instanceof Reactive.SinkReducedTransformed
@@ -212,41 +226,50 @@ public class FeatureStreamImpl implements FeatureStream {
   private FeatureTokenSource getFeatureTokenSourceTransformed(
       FeatureTokenSource featureTokenSource,
       Map<String, PropertyTransformations> propertyTransformations) {
-    FeatureTokenTransformerMappings schemaMapper =
-        new FeatureTokenTransformerMappings(
-            propertyTransformations, codelists, data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
-
-    Optional<CrsTransformer> crsTransformer =
-        query
-            .getCrs()
-            .flatMap(
-                targetCrs ->
-                    crsTransformerFactory.getTransformer(
-                        data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
-
-    Optional<CrsTransformer> crsTransformerWgs84 =
-        query
-            .getCrs()
-            .flatMap(
-                targetCrs ->
-                    crsTransformerFactory.getTransformer(
-                        data.getNativeCrs().orElse(OgcCrs.CRS84),
-                        nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
-    FeatureTokenTransformerCoordinates valueMapper =
-        new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
-
-    FeatureTokenTransformerRemoveEmptyOptionals cleaner =
-        new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);
-
     FeatureTokenSource tokenSourceTransformed = featureTokenSource;
 
-    if (stepMapping) {
+    if (stepMappingSchema) {
+      FeatureTokenTransformerMappings schemaMapper =
+          new FeatureTokenTransformerMappings(
+              propertyTransformations,
+              codelists,
+              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
       tokenSourceTransformed = tokenSourceTransformed.via(schemaMapper);
-    }
-    if (stepCoordinates) {
+    } else if (stepMappingValues) {
+      FeatureTokenTransformerMappingValuesOnly valueMapper =
+          new FeatureTokenTransformerMappingValuesOnly(
+              propertyTransformations,
+              codelists,
+              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
       tokenSourceTransformed = tokenSourceTransformed.via(valueMapper);
     }
+    if (stepGeometry) {
+      FeatureTokenTransformerGeometry geometryMapper = new FeatureTokenTransformerGeometry();
+      tokenSourceTransformed = tokenSourceTransformed.via(geometryMapper);
+    }
+    if (stepCoordinates) {
+      Optional<CrsTransformer> crsTransformer =
+          query
+              .getCrs()
+              .flatMap(
+                  targetCrs ->
+                      crsTransformerFactory.getTransformer(
+                          data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
+      Optional<CrsTransformer> crsTransformerWgs84 =
+          query
+              .getCrs()
+              .flatMap(
+                  targetCrs ->
+                      crsTransformerFactory.getTransformer(
+                          data.getNativeCrs().orElse(OgcCrs.CRS84),
+                          nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
+      FeatureTokenTransformerCoordinates coordinatesMapper =
+          new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
+      tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
+    }
     if (stepClean) {
+      FeatureTokenTransformerRemoveEmptyOptionals cleaner =
+          new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);
       tokenSourceTransformed = tokenSourceTransformed.via(cleaner);
     }
     if (FeatureTokenValidator.LOGGER.isTraceEnabled()) {
@@ -256,27 +279,27 @@ public class FeatureStreamImpl implements FeatureStream {
     return tokenSourceTransformed;
   }
 
-  private Map<String, PropertyTransformations> getMergedTransformations(
+  static Map<String, PropertyTransformations> getMergedTransformations(
+      Map<String, FeatureSchema> featureSchemas,
+      Query query,
       Map<String, PropertyTransformations> propertyTransformations) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
-
+    if (query instanceof FeatureQuery featureQuery) {
       return ImmutableMap.of(
           featureQuery.getType(),
           getPropertyTransformations(
-              (FeatureQuery) query,
+              featureSchemas,
+              featureQuery,
               Optional.ofNullable(propertyTransformations.get(featureQuery.getType()))));
     }
 
-    if (query instanceof MultiFeatureQuery) {
-      MultiFeatureQuery multiFeatureQuery = (MultiFeatureQuery) query;
-
+    if (query instanceof MultiFeatureQuery multiFeatureQuery) {
       return multiFeatureQuery.getQueries().stream()
           .map(
               typeQuery ->
                   new SimpleImmutableEntry<>(
                       typeQuery.getType(),
                       getPropertyTransformations(
+                          featureSchemas,
                           typeQuery,
                           Optional.ofNullable(propertyTransformations.get(typeQuery.getType())))))
           .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -285,17 +308,21 @@ public class FeatureStreamImpl implements FeatureStream {
     return ImmutableMap.of();
   }
 
-  private PropertyTransformations getPropertyTransformations(
-      TypeQuery typeQuery, Optional<PropertyTransformations> propertyTransformations) {
-    FeatureSchema featureSchema = data.getTypes().get(typeQuery.getType());
-
+  static PropertyTransformations getPropertyTransformations(
+      Map<String, FeatureSchema> featureSchemas,
+      TypeQuery typeQuery,
+      Optional<PropertyTransformations> propertyTransformations) {
     if (typeQuery instanceof FeatureQuery
         && ((FeatureQuery) typeQuery).getSchemaScope() == SchemaBase.Scope.RECEIVABLE) {
-      return () -> getProviderTransformations(featureSchema, SchemaBase.Scope.RECEIVABLE);
+      return () ->
+          getProviderTransformations(
+              featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RECEIVABLE);
     }
 
     PropertyTransformations providerTransformations =
-        () -> getProviderTransformations(featureSchema, SchemaBase.Scope.RETURNABLE);
+        () ->
+            getProviderTransformations(
+                featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RETURNABLE);
 
     PropertyTransformations merged =
         propertyTransformations
@@ -305,7 +332,8 @@ public class FeatureStreamImpl implements FeatureStream {
     return applyRename(merged);
   }
 
-  private PropertyTransformations applyRename(PropertyTransformations propertyTransformations) {
+  private static PropertyTransformations applyRename(
+      PropertyTransformations propertyTransformations) {
     if (propertyTransformations.getTransformations().values().stream()
         .flatMap(Collection::stream)
         .anyMatch(propertyTransformation -> propertyTransformation.getRename().isPresent())) {
@@ -345,7 +373,7 @@ public class FeatureStreamImpl implements FeatureStream {
     return propertyTransformations;
   }
 
-  private Map<String, List<PropertyTransformation>> getProviderTransformations(
+  private static Map<String, List<PropertyTransformation>> getProviderTransformations(
       FeatureSchema featureSchema, SchemaBase.Scope scope) {
     return featureSchema
         .accept(
@@ -360,19 +388,16 @@ public class FeatureStreamImpl implements FeatureStream {
                     .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
   }
 
-  private java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
+  private static java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
       getProviderTransformationsForProperty(FeatureSchema schema, SchemaBase.Scope scope) {
     if (schema.getTransformations().isEmpty()) {
-      if (schema.isTemporal()) {
+      if (schema.isTemporal() && schema.getType() == SchemaBase.Type.DATETIME) {
         return java.util.stream.Stream.of(
             Map.entry(
                 schema.getFullPathAsString(),
                 List.of(
                     new ImmutablePropertyTransformation.Builder()
-                        .dateFormat(
-                            schema.getType() == SchemaBase.Type.DATETIME
-                                ? DATETIME_FORMAT
-                                : DATE_FORMAT)
+                        .dateFormat(DATETIME_FORMAT)
                         .build())));
       }
       return java.util.stream.Stream.empty();

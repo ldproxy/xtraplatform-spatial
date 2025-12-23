@@ -15,13 +15,14 @@ import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import de.ii.xtraplatform.strings.domain.StringTemplateFilters;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,8 +95,11 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
                     new SimpleEntry<>(
                         getNameWithoutRole(getPropertyName(property).get()), property))
             .collect(
-                ImmutableMap.toImmutableMap(
-                    Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first));
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (first, second) -> first,
+                    LinkedHashMap::new));
 
     List<String> required =
         visitedProperties.stream()
@@ -113,8 +117,11 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
   private Map<String, T> extractDefinitions(List<T> properties) {
     return extractDefinitions(properties.stream())
         .collect(
-            ImmutableMap.toImmutableMap(
-                def -> getPropertyName(def).get(), def -> def, (first, second) -> second));
+            Collectors.toMap(
+                def -> getPropertyName(def).get(),
+                def -> def,
+                (first, second) -> second,
+                LinkedHashMap::new));
   }
 
   protected Stream<T> extractDefinitions(Stream<T> properties) {
@@ -184,7 +191,12 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
                 property ->
                     new SimpleEntry<>(
                         getNameWithoutRole(getPropertyName(property).get()), property))
-            .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (first, second) -> first,
+                    LinkedHashMap::new));
 
     List<String> required =
         visitedProperties.stream()
@@ -209,6 +221,12 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
     if (schema.getConstraints().isPresent()) {
       objectSchema =
           withConstraints(objectSchema, schema.getConstraints().get(), schema, codelists);
+    }
+
+    if (!schema.receivable() && schema.returnable()) {
+      objectSchema = withReadOnly(objectSchema);
+    } else if (!schema.returnable() && schema.receivable()) {
+      objectSchema = withWriteOnly(objectSchema);
     }
 
     return objectSchema;
@@ -237,7 +255,8 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
             .map(r -> CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_HYPHEN, r))
             .or(() -> schema.getRefType().map(ignore -> "reference"))
             .or(() -> schema.getEmbeddedRole().map(Enum::name));
-    Optional<String> refCollectionId = schema.getRefType();
+    Optional<String> refCollectionId =
+        schema.getRefType().filter(refType -> !FeatureRefResolver.REF_TYPE_DYNAMIC.equals(refType));
     Optional<String> refUriTemplate =
         schema
             .getRefUriTemplate()
@@ -320,10 +339,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       case GEOMETRY:
         valueSchema =
             getSchemaForGeometry(
-                schema.getGeometryType().orElse(SimpleFeatureGeometry.ANY),
-                label,
-                description,
-                role);
+                schema.getGeometryType().orElse(GeometryType.ANY), label, description, role);
         break;
       case OBJECT:
       case OBJECT_ARRAY:
@@ -422,7 +438,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       Optional<String> codelistId);
 
   protected abstract T getSchemaForGeometry(
-      SimpleFeatureGeometry geometryType,
+      GeometryType geometryType,
       Optional<String> title,
       Optional<String> description,
       Optional<String> role);

@@ -16,6 +16,7 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.tiles.domain.Cache;
 import de.ii.xtraplatform.tiles.domain.Cache.Storage;
 import de.ii.xtraplatform.tiles.domain.TileGenerationSchema;
+import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
@@ -55,7 +56,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   private final Map<String, Map<String, List<TileMatrixSetLimits>>> dirty;
   private final Map<String, Set<String>> tileMatrixSets;
   private final Optional<TileMatrixSetRepository> tileMatrixSetRepository;
-  private final Optional<TileStorePartitions> partitions;
+  private final Optional<TileMatrixPartitions> partitions;
   private Tuple<TileStore, ResourceStore> staging;
 
   public TileStoreMulti(
@@ -65,7 +66,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
       Map<String, Map<String, TileGenerationSchema>> tileSchemas,
       Map<String, Set<String>> tileMatrixSets,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository,
-      Optional<TileStorePartitions> partitions) {
+      Optional<TileMatrixPartitions> partitions) {
     this.cacheStore = cacheStore;
     this.storage = storage;
     this.tileSetName = tileSetName;
@@ -279,7 +280,8 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
             tileSchemas,
             tileMatrixSets,
             tileMatrixSetRepository,
-            partitions)
+            partitions,
+            false)
         : new TileStorePlain(blobStore);
   }
 

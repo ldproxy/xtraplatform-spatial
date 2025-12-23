@@ -14,7 +14,8 @@ import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,7 +35,7 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
 
     String pathAsString();
 
-    Optional<SimpleFeatureGeometry> geometryType();
+    Optional<GeometryType> geometryType();
 
     OptionalInt geometryDimension();
 
@@ -44,10 +45,8 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
     @Nullable
     Type valueType();
 
-    @Value.Default
-    default boolean inGeometry() {
-      return false;
-    }
+    @Nullable
+    Geometry<?> geometry();
 
     @Value.Default
     default boolean inObject() {
@@ -140,19 +139,11 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
 
     ModifiableContext<T, U> setPathTracker(FeaturePathTracker pathTracker);
 
-    ModifiableContext<T, U> setGeometryType(SimpleFeatureGeometry geometryType);
-
-    ModifiableContext<T, U> setGeometryType(Optional<SimpleFeatureGeometry> geometryType);
-
-    ModifiableContext<T, U> setGeometryDimension(int geometryDimension);
-
-    ModifiableContext<T, U> setGeometryDimension(OptionalInt geometryDimension);
-
     ModifiableContext<T, U> setValue(String value);
 
     ModifiableContext<T, U> setValueType(Type valueType);
 
-    ModifiableContext<T, U> setInGeometry(boolean inGeometry);
+    ModifiableContext<T, U> setGeometry(Geometry<?> geometry);
 
     ModifiableContext<T, U> setInObject(boolean inObject);
 
@@ -197,6 +188,8 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
   void onArrayStart(V context);
 
   void onArrayEnd(V context);
+
+  void onGeometry(V context);
 
   void onValue(V context);
 }

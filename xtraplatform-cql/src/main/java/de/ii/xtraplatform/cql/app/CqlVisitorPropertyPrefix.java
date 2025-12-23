@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.cql.app;
 
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorCopy;
 import de.ii.xtraplatform.cql.domain.Property;
 import java.util.List;
 

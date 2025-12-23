@@ -50,7 +50,7 @@ public abstract class FeaturePropertyTransformerConcat
     }
 
     if (!isObject()) {
-      return transformValues(schema.getFullPath(), slice);
+      return transformValues(schema.getFullPath(), schema.isArray(), slice);
     }
 
     int min = findFirst(slice, pathAsList(currentPropertyPath), 0);

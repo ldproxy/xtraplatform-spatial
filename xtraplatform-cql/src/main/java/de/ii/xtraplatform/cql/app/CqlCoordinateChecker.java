@@ -8,9 +8,11 @@
 package de.ii.xtraplatform.cql.app;
 
 import com.google.common.collect.ImmutableList;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.CqlNode;
-import de.ii.xtraplatform.cql.domain.Geometry;
-import de.ii.xtraplatform.cql.domain.Geometry.GeometryCollection;
+import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
+import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.SpatialLiteral;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CoordinateTuple;
@@ -19,6 +21,17 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
+import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.GeometryCollection;
+import de.ii.xtraplatform.geometries.domain.LineString;
+import de.ii.xtraplatform.geometries.domain.MultiLineString;
+import de.ii.xtraplatform.geometries.domain.MultiPoint;
+import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.Point;
+import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.Position;
+import de.ii.xtraplatform.geometries.domain.PositionList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -64,65 +77,53 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
   }
 
   @Override
-  public Object visit(Geometry.Point point, List<Object> children) {
-    point.getCoordinates().forEach(coordinate -> coordinate.accept(this));
+  public Object visit(GeometryNode geometry2, List<Object> children) {
+    Geometry<?> geom = geometry2.getGeometry();
+    switch (geom.getType()) {
+      case POINT:
+        checkPosition(((Point) geom).getValue());
+        return null;
+      case LINE_STRING:
+        PositionList posList = ((LineString) geom).getValue();
+        IntStream.range(0, posList.getNumPositions()).forEach(i -> checkPosition(posList.get(i)));
+        return null;
+      case POLYGON:
+        ((Polygon) geom).getValue().forEach(ring -> GeometryNode.of(ring).accept(this));
+        return null;
+      case MULTI_POINT:
+        ((MultiPoint) geom).getValue().forEach(point -> GeometryNode.of(point).accept(this));
+        return null;
+      case MULTI_LINE_STRING:
+        ((MultiLineString) geom)
+            .getValue()
+            .forEach(lineString -> GeometryNode.of(lineString).accept(this));
+        return null;
+      case MULTI_POLYGON:
+        ((MultiPolygon) geom).getValue().forEach(polygon -> GeometryNode.of(polygon).accept(this));
+        return null;
+      case GEOMETRY_COLLECTION:
+        ((GeometryCollection) geom)
+            .getValue()
+            .forEach(geometry -> GeometryNode.of(geometry).accept(this));
+        return null;
+    }
     return null;
   }
 
   @Override
-  public Object visit(Geometry.LineString lineString, List<Object> children) {
-    lineString.getCoordinates().forEach(coordinate -> coordinate.accept(this));
-    return null;
-  }
-
-  @Override
-  public Object visit(Geometry.Polygon polygon, List<Object> children) {
-    polygon.getCoordinates().stream()
-        .flatMap(List::stream)
-        .forEach(coordinate -> coordinate.accept(this));
-    return null;
-  }
-
-  @Override
-  public Object visit(Geometry.MultiPoint multiPoint, List<Object> children) {
-    multiPoint.getCoordinates().stream().forEach(coordinate -> coordinate.accept(this));
-    return null;
-  }
-
-  @Override
-  public Object visit(Geometry.MultiLineString multiLineString, List<Object> children) {
-    multiLineString.getCoordinates().stream()
-        .map(Geometry::getCoordinates)
-        .flatMap(List::stream)
-        .forEach(coordinate -> coordinate.accept(this));
-    return null;
-  }
-
-  @Override
-  public Object visit(Geometry.MultiPolygon multiPolygon, List<Object> children) {
-    multiPolygon.getCoordinates().stream()
-        .map(Geometry::getCoordinates)
-        .flatMap(List::stream)
-        .flatMap(List::stream)
-        .forEach(coordinate -> coordinate.accept(this));
-    return null;
-  }
-
-  @Override
-  public Object visit(Geometry.Bbox bbox, List<Object> children) {
+  public Object visit(Bbox bbox, List<Object> children) {
     List<Double> doubles = bbox.getCoordinates();
-    Geometry.Coordinate ll;
-    Geometry.Coordinate ur;
-    ll = Geometry.Coordinate.of(doubles.get(0), doubles.get(1));
-    ur = Geometry.Coordinate.of(doubles.get(2), doubles.get(3));
-    visit(ll, ImmutableList.of());
-    visit(ur, ImmutableList.of());
+    Position ll = Position.ofXY(doubles.get(0), doubles.get(1));
+    Position ur = Position.ofXY(doubles.get(2), doubles.get(3));
+    visit(PositionNode.of(ll), ImmutableList.of());
+    visit(PositionNode.of(ur), ImmutableList.of());
 
     int axisWithWraparound = crsInfo.getAxisWithWraparound(filterCrs).orElse(-1);
     IntStream.range(0, 2)
         .forEach(
             axis -> {
-              if (axisWithWraparound != axis && ll.get(axis) > ur.get(axis))
+              if (axisWithWraparound != axis
+                  && ll.getCoordinates()[axis] > ur.getCoordinates()[axis])
                 throw new IllegalArgumentException(
                     String.format(
                         "The coordinates of the bounding box [[ %s ], [ %s ]] do not form a valid bounding box for coordinate reference system '%s'. The first value is larger than the second value for the %s axis.",
@@ -136,58 +137,56 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
   }
 
   @Override
-  public Object visit(GeometryCollection geometryCollection, List<Object> children) {
-    geometryCollection.getCoordinates().forEach(geom -> visit((Geometry<?>) geom, children));
+  public Object visit(PositionNode positionNode, List<Object> children) {
+    checkPosition(positionNode.getPosition());
     return null;
   }
 
-  @Override
-  public Object visit(Geometry.Coordinate coordinate, List<Object> children) {
-    checkCoordinate(coordinate, filterCrs);
+  private void checkPosition(Position pos) {
+    checkPosition(pos, filterCrs);
 
     crsTransformerFilterToNative.ifPresent(
         t -> {
-          CoordinateTuple transformed = t.transform(coordinate.get(0), coordinate.get(1));
+          CoordinateTuple transformed = t.transform(pos.x(), pos.y());
           if (Objects.isNull(transformed))
             throw new IllegalArgumentException(
                 String.format(
                     "Filter is invalid. Coordinate '%s' cannot be transformed to %s.",
-                    getCoordinatesAsString(coordinate), getCrsText(nativeCrs.get())));
-          checkCoordinate(
-              Geometry.Coordinate.of(transformed.getX(), transformed.getY()), nativeCrs.get());
+                    getCoordinatesAsString(pos), getCrsText(nativeCrs.get())));
+          checkPosition(Position.ofXY(transformed.getX(), transformed.getY()), nativeCrs.get());
         });
 
-    Geometry.Coordinate coordinateCrs84 = coordinate;
+    Position posCrs84 = pos;
     if (crsTransformerFilterToCrs84.isPresent()) {
-      CoordinateTuple transformed =
-          crsTransformerFilterToCrs84.get().transform(coordinate.get(0), coordinate.get(1));
+      CoordinateTuple transformed = crsTransformerFilterToCrs84.get().transform(pos.x(), pos.y());
       if (Objects.nonNull(transformed)) {
-        coordinateCrs84 = Geometry.Coordinate.of(transformed.getX(), transformed.getY());
+        posCrs84 = Position.ofXY(transformed.getX(), transformed.getY());
       }
     }
-    checkDomainOfValidity(coordinateCrs84, domainOfValidityFilter, getCrsText(filterCrs));
-    if (nativeCrs.isPresent())
-      checkDomainOfValidity(coordinateCrs84, domainOfValidityNative, getCrsText(nativeCrs.get()));
-
-    return null;
+    checkDomainOfValidity(posCrs84, domainOfValidityFilter, getCrsText(filterCrs));
+    if (nativeCrs.isPresent()) {
+      checkDomainOfValidity(posCrs84, domainOfValidityNative, getCrsText(nativeCrs.get()));
+    }
   }
 
-  private void checkCoordinate(Geometry.Coordinate coordinate, EpsgCrs crs) {
+  private void checkPosition(Position position, EpsgCrs crs) {
     // check each axis against the constraints specified in the CRS definition
     List<Optional<Double>> minimums = crsInfo.getAxisMinimums(crs);
     List<Optional<Double>> maximums = crsInfo.getAxisMaximums(crs);
-    IntStream.range(0, coordinate.size())
+    IntStream.range(0, position.getAxes() == Axes.XY | position.getAxes() == Axes.XYM ? 2 : 3)
+        .filter(i -> !Double.isNaN(position.getCoordinates()[i]))
+        .filter(i -> minimums.get(i).isPresent() || maximums.get(i).isPresent())
         .forEach(
             i -> {
               minimums
                   .get(i)
                   .ifPresent(
                       min -> {
-                        if (coordinate.get(i) < min)
+                        if (position.getCoordinates()[i] < min)
                           throw new IllegalArgumentException(
                               String.format(
                                   "The coordinate '%s' in the filter expression is invalid for %s. The value of the %s axis is smaller than the minimum value for the axis: %f.",
-                                  getCoordinatesAsString(coordinate),
+                                  getCoordinatesAsString(position),
                                   getCrsText(crs),
                                   AXES.get(i),
                                   min));
@@ -196,11 +195,11 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
                   .get(i)
                   .ifPresent(
                       max -> {
-                        if (coordinate.get(i) > max)
+                        if (position.getCoordinates()[i] > max)
                           throw new IllegalArgumentException(
                               String.format(
                                   "The coordinate '%s' in the filter expression is invalid for %s. The value of the %s axis is larger than the maximum value for the axis: %f.",
-                                  getCoordinatesAsString(coordinate),
+                                  getCoordinatesAsString(position),
                                   getCrsText(crs),
                                   AXES.get(i),
                                   max));
@@ -209,20 +208,18 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
   }
 
   private void checkDomainOfValidity(
-      Geometry.Coordinate coordinate, Optional<BoundingBox> domainOfValidity, String crsText) {
+      Position position, Optional<BoundingBox> domainOfValidity, String crsText) {
     // validate against the domain of validity of the CRS
     domainOfValidity.ifPresent(
         bboxCrs84 -> {
-          if (coordinate.get(0) < bboxCrs84.getXmin()
-              || coordinate.get(0) > bboxCrs84.getXmax()
-              || coordinate.get(1) < bboxCrs84.getYmin()
-              || coordinate.get(1) > bboxCrs84.getYmax()) {
+          if (position.x() < bboxCrs84.getXmin()
+              || position.x() > bboxCrs84.getXmax()
+              || position.y() < bboxCrs84.getYmin()
+              || position.y() > bboxCrs84.getYmax()) {
             throw new IllegalArgumentException(
                 String.format(
                     "A coordinate in the filter expression is outside the domain of validity of %s. The coordinate converted to WGS 84 longitude/latitude is [ %s ], the domain of validity is [ %s ].",
-                    crsText,
-                    getCoordinatesAsString(coordinate),
-                    getCoordinatesAsString(bboxCrs84)));
+                    crsText, getCoordinatesAsString(position), getCoordinatesAsString(bboxCrs84)));
           }
         });
   }
@@ -237,9 +234,9 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
     return String.format("the coordinate reference system '%s'", crs.toHumanReadableString());
   }
 
-  private String getCoordinatesAsString(Geometry.Coordinate coordinate) {
-    return coordinate.stream()
-        .map(c -> String.format(Locale.US, "%.2f", c))
+  private String getCoordinatesAsString(Position position) {
+    return Arrays.stream(position.getCoordinates())
+        .mapToObj(c -> String.format(Locale.US, "%.2f", c))
         .collect(Collectors.joining(", "));
   }
 

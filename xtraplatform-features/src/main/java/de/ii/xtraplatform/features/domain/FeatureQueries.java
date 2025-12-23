@@ -32,6 +32,10 @@ public interface FeatureQueries {
     return false;
   }
 
+  default boolean skipUnusedPipelineSteps() {
+    return false;
+  }
+
   default FeatureStream getFeatureStream(FeatureQuery query) {
     throw new UnsupportedOperationException();
   }

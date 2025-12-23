@@ -56,7 +56,7 @@ public class AggregateStatsQueryGenerator {
 
     String column =
         SqlQueryColumnOperations.getQualifiedColumnResolved(
-            spatialAlias, spatialColumn, sqlDialect, Set.of(Operation.WKB, Operation.WKT));
+            spatialAlias, spatialColumn, sqlDialect, Set.of(Operation.WKB, Operation.WKT), false);
     if (column.contains(" AS ") && !column.endsWith(")")) {
       column = column.substring(0, column.indexOf(" AS "));
     }

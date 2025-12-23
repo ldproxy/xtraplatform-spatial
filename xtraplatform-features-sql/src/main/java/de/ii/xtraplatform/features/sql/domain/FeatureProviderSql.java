@@ -97,7 +97,9 @@ import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
@@ -171,6 +173,12 @@ import org.threeten.extra.Interval;
  *     <p>### Dataset Changes
  *     <p>{@docVar:datasetChanges}
  *     <p>{@docTable:datasetChanges}
+ *     <p>### Query Generation
+ *     <p>Options for query generation.
+ *     <p>{@docTable:queryGeneration}
+ *     <p>### Query Processing
+ *     <p>Options for query processing.
+ *     <p>{@docTable:queryProcessing}
  *     <p>### Source Path Defaults
  *     <p>Defaults for the path expressions in `sourcePath`, also see [Source Path
  *     Syntax](#path-syntax).
@@ -201,13 +209,54 @@ import org.threeten.extra.Interval;
  *     <p>Additional columns for CRUD inserts can be set by adding `{inserts=columnName=value}`
  *     after the table name. The value may be a constant or a function, for example
  *     `{inserts=id=gen_random_uuid()&featuretype='type1'}`.
+ *     <p>Also regarding CRUD, if a property with `role: ID` does match the primary key of the main
+ *     table, but it should not be automatically generated on insert, add `{generated=false}` to the
+ *     `sourcePath` of that property.
  *     <p>All table and column names must be unquoted identifiers.
  *     <p>Arbitrary SQL expressions for values are supported, for example to apply function calls.
  *     As an example, this `[EXPRESSION]{sql=$T$.length+55.5}` (instead of just `length`) would add
  *     a fixed amount to the length column. The prefix `$T$` will be replaced with the table alias.
- *     <p>### Query Generation
- *     <p>Options for query generation.
- *     <p>{@docTable:queryGeneration}
+ *     <p>### CRUD
+ *     <p>If the features of this provider should be mutated via the API, `datasetChanges.mode` has
+ *     to be set to `CRUD`. Also consider the following paragraphs to understand which adjustments
+ *     to the mapping might be necessary for your use case.
+ *     <p>#### Table types
+ *     <p><code>
+ * - `main` Main tables represent the instances of a feature type. They are defined in the
+ *   upper-most `sourcePath` of a type.
+ * - `secondary` Secondary tables are connected to main tables via joins, either directly or
+ *   through a chain of secondary and/or junction tables.
+ * - `junction` Junction tables usually represent m:n relations. They mainly contain two foreign keys
+ *   of main and/or secondary tables.
+ *     </code>
+ *     <p>#### Primary keys
+ *     <p>It is expected that every main and secondary table has a primary key, and that the value
+ *     for the primary key is automatically generated on insert. Usually
+ *     `sourcePathDefaults.primaryKey` should match the primary key name from the database. If not
+ *     every table has the same primary key, it can be overridden, see [Source Path
+ *     Syntax](#source-path-syntax).
+ *     <p>In rare cases, when another column than the primary key is used in join conditions, the
+ *     `primaryKey` in the mapping needs to match that column and differ from the actual primary
+ *     key. An example would be a junction table that connects feature instances by id.
+ *     <p>#### Feature ids
+ *     <p>There are four variants for creating new feature ids on insert:
+ *     <p><code>
+ * - **Primary key, auto-generated** The `sourcePath` of the property with `role: ID` matches
+ *   the `primaryKey` and new values are automatically generated on insert by the database.
+ * - **Primary key, user-defined** The `sourcePath` of the property with `role: ID` matches the
+ *   `primaryKey` and has the flag `{generated=false}`, the value from the payload given by the
+ *   user is inserted.
+ * - **Other column, auto-generated** The `sourcePath` of the property with `role: ID` does not
+ *   match the `primaryKey`, and the `sourcePath` of the main table has a matching `inserts` flag
+ *   with a generation function, e.g. `{inserts=id=gen_random_uuid()'}` (see [Source Path Syntax](#source-path-syntax)).
+ * - **Other column, user-defined** The `sourcePath` of the property with `role: ID` does not match
+ *   the `primaryKey`, and the `sourcePath` of the main table does not have a matching `inserts`
+ *   flag, the value from the payload given by the user is inserted.
+ *     </code>
+ *     <p>#### Additional columns
+ *     <p>If an insert or update should set additional columns that are not mapped to any property,
+ *     use the `inserts` flag in `sourcePath` (see [Source Path Syntax](#source-path-syntax)), e.g.
+ *     `{inserts=id=gen_random_uuid()&featuretype='Street'}`.
  * @cfgPropertiesAdditionalDe ### Connection Info
  *     <p>Das Connection-Info-Objekt für SQL-Datenbanken wird wie folgt beschrieben:
  *     <p>{@docTable:connectionInfo}
@@ -217,6 +266,12 @@ import org.threeten.extra.Interval;
  *     <p>### Datensatzänderungen
  *     <p>{@docVar:datasetChanges}
  *     <p>{@docTable:datasetChanges}
+ *     <p>### Query-Generierung
+ *     <p>Optionen für die Query-Generierung in `queryGeneration`.
+ *     <p>{@docTable:queryGeneration}
+ *     <p>### Query-Verarbeitung
+ *     <p>Optionen für die Query-Verarbeitung in `queryProcessing`.
+ *     <p>{@docTable:queryProcessing}
  *     <p>### SQL-Pfad-Defaults
  *     <p>Defaults für die Pfad-Ausdrücke in `sourcePath`, siehe auch
  *     [SQL-Pfad-Syntax](#path-syntax).
@@ -253,14 +308,60 @@ import org.threeten.extra.Interval;
  *     <p>Zusätzliche Spalten für CRUD Inserts können durch den Zusatz `{inserts=Spaltenname=Wert}`
  *     nach dem Tabellennamen angegeben werden. Der Wert kann eine Konstante oder eine Funktion
  *     sein, z.B. `{inserts=id=gen_random_uuid()&featuretype='type1'}`.
+ *     <p>Auch im Hinblick auf CRUD: wenn eine Eigenschaft mit `role: ID` dem Primärschlüssel der
+ *     Haupttabelle entspricht, aber der Wert beim Einfügen nicht automatisch generiert werden soll,
+ *     dann ist für diese Eigenschaft in `sourcePath` das Flag `{generated=false}` anzugeben.
  *     <p>Alle Tabellen- und Spaltennamen müssen "unquoted Identifier" sein.
  *     <p>Beliebige SQL-Ausdrücke für Werte sind möglich, z.B. um Funktionsaufrufe anzuwenden. So
  *     würde z.B. dieser Ausdruck `[EXPRESSION]{sql=$T$.length+55.5}` (anstatt nur `length`) einen
  *     fixen Wert zur Längen-Spalte addieren. Der Präfix `$T$` wird durch den Tabellen-Alias
  *     ersetzt.
- *     <p>### Query-Generierung
- *     <p>Optionen für die Query-Generierung in `queryGeneration`.
- *     <p>{@docTable:queryGeneration}
+ *     <p>### CRUD
+ *     <p>Wenn die Features dieses Providers über die API verändert werden sollen, muss
+ *     `datasetChanges.mode` auf `CRUD` gesetzt werden. Außerdem sind die folgenden Absätze zu
+ *     beachten, um zu verstehen, welche Anpassungen am Mapping für den eigenen Anwendungsfall
+ *     notwendig sind.
+ *     <p>#### Tabellentypen
+ *     <p><code>
+ * - `main` Haupttabellen repräsentieren die Instanzen einer Objektart. Sie sind im
+ *   obersten `sourcePath` einer Objektart definiert.
+ * - `secondary` Sekundärtabellen sind über Joins mit Haupttabellen verbunden, entweder direkt
+ *   oder über eine Kette von Sekundär- und/oder Junction-Tabellen.
+ * - `junction` Junction-Tabellen repräsentieren in der Regel m:n-Beziehungen. Sie enthalten
+ *   hauptsächlich zwei Fremdschlüssel von Haupt- und/oder Sekundärtabellen.
+ *     </code>
+ *     <p>#### Primärschlüssel
+ *     <p>Es wird erwartet, dass jede Haupt- und Sekundärtabelle einen Primärschlüssel hat und dass
+ *     der Wert für den Primärschlüssel beim Einfügen automatisch generiert wird. In der Regel
+ *     sollte `sourcePathDefaults.primaryKey` dem Primärschlüssel aus der Datenbank entsprechen.
+ *     Wenn nicht jede Tabelle denselben Primärschlüssel hat, kann dieser überschrieben werden,
+ *     siehe [SQL-Pfad-Syntax](#sql-pfad-syntax).
+ *     <p>In seltenen Fällen, wenn in Join-Bedingungen eine andere Spalte als der Primärschlüssel
+ *     verwendet wird, muss der `primaryKey` im Mapping dieser Spalte entsprechen und sich vom
+ *     tatsächlichen Primärschlüssel unterscheiden. Ein Beispiel wäre eine Junction-Tabelle, die
+ *     Feature-Instanzen über deren Ids verbindet.
+ *     <p>#### Feature-Ids
+ *     <p>Es gibt vier Varianten, um bei Inserts neue Feature-Ids zu erzeugen:
+ *     <p><code>
+ * - **Primärschlüssel, automatisch generiert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht dem `primaryKey` und neue Werte werden beim Einfügen automatisch von der
+ *   Datenbank generiert.
+ * - **Primärschlüssel, benutzerdefiniert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht dem `primaryKey` und hat das Flag `{generated=false}`, der Wert aus dem
+ *   Payload wird eingefügt.
+ * - **Andere Spalte, automatisch generiert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat ein
+ *   entsprechendes `inserts`-Flag mit einer Generierungsfunktion, z.B.
+ *   `{inserts=id=gen_random_uuid()'}` (siehe [SQL-Pfad-Syntax](#sql-pfad-syntax)).
+ * - **Andere Spalte, benutzerdefiniert** Der `sourcePath` der Eigenschaft mit `role: ID`
+ *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat kein
+ *   entsprechendes `inserts`-Flag, der Wert aus der Nutzlast wird eingefügt.
+ *     </code>
+ *     <p>#### Zusätzliche Spalten
+ *     <p>Wenn bei einem Insert oder Update zusätzliche Spalten gesetzt werden sollen, die nicht auf
+ *     eine Eigenschaft abgebildet sind, kann das `inserts`-Flag in `sourcePath` verwendet werden
+ *     (siehe [SQL-Pfad-Syntax](#sql-pfad-syntax)), z.B.
+ *     `{inserts=id=gen_random_uuid()&featuretype='Strasse'}`.
  * @ref:cfgProperties {@link de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData}
  * @ref:connectionInfo {@link de.ii.xtraplatform.features.sql.domain.ImmutableConnectionInfoSql}
  * @ref:pool {@link de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings}
@@ -268,6 +369,8 @@ import org.threeten.extra.Interval;
  * @ref:sourcePathDefaults {@link de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults}
  * @ref:queryGeneration {@link
  *     de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings}
+ * @ref:queryProcessing {@link
+ *     de.ii.xtraplatform.features.sql.domain.ImmutableQueryProcessorSettings}
  * @ref:datasetChanges2 {@link
  *     de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.DatasetChangeSettings}
  */
@@ -305,6 +408,13 @@ import org.threeten.extra.Interval;
           name = "queryGeneration",
           rows = {
             @DocStep(type = Step.TAG_REFS, params = "{@ref:queryGeneration}"),
+            @DocStep(type = Step.JSON_PROPERTIES)
+          },
+          columnSet = ColumnSet.JSON_PROPERTIES),
+      @DocTable(
+          name = "queryProcessing",
+          rows = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:queryProcessing}"),
             @DocStep(type = Step.JSON_PROPERTIES)
           },
           columnSet = ColumnSet.JSON_PROPERTIES),
@@ -422,6 +532,7 @@ public class FeatureProviderSql
     this.scheduler = scheduler;
     this.subdecoders = subdecoders;
     this.cronJob = null;
+    this.tableSchemas = null;
   }
 
   private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
@@ -714,14 +825,19 @@ public class FeatureProviderSql
   public Map<String, List<SchemaSql>> getSourceSchemas() {
     QuerySchemaDeriver querySchemaDeriver = new QuerySchemaDeriver(pathParser3);
 
-    this.tableSchemas =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    Map.entry(
-                        entry.getKey(),
-                        entry.getValue().accept(WITH_SCOPE_RETURNABLE).accept(querySchemaDeriver)))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    if (this.tableSchemas == null) {
+      this.tableSchemas =
+          getData().getTypes().entrySet().stream()
+              .map(
+                  entry ->
+                      Map.entry(
+                          entry.getKey(),
+                          entry
+                              .getValue()
+                              .accept(WITH_SCOPE_RETURNABLE)
+                              .accept(querySchemaDeriver)))
+              .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    }
 
     return this.tableSchemas;
   }
@@ -763,37 +879,41 @@ public class FeatureProviderSql
   protected FeatureTokenDecoder<
           SqlRow, FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
-
+    if (query instanceof FeatureQuery featureQuery) {
       List<SqlQueryMapping> sqlQueryMappings = queryMappings.get(featureQuery.getType());
 
-      return new FeatureDecoderSql(
-          mappings,
-          sqlQueryMappings,
-          query,
-          subdecoders,
-          getData().getQueryGeneration().getGeometryAsWkb());
+      return createDecoder(query, mappings, sqlQueryMappings);
     }
 
-    if (query instanceof MultiFeatureQuery) {
-      MultiFeatureQuery multiFeatureQuery = (MultiFeatureQuery) query;
-
+    if (query instanceof MultiFeatureQuery multiFeatureQuery) {
       List<SqlQueryMapping> sqlQueryMappings =
           multiFeatureQuery.getQueries().stream()
               .flatMap(typeQuery -> queryMappings.get(typeQuery.getType()).stream())
               .collect(Collectors.toList());
-      ;
 
-      return new FeatureDecoderSql(
-          mappings,
-          sqlQueryMappings,
-          query,
-          subdecoders,
-          getData().getQueryGeneration().getGeometryAsWkb());
+      return createDecoder(query, mappings, sqlQueryMappings);
     }
 
     throw new IllegalArgumentException();
+  }
+
+  private FeatureTokenDecoder<
+          SqlRow, FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
+      createDecoder(
+          Query query,
+          Map<String, SchemaMapping> mappings,
+          List<SqlQueryMapping> sqlQueryMappings) {
+    return new FeatureDecoderSql(
+        mappings,
+        sqlQueryMappings,
+        query,
+        subdecoders,
+        getData().getQueryGeneration().getGeometryAsWkb(),
+        getWkbDialect());
+  }
+
+  protected WkbDialect getWkbDialect() {
+    return WkbDialect.SQL_MM;
   }
 
   @Override
@@ -826,9 +946,6 @@ public class FeatureProviderSql
       return false;
     }
     if (!getData().getDatasetChanges().isModeCrud()) {
-      LOGGER.warn(
-          "Feature provider with id '{}' does not support mutations: datasetChanges.mode is not 'CRUD'",
-          getId());
       return false;
     }
 
@@ -1103,9 +1220,12 @@ public class FeatureProviderSql
 
   @Override
   public MutationResult createFeatures(
-      String featureType, FeatureTokenSource featureTokenSource, EpsgCrs crs) {
+      String featureType,
+      FeatureTokenSource featureTokenSource,
+      EpsgCrs crs,
+      Optional<String> featureId) {
 
-    return writeFeatures(featureType, featureTokenSource, Optional.empty(), crs, false);
+    return writeFeatures(Type.CREATE, featureType, featureTokenSource, featureId, crs, false);
   }
 
   @Override
@@ -1115,7 +1235,13 @@ public class FeatureProviderSql
       FeatureTokenSource featureTokenSource,
       EpsgCrs crs,
       boolean partial) {
-    return writeFeatures(featureType, featureTokenSource, Optional.of(featureId), crs, partial);
+    return writeFeatures(
+        partial ? Type.UPDATE : Type.REPLACE,
+        featureType,
+        featureTokenSource,
+        Optional.of(featureId),
+        crs,
+        partial);
   }
 
   @Override
@@ -1143,7 +1269,38 @@ public class FeatureProviderSql
     return deletionStream.run().toCompletableFuture().join();
   }
 
+  @Override
+  public boolean hasGeneratedId(String featureType) {
+    Optional<List<SqlQueryMapping>> queryMapping =
+        Optional.ofNullable(queryMappings.get(featureType));
+
+    if (queryMapping.isPresent()) {
+      return queryMapping.get().stream()
+          .allMatch(
+              mapping -> {
+                if (mapping.getColumnForId().isPresent() && mapping.getSchemaForId().isPresent()) {
+                  String primaryKey = mapping.getColumnForId().get().first().getPrimaryKey();
+                  String idColumn = mapping.getColumnForId().get().second().getName();
+
+                  if (!Objects.equals(primaryKey, idColumn)) {
+                    return false;
+                  }
+
+                  return !mapping
+                      .getColumnForId()
+                      .get()
+                      .second()
+                      .hasOperation(Operation.DO_NOT_GENERATE);
+                }
+                return true;
+              });
+    }
+
+    return true;
+  }
+
   private MutationResult writeFeatures(
+      Type type,
       String featureType,
       FeatureTokenSource featureTokenSource,
       Optional<String> featureId,
@@ -1158,20 +1315,18 @@ public class FeatureProviderSql
     }
 
     Transformer<FeatureDataSql, String> featureWriter =
-        featureId.isPresent()
-            ? featureMutationsSql.getUpdaterFlow(
-                queryMapping.get().get(0), null, featureId.get(), crs)
-            : featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, crs);
+        type == Type.CREATE
+            ? featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, featureId, crs)
+            : featureMutationsSql.getUpdaterFlow(
+                queryMapping.get().get(0), null, featureId.get(), crs);
 
     ImmutableMutationResult.Builder builder =
-        ImmutableMutationResult.builder()
-            .type(featureId.isPresent() ? partial ? Type.UPDATE : Type.REPLACE : Type.CREATE)
-            .hasFeatures(false);
+        ImmutableMutationResult.builder().type(type).hasFeatures(false);
     FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
 
     Source<FeatureDataSql> featureSqlSource =
         featureTokenSource
-            // TODO: Simple .via(statsCollector)
+            .via(statsCollector)
             .via(
                 new FeatureEncoderSql(
                     queryMapping.get().get(0),
@@ -1197,10 +1352,17 @@ public class FeatureProviderSql
             .withResult((Builder) builder)
             .handleError(
                 (result, throwable) -> {
-                  Throwable error =
-                      throwable instanceof PSQLException || throwable instanceof JsonParseException
-                          ? new IllegalArgumentException(throwable.getMessage())
-                          : throwable;
+                  Throwable error = throwable;
+
+                  if (throwable instanceof PSQLException
+                      || throwable instanceof JsonParseException) {
+                    error =
+                        new IllegalArgumentException(
+                            "Invalid feature data. You may be able to obtain more information about the problem by adding the header ‘Prefer: handling=strict’ to the request.",
+                            throwable);
+                    LogContext.errorAsDebug(LOGGER, throwable, "Error during feature mutation");
+                  }
+
                   return result.error(error);
                 })
             .handleItem((Builder::addIds))
@@ -1318,6 +1480,14 @@ public class FeatureProviderSql
   @Override
   public boolean supportsIsNull() {
     return true;
+  }
+
+  @Override
+  public boolean skipUnusedPipelineSteps() {
+    if (Objects.nonNull(getData().getQueryProcessing())) {
+      return getData().getQueryProcessing().getSkipUnusedPipelineSteps();
+    }
+    return false;
   }
 
   @Override

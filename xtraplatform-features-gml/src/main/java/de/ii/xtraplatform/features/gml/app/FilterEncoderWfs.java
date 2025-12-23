@@ -14,6 +14,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Doubles;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
+import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
 import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
@@ -27,15 +28,7 @@ import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlVisitor;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
-import de.ii.xtraplatform.cql.domain.Geometry.Bbox;
-import de.ii.xtraplatform.cql.domain.Geometry.Coordinate;
-import de.ii.xtraplatform.cql.domain.Geometry.GeometryCollection;
-import de.ii.xtraplatform.cql.domain.Geometry.LineString;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiLineString;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiPoint;
-import de.ii.xtraplatform.cql.domain.Geometry.MultiPolygon;
-import de.ii.xtraplatform.cql.domain.Geometry.Point;
-import de.ii.xtraplatform.cql.domain.Geometry.Polygon;
+import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.Gt;
 import de.ii.xtraplatform.cql.domain.Gte;
 import de.ii.xtraplatform.cql.domain.In;
@@ -46,6 +39,8 @@ import de.ii.xtraplatform.cql.domain.Lt;
 import de.ii.xtraplatform.cql.domain.Lte;
 import de.ii.xtraplatform.cql.domain.Not;
 import de.ii.xtraplatform.cql.domain.Or;
+import de.ii.xtraplatform.cql.domain.Parameter;
+import de.ii.xtraplatform.cql.domain.PositionNode;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
 import de.ii.xtraplatform.cql.domain.SpatialFunction;
@@ -380,52 +375,15 @@ public class FilterEncoderWfs {
     }
 
     @Override
-    public FesExpression visit(Coordinate coordinate, List<FesExpression> children) {
+    public FesExpression visit(PositionNode position, List<FesExpression> children) {
       throw new IllegalArgumentException(
-          "Coordinates are not supported in filter expressions for WFS feature providers.");
+          "Positions are not supported in filter expressions for WFS feature providers.");
     }
 
     @Override
-    public FesExpression visit(Point point, List<FesExpression> children) {
+    public FesExpression visit(GeometryNode geometry, List<FesExpression> children) {
       throw new IllegalArgumentException(
-          "Point geometries are not supported in filter expressions for WFS feature providers.");
-    }
-
-    @Override
-    public FesExpression visit(LineString lineString, List<FesExpression> children) {
-      throw new IllegalArgumentException(
-          "LineString geometries are not supported in filter expressions for WFS feature providers.");
-    }
-
-    @Override
-    public FesExpression visit(Polygon polygon, List<FesExpression> children) {
-      throw new IllegalArgumentException(
-          "Polygon geometries are not supported in filter expressions for WFS feature providers.");
-    }
-
-    @Override
-    public FesExpression visit(MultiPoint multiPoint, List<FesExpression> children) {
-      throw new IllegalArgumentException(
-          "MultiPoint geometries are not supported in filter expressions for WFS feature providers.");
-    }
-
-    @Override
-    public FesExpression visit(MultiLineString multiLineString, List<FesExpression> children) {
-      throw new IllegalArgumentException(
-          "MultiLineString geometries are not supported in filter expressions for WFS feature providers.");
-    }
-
-    @Override
-    public FesExpression visit(MultiPolygon multiPolygon, List<FesExpression> children) {
-      throw new IllegalArgumentException(
-          "MultiPolygon geometries are not supported in filter expressions for WFS feature providers.");
-    }
-
-    @Override
-    public FesExpression visit(
-        GeometryCollection geometryCollection, List<FesExpression> children) {
-      throw new IllegalArgumentException(
-          "GeometryCollection geometries are not supported in filter expressions for WFS feature providers.");
+          "Geometries are not supported in filter expressions for WFS feature providers.");
     }
 
     @Override
@@ -460,6 +418,14 @@ public class FilterEncoderWfs {
       FesLiteral literal0 = new FesLiteral("0");
       FesLiteral literal1 = new FesLiteral("1");
       return new FesPropertyIsEqualTo(literal0, literal1);
+    }
+
+    @Override
+    public FesExpression visit(Parameter parameter, List<FesExpression> children) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Parameters are not supported in filter expressions for WFS feature providers. Found: %s",
+              parameter.getName()));
     }
   }
 }

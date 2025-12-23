@@ -20,7 +20,7 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEncodingEnabled;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
-import de.ii.xtraplatform.geometries.domain.SimpleFeatureGeometry;
+import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.List;
 import java.util.Map;
@@ -181,15 +181,21 @@ public interface FeatureSchema
   /**
    * @langEn The specific geometry type for properties with `type: GEOMETRY`. Possible values are
    *     simple feature geometry types: `POINT`, `MULTI_POINT`, `LINE_STRING`, `MULTI_LINE_STRING`,
-   *     `POLYGON`, `MULTI_POLYGON`, `GEOMETRY_COLLECTION` and `ANY`
+   *     `POLYGON`, `MULTI_POLYGON`, `GEOMETRY_COLLECTION` and `ANY`. In addition, for feature
+   *     formats that support more complex geometries, the types `ANY_EXTENDED`, `CIRCULAR_STRING`,
+   *     `COMPOUND_CURVE`, `CURVE_POLYGON`, `MULTI_CURVE`, `MULTI_SURFACE` and `POLYHEDRAL_SURFACE`
+   *     are available.
    * @langDe Mit der Angabe kann der Geometrietype spezifiziert werden. Die Angabe ist nur bei
    *     Geometrieeigenschaften (`type: GEOMETRY`) relevant. Erlaubt sind die
    *     Simple-Feature-Geometrietypen, d.h. `POINT`, `MULTI_POINT`, `LINE_STRING`,
    *     `MULTI_LINE_STRING`, `POLYGON`, `MULTI_POLYGON`, `GEOMETRY_COLLECTION` und `ANY`.
+   *     Zusätzlich können für Formate, die komplexere Geometrien unterstützen auch die Typen
+   *     `ANY_EXTENDED`, `CIRCULAR_STRING`, `COMPOUND_CURVE`, `CURVE_POLYGON`, `MULTI_CURVE`,
+   *     `MULTI_SURFACE` und `POLYHEDRAL_SURFACE` verwendet werden.
    * @default null
    */
   @Override
-  Optional<SimpleFeatureGeometry> getGeometryType();
+  Optional<GeometryType> getGeometryType();
 
   /**
    * @langEn Optional name for an object type, used for example in JSON Schema. For properties that
@@ -330,7 +336,11 @@ public interface FeatureSchema
   @Value.Derived
   @Value.Auxiliary
   default boolean receivable() {
-    return !isConstant() && !getExcludedScopes().contains(Scope.RECEIVABLE);
+    return !isConstant()
+        && !isId()
+        && !getExcludedScopes().contains(Scope.RECEIVABLE)
+        && !isMultiSource()
+        && getTransformations().stream().allMatch(PropertyTransformation::isInternal);
   }
 
   @JsonIgnore

@@ -10,8 +10,10 @@ package de.ii.xtraplatform.features.sql.domain;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.ImmutableMutationResult.Builder;
-import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.features.domain.Tuple;
+import de.ii.xtraplatform.geometries.domain.Geometry;
+import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -27,10 +29,10 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
   private final EpsgCrs crs;
   private int axis = 0;
   private int dim = 2;
-  private String xmin = "";
-  private String ymin = "";
-  private String xmax = "";
-  private String ymax = "";
+  private Double xmin = null;
+  private Double ymin = null;
+  private Double xmax = null;
+  private Double ymax = null;
   private String start = "";
   private String end = "";
 
@@ -40,7 +42,7 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
   }
 
   @Override
-  public void onStart(ModifiableContext<SchemaSql, SchemaMappingSql> context) {
+  public void onStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     // TODO: get crs
     this.dim = context.geometryDimension().orElse(2);
 
@@ -48,15 +50,9 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
   }
 
   @Override
-  public void onEnd(ModifiableContext<SchemaSql, SchemaMappingSql> context) {
-    if (!xmin.isEmpty() && !ymin.isEmpty() && !xmax.isEmpty() && !ymax.isEmpty()) {
-      builder.spatialExtent(
-          BoundingBox.of(
-              Double.parseDouble(xmin),
-              Double.parseDouble(ymin),
-              Double.parseDouble(xmax),
-              Double.parseDouble(ymax),
-              crs));
+  public void onEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
+    if (xmin != null && ymin != null && xmax != null && ymax != null) {
+      builder.spatialExtent(BoundingBox.of(xmin, ymin, xmax, ymax, crs));
     }
 
     if (!start.isEmpty() || !end.isEmpty()) {
@@ -81,37 +77,22 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
   }
 
   @Override
-  public void onValue(ModifiableContext<SchemaSql, SchemaMappingSql> context) {
+  public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     if (Objects.nonNull(context.value())) {
       String value = context.value();
 
-      if (context.inGeometry()) {
-        if (axis == 0 && (xmin.isEmpty() || value.compareTo(xmin) < 0)) {
-          this.xmin = value;
-        }
-        if (axis == 0 && (xmax.isEmpty() || value.compareTo(xmax) > 0)) {
-          this.xmax = value;
-        }
-        if (axis == 1 && (ymin.isEmpty() || value.compareTo(ymin) < 0)) {
-          this.ymin = value;
-        }
-        if (axis == 1 && (ymax.isEmpty() || value.compareTo(ymax) > 0)) {
-          this.ymax = value;
-        }
-
-        this.axis = (axis + 1) % dim;
-      } else if (context.schema().filter(SchemaBase::isPrimaryInstant).isPresent()) {
+      if (hasRole(context, Role.PRIMARY_INSTANT)) {
         if (start.isEmpty() || value.compareTo(start) < 0) {
           this.start = value;
         }
         if (end.isEmpty() || value.compareTo(end) > 0) {
           this.end = value;
         }
-      } else if (context.schema().filter(SchemaBase::isPrimaryIntervalStart).isPresent()) {
+      } else if (hasRole(context, Role.PRIMARY_INTERVAL_START)) {
         if (start.isEmpty() || value.compareTo(start) < 0) {
           this.start = value;
         }
-      } else if (context.schema().filter(SchemaBase::isPrimaryIntervalEnd).isPresent()) {
+      } else if (hasRole(context, Role.PRIMARY_INTERVAL_END)) {
         if (end.isEmpty() || value.compareTo(end) > 0) {
           this.end = value;
         }
@@ -119,5 +100,30 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
     }
 
     super.onValue(context);
+  }
+
+  @Override
+  public void onGeometry(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
+    if (Objects.nonNull(context.geometry())) {
+      Geometry<?> value = context.geometry();
+
+      double[][] minMax = value.accept(new MinMaxDeriver());
+      if (minMax.length > 1 && minMax[0].length >= dim && minMax[1].length >= dim) {
+        this.xmin = minMax[0][0];
+        this.xmax = minMax[1][0];
+        this.ymin = minMax[0][1];
+        this.ymax = minMax[1][1];
+      }
+    }
+
+    super.onGeometry(context);
+  }
+
+  private boolean hasRole(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context, Role role) {
+    return context
+        .mapping()
+        .getSchemaForRole(role)
+        .filter(schema -> Objects.equals(schema.getFullPathAsString(), context.pathAsString()))
+        .isPresent();
   }
 }

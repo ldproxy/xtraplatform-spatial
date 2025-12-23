@@ -65,11 +65,13 @@ import org.slf4j.LoggerFactory;
  * @title PostGIS Tiles
  * @langEn Optimized vector tile generation using `ST_AsMVT` from PostGIS.
  * @langDe Optimierte Generierung von Vektor-Kacheln mit `ST_AsMVT` von PostGIS.
- * @scopeEn It is highly recommended to enable this extension for simple mappings (see limitations).
- *     That will speed up vector tile generation roughly by a factor of 4.
- * @scopeDe Es wird stark empfohlen, diese Erweiterung für einfache Mappings zu aktivieren (siehe
- *     Limitierungen). Dadurch wird die Generierung von Vektor-Kacheln ca. um den Faktor 4
- *     beschleunigt.
+ * @scopeEn Enabling this extension might speed up vector tile generation for simple mappings (see
+ *     limitations). The actual speedup depends on the resources available on the application and
+ *     database servers, since part of the workload is shifted from the application to the database.
+ * @scopeDe Die Aktivierung dieser Erweiterung kann die Generierung von Vektor-Kacheln für einfache
+ *     Mappings (siehe Einschränkungen) beschleunigen. Die tatsächliche Beschleunigung hängt von den
+ *     auf den Anwendungs- und Datenbankservern verfügbaren Ressourcen ab, da ein Teil der
+ *     Arbeitslast von der Anwendung auf die Datenbank verschoben wird.
  * @limitationsEn Only simple value properties are supported. That means no objects, arrays,
  *     transformations or joins. Such properties may be excluded from the generated tiles, see
  *     option `unsupportedProperties`. The native CRS must not have a forced axis order.

@@ -75,6 +75,17 @@ public interface FeatureProviderSqlData
   @Nullable
   QueryGeneratorSettings getQueryGeneration();
 
+  /**
+   * @langEn Options for query processing, for details see [Query
+   *     Processing](10-sql.md#query-processing) below.
+   * @langDe Einstellungen für die Query-Verarbeitung, für Details siehe
+   *     [Query-Verarbeitung](10-sql.md#query-processing).
+   * @since v4.6
+   */
+  @DocMarker("specific")
+  @Nullable
+  QueryProcessorSettings getQueryProcessing();
+
   // for json ordering
   @Override
   BuildableMap<FeatureSchema, ImmutableFeatureSchema.Builder> getTypes();
@@ -193,21 +204,49 @@ public interface FeatureProviderSqlData
 
     /**
      * @langEn Encoding of the returned geometries, either Well-Known Text (WKT) or Well-Known
-     *     Binary (WKB).
+     *     Binary (WKB). WKB is the default encoding since v4.5.
      * @langDe Kodierung der zurückgegebenen Geometrien, entweder Well-Known Text (WKT) oder
-     *     Well-Known Binary (WKB).
-     * @default WKT
+     *     Well-Known Binary (WKB). WKB ist die Standardkodierung seit v4.5.
+     * @default WKB
      * @since v4.4
      */
     @Value.Default
     default GeometryEncoding getGeometryEncoding() {
-      return GeometryEncoding.WKT;
+      return GeometryEncoding.WKB;
     }
 
     @JsonIgnore
     @Value.Lazy
     default boolean getGeometryAsWkb() {
       return getGeometryEncoding() == GeometryEncoding.WKB;
+    }
+  }
+
+  @Value.Immutable
+  @JsonDeserialize(builder = ImmutableQueryProcessorSettings.Builder.class)
+  interface QueryProcessorSettings {
+
+    /**
+     * @langEn Skip unused pipeline steps in the feature stream processing. If set to true, steps
+     *     that are not required to fulfil the request (e.g. coordinate processing, if no coordinate
+     *     transformation or specific coordinate precision is needed) are skipped. This can improve
+     *     performance depending on the query and the capabilities used in the feature provider. For
+     *     now the default is `false`, but the default may change to `true`, if experience shows
+     *     that the option does not have side effects.
+     * @langDe Überspringen Sie nicht verwendete Pipeline-Schritte in der
+     *     Feature-Stream-Verarbeitung. Wenn diese Option auf `true` gesetzt ist, werden Schritte
+     *     übersprungen, die zur Erfüllung der Query nicht erforderlich sind (z. B.
+     *     Koordinatenverarbeitung, wenn keine Koordinatentransformation oder bestimmte
+     *     Koordinatengenauigkeit erforderlich ist). Dies kann die Leistung je nach Query und den im
+     *     Feature-Provider verwendeten Möglichkeiten verbessern. Derzeit ist die
+     *     Standardeinstellung `false`, aber die Standardeinstellung kann sich zu `true` ändern,
+     *     wenn die Erfahrung zeigt, dass die Option keine Nebenwirkungen hat.
+     * @since v4.6
+     * @default false
+     */
+    @Value.Default
+    default boolean getSkipUnusedPipelineSteps() {
+      return false;
     }
   }
 

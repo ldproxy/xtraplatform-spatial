@@ -96,6 +96,23 @@ public interface SeedingOptions {
     return !Objects.equals(getRunOnDatasetChange(), false);
   }
 
+  /**
+   * @langEn If disabled, the seeding will not run on feature change events. See [Dataset
+   *     Changes](../feature/10-sql.md#dataset-changes).
+   * @langDe Steuert, ob das Seeding bei Feature Change Events ausgeführt wird. Siehe
+   *     [Datensatzänderungen](../feature/10-sql.md#dataset-changes).
+   * @since v4.5
+   * @default true
+   */
+  @Nullable
+  Boolean getRunOnFeatureChange();
+
+  @Value.Lazy
+  @JsonIgnore
+  default boolean shouldRunOnFeatureChange() {
+    return !Objects.equals(getRunOnFeatureChange(), false);
+  }
+
   @Value.Lazy
   @JsonIgnore
   default Optional<String> getCronExpression() {

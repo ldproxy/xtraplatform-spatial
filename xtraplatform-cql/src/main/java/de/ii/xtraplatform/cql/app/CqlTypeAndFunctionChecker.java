@@ -22,6 +22,7 @@ import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
+import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.ImmutableBetween;
@@ -67,7 +68,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   private static final Set<Type> INSTANT = ImmutableSet.of(Type.LocalDate, Type.Instant);
   private static final Set<Type> TIMESTAMP_IN_INTERVAL = ImmutableSet.of(Type.Instant, Type.OPEN);
   private static final Set<Type> DATE_IN_INTERVAL = ImmutableSet.of(Type.LocalDate, Type.OPEN);
-  private static final Set<Type> SPATIAL = ImmutableSet.of(Type.Geometry);
+  private static final Set<Type> SPATIAL = ImmutableSet.of(Type.Geometry, Type.Bbox);
   private static final Set<Type> ARRAY = ImmutableSet.of(Type.List);
   private static final List<Set<Type>> SCALAR = ImmutableList.of(NUMBER, TEXT, BOOLEAN, INSTANT);
   private static final List<Set<Type>> SCALAR_ORDERED = ImmutableList.of(NUMBER, TEXT, INSTANT);
@@ -295,17 +296,14 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
       throw new CqlIncompatibleTypes(
           getText(node),
           firstType.schemaType(),
-          asSchemaTypes(
-              compatibilityLists.stream()
-                  .flatMap(Collection::stream)
-                  .collect(Collectors.toUnmodifiableList())));
+          asSchemaTypes(compatibilityLists.stream().flatMap(Collection::stream).toList()));
 
     final List<Type> compatibleTypes =
         getCompatibilityLists(node.getClass()).stream()
             .filter(list -> list.contains(firstType))
             .flatMap(Collection::stream)
             .distinct()
-            .collect(Collectors.toUnmodifiableList());
+            .toList();
     final List<Type> expectedTypes =
         ImmutableList.<Type>builder().add(firstType).addAll(compatibleTypes).build();
     otherTypes.stream()
@@ -397,11 +395,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   }
 
   private List<String> asSchemaTypes(List<Type> types) {
-    return types.stream().map(Type::schemaType).distinct().collect(Collectors.toUnmodifiableList());
+    return types.stream().map(Type::schemaType).distinct().toList();
   }
 
   private List<String> asSchemaTypesFunction(Set<Type> types) {
-    return types.stream().map(Type::schemaType).distinct().collect(Collectors.toUnmodifiableList());
+    return types.stream().map(Type::schemaType).distinct().toList();
   }
 
   private Set<Set<String>> asSchemaTypes(Set<Set<Type>> types) {
@@ -421,9 +419,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
               throw new CqlIncompatibleTypes(
                   getText(node),
                   type.schemaType(),
-                  expectedTypes.stream()
-                      .map(Type::schemaType)
-                      .collect(Collectors.toUnmodifiableList()));
+                  expectedTypes.stream().map(Type::schemaType).toList());
             });
   }
 

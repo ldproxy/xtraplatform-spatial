@@ -8,7 +8,9 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.jobs.domain.Job;
+import de.ii.xtraplatform.jobs.domain.Job.JobDetails;
 import de.ii.xtraplatform.tiles.app.FeatureEncoderMVT;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSeedingJob.Builder;
 import java.util.List;
@@ -19,7 +21,8 @@ import javax.ws.rs.core.MediaType;
 import org.immutables.value.Value;
 
 @Value.Immutable
-public interface TileSeedingJob {
+@JsonDeserialize(builder = ImmutableTileSeedingJob.Builder.class)
+public interface TileSeedingJob extends JobDetails {
 
   String TYPE_MVT = TileSeedingJobSet.type("vector", "mvt");
   String TYPE_PNG = TileSeedingJobSet.type("raster", "png");
