@@ -22,7 +22,11 @@ import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProviderEntity;
 import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
+import de.ii.xtraplatform.tiles.domain.Cache.Storage;
+import de.ii.xtraplatform.tiles.domain.Cache.Type;
+import de.ii.xtraplatform.tiles.domain.ImmutableCache;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
+import de.ii.xtraplatform.tiles.domain.ImmutableSeedingOptions;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeatures;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeatures.Builder;
@@ -239,6 +243,9 @@ public class TileProviderFeaturesFactory
 
     TileProviderFeaturesData data = (TileProviderFeaturesData) entityData;
 
+    TilesetFeatures all =
+        new Builder().id("__all__").addCombine(TilesetFeatures.COMBINE_ALL).build();
+
     Map<String, TilesetFeatures> collections =
         types.values().stream()
             .flatMap(Collection::stream)
@@ -251,7 +258,29 @@ public class TileProviderFeaturesFactory
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     return (T)
-        new ImmutableTileProviderFeaturesData.Builder().from(data).tilesets(collections).build();
+        new ImmutableTileProviderFeaturesData.Builder()
+            .from(data)
+            .tilesets(Map.of())
+            .putTilesets(all.getId(), all)
+            .putAllTilesets(collections)
+            .addCaches(
+                new ImmutableCache.Builder()
+                    .type(Type.DYNAMIC)
+                    .storage(Storage.PER_JOB)
+                    .seeded(true)
+                    .putLevels(
+                        "WebMercatorQuad", new ImmutableMinMax.Builder().min(0).max(16).build())
+                    .build())
+            .seeding(new ImmutableSeedingOptions.Builder().runOnStartup(false).purge(false).build())
+            .tilesetDefaults(
+                new ImmutableTilesetFeaturesDefaults.Builder()
+                    .from(data.getTilesetDefaults())
+                    .levels(
+                        ImmutableMap.of(
+                            "WebMercatorQuad",
+                            new ImmutableMinMax.Builder().min(0).max(16).getDefault(8).build()))
+                    .build())
+            .build();
   }
 
   @AssistedFactory
