@@ -12,6 +12,8 @@ import com.google.common.collect.ImmutableMap;
 import dagger.assisted.AssistedFactory;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
+import de.ii.xtraplatform.entities.domain.AutoEntity;
+import de.ii.xtraplatform.entities.domain.AutoEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityFactory;
@@ -22,14 +24,20 @@ import de.ii.xtraplatform.features.domain.FeatureProviderEntity;
 import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileProviderFeaturesData;
+import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeatures;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeatures.Builder;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeaturesDefaults;
 import de.ii.xtraplatform.tiles.domain.TileProviderData;
 import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.slf4j.Logger;
@@ -39,7 +47,7 @@ import org.slf4j.LoggerFactory;
 @AutoBind
 public class TileProviderFeaturesFactory
     extends AbstractEntityFactory<TileProviderFeaturesData, TileProviderFeatures>
-    implements EntityFactory {
+    implements EntityFactory, AutoEntityFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderFeaturesFactory.class);
 
@@ -69,6 +77,11 @@ public class TileProviderFeaturesFactory
   @Override
   public Optional<String> subType() {
     return Optional.of(TileProviderFeaturesData.ENTITY_SUBTYPE);
+  }
+
+  @Override
+  public Optional<AutoEntityFactory> auto() {
+    return Optional.of(this);
   }
 
   @Override
@@ -205,6 +218,40 @@ public class TileProviderFeaturesFactory
         .putTilesets(all.getId(), all)
         .putAllTilesets(tilesets)
         .build();
+  }
+
+  @Override
+  public <T extends AutoEntity> Map<String, String> check(T entityData) {
+    return Map.of();
+  }
+
+  @Override
+  public <T extends AutoEntity> Map<String, List<String>> analyze(T entityData) {
+    return Map.of();
+  }
+
+  @Override
+  public <T extends AutoEntity> T generate(
+      T entityData, Map<String, List<String>> types, Consumer<Map<String, List<String>>> tracker) {
+    if (!(entityData instanceof TileProviderFeaturesData)) {
+      return entityData;
+    }
+
+    TileProviderFeaturesData data = (TileProviderFeaturesData) entityData;
+
+    Map<String, TilesetFeatures> collections =
+        types.values().stream()
+            .flatMap(Collection::stream)
+            .map(
+                type -> {
+                  ImmutableTilesetFeatures collection = new Builder().id(type).build();
+
+                  return new SimpleImmutableEntry<>(type, collection);
+                })
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+
+    return (T)
+        new ImmutableTileProviderFeaturesData.Builder().from(data).tilesets(collections).build();
   }
 
   @AssistedFactory
