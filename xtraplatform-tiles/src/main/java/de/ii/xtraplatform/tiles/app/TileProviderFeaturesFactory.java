@@ -274,7 +274,6 @@ public class TileProviderFeaturesFactory
             .seeding(new ImmutableSeedingOptions.Builder().runOnStartup(false).purge(false).build())
             .tilesetDefaults(
                 new ImmutableTilesetFeaturesDefaults.Builder()
-                    .from(data.getTilesetDefaults())
                     .levels(
                         ImmutableMap.of(
                             "WebMercatorQuad",
