@@ -165,6 +165,8 @@ public class SqlSchemaCrawler implements Closeable {
                 .setRetrieveIndexes(false)
                 .setRetrieveIndexInformation(false)
                 .setRetrieveTableColumns(false)
+                .setRetrievePrimaryKeys(false)
+                .setRetrieveTableConstraints(false)
                 .setRetrieveTableConstraintDefinitions(false)
                 .setRetrieveTableConstraintInformation(false)
                 .setRetrieveTableDefinitionsInformation(false)
@@ -187,7 +189,6 @@ public class SqlSchemaCrawler implements Closeable {
                 .setRetrieveTableColumnPrivileges(false)
                 .setRetrieveTablePrivileges(false)
                 .setRetrieveTriggerInformation(false)
-                // .setRetrieveWeakAssociations(false)
                 .toOptions())
         .toOptions();
   }
@@ -200,6 +201,8 @@ public class SqlSchemaCrawler implements Closeable {
                 .setRetrieveIndexes(true)
                 .setRetrieveIndexInformation(true)
                 .setRetrieveTableColumns(true)
+                .setRetrievePrimaryKeys(true)
+                .setRetrieveTableConstraints(true)
                 .setRetrieveTableConstraintDefinitions(true) // needed???
                 .setRetrieveTableConstraintInformation(true)
                 .setRetrieveTableDefinitionsInformation(true)
@@ -224,7 +227,6 @@ public class SqlSchemaCrawler implements Closeable {
                 .setRetrieveTableColumnPrivileges(false)
                 .setRetrieveTablePrivileges(false)
                 .setRetrieveTriggerInformation(false)
-                // .setRetrieveWeakAssociations(false)
                 .toOptions())
         .toOptions();
   }
