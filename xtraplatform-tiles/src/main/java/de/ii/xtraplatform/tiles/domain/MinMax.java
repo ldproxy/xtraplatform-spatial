@@ -7,6 +7,9 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.collect.Range;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
@@ -30,10 +33,13 @@ public interface MinMax extends Buildable<MinMax> {
     return new ImmutableMinMax.Builder().min(min).max(max).build();
   }
 
+  @JsonInclude(Include.ALWAYS)
   int getMin();
 
+  @JsonInclude(Include.ALWAYS)
   int getMax();
 
+  @JsonInclude(Include.NON_ABSENT)
   Optional<Integer> getDefault();
 
   @Override
@@ -43,6 +49,7 @@ public interface MinMax extends Buildable<MinMax> {
 
   abstract class Builder implements BuildableBuilder<MinMax> {}
 
+  @JsonIgnore
   @Value.Lazy
   default Range<Integer> asRange() {
     return Range.closed(getMin(), getMax());
