@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.slf4j.Logger;
@@ -118,6 +119,11 @@ public class TileProviderFeaturesFactory
   @Override
   public EntityDataBuilder<? extends EntityData> emptySuperDataBuilder() {
     return new ImmutableProviderCommonData.Builder();
+  }
+
+  @Override
+  public List<String> getIgnoreKeys() {
+    return Stream.concat(super.getIgnoreKeys().stream(), Stream.of("levels")).toList();
   }
 
   @Override
