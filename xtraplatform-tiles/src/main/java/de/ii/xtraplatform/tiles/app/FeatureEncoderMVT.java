@@ -12,6 +12,7 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.features.domain.transform.FeatureEncoderSfFlat;
 import de.ii.xtraplatform.features.domain.transform.FeatureSfFlat;
 import de.ii.xtraplatform.tiles.domain.LevelTransformation;
+import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileCoordinates;
 import de.ii.xtraplatform.tiles.domain.TileGenerationContext;
 import de.ii.xtraplatform.tiles.domain.TileGenerationOptions;
@@ -70,7 +71,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
     this.geometryFactoryWorld = new GeometryFactory();
 
     final int size = tile.getTileMatrixSet().getTileSize();
-    final int buffer = 8;
+    final int buffer = TileBuilder.BUFFER_SIZE_FORMAL;
     CoordinateXY[] coords = new CoordinateXY[5];
     coords[0] = new CoordinateXY(-buffer, size + buffer);
     coords[1] = new CoordinateXY(size + buffer, size + buffer);
