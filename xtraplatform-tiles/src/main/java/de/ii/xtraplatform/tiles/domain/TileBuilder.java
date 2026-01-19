@@ -19,6 +19,9 @@ import java.util.Set;
 @AutoMultiBind
 public interface TileBuilder {
 
+  // buffer in relation to the "formal" tile size (256 for WMQ)
+  int BUFFER_SIZE_FORMAL = 8;
+
   int getPriority();
 
   boolean isApplicable(String featureProviderId);
