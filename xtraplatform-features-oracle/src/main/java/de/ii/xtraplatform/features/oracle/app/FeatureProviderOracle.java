@@ -62,8 +62,6 @@ import org.slf4j.LoggerFactory;
  * - Only **Oracle 19c** has been tested.
  * - Only geometries in a 2D coordinate reference system are supported.
  * - All identifiers must be unquoted identifiers; that is the identifiers will be all uppercase.
- * - The option `linearizeCurves` is not supported. All geometries must conform to the OGC Simple
- *   Feature Access standard.
  * - The spatial operator `S_CROSSES` is not supported.
  * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
  * - CRUD operations are not supported.
