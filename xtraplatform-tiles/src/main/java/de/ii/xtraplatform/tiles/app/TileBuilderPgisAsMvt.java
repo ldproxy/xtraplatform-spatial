@@ -290,12 +290,19 @@ public class TileBuilderPgisAsMvt
             .map(FeatureSchema::getName);
 
     String filter = filtersToSql(providerId, tileset, schema, tms.getId(), level);
+    int buffer = (tms.getTileExtent() / tms.getTileSize()) * TileBuilder.BUFFER_SIZE_FORMAL;
 
     String bounds = "bounds AS (SELECT %1$s AS geom, %2$s::box2d AS b2d)";
     String mvtgeom =
         String.format(
-            "mvtgeom AS (SELECT ST_AsMVTGeom(ST_Transform(A.%1$s, %%3$s), bounds.b2d, %6$d, 8) AS geom, %2$s FROM %3$s A, bounds WHERE (%5$s AND ST_Intersects(A.%1$s, ST_Transform(bounds.geom, %4$s))))",
-            geomColumn, attrColumns, table, nativeCrs.getCode(), filter, tms.getTileExtent());
+            "mvtgeom AS (SELECT ST_AsMVTGeom(ST_Transform(A.%1$s, %%3$s), bounds.b2d, %6$d, %7$d) AS geom, %2$s FROM %3$s A, bounds WHERE (%5$s AND ST_Intersects(A.%1$s, ST_Transform(bounds.geom, %4$s))))",
+            geomColumn,
+            attrColumns,
+            table,
+            nativeCrs.getCode(),
+            filter,
+            tms.getTileExtent(),
+            buffer);
 
     String template =
         String.format(
