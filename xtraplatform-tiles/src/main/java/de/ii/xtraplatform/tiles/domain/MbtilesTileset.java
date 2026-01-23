@@ -104,7 +104,7 @@ public class MbtilesTileset {
       MbtilesMetadata metadata,
       Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
-      boolean seeded)
+      boolean strictlySeeded)
       throws IOException {
     this(
         tilesetPath,
@@ -112,7 +112,7 @@ public class MbtilesTileset {
         partitions,
         isRaster,
         false,
-        partitions.isPresent() && seeded && isRaster ? Mutex.createNoOp() : Mutex.create());
+        partitions.isPresent() && strictlySeeded ? Mutex.createNoOp() : Mutex.create());
   }
 
   private MbtilesTileset(
