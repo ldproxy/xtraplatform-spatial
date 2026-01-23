@@ -99,6 +99,17 @@ public interface Cache extends WithTmsLevels, WithTilesetTmsLevels {
   }
 
   /**
+   * @langEn Should this cache be exclusively used by the [Seeding](#seeding)?
+   * @langDe Soll dieser Cache ausschließlich beim [Seeding](#seeding) verwendet werden?
+   * @default false
+   * @since v4.6
+   */
+  @Value.Default
+  default boolean getSeededOnly() {
+    return false;
+  }
+
+  /**
    * @langEn Tiling schemes and zoom levels that should be stored in the cache. Applies to all
    *     tilesets that are not specified in `tilesetLevels`.
    * @langDe Kachelschemas und Zoomstufen, die von diesem Cache gespeichert werden sollen. Gilt für
