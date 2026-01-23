@@ -66,7 +66,7 @@ public class TileStoreMbTiles implements TileStore {
       Map<String, Set<String>> tileMatrixSets,
       Optional<TileMatrixSetRepository> tileMatrixSetRepository,
       Optional<TileMatrixPartitions> partitions,
-      boolean seeded) {
+      boolean strictlySeeded) {
     Map<String, MbtilesTileset> tileSets = new ConcurrentHashMap<>();
     try {
       for (String tileset : tileSchemas.keySet()) {
@@ -81,7 +81,7 @@ public class TileStoreMbTiles implements TileStore {
                   getVectorLayers(tileSchemas, tileset),
                   partitions,
                   tileSchemas.get(tileset).isEmpty(),
-                  seeded));
+                  strictlySeeded));
         }
       }
     } catch (IOException e) {
@@ -436,7 +436,7 @@ public class TileStoreMbTiles implements TileStore {
       List<VectorLayer> vectorLayers,
       Optional<TileMatrixPartitions> partitions,
       boolean isRaster,
-      boolean seeded)
+      boolean strictlySeeded)
       throws IOException {
     Path relPath =
         Path.of(tileset).resolve(tileMatrixSet + (partitions.isEmpty() ? MBTILES_SUFFIX : ""));
@@ -461,7 +461,7 @@ public class TileStoreMbTiles implements TileStore {
             .build();
 
     if (partitions.isPresent()) {
-      return new MbtilesTileset(filePath.get(), md, partitions, isRaster, seeded);
+      return new MbtilesTileset(filePath.get(), md, partitions, isRaster, strictlySeeded);
     }
 
     if (rootStore.has(relPath)) {
@@ -469,7 +469,7 @@ public class TileStoreMbTiles implements TileStore {
     }
 
     try {
-      return new MbtilesTileset(filePath.get(), md, Optional.empty(), isRaster, seeded);
+      return new MbtilesTileset(filePath.get(), md, Optional.empty(), isRaster, strictlySeeded);
     } catch (FileAlreadyExistsException e) {
       throw new IllegalStateException(
           "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.");
