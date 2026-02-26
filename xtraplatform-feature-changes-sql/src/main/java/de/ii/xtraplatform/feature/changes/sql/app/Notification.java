@@ -24,6 +24,8 @@ import org.threeten.extra.Interval;
 @Value.Immutable
 public interface Notification {
 
+  Splitter SPLITTER = Splitter.on(",").trimResults();
+
   static Notification from(String featureType, String payload) {
     return ImmutableNotification.builder().featureType(featureType).payload(payload).build();
   }
@@ -55,22 +57,22 @@ public interface Notification {
         .build();
   }
 
-  Splitter SPLITTER = Splitter.on(",").trimResults();
-
   private static List<String> parseFeatureId(String featureId) {
-    if (featureId.isEmpty() || featureId.equalsIgnoreCase("NULL")) return ImmutableList.of();
+    if (featureId.isEmpty() || "NULL".equalsIgnoreCase(featureId)) {
+      return ImmutableList.of();
+    }
 
     return ImmutableList.of(featureId);
   }
 
   private static Optional<Interval> parseInterval(List<String> interval) {
-    if (interval.get(0).isEmpty()) {
-      // no instant or interval, ignore
-    } else if (interval.get(1).isEmpty()) {
+    if (interval.get(1).isEmpty()) {
       // an instant
       try {
         Instant instant = parseTimestamp(interval.get(0));
-        if (Objects.nonNull(instant)) return Optional.of(Interval.of(instant, instant));
+        if (Objects.nonNull(instant)) {
+          return Optional.of(Interval.of(instant, instant));
+        }
       } catch (Exception e) {
         // ignore
       }
