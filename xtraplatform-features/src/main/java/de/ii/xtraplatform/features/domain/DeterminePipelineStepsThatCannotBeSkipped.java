@@ -68,16 +68,6 @@ public class DeterminePipelineStepsThatCannotBeSkipped
     if (parents.isEmpty()) {
       // at the root level: aggregate information from properties and test global settings
 
-      // coordinate processing is needed if a target CRS differs from the native CRS or geometries
-      // are simplified
-      if (!targetCrs.equals(nativeCrs)
-          || (simplifyGeometries)
-          || (!(OgcCrs.CRS84.equals(nativeCrs) || OgcCrs.CRS84h.equals(nativeCrs))
-              && supportSecondaryGeometry
-              && schema.isSecondaryGeometry())) {
-        steps.add(PipelineSteps.COORDINATES);
-      }
-
       // metadata processing (extents, etag) is needed only if the response is not sent as a stream
       if (deriveMetadataFromContent) {
         steps.add(PipelineSteps.METADATA, PipelineSteps.ETAG);
@@ -135,6 +125,16 @@ public class DeterminePipelineStepsThatCannotBeSkipped
 
     } else {
       // at property level: determine needed steps based on schema information
+
+      // coordinate processing is needed if a target CRS differs from the native CRS or geometries
+      // are simplified
+      if (!targetCrs.equals(nativeCrs)
+          || (simplifyGeometries)
+          || (!(OgcCrs.CRS84.equals(nativeCrs) || OgcCrs.CRS84h.equals(nativeCrs))
+              && supportSecondaryGeometry
+              && schema.isSecondaryGeometry())) {
+        steps.add(PipelineSteps.COORDINATES);
+      }
 
       // mapping is needed for any complex schema: concat/coalesce/merge, an array/object, or use of
       // a sub-decoder
