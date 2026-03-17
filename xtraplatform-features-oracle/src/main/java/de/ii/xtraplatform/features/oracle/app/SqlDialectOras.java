@@ -13,7 +13,6 @@ import de.ii.xtraplatform.cql.domain.SpatialFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.time.Instant;
@@ -31,16 +30,27 @@ import org.threeten.extra.Interval;
 // - only 2D geometries are supported / have been tested
 // - S_CROSSES not supported
 // - identifiers must be unquoted, that is, in uppercase in Oracle
+@SuppressWarnings("PMD.TooManyMethods")
 public class SqlDialectOras implements SqlDialect {
 
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
-  private QueryGeneratorSettings settings;
+  private final Map<SpatialFunction, Tuple<String, Optional<String>>> spatialOperators =
+      new ImmutableMap.Builder<SpatialFunction, Tuple<String, Optional<String>>>()
+          .put(SpatialFunction.S_EQUALS, Tuple.of("SDO_EQUAL", Optional.empty()))
+          .put(SpatialFunction.S_DISJOINT, Tuple.of("SDO_RELATE", Optional.of("DISJOINT")))
+          .put(SpatialFunction.S_TOUCHES, Tuple.of("SDO_TOUCH", Optional.empty()))
+          .put(SpatialFunction.S_WITHIN, Tuple.of("SDO_INSIDE", Optional.empty()))
+          .put(SpatialFunction.S_OVERLAPS, Tuple.of("SDO_OVERLAPS", Optional.empty()))
+          // S_CROSSES is not supported
+          .put(SpatialFunction.S_INTERSECTS, Tuple.of("SDO_ANYINTERACT", Optional.empty()))
+          .put(SpatialFunction.S_CONTAINS, Tuple.of("SDO_CONTAINS", Optional.empty()))
+          .build();
 
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    StringBuilder queryBuilder = new StringBuilder("SDO_UTIL.TO_WKTGEOMETRY(");
+    StringBuilder queryBuilder = new StringBuilder(128).append("SDO_UTIL.TO_WKTGEOMETRY(");
     if (linearizeCurves) {
       queryBuilder.append("SDO_GEOM.SDO_ARC_DENSIFY(");
     }
@@ -54,7 +64,7 @@ public class SqlDialectOras implements SqlDialect {
     if (linearizeCurves) {
       queryBuilder.append(",0.001,'arc_tolerance=0.1')");
     }
-    return queryBuilder.append(")").toString();
+    return queryBuilder.append(')').toString();
   }
 
   @Override
@@ -64,7 +74,7 @@ public class SqlDialectOras implements SqlDialect {
 
   @Override
   public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    StringBuilder queryBuilder = new StringBuilder("SDO_UTIL.TO_WKBGEOMETRY(");
+    StringBuilder queryBuilder = new StringBuilder(128).append("SDO_UTIL.TO_WKBGEOMETRY(");
     if (linearizeCurves) {
       queryBuilder.append("SDO_GEOM.SDO_ARC_DENSIFY(");
     }
@@ -78,7 +88,7 @@ public class SqlDialectOras implements SqlDialect {
     if (linearizeCurves) {
       queryBuilder.append(",0.001,'arc_tolerance=0.1')");
     }
-    return queryBuilder.append(")").toString();
+    return queryBuilder.append(')').toString();
   }
 
   @Override
@@ -225,7 +235,7 @@ public class SqlDialectOras implements SqlDialect {
       throw new IllegalArgumentException(
           "3D spatial operators are not supported for Oracle feature providers.");
     }
-    Tuple<String, Optional<String>> op = SPATIAL_OPERATORS.get(spatialFunction);
+    Tuple<String, Optional<String>> op = spatialOperators.get(spatialFunction);
     if (Objects.isNull(op)) {
       throw new IllegalArgumentException(
           String.format(
@@ -234,18 +244,6 @@ public class SqlDialectOras implements SqlDialect {
     }
     return op;
   }
-
-  private final Map<SpatialFunction, Tuple<String, Optional<String>>> SPATIAL_OPERATORS =
-      new ImmutableMap.Builder<SpatialFunction, Tuple<String, Optional<String>>>()
-          .put(SpatialFunction.S_EQUALS, Tuple.of("SDO_EQUAL", Optional.empty()))
-          .put(SpatialFunction.S_DISJOINT, Tuple.of("SDO_RELATE", Optional.of("DISJOINT")))
-          .put(SpatialFunction.S_TOUCHES, Tuple.of("SDO_TOUCH", Optional.empty()))
-          .put(SpatialFunction.S_WITHIN, Tuple.of("SDO_INSIDE", Optional.empty()))
-          .put(SpatialFunction.S_OVERLAPS, Tuple.of("SDO_OVERLAPS", Optional.empty()))
-          // S_CROSSES is not supported
-          .put(SpatialFunction.S_INTERSECTS, Tuple.of("SDO_ANYINTERACT", Optional.empty()))
-          .put(SpatialFunction.S_CONTAINS, Tuple.of("SDO_CONTAINS", Optional.empty()))
-          .build();
 
   @Override
   public String getSpatialOperatorMatch(SpatialFunction spatialFunction) {
