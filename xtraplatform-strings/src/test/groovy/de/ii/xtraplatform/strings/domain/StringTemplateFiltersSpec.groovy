@@ -242,11 +242,10 @@ class StringTemplateFiltersSpec extends Specification {
     def 'Test template and valueLookup'() {
         given:
         String template = "{{value | replace:'ABC':''}}"
-        StringTemplateFilters stringTemplateFilters = new StringTemplateFilters()
         String value = "TestABC"
         Function<String, String> function = s -> value
         when:
-        String result = stringTemplateFilters.applyTemplate(template, function)
+        String result = StringTemplateFilters.applyTemplate(template, function)
         then:
         result == "Test"
     }
@@ -255,11 +254,10 @@ class StringTemplateFiltersSpec extends Specification {
         given:
         String template = "{{value | unHtml}}"
         String value = "<test>test"
-        StringTemplateFilters str = new StringTemplateFilters()
         Function<String, String> function = s -> value
 
         when:
-        String result = str.applyTemplate(template,
+        String result = StringTemplateFilters.applyTemplate(template,
                 isHtml -> { },
                 function, Map.of(), false)
 
@@ -272,12 +270,11 @@ class StringTemplateFiltersSpec extends Specification {
         given:
         String template = "{{value | test}}"
         String value = "<test>test"
-        StringTemplateFilters str = new StringTemplateFilters()
         Function<String, String> function = s -> value
         Map<String, Function<String, String>> customFilters = Map.of("test", (Function<String, String>) (s) -> s.replace("<test>", ""))
 
         when:
-        String result = str.applyTemplate(template,
+        String result = StringTemplateFilters.applyTemplate(template,
                 isHtml -> { },
                 function, customFilters, false)
 
@@ -291,11 +288,10 @@ class StringTemplateFiltersSpec extends Specification {
         given:
         String template = "{{value | test}}"
         String value = "<test>test"
-        StringTemplateFilters str = new StringTemplateFilters()
         Function function = s -> value
 
         when:
-        String result = str.applyTemplate(template,
+        String result = StringTemplateFilters.applyTemplate(template,
                 isHtml -> { },
                 function, Map.of(), false)
 
