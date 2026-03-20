@@ -74,15 +74,21 @@ public interface BoundingBox {
       return first;
     }
 
-    return new ImmutableBoundingBox.Builder()
-        .xmin(Math.min(first.getXmin(), second.getXmin()))
-        .ymin(Math.min(first.getYmin(), second.getYmin()))
-        .zmin(first.is3d() && second.is3d() ? Math.min(first.getZmin(), second.getZmin()) : null)
-        .xmax(Math.max(first.getXmax(), second.getXmax()))
-        .ymax(Math.max(first.getYmax(), second.getYmax()))
-        .zmax(first.is3d() && second.is3d() ? Math.max(first.getZmax(), second.getZmax()) : null)
-        .epsgCrs(first.getEpsgCrs())
-        .build();
+    Builder builder =
+        new ImmutableBoundingBox.Builder()
+            .xmin(Math.min(first.getXmin(), second.getXmin()))
+            .ymin(Math.min(first.getYmin(), second.getYmin()))
+            .xmax(Math.max(first.getXmax(), second.getXmax()))
+            .ymax(Math.max(first.getYmax(), second.getYmax()))
+            .epsgCrs(first.getEpsgCrs());
+
+    if (first.is3d() && second.is3d()) {
+      builder
+          .zmin(Math.min(first.getZmin(), second.getZmin()))
+          .zmax(Math.max(first.getZmax(), second.getZmax()));
+    }
+
+    return builder.build();
   }
 
   static Optional<BoundingBox> intersect2d(BoundingBox first, BoundingBox second, double buffer) {

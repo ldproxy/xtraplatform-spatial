@@ -14,6 +14,7 @@ import java.util.Locale;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.FieldNamingConventions")
 public class CoordinateTupleWithPrecision extends CoordinateTuple {
 
   private static DecimalFormat DEFAULT_FORMAT =
