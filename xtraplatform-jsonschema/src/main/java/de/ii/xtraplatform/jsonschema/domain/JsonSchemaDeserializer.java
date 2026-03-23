@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 public class JsonSchemaDeserializer extends StdDeserializer<JsonSchema> {
 
+  private static final long serialVersionUID = 1L;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonSchemaDeserializer.class);
 
   private final ObjectMapper mapper;
@@ -39,6 +41,12 @@ public class JsonSchemaDeserializer extends StdDeserializer<JsonSchema> {
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.CyclomaticComplexity"
+  })
   public JsonSchema deserialize(
       JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
     JsonNode schemaNode = jsonParser.getCodec().readTree(jsonParser);
@@ -89,6 +97,8 @@ public class JsonSchemaDeserializer extends StdDeserializer<JsonSchema> {
             return mapper.treeToValue(schemaNode, JsonSchemaObject.class);
           case "string":
             return mapper.treeToValue(schemaNode, JsonSchemaString.class);
+          default:
+            break;
         }
       } else {
         if (LOGGER.isWarnEnabled()) {
