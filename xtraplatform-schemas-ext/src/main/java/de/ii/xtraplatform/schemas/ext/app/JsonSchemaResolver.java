@@ -29,7 +29,6 @@ import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
 import de.ii.xtraplatform.schemas.ext.domain.JsonSchemaConfiguration;
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -84,6 +83,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
 public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonSchemaResolver.class);
@@ -120,9 +120,9 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       URI schemaUri = URI.create(ref);
 
       if (SCHEMES.contains(schemaUri.getScheme())
-          || ((Objects.isNull(schemaUri.getScheme())
+          || Objects.isNull(schemaUri.getScheme())
               && !schemaUri.getSchemeSpecificPart().isBlank()
-              && !schemaUri.getSchemeSpecificPart().startsWith("/")))) {
+              && !schemaUri.getSchemeSpecificPart().startsWith("/")) {
         return true;
       }
     } catch (Throwable e) {
@@ -167,7 +167,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       if (Objects.isNull(schemaUri.getScheme())
           && !schemaUri.getSchemeSpecificPart().isBlank()
           && !schemaUri.getSchemeSpecificPart().startsWith("/")) {
-        Path path = Path.of(schemaUri.getSchemeSpecificPart());
+        java.nio.file.Path path = java.nio.file.Path.of(schemaUri.getSchemeSpecificPart());
 
         if (!schemaStore.has(path)) {
           LOGGER.error("Cannot load schema '{}', not found in 'resources/schemas'.", schemaSource);
@@ -204,6 +204,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
     return Optional.empty();
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private List<Schema> resolveComposition(Schema schema, FeatureProviderDataV2 data) {
     if (Objects.nonNull(schema.getRef())) {
       return resolveComposition(schema.getRef(), data);
@@ -269,11 +270,13 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
             .from(original)
             .schema(Optional.empty())
             .propertyMap(Map.of());
+    Map<String, FeatureSchema> originalPropertyMap =
+        Objects.nonNull(original) ? original.getPropertyMap() : Map.of();
 
     if (Objects.nonNull(s.getProperties())) {
       resolveProperties(
           s.getProperties(),
-          Objects.nonNull(original) ? original.getPropertyMap() : null,
+          originalPropertyMap,
           schema,
           builder::putPropertyMap,
           data,
@@ -293,6 +296,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
     return builder.build();
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NcssCount", "PMD.NPathComplexity"})
   private FeatureSchema toFeatureSchema(
       String name,
       Schema schema,
@@ -300,24 +304,28 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       @Nullable FeatureSchema original,
       FeatureProviderDataV2 data,
       boolean isRequired) {
-    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder();
     List<Schema> resolved = resolveComposition(schema, data);
     Schema s = resolved.get(0);
-    boolean isRoot = Objects.isNull(root);
-
-    Schema r = isRoot ? schema : root;
-    Type t = toType(s.getExplicitTypes());
 
     if (Objects.equals(s, root)) {
       return null;
     }
 
+    if (Objects.nonNull(original) && original.getIgnore()) {
+      return null;
+    }
+
+    boolean isRoot = Objects.isNull(root);
+    Schema r = isRoot ? schema : root;
+    Type t = toType(s.getExplicitTypes());
+    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder();
+
     if (Objects.nonNull(original)) {
-      if (original.getIgnore()) {
-        return null;
-      }
       builder.from(original).schema(Optional.empty()).propertyMap(Map.of());
     }
+
+    Map<String, FeatureSchema> originalPropertyMap =
+        Objects.nonNull(original) ? original.getPropertyMap() : Map.of();
 
     builder
         .name(name)
@@ -339,21 +347,14 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       constrained = true;
     }
 
-    t =
-        applyTypeRefs(
-            s.getUri().toString(),
-            builder,
-            t,
-            Optional.ofNullable(original).flatMap(FeatureSchema::getSourcePath).orElse(name),
-            isRoot,
-            data);
+    t = applyTypeRefs(s.getUri().toString(), builder, t, isRoot, data);
 
     if (t == Type.OBJECT) {
       if (Objects.nonNull(s.getProperties()) || resolved.size() > 1) {
         if (Objects.nonNull(s.getProperties())) {
           resolveProperties(
               s.getProperties(),
-              Objects.nonNull(original) ? original.getPropertyMap() : null,
+              originalPropertyMap,
               r,
               builder::putPropertyMap,
               data,
@@ -365,7 +366,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
             if (Objects.nonNull(add.getProperties())) {
               resolveProperties(
                   add.getProperties(),
-                  Objects.nonNull(original) ? original.getPropertyMap() : null,
+                  originalPropertyMap,
                   r,
                   builder::putPropertyMap,
                   data,
@@ -412,11 +413,9 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
             s.getEnums().stream().map(Object::toString).collect(Collectors.toList()));
         constrained = true;
       }
-      if (t == Type.STRING) {
-        if (s.getPattern() != null) {
-          constraintsBuilder.regex(s.getPattern());
-          constrained = true;
-        }
+      if (t == Type.STRING && s.getPattern() != null) {
+        constraintsBuilder.regex(s.getPattern());
+        constrained = true;
       }
       if (t == Type.INTEGER || t == Type.FLOAT) {
         if (s.getMinimum() != null) {
@@ -461,12 +460,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
   }
 
   private Type applyTypeRefs(
-      String uri,
-      Builder builder,
-      Type type,
-      String sourcePath,
-      boolean isRoot,
-      FeatureProviderDataV2 data) {
+      String uri, Builder builder, Type type, boolean isRoot, FeatureProviderDataV2 data) {
     Optional<JsonSchemaConfiguration> cfg = getConfiguration(data);
     if (cfg.isPresent() && (type == Type.OBJECT || type == Type.OBJECT_ARRAY)) {
       Optional<String> geometryTypeRef =
