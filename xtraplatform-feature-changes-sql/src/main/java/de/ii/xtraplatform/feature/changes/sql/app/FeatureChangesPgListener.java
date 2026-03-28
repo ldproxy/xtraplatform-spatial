@@ -27,9 +27,9 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlConnector;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsPgis;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.Connection; // NOPMD
+import java.sql.SQLException; // NOPMD
+import java.sql.Statement; // NOPMD
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,6 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.DoNotUseThreads")
 public class FeatureChangesPgListener implements FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureChangesPgListener.class);
@@ -105,9 +106,11 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
       return false;
     }
     if (!((FeatureProviderSqlData) data).getDatasetChanges().isModeTrigger()) {
-      LOGGER.warn(
-          "Feature provider with id '{}' does not support change listeners: datasetChanges.mode is not 'TRIGGER'",
-          data.getId());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Feature provider with id '{}' does not support change listeners: datasetChanges.mode is not 'TRIGGER'",
+            data.getId());
+      }
       return false;
     }
 
@@ -122,15 +125,10 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
     Optional<FeatureChangesPgConfiguration> configuration =
         getConfiguration(provider.getData().getExtensions());
 
-    if (configuration.isPresent()) {
+    if (configuration.isPresent() && hook == LIFECYCLE_HOOK.STARTED) {
       SqlClient sqlClient = ((SqlConnector) connector).getSqlClient();
-
-      switch (hook) {
-        case STARTED:
-          subscribe(
-              provider, configuration.get(), sqlClient::getConnection, sqlClient::getNotifications);
-          break;
-      }
+      subscribe(
+          provider, configuration.get(), sqlClient::getConnection, sqlClient::getNotifications);
     }
   }
 
@@ -211,7 +209,9 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
   private void poll(
       String provider, FeatureChanges featureChangeHandler, Subscription subscription) {
     if (!subscription.isConnected()) {
-      LOGGER.debug("Lost connection to retrieve feature changes for {}", subscription.getLabel());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Lost connection to retrieve feature changes for {}", subscription.getLabel());
+      }
       subscriptions.get(provider).remove(subscription.getChannel());
       subscribe(provider, subscription);
 
@@ -250,8 +250,9 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
     includes.forEach(
         include -> {
           if (types.stream()
-              .map(FeatureSchema::getName)
-              .noneMatch(type -> Objects.equals(type, include))) {
+                  .map(FeatureSchema::getName)
+                  .noneMatch(type -> Objects.equals(type, include))
+              && LOGGER.isWarnEnabled()) {
             LOGGER.warn("Change listener: unknown type '{}' in listenForTypes", include);
           }
         });
