@@ -34,6 +34,28 @@ import org.immutables.value.Value;
   "$defs"
 })
 public abstract class JsonSchemaDocument extends JsonSchemaObject {
+
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaDocument> FUNNEL =
+      (from, into) -> {
+        into.putString(from.getType(), StandardCharsets.UTF_8);
+        from.getRequired().stream()
+            .sorted()
+            .forEachOrdered(val -> into.putString(val, StandardCharsets.UTF_8));
+        from.getProperties().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
+        from.getPatternProperties().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
+        into.putString(from.getSchema(), StandardCharsets.UTF_8);
+        from.getId().ifPresent(val -> into.putString(val, StandardCharsets.UTF_8));
+        from.getDefinitions().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
+        from.getAnyOf().stream().forEachOrdered(val -> JsonSchema.FUNNEL.funnel(val, into));
+      };
+
   @JsonProperty("$schema")
   @Value.Default
   public String getSchema() {
@@ -49,12 +71,12 @@ public abstract class JsonSchemaDocument extends JsonSchemaObject {
   public enum VERSION {
     V202012("https://json-schema.org/draft/2020-12/schema", "$defs");
 
+    private final String url;
+    private final String defs;
+
     public static VERSION current() {
       return V202012;
     }
-
-    private final String url;
-    private final String defs;
 
     VERSION(String url, String defs) {
       this.url = url;
@@ -70,6 +92,7 @@ public abstract class JsonSchemaDocument extends JsonSchemaObject {
     }
   }
 
+  @SuppressWarnings("PMD.TooManyMethods")
   public abstract static class Builder extends JsonSchema.Builder {
     public abstract Builder id(Optional<String> id);
 
@@ -77,12 +100,17 @@ public abstract class JsonSchemaDocument extends JsonSchemaObject {
 
     public abstract Builder putDefinitions(String key, JsonSchema value);
 
+    @Override
     public abstract Builder title(String title);
 
+    @Override
     public abstract Builder description(String description);
 
+    @Override
     public abstract Builder name(String name);
 
+    @Override
+    @SuppressWarnings("PMD.LinguisticNaming")
     public abstract Builder isRequired(boolean isRequired);
 
     public abstract Builder required(Iterable<String> elements);
@@ -107,27 +135,7 @@ public abstract class JsonSchemaDocument extends JsonSchemaObject {
 
     public abstract Builder not(JsonSchema value);
 
+    @Override
     public abstract JsonSchemaDocument build();
   }
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaDocument> FUNNEL =
-      (from, into) -> {
-        into.putString(from.getType(), StandardCharsets.UTF_8);
-        from.getRequired().stream()
-            .sorted()
-            .forEachOrdered(val -> into.putString(val, StandardCharsets.UTF_8));
-        from.getProperties().entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
-        from.getPatternProperties().entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
-        into.putString(from.getSchema(), StandardCharsets.UTF_8);
-        from.getId().ifPresent(val -> into.putString(val, StandardCharsets.UTF_8));
-        from.getDefinitions().entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
-        from.getAnyOf().stream().forEachOrdered(val -> JsonSchema.FUNNEL.funnel(val, into));
-      };
 }

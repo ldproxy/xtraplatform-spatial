@@ -16,13 +16,13 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaGeometry.Builder.class)
 public abstract class JsonSchemaGeometry extends JsonSchema {
 
-  public abstract String getFormat();
-
-  public abstract static class Builder extends JsonSchema.Builder {}
-
   @SuppressWarnings("UnstableApiUsage")
   public static final Funnel<JsonSchemaGeometry> FUNNEL =
       (from, into) -> {
         into.putString(from.getFormat(), StandardCharsets.UTF_8);
       };
+
+  public abstract String getFormat();
+
+  public abstract static class Builder extends JsonSchema.Builder {}
 }
