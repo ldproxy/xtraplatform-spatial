@@ -28,16 +28,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureTokenDecoderGraphQlJson2
     extends FeatureTokenDecoder<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
     implements Decoder.Pipeline {
 
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(FeatureTokenDecoderGraphQlJson2.class);
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
 
   private final JsonParser parser;
@@ -47,22 +43,20 @@ public class FeatureTokenDecoderGraphQlJson2
   private final Map<String, SchemaMapping> mappings;
   private final String type;
   private final String wrapper;
-  private final Optional<String> nullValue;
 
-  private boolean started;
-  private int depth = -1;
-  private int featureDepth = 0;
-  private boolean inFeatures = false;
-  private boolean inProperties = false;
-  private boolean isCollection = false;
-  private boolean inErrors = false;
-  private int lastNameIsArrayDepth = 0;
-  private int startArray = 0;
-  private int endArray = 0;
+  private final ParsingState state;
 
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
-  private List<List<String>> arrayPaths;
   private DecoderJsonProperties decoderJsonProperties;
+
+  private static final class ParsingState {
+    boolean started;
+    int featureDepth;
+    boolean inFeatures;
+    boolean inProperties;
+    boolean isCollection;
+    boolean inErrors;
+  }
 
   public FeatureTokenDecoderGraphQlJson2(
       FeatureSchema featureSchema,
@@ -80,6 +74,7 @@ public class FeatureTokenDecoderGraphQlJson2
       String type,
       String wrapper,
       Optional<String> nullValue) {
+    super();
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
@@ -91,7 +86,8 @@ public class FeatureTokenDecoderGraphQlJson2
     this.mappings = mappings;
     this.type = type;
     this.wrapper = wrapper;
-    this.nullValue = nullValue;
+    this.state = new ParsingState();
+    Objects.requireNonNull(nullValue);
   }
 
   @Override
@@ -102,7 +98,7 @@ public class FeatureTokenDecoderGraphQlJson2
             .setMappings(mappings)
             .setQuery(featureQuery);
 
-    this.arrayPaths =
+    List<List<String>> arrayPaths =
         context.mapping().getSchemasByTargetPath().entrySet().stream()
             .filter(entry -> entry.getValue().get(0).isArray())
             .map(entry -> entry.getKey())
@@ -128,7 +124,7 @@ public class FeatureTokenDecoderGraphQlJson2
   }
 
   // for unit tests
-  void parse(String data) throws Exception {
+  void parse(String data) {
     byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8);
     feedInput(dataBytes);
     cleanup();
@@ -147,6 +143,7 @@ public class FeatureTokenDecoderGraphQlJson2
     }
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public boolean advanceParser() {
 
     boolean feedMeMore = false;
@@ -165,44 +162,44 @@ public class FeatureTokenDecoderGraphQlJson2
 
         case START_OBJECT:
         case START_ARRAY:
-          if (!inProperties) {
-            if (inFeatures && context.path().size() == featureDepth) {
-              this.inProperties = true;
-              if (isCollection) {
+          if (!state.inProperties) {
+            if (state.inFeatures && context.path().size() == state.featureDepth) {
+              state.inProperties = true;
+              if (state.isCollection) {
                 startFeature();
               }
-            } else if (!inFeatures && Objects.equals(currentName, wrapper)) {
+            } else if (!state.inFeatures && Objects.equals(currentName, wrapper)) {
               startIfNecessary(nextToken == JsonToken.START_ARRAY);
-            } else if (!inFeatures && Objects.equals(currentName, "errors")) {
-              this.inErrors = true;
+            } else if (!state.inFeatures && Objects.equals(currentName, "errors")) {
+              state.inErrors = true;
             }
             break;
           }
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, state.featureDepth);
           break;
         case END_OBJECT:
-          if (inProperties && context.path().size() == featureDepth) {
-            this.inProperties = false;
+          if (state.inProperties && context.path().size() == state.featureDepth) {
+            state.inProperties = false;
             getDownstream().onFeatureEnd(context);
-            if (!isCollection) {
+            if (!state.isCollection) {
               getDownstream().onEnd(context);
-              this.inFeatures = false;
+              state.inFeatures = false;
             }
             break;
           }
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, state.featureDepth);
           break;
         case END_ARRAY:
-          if (!inProperties && context.path().size() == featureDepth) {
+          if (!state.inProperties && context.path().size() == state.featureDepth) {
             getDownstream().onEnd(context);
-            this.inFeatures = false;
+            state.inFeatures = false;
             break;
           }
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, state.featureDepth);
           break;
         default:
-          if (!inErrors) {
-            feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          if (!state.inErrors) {
+            feedMeMore = decoderJsonProperties.parse(nextToken, currentName, state.featureDepth);
             break;
           }
           if (Objects.equals(currentName, "message")) {
@@ -231,10 +228,10 @@ public class FeatureTokenDecoderGraphQlJson2
   }
 
   private void startIfNecessary(boolean isCollection) {
-    if (!started) {
-      this.started = true;
-      this.inFeatures = true;
-      this.isCollection = isCollection;
+    if (!state.started) {
+      state.started = true;
+      state.inFeatures = true;
+      state.isCollection = isCollection;
 
       if (!isCollection) {
         context.metadata().isSingleFeature(true);
@@ -251,7 +248,7 @@ public class FeatureTokenDecoderGraphQlJson2
     context.setIndexes(List.of());
     decoderJsonProperties.reset();
     getDownstream().onFeatureStart(context);
-    this.featureDepth = context.path().size();
-    this.inProperties = true;
+    state.featureDepth = context.path().size();
+    state.inProperties = true;
   }
 }

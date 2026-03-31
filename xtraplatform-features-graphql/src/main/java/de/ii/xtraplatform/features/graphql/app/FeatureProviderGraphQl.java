@@ -375,7 +375,6 @@ public class FeatureProviderGraphQl
           .join();
     } catch (Throwable e) {
       // continue
-      boolean br = true;
     }
 
     return Optional.empty();

@@ -45,7 +45,7 @@ public interface GraphQlQueries {
     String getName();
 
     default String getName(String type) {
-      return StringTemplateFilters.applyTemplate(getName(), (Map.of("type", type))::get);
+      return StringTemplateFilters.applyTemplate(getName(), Map.of("type", type)::get);
     }
 
     /**
@@ -76,7 +76,7 @@ public interface GraphQlQueries {
     String getName();
 
     default String getName(String type) {
-      return StringTemplateFilters.applyTemplate(getName(), (Map.of("type", type))::get);
+      return StringTemplateFilters.applyTemplate(getName(), Map.of("type", type)::get);
     }
 
     /**

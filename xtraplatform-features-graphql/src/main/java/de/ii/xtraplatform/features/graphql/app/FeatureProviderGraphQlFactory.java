@@ -25,6 +25,7 @@ import de.ii.xtraplatform.features.domain.SchemaReferenceResolver;
 import de.ii.xtraplatform.features.graphql.domain.FeatureProviderGraphQlData;
 import de.ii.xtraplatform.features.graphql.domain.ImmutableFeatureProviderGraphQlData;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
@@ -41,7 +42,6 @@ public class FeatureProviderGraphQlFactory
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderGraphQlFactory.class);
 
   private final Lazy<Set<SchemaFragmentResolver>> schemaResolvers;
-  private final ConnectorFactory connectorFactory;
 
   @Inject
   public FeatureProviderGraphQlFactory(
@@ -50,7 +50,7 @@ public class FeatureProviderGraphQlFactory
       ProviderGraphQlFactoryAssisted providerGraphQlFactoryAssisted) {
     super(providerGraphQlFactoryAssisted);
     this.schemaResolvers = schemaResolvers;
-    this.connectorFactory = connectorFactory;
+    Objects.requireNonNull(connectorFactory);
   }
 
   @Override
