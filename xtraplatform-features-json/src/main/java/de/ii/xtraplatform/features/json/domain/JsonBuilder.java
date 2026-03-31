@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public class JsonBuilder {
 
   private final ObjectMapper jsonMapper;
@@ -55,8 +56,6 @@ public class JsonBuilder {
 
     nestingTracker.closeObject();
 
-    currentObject = null;
-
     restoreParent();
   }
 
@@ -79,8 +78,6 @@ public class JsonBuilder {
     }
 
     nestingTracker.closeArray();
-
-    currentArray = null;
 
     restoreParent();
   }

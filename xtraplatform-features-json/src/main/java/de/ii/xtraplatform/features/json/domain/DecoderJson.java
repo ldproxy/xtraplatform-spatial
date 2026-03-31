@@ -25,21 +25,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class DecoderJson implements Decoder {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DecoderJson.class);
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
 
   private final JsonParser parser;
   private final ByteArrayFeeder feeder;
   private final Optional<String> nullValue;
   private List<List<String>> arrayPaths;
-  private DecoderJsonProperties decoderJsonProperties;
-  private boolean inProperties = false;
-  private boolean isArray = false;
+  private Optional<DecoderJsonProperties> decoderJsonProperties = Optional.empty();
+  private boolean inProperties;
+  private boolean isArray;
   private int featureDepth;
   private int valueIndex;
 
@@ -56,8 +53,6 @@ public class DecoderJson implements Decoder {
   @Override
   public void decode(byte[] data, Pipeline pipeline) {
     boolean isValues = pipeline.context().schema().filter(FeatureSchema::isValue).isPresent();
-    boolean isSingleValue =
-        isValues && pipeline.context().schema().filter(FeatureSchema::isArray).isEmpty();
 
     init(pipeline, isValues);
 
@@ -67,17 +62,23 @@ public class DecoderJson implements Decoder {
       throw new IllegalStateException(e);
     }
 
+    if (isValues) {
+      boolean isSingleValue = pipeline.context().schema().filter(FeatureSchema::isArray).isEmpty();
+      boolean feedMeMore = false;
+      while (!feedMeMore) {
+        feedMeMore = decodeValues(pipeline.context(), pipeline.downstream(), isSingleValue);
+      }
+      return;
+    }
+
     boolean feedMeMore = false;
     while (!feedMeMore) {
-      feedMeMore =
-          isValues
-              ? decodeValues(pipeline.context(), pipeline.downstream(), isSingleValue)
-              : decodeObjects(pipeline.context(), pipeline.downstream());
+      feedMeMore = decodeObjects(pipeline.context(), pipeline.downstream());
     }
   }
 
   private void init(Pipeline pipeline, boolean isValues) {
-    if (!isValues && Objects.isNull(decoderJsonProperties)) {
+    if (!isValues && decoderJsonProperties.isEmpty()) {
       this.arrayPaths =
           pipeline.context().mapping().getSchemasBySourcePath().entrySet().stream()
               .filter(entry -> entry.getValue().get(0).isArray())
@@ -85,12 +86,13 @@ public class DecoderJson implements Decoder {
               .collect(Collectors.toList());
 
       this.decoderJsonProperties =
-          new DecoderJsonProperties(
-              pipeline,
-              arrayPaths,
-              supplierMayThrow(parser::getValueAsString),
-              Optional.empty(),
-              Optional.empty());
+          Optional.of(
+              new DecoderJsonProperties(
+                  pipeline,
+                  arrayPaths,
+                  supplierMayThrow(parser::getValueAsString),
+                  Optional.empty(),
+                  Optional.empty()));
 
       this.featureDepth = pipeline.context().pathTracker().asList().size();
     }
@@ -102,9 +104,9 @@ public class DecoderJson implements Decoder {
     this.isArray = false;
     this.valueIndex = 0;
     if (full) {
-      this.decoderJsonProperties = null;
-    } else if (Objects.nonNull(decoderJsonProperties)) {
-      decoderJsonProperties.reset();
+      this.decoderJsonProperties = Optional.empty();
+    } else {
+      decoderJsonProperties.ifPresent(DecoderJsonProperties::reset);
     }
   }
 
@@ -113,6 +115,7 @@ public class DecoderJson implements Decoder {
     feeder.endOfInput();
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private boolean decodeObjects(
       ModifiableContext<FeatureSchema, SchemaMapping> context,
       FeatureEventHandler<
@@ -120,15 +123,19 @@ public class DecoderJson implements Decoder {
           downstream) {
 
     boolean feedMeMore = false;
+    DecoderJsonProperties properties =
+        decoderJsonProperties.orElseThrow(
+            () -> new IllegalStateException("Decoder has not been initialized."));
 
     try {
       JsonToken nextToken = parser.nextToken();
-      String currentName = parser.currentName();
 
       // TODO: null is end-of-input
       if (Objects.isNull(nextToken)) {
         return true;
       }
+
+      String currentName = parser.currentName();
 
       switch (nextToken) {
         case NOT_AVAILABLE:
@@ -146,7 +153,7 @@ public class DecoderJson implements Decoder {
             }
             break;
           }
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = properties.parse(nextToken, currentName, featureDepth);
           break;
         case START_ARRAY:
           if (!inProperties) {
@@ -157,10 +164,10 @@ public class DecoderJson implements Decoder {
             }
             break;
           }
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = properties.parse(nextToken, currentName, featureDepth);
           break;
         case END_OBJECT:
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = properties.parse(nextToken, currentName, featureDepth);
           break;
         case END_ARRAY:
           if (inProperties && isArray && context.path().size() == featureDepth) {
@@ -168,19 +175,25 @@ public class DecoderJson implements Decoder {
             downstream.onArrayEnd(context);
             break;
           }
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = properties.parse(nextToken, currentName, featureDepth);
           break;
         default:
-          feedMeMore = decoderJsonProperties.parse(nextToken, currentName, featureDepth);
+          feedMeMore = properties.parse(nextToken, currentName, featureDepth);
           break;
       }
     } catch (IOException e) {
-      throw new IllegalArgumentException("Could not parse JSON: " + e.getMessage());
+      throw new IllegalArgumentException("Could not parse JSON: " + e.getMessage(), e);
     }
 
     return feedMeMore;
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   private boolean decodeValues(
       ModifiableContext<FeatureSchema, SchemaMapping> context,
       FeatureEventHandler<
@@ -244,6 +257,8 @@ public class DecoderJson implements Decoder {
             case VALUE_FALSE:
               context.setValueType(Type.BOOLEAN);
               break;
+            default:
+              throw new IllegalStateException("Unsupported JSON token: " + nextToken);
           }
 
           if (nextToken == JsonToken.VALUE_NULL && nullValue.isPresent()) {
@@ -263,7 +278,7 @@ public class DecoderJson implements Decoder {
           break;
       }
     } catch (IOException e) {
-      throw new IllegalArgumentException("Could not parse JSON: " + e.getMessage());
+      throw new IllegalArgumentException("Could not parse JSON: " + e.getMessage(), e);
     }
 
     return false;
