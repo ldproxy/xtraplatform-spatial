@@ -18,6 +18,7 @@ import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -198,7 +199,8 @@ import org.immutables.value.Value;
 public interface Tile3dProviderFeaturesData extends Tile3dProviderData {
 
   String PROVIDER_SUBTYPE = "FEATURES";
-  String ENTITY_SUBTYPE = String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase();
+  String ENTITY_SUBTYPE =
+      String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase(Locale.ROOT);
 
   /**
    * @langEn Always `FEATURES`.
