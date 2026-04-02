@@ -20,20 +20,29 @@ public interface Polygon extends SingleSurface<LineString> {
     return ImmutablePolygon.builder().value(List.of()).axes(axes).build();
   }
 
-  static Polygon of(double[] xyOuterRing) {
+  static Polygon of(double... xyOuterRing) {
     return ImmutablePolygon.builder().value(List.of(LineString.of(xyOuterRing))).build();
   }
 
+  @SuppressWarnings("PMD.UseVarargs")
   static Polygon of(double[] xyOuterRing, EpsgCrs crs) {
+    return of(crs, xyOuterRing);
+  }
+
+  static Polygon of(EpsgCrs crs, double... xyOuterRing) {
     return ImmutablePolygon.builder()
         .crs(crs)
-        .value(List.of(LineString.of(xyOuterRing, crs)))
+        .value(List.of(LineString.of(crs, xyOuterRing)))
         .build();
   }
 
   static Polygon of(List<PositionList> rings) {
     return ImmutablePolygon.builder()
-        .value(rings.stream().map(LineString::of).filter(ring -> !ring.isEmpty()).toList())
+        .value(
+            rings.stream()
+                .map(ring -> LineString.of(ring))
+                .filter(ring -> !ring.isEmpty())
+                .toList())
         .build();
   }
 
@@ -59,6 +68,7 @@ public interface Polygon extends SingleSurface<LineString> {
         .build();
   }
 
+  @Override
   @Value.Default
   default Axes getAxes() {
     if (isEmpty()) {
@@ -89,7 +99,7 @@ public interface Polygon extends SingleSurface<LineString> {
     Preconditions.checkArgument(
         getValue().stream()
             .allMatch(
-                g -> (g.getCrs().isEmpty() && getCrs().isEmpty()) || (g.getCrs().equals(getCrs()))),
+                g -> g.getCrs().isEmpty() && getCrs().isEmpty() || g.getCrs().equals(getCrs())),
         "All geometries must have the same CRS.");
   }
 

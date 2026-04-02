@@ -40,6 +40,7 @@ public interface CurvePolygon extends SingleSurface<Curve<?>> {
         .build();
   }
 
+  @Override
   @Value.Default
   default Axes getAxes() {
     if (isEmpty()) {
@@ -66,7 +67,7 @@ public interface CurvePolygon extends SingleSurface<Curve<?>> {
     Preconditions.checkArgument(
         getValue().stream()
             .allMatch(
-                g -> (g.getCrs().isEmpty() && getCrs().isEmpty()) || (g.getCrs().equals(getCrs()))),
+                g -> g.getCrs().isEmpty() && getCrs().isEmpty() || g.getCrs().equals(getCrs())),
         "All geometries must have the same CRS.");
   }
 

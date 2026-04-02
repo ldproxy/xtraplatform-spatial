@@ -25,7 +25,7 @@ public abstract class PositionList {
     return ImmutablePositionList.builder().axes(axes).coordinates(new double[0]).build();
   }
 
-  public static PositionList of(Axes axes, double[] coordinates) {
+  public static PositionList of(Axes axes, double... coordinates) {
     return ImmutablePositionList.builder().axes(axes).coordinates(coordinates).build();
   }
 

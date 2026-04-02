@@ -46,6 +46,7 @@ public interface PolyhedralSurface extends Surface<List<Polygon>>, CompositeGeom
         .build();
   }
 
+  @Override
   @Value.Default
   default Axes getAxes() {
     if (isEmpty()) {
@@ -81,7 +82,7 @@ public interface PolyhedralSurface extends Surface<List<Polygon>>, CompositeGeom
     Preconditions.checkArgument(
         getValue().stream()
             .allMatch(
-                g -> (g.getCrs().isEmpty() && getCrs().isEmpty()) || (g.getCrs().equals(getCrs()))),
+                g -> g.getCrs().isEmpty() && getCrs().isEmpty() || g.getCrs().equals(getCrs())),
         "All geometries must have the same CRS.");
   }
 }

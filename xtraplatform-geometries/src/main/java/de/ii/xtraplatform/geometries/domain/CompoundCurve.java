@@ -41,6 +41,7 @@ public interface CompoundCurve extends Curve<List<SingleCurve>>, CompositeGeomet
         .build();
   }
 
+  @Override
   @Value.Default
   default Axes getAxes() {
     if (isEmpty()) {
@@ -77,6 +78,7 @@ public interface CompoundCurve extends Curve<List<SingleCurve>>, CompositeGeomet
         numPositionsLastCurve * size);
   }
 
+  @Override
   @Value.Derived
   @Value.Auxiliary
   default int getNumGeometries() {
@@ -118,7 +120,7 @@ public interface CompoundCurve extends Curve<List<SingleCurve>>, CompositeGeomet
     Preconditions.checkArgument(
         getValue().stream()
             .allMatch(
-                g -> (g.getCrs().isEmpty() && getCrs().isEmpty()) || (g.getCrs().equals(getCrs()))),
+                g -> g.getCrs().isEmpty() && getCrs().isEmpty() || g.getCrs().equals(getCrs())),
         "All geometries must have the same CRS.");
   }
 }

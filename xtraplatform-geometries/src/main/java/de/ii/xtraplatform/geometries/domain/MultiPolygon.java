@@ -59,7 +59,7 @@ public interface MultiPolygon extends AbstractGeometryCollection<Polygon> {
     Preconditions.checkArgument(
         getValue().stream()
             .allMatch(
-                g -> (g.getCrs().isEmpty() && getCrs().isEmpty()) || (g.getCrs().equals(getCrs()))),
+                g -> g.getCrs().isEmpty() && getCrs().isEmpty() || g.getCrs().equals(getCrs())),
         "All geometries must have the same CRS.");
   }
 }

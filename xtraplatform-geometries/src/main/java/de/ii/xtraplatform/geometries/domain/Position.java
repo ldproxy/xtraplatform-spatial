@@ -13,6 +13,7 @@ import javax.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
 public abstract class Position {
 
   @NotNull
@@ -27,7 +28,7 @@ public abstract class Position {
     return ImmutablePosition.builder().axes(axes).coordinates(coordinates).build();
   }
 
-  public static Position of(Axes axes, double[] coordinates) {
+  public static Position of(Axes axes, double... coordinates) {
     return ImmutablePosition.builder().axes(axes).coordinates(coordinates).build();
   }
 
@@ -71,6 +72,13 @@ public abstract class Position {
           && Arrays.equals(getCoordinates(), other.getCoordinates());
     }
     return false;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = getAxes().hashCode();
+    result = 31 * result + Arrays.hashCode(getCoordinates());
+    return result;
   }
 
   @Value.Derived

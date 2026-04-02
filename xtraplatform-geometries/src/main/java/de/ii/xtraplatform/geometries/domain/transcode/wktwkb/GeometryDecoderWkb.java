@@ -23,11 +23,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+@SuppressWarnings("PMD.GodClass")
 public class GeometryDecoderWkb extends AbstractGeometryDecoder {
 
   private final WkbDialect dialect;
 
   public GeometryDecoderWkb() {
+    super();
     this.dialect = WkbDialect.SQL_MM;
   }
 
@@ -37,6 +39,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
   // 2) The embedded geometries do not repeat the endian byte for COMPOUNDCURVE, CURVEPOLYGON,
   // MULTICURVE, MULTISURFACE.
   public GeometryDecoderWkb(WkbDialect wkbDialect) {
+    super();
     this.dialect = wkbDialect;
   }
 
@@ -50,6 +53,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     }
   }
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public Geometry<?> decode(
       DataInputStream dis,
       Optional<EpsgCrs> crs,
@@ -62,12 +66,13 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
             ? isLittleEndianRootGeometry.get()
             : dis.readByte() == 1;
     long typeCode = readUnsignedInt(dis, isLittleEndian);
-    Axes axes = Axes.fromWkbCode(typeCode);
     GeometryType type = WktWkbGeometryType.fromWkbType((int) typeCode).toGeometryType();
 
     if (!allowedTypes.isEmpty() && !allowedTypes.contains(type)) {
       throw new IOException("Unexpected geometry type " + type + ". Allowed: " + allowedTypes);
     }
+
+    Axes axes = Axes.fromWkbCode(typeCode);
     if (allowedAxes != null && !allowedAxes.equals(axes)) {
       throw new IOException("Geometry axes " + axes + " do not match expected " + allowedAxes);
     }
@@ -152,18 +157,6 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     };
   }
 
-  private Position pointPos(Axes axes, double[] coords) {
-    return Position.of(axes, coords);
-  }
-
-  private PositionList posList(Axes axes, double[] coords) {
-    return PositionList.of(axes, coords);
-  }
-
-  private List<PositionList> posListList(Axes axes, List<double[]> coords) {
-    return coords.stream().map(c -> PositionList.of(axes, c)).toList();
-  }
-
   private long readUnsignedInt(DataInputStream dis, boolean isLittleEndian) throws IOException {
     int v = dis.readInt();
     return (isLittleEndian ? Integer.reverseBytes(v) : v) & 0xFFFFFFFFL;
@@ -177,8 +170,10 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
   private Position readPosition(DataInputStream dis, boolean isLittleEndian, Axes axes)
       throws IOException {
     double[] coords = new double[axes.size()];
-    for (int j = 0; j < axes.size(); j++) coords[j] = readDouble(dis, isLittleEndian);
-    return pointPos(axes, coords);
+    for (int j = 0; j < axes.size(); j++) {
+      coords[j] = readDouble(dis, isLittleEndian);
+    }
+    return Position.of(axes, coords);
   }
 
   private PositionList readPositionList(DataInputStream dis, boolean isLittleEndian, Axes axes)
@@ -186,9 +181,12 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     int dim = axes.size();
     long num = readUnsignedInt(dis, isLittleEndian);
     double[] coords = new double[dim * (int) num];
-    for (int i = 0; i < num; i++)
-      for (int j = 0; j < dim; j++) coords[i * dim + j] = readDouble(dis, isLittleEndian);
-    return posList(axes, coords);
+    for (int i = 0; i < num; i++) {
+      for (int j = 0; j < dim; j++) {
+        coords[i * dim + j] = readDouble(dis, isLittleEndian);
+      }
+    }
+    return PositionList.of(axes, coords);
   }
 
   private List<PositionList> readListOfPositionList(
@@ -198,12 +196,21 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     List<double[]> list = new ArrayList<>();
     for (int k = 0; k < num; k++) {
       long numPoints = readUnsignedInt(dis, isLittleEndian);
-      double[] coords = new double[dim * (int) numPoints];
-      for (int i = 0; i < numPoints; i++)
-        for (int j = 0; j < dim; j++) coords[i * dim + j] = readDouble(dis, isLittleEndian);
+      double[] coords = readCoordinates(dis, isLittleEndian, dim, numPoints);
       list.add(coords);
     }
-    return posListList(axes, list);
+    return list.stream().map(c -> PositionList.of(axes, c)).toList();
+  }
+
+  private double[] readCoordinates(
+      DataInputStream dis, boolean isLittleEndian, int dim, long numPoints) throws IOException {
+    double[] coords = new double[dim * (int) numPoints];
+    for (int i = 0; i < numPoints; i++) {
+      for (int j = 0; j < dim; j++) {
+        coords[i * dim + j] = readDouble(dis, isLittleEndian);
+      }
+    }
+    return coords;
   }
 
   private List<Geometry<?>> readListOfGeometry(
@@ -226,7 +233,9 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               dialect == WkbDialect.ORACLE && embeddedGeometriesDoNotHaveLittleEndianFlagInOracle
                   ? Optional.of(isLittleEndian)
                   : Optional.empty());
-      if (g != null) builder.add(g);
+      if (g != null) {
+        builder.add(g);
+      }
     }
     return builder.build();
   }

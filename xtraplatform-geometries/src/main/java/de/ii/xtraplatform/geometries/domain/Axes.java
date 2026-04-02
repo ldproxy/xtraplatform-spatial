@@ -13,7 +13,7 @@ public enum Axes {
   XYM(3, " M", 2000),
   XYZM(4, " ZM", 3000);
 
-  public static final int SPECIAL_SHIFT = 1000000;
+  public static final int SPECIAL_SHIFT = 1_000_000;
 
   private final int size;
   private final String wktSuffix;
@@ -39,10 +39,15 @@ public enum Axes {
       // with axes XY have a different geometry type code 100000x.
       return Axes.XY;
     }
-    return (geometryTypeCode >= Axes.XYZM.wkbShift)
-        ? Axes.XYZM
-        : (geometryTypeCode >= Axes.XYM.wkbShift)
-            ? Axes.XYM
-            : (geometryTypeCode >= Axes.XYZ.wkbShift) ? Axes.XYZ : Axes.XY;
+    if (geometryTypeCode >= Axes.XYZM.wkbShift) {
+      return Axes.XYZM;
+    }
+    if (geometryTypeCode >= Axes.XYM.wkbShift) {
+      return Axes.XYM;
+    }
+    if (geometryTypeCode >= Axes.XYZ.wkbShift) {
+      return Axes.XYZ;
+    }
+    return Axes.XY;
   }
 }
