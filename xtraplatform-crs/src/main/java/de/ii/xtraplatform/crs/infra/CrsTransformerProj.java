@@ -52,14 +52,15 @@ public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTra
       int targetDimension,
       CoordinateOperation coordinateOperation,
       Optional<CoordinateOperation> horizontalCoordinateOperation) {
+    super();
     this.sourceCrs = origSourceCrs;
     this.targetCrs = origTargetCrs;
 
     Unit<?> sourceUnit = sourceCrs.getCoordinateSystem().getAxis(0).getUnit();
     Unit<?> targetUnit = targetCrs.getCoordinateSystem().getAxis(0).getUnit();
 
-    this.isSourceMetric = sourceUnit == Units.METRE;
-    this.isTargetMetric = targetUnit == Units.METRE;
+    this.isSourceMetric = Units.METRE.equals(sourceUnit);
+    this.isTargetMetric = Units.METRE.equals(targetUnit);
 
     SingleCRS horizontalSourceCrs = getHorizontalCrs(sourceCrs);
     SingleCRS horizontalTargetCrs = getHorizontalCrs(targetCrs);
@@ -96,6 +97,7 @@ public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTra
   }
 
   @Override
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
   public double[] transform(double[] coordinates, int numberOfPoints, int dimension) {
     if (dimension > sourceDimension) {
       throw new IllegalStateException(

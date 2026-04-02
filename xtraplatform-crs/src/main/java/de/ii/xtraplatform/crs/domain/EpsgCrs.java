@@ -10,6 +10,7 @@ package de.ii.xtraplatform.crs.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,6 +22,7 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableEpsgCrs.Builder.class)
 // TODO: test
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+@SuppressWarnings("PMD.TooManyMethods")
 public interface EpsgCrs {
 
   enum Force {
@@ -55,21 +57,19 @@ public interface EpsgCrs {
       return ogcCrs.get();
     }
 
-    int code;
-    try {
-      code = Integer.parseInt(prefixedCode.substring(prefixedCode.lastIndexOf(":") + 1));
-    } catch (NumberFormatException e) {
-      try {
-        code = Integer.parseInt(prefixedCode.substring(prefixedCode.lastIndexOf("/") + 1));
-      } catch (NumberFormatException e2) {
-        try {
-          code = Integer.parseInt(prefixedCode);
-        } catch (NumberFormatException e3) {
-          throw new IllegalArgumentException("Could not parse CRS: " + prefixedCode);
-        }
-      }
+    int separator = Math.max(prefixedCode.lastIndexOf(':'), prefixedCode.lastIndexOf('/'));
+    String codeString = separator >= 0 ? prefixedCode.substring(separator + 1) : prefixedCode;
+
+    if (codeString.isEmpty() || !codeString.chars().allMatch(Character::isDigit)) {
+      throw new IllegalArgumentException("Could not parse CRS: " + prefixedCode);
     }
-    return ImmutableEpsgCrs.of(code);
+
+    BigInteger code = new BigInteger(codeString);
+    if (code.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
+      throw new IllegalArgumentException("Could not parse CRS: " + prefixedCode);
+    }
+
+    return ImmutableEpsgCrs.of(code.intValue());
   }
 
   static EpsgCrs fromString(String prefixedCode, String prefixedCodeVertical) {
