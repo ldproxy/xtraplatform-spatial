@@ -22,6 +22,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.shape.fractal.MortonCode;
 
 @Value.Immutable
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
 public interface TileTree {
 
   TileTree ROOT = of(0, 0, 0);
@@ -199,6 +200,7 @@ public interface TileTree {
         .build();
   }
 
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   static List<TileTree> subtrees(
       int level, int row, int col, TileSubMatrix contents, int subtreeLevels) {
     if (level > contents.getLevel()) {
@@ -224,9 +226,9 @@ public interface TileTree {
             TileSubMatrix.of(
                     contents.getLevel(),
                     r * sizeCon,
-                    (r * sizeCon) + (sizeCon) - 1,
+                    r * sizeCon + sizeCon - 1,
                     c * sizeCon,
-                    (c * sizeCon) + (sizeCon) - 1)
+                    c * sizeCon + sizeCon - 1)
                 .intersection(contents);
 
         if (content.isPresent()) {

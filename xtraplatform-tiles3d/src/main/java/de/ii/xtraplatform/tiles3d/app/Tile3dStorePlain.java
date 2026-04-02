@@ -15,23 +15,12 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dStore;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dStoreReadOnly;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-class Tile3dStorePlain implements Tile3dStore {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dStorePlain.class);
-
-  static Tile3dStoreReadOnly readOnly(ResourceStore blobStore) {
-    return new Tile3dStorePlain(blobStore);
-  }
-
-  static Tile3dStore readWrite(ResourceStore blobStore) {
-    return new Tile3dStorePlain(blobStore);
-  }
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
+final class Tile3dStorePlain implements Tile3dStore {
 
   private static final String UNKNOWN_PATH = "__unknown__";
 
@@ -39,6 +28,14 @@ class Tile3dStorePlain implements Tile3dStore {
 
   private Tile3dStorePlain(ResourceStore blobStore) {
     this.blobStore = blobStore;
+  }
+
+  static Tile3dStoreReadOnly readOnly(ResourceStore blobStore) {
+    return new Tile3dStorePlain(blobStore);
+  }
+
+  static Tile3dStore readWrite(ResourceStore blobStore) {
+    return new Tile3dStorePlain(blobStore);
   }
 
   @Override
@@ -60,7 +57,8 @@ class Tile3dStorePlain implements Tile3dStore {
 
   @Override
   public boolean isEmpty() throws IOException {
-    try (Stream<Path> paths = blobStore.walk(Path.of(""), 5, (p, a) -> a.isValue())) {
+    try (Stream<java.nio.file.Path> paths =
+        blobStore.walk(java.nio.file.Path.of(""), 5, (p, a) -> a.isValue())) {
       return paths.findAny().isEmpty();
     } catch (IOException e) {
       // ignore
@@ -97,18 +95,18 @@ class Tile3dStorePlain implements Tile3dStore {
     blobStore.put(pathContent(level, x, y), new ByteArrayInputStream(tile));
   }
 
-  private static Path path(Tile3dQuery tile) {
-    return Path.of(tile.getFileName().orElse(UNKNOWN_PATH));
+  private static java.nio.file.Path path(Tile3dQuery tile) {
+    return java.nio.file.Path.of(tile.getFileName().orElse(UNKNOWN_PATH));
   }
 
-  private static Path pathSubtree(int level, int x, int y) {
+  private static java.nio.file.Path pathSubtree(int level, int x, int y) {
     String fileName = String.format("%d_%d_%d.%s", level, x, y, "subtree");
-    return Path.of(fileName);
+    return java.nio.file.Path.of(fileName);
   }
 
-  private static Path pathContent(int level, int x, int y) {
+  private static java.nio.file.Path pathContent(int level, int x, int y) {
     String fileName = String.format("%d_%d_%d.%s", level, x, y, "glb");
-    return Path.of(fileName);
+    return java.nio.file.Path.of(fileName);
   }
 
   private static Blob applyContentType(Blob blob) {
@@ -118,8 +116,9 @@ class Tile3dStorePlain implements Tile3dStore {
     return blob.withPrecomputedContentType(contentType);
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static String contentType(String fileName) {
-    String ext = Files.getFileExtension(fileName).toLowerCase();
+    String ext = Files.getFileExtension(fileName).toLowerCase(Locale.ROOT);
 
     switch (ext) {
       case "glb":

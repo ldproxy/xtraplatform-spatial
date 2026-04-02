@@ -17,6 +17,7 @@ import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.docs.DocVar;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
+import java.util.Locale;
 import java.util.Map;
 import org.immutables.value.Value;
 
@@ -84,7 +85,8 @@ import org.immutables.value.Value;
 public interface Tile3dProviderFilesData extends Tile3dProviderData {
 
   String PROVIDER_SUBTYPE = "FILES";
-  String ENTITY_SUBTYPE = String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase();
+  String ENTITY_SUBTYPE =
+      String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase(Locale.ROOT);
 
   /**
    * @langEn Always `FILES`.

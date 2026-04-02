@@ -28,7 +28,6 @@ import de.ii.xtraplatform.tiles3d.domain.Tileset3dFiles;
 import de.ii.xtraplatform.tiles3d.domain.spec.Tileset3d;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -81,15 +80,17 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
 
     for (Entry<String, Tileset3dFiles> entry : getData().getTilesets().entrySet()) {
       Tileset3dFiles tilesetCfg = entry.getValue().mergeDefaults(getData().getTilesetDefaults());
-      Path source = Path.of(tilesetCfg.getSource());
+      java.nio.file.Path source = java.nio.file.Path.of(tilesetCfg.getSource());
 
       try {
         if (!rootStore.has(source)) {
           throw new IllegalStateException("Could not find 3D Tiles tileset file: " + source);
         }
 
-        InputStream inputStream = rootStore.content(source).orElseThrow();
-        Tileset3d tileset = objectMapper.readValue(inputStream, Tileset3d.class);
+        Tileset3d tileset;
+        try (InputStream inputStream = rootStore.content(source).orElseThrow()) {
+          tileset = objectMapper.readValue(inputStream, Tileset3d.class);
+        }
 
         tileset.validate(source);
 

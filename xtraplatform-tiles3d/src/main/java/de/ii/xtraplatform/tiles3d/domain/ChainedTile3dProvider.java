@@ -37,6 +37,7 @@ public interface ChainedTile3dProvider {
 
   TileResult getTile(Tile3dQuery tile) throws IOException;
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   default TileResult get(Tile3dQuery tile) {
     TileResult tileResult = TileResult.notFound();
 
