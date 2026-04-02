@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.UnusedPrivateField")
 public class DecoderJsonProperties {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DecoderJsonProperties.class);
@@ -64,14 +65,19 @@ public class DecoderJsonProperties {
     this.valueIndex = 0;
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   public boolean parse(JsonToken nextToken, String currentName, int featureDepth) {
-
-    boolean feedMeMore = false;
-
     // TODO: null is end-of-input
     if (Objects.isNull(nextToken)) {
       return true; // or completestage???
     }
+
+    boolean feedMeMore = false;
 
     switch (nextToken) {
       case NOT_AVAILABLE:
@@ -169,6 +175,8 @@ public class DecoderJsonProperties {
           case VALUE_FALSE:
             context.setValueType(Type.BOOLEAN);
             break;
+          default:
+            throw new IllegalStateException("Unsupported JSON token: " + nextToken);
         }
 
         if (Objects.nonNull(currentName)) {
@@ -193,9 +201,9 @@ public class DecoderJsonProperties {
             .filter(
                 s ->
                     s.isValue()
-                        && (parentSchemas.size() > 1
-                            && parentSchemas.get(0).isArray()
-                            && parentSchemas.get(0).getSourcePath().isEmpty()))
+                        && parentSchemas.size() > 1
+                        && parentSchemas.get(0).isArray()
+                        && parentSchemas.get(0).getSourcePath().isEmpty())
             .isPresent()) {
           ArrayList<Integer> indexes =
               new ArrayList<>(
@@ -232,16 +240,14 @@ public class DecoderJsonProperties {
                     }
                   });
         } else {
-          try {
-            downstream.onValue(context);
-
-            context.pathTracker().track(depth + featureDepth);
-          } catch (Throwable e) {
-            boolean br = true;
-          }
+          downstream.onValue(context);
+          context.pathTracker().track(depth + featureDepth);
         }
 
         break;
+
+      default:
+        throw new IllegalStateException("Unsupported JSON token: " + nextToken);
     }
 
     return feedMeMore;

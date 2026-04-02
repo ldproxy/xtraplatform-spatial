@@ -16,6 +16,7 @@ import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableSchemaMapping;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import java.util.Objects;
 import java.util.Optional;
 
 public class FeatureDecoderJson extends FeatureDecoder<byte[]> implements Decoder.Pipeline {
@@ -32,6 +33,9 @@ public class FeatureDecoderJson extends FeatureDecoder<byte[]> implements Decode
       String type,
       String wrapper,
       Optional<String> nullValue) {
+    super();
+    Objects.requireNonNull(type);
+    Objects.requireNonNull(wrapper);
     this.decoderJson = new DecoderJson(nullValue);
     this.featureSchema = featureSchema;
     this.featureQuery = query;
@@ -71,6 +75,7 @@ public class FeatureDecoderJson extends FeatureDecoder<byte[]> implements Decode
     return context;
   }
 
+  @Override
   public FeatureEventHandler<
           FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       downstream() {
