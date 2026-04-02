@@ -117,14 +117,12 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
   @Override
   public Reactive.Source<byte[]> getSourceStream(String query) {
-    InputStream inputStream =
+    try (InputStream inputStream =
         httpClient.postAsInputStream(
             connectionInfo.getUri().toString(),
             query.getBytes(StandardCharsets.UTF_8),
             MediaType.APPLICATION_JSON_TYPE,
-            Map.of("Accept", MediaType.APPLICATION_JSON));
-
-    try {
+            Map.of("Accept", MediaType.APPLICATION_JSON))) {
       byte[] bytes = inputStream.readAllBytes();
       LOGGER.debug("Response \n{}", new String(bytes, StandardCharsets.UTF_8));
 

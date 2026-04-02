@@ -51,14 +51,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
 public class FilterEncoderGraphQl {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FilterEncoderGraphQl.class);
-
-  private final Cql cql;
   private final EpsgCrs nativeCrs;
   private final CrsTransformerFactory crsTransformerFactory;
   BiFunction<List<Double>, Optional<EpsgCrs>, List<Double>> coordinatesTransformer;
@@ -71,7 +67,7 @@ public class FilterEncoderGraphQl {
       GraphQlQueries queryGeneration) {
     this.nativeCrs = nativeCrs;
     this.crsTransformerFactory = crsTransformerFactory;
-    this.cql = cql;
+    Objects.requireNonNull(cql);
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
     this.queryGeneration = queryGeneration;
   }
@@ -82,23 +78,25 @@ public class FilterEncoderGraphQl {
 
   private List<Double> transformCoordinatesIfNecessary(
       List<Double> coordinates, Optional<EpsgCrs> sourceCrs) {
-
-    if (sourceCrs.isPresent() && !Objects.equals(sourceCrs.get(), nativeCrs)) {
-      Optional<CrsTransformer> transformer =
-          crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
-      if (transformer.isPresent()) {
-        double[] transformed =
-            transformer.get().transform(Doubles.toArray(coordinates), coordinates.size() / 2, 2);
-        if (Objects.isNull(transformed)) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Filter is invalid. Coordinates cannot be transformed: %s", coordinates));
-        }
-
-        return Doubles.asList(transformed);
-      }
+    if (sourceCrs.isEmpty() || Objects.equals(sourceCrs.get(), nativeCrs)) {
+      return coordinates;
     }
-    return coordinates;
+
+    Optional<CrsTransformer> transformer =
+        crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
+
+    if (transformer.isEmpty()) {
+      return coordinates;
+    }
+
+    double[] transformed =
+        transformer.get().transform(Doubles.toArray(coordinates), coordinates.size() / 2, 2);
+    if (Objects.isNull(transformed)) {
+      throw new IllegalArgumentException(
+          String.format("Filter is invalid. Coordinates cannot be transformed: %s", coordinates));
+    }
+
+    return Doubles.asList(transformed);
   }
 
   // TODO: reverse FeatureSchema for nested mappings?
@@ -106,16 +104,16 @@ public class FilterEncoderGraphQl {
     return schema.getProperties().stream()
         .filter(
             featureProperty -> {
-              if (Objects.nonNull(featureProperty.getName())) {
-                if (Objects.equals(
-                    featureProperty.getName().toLowerCase(), property.toLowerCase())) {
-                  return true;
-                }
-                if (Objects.equals(property, ID_PLACEHOLDER) && featureProperty.isId()) {
-                  return true;
-                }
+              String featurePropertyName = featureProperty.getName();
+              if (Objects.isNull(featurePropertyName)) {
+                return false;
               }
-              return false;
+
+              if (featurePropertyName.equalsIgnoreCase(property)) {
+                return true;
+              }
+
+              return Objects.equals(property, ID_PLACEHOLDER) && featureProperty.isId();
             })
         .map(FeatureSchema::getSourcePath)
         .filter(Optional::isPresent)
@@ -195,7 +193,7 @@ public class FilterEncoderGraphQl {
 
       String argument =
           StringTemplateFilters.applyTemplate(
-              template.get(), (Map.of("sourcePath", sourcePath, "value", value))::get);
+              template.get(), Map.of("sourcePath", sourcePath, "value", value)::get);
 
       return fromString(argument);
     }
@@ -248,7 +246,7 @@ public class FilterEncoderGraphQl {
         String argument =
             StringTemplateFilters.applyTemplate(
                 queryGeneration.getCollection().getArguments().getBbox().get(),
-                (Map.of("sourcePath", sourcePath, "value", wkt))::get);
+                Map.of("sourcePath", sourcePath, "value", wkt)::get);
 
         return fromString(argument);
       }
@@ -348,7 +346,7 @@ public class FilterEncoderGraphQl {
       String argument =
           StringTemplateFilters.applyTemplate(
               queryGeneration.getCollection().getArguments().getGeometry().get(),
-              (Map.of("value", wkt))::get,
+              Map.of("value", wkt)::get,
               Map.of("toWkt", java.util.function.Function.identity()));
 
       return fromString(argument);
@@ -401,6 +399,7 @@ public class FilterEncoderGraphQl {
     return fromString(obj, false);
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static Map<String, String> fromString(String obj, boolean subField) {
     String separator = subField ? " " : ":";
     String cleaned = obj.trim();

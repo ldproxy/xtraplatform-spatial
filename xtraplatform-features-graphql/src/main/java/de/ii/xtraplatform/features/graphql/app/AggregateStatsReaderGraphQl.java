@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.graphql.app;
 
 import de.ii.xtraplatform.crs.domain.BoundingBox;
-import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -18,20 +17,19 @@ import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
 
 public class AggregateStatsReaderGraphQl implements AggregateStatsReader<FeatureSchema> {
 
-  private final FeatureMetadata featureMetadata;
-  private final Optional<CrsTransformer> crsTransformer;
-
   public AggregateStatsReaderGraphQl(
       FeatureMetadata featureMetadata,
       CrsTransformerFactory crsTransformerFactory,
       EpsgCrs nativeCrs) {
-    this.featureMetadata = featureMetadata;
-    this.crsTransformer = crsTransformerFactory.getTransformer(OgcCrs.CRS84, nativeCrs, true);
+    Objects.requireNonNull(featureMetadata);
+    Objects.requireNonNull(crsTransformerFactory)
+        .getTransformer(OgcCrs.CRS84, Objects.requireNonNull(nativeCrs), true);
   }
 
   @Override
