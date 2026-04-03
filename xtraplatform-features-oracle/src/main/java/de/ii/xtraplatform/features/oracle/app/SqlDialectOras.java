@@ -25,7 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
 
-// TODO. Notes:
+// NOTE:
 // - only simple feature geometries are supported
 // - only 2D geometries are supported / have been tested
 // - S_CROSSES not supported
