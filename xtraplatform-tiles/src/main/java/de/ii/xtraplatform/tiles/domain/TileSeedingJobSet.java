@@ -160,12 +160,14 @@ public interface TileSeedingJobSet extends JobSetDetails {
   }
 
   default void update(String tileSet, String tileMatrixSet, int level, int delta) {
-    TilesetProgress progress = getTileSets().get(tileSet).getProgress();
+    if (getTileSets().containsKey(tileSet)) {
+      TilesetProgress progress = getTileSets().get(tileSet).getProgress();
 
-    progress.getCurrent().addAndGet(delta);
+      progress.getCurrent().addAndGet(delta);
 
-    if (progress.getLevels().containsKey(tileMatrixSet)) {
-      progress.getLevels().get(tileMatrixSet).addAndGet(level, -1 * delta);
+      if (progress.getLevels().containsKey(tileMatrixSet)) {
+        progress.getLevels().get(tileMatrixSet).addAndGet(level, -1 * delta);
+      }
     }
   }
 
