@@ -56,7 +56,8 @@ public class FeatureProviderGeoParquetFactory
     extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderGeoParquet>
     implements EntityFactory {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderGeoParquetFactory.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(FeatureProviderGeoParquetFactory.class);
 
   private final Lazy<Set<SchemaFragmentResolver>> schemaResolvers;
   private final boolean skipHydration;
@@ -112,7 +113,7 @@ public class FeatureProviderGeoParquetFactory
         .connectionInfo(
             new ImmutableConnectionInfoSql.Builder()
                 .database("")
-                //.dialect(SqlDbmsAdapterOras.ID)
+                .dialect(SqlDbmsAdapterDuckdb.ID)
                 .pool(
                     new ImmutablePoolSettings.Builder()
                         .maxConnections(-1)

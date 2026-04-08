@@ -38,6 +38,7 @@ import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,15 +102,13 @@ public class FeatureProviderGeoParquet extends FeatureProviderSql {
 
   @Override
   protected boolean onStartup() throws InterruptedException {
-    /*
-    if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsAdapterOras.ID)) {
+    if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsAdapterDuckdb.ID)) {
       LOGGER.error(
           "Feature provider with id '{}' could not be started: dialect '{}' is not supported",
           getId(),
           getData().getConnectionInfo().getDialect());
       return false;
     }
-     */
 
     return super.onStartup();
   }
