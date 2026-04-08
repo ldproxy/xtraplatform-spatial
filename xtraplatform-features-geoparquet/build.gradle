@@ -1,0 +1,19 @@
+
+maturity = 'PROPOSAL'
+maintenance = 'NONE'
+description = 'GeoParquet feature provider.'
+descriptionDe = 'GeoParquet Feature-Provider.'
+
+dependencies {
+    provided 'de.interactive_instruments:xtraplatform-blobs'
+    provided 'de.interactive_instruments:xtraplatform-cache'
+    provided 'de.interactive_instruments:xtraplatform-entities'
+    provided 'de.interactive_instruments:xtraplatform-streams'
+    provided 'de.interactive_instruments:xtraplatform-values'
+    provided 'de.interactive_instruments:xtraplatform-services'
+    provided project(':xtraplatform-cql')
+    provided project(':xtraplatform-crs')
+    provided project(':xtraplatform-features')
+    provided project(':xtraplatform-features-sql')
+    provided project(':xtraplatform-geometries')
+}
