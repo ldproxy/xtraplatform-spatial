@@ -79,8 +79,8 @@ public class SqlDialectDuckdb implements SqlDialect {
   }
 
   @Override
-  public String applyToJsonValue(String alias, String column, String path,
-      PropertyTypeInfo typeInfo) {
+  public String applyToJsonValue(
+      String alias, String column, String path, PropertyTypeInfo typeInfo) {
     return "";
   }
 

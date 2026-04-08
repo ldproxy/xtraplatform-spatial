@@ -16,4 +16,7 @@ dependencies {
     provided project(':xtraplatform-features')
     provided project(':xtraplatform-features-sql')
     provided project(':xtraplatform-geometries')
+
+    embedded(libs.duckdb)
 }
+
