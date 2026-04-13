@@ -17,7 +17,6 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
@@ -27,13 +26,6 @@ public class SqlDialectDuckdb implements SqlDialect {
 
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
-
-  @Override
-  public String applyToExpression(
-      String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
-    // Note: Experimental
-    return name.replace(table, String.format("read_parquet('%s')", table));
-  }
 
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
