@@ -10,7 +10,9 @@ package de.ii.xtraplatform.geometries.domain.transform;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ArcInterpolator {
+public final class ArcInterpolator {
+
+  private ArcInterpolator() {}
 
   public static double[] interpolateArcString(
       double[] coordinates, int dimension, double maxDeviation) {
@@ -40,6 +42,12 @@ public class ArcInterpolator {
     return result;
   }
 
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidInstantiatingObjectsInLoops"
+  })
   public static double[] interpolateArc3Points(
       double[] coordinates, int index, int dimension, double maxDeviation) {
     double[] center2d = calculateCircleCenter2d(coordinates, index, dimension);
@@ -73,7 +81,6 @@ public class ArcInterpolator {
     boolean isClockwise =
         (angle2 - angle1 + 2 * Math.PI) % (2 * Math.PI)
             > (angle3 - angle1 + 2 * Math.PI) % (2 * Math.PI);
-    ;
 
     double startAngle = angle1;
     double endAngle = angle3;
@@ -156,7 +163,7 @@ public class ArcInterpolator {
       double midY = (coordinates[i * dimension + 1] + coordinates[(i + 1) * dimension + 1]) / 2;
 
       // Compute the distance from the midpoint to the circle center
-      double distanceToCenter = distance2d(new double[] {midX, midY}, center2d);
+      double distanceToCenter = distance2d(midX, midY, center2d[0], center2d[1]);
       double deviation = Math.abs(distanceToCenter - radius);
 
       // Update the maximum deviation
@@ -166,22 +173,34 @@ public class ArcInterpolator {
     return maxDeviation;
   }
 
-  private static double distance2d(double[] point1, double[] point2) {
+  private static double distance2d(double[] point1, double... point2) {
     return Math.sqrt(Math.pow(point1[0] - point2[0], 2) + Math.pow(point1[1] - point2[1], 2));
   }
 
+  private static double distance2d(double x1, double y1, double x2, double y2) {
+    return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+  }
+
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static double[] calculateCircleCenter2d(double[] coordinates, int index, int dimension) {
-    double x1 = coordinates[index * dimension], y1 = coordinates[index * dimension + 1];
-    double x2 = coordinates[(index + 1) * dimension], y2 = coordinates[(index + 1) * dimension + 1];
-    double x3 = coordinates[(index + 2) * dimension], y3 = coordinates[(index + 2) * dimension + 1];
+    double x1 = coordinates[index * dimension];
+    double y1 = coordinates[index * dimension + 1];
+    double x2 = coordinates[(index + 1) * dimension];
+    double y2 = coordinates[(index + 1) * dimension + 1];
+    double x3 = coordinates[(index + 2) * dimension];
+    double y3 = coordinates[(index + 2) * dimension + 1];
 
     // Center points of the segments
-    double mx1 = (x1 + x2) / 2.0, my1 = (y1 + y2) / 2.0;
-    double mx2 = (x2 + x3) / 2.0, my2 = (y2 + y3) / 2.0;
+    double mx1 = (x1 + x2) / 2.0;
+    double my1 = (y1 + y2) / 2.0;
+    double mx2 = (x2 + x3) / 2.0;
+    double my2 = (y2 + y3) / 2.0;
 
     // Gradients of the segments
-    double dx1 = x2 - x1, dy1 = y2 - y1;
-    double dx2 = x3 - x2, dy2 = y3 - y2;
+    double dx1 = x2 - x1;
+    double dy1 = y2 - y1;
+    double dx2 = x3 - x2;
+    double dy2 = y3 - y2;
 
     // Handle vertical/horizontal lines to avoid NaN values
     boolean vert1 = dx1 == 0.0;
@@ -189,20 +208,20 @@ public class ArcInterpolator {
     boolean hor1 = dy1 == 0.0;
     boolean hor2 = dy2 == 0.0;
 
-    if ((vert1 && vert2) || (hor1 && hor2)) {
+    if (vert1 && vert2 || hor1 && hor2) {
       // collinear points, not an arc
       return new double[] {Double.NaN, Double.NaN};
     } else if (vert1) {
       // first segment is vertical
       double perp2 = -dx2 / dy2;
       double centerY = my1;
-      double centerX = ((centerY - my2) / perp2) + mx2;
+      double centerX = (centerY - my2) / perp2 + mx2;
       return new double[] {centerX, centerY};
     } else if (vert2) {
       // second segment is vertical
       double perp1 = -dx1 / dy1;
       double centerY = my2;
-      double centerX = ((centerY - my1) / perp1) + mx1;
+      double centerX = (centerY - my1) / perp1 + mx1;
       return new double[] {centerX, centerY};
     } else if (hor1) {
       // first segment is horizontal

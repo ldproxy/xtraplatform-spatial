@@ -26,12 +26,12 @@ public class DouglasPeuckerLineSimplifier {
     this.minPoints = minPoints;
   }
 
-  public double[] simplify(double[] pts) {
+  public double[] simplify(double... pts) {
     return simplify(pts, pts.length / 2);
   }
 
   public double[] simplify(double[] pts, int numPts) {
-    this.pts = pts;
+    this.pts = pts.clone();
     usePts = new boolean[numPts];
     for (int i = 0; i < numPts; i++) {
       usePts[i] = true;
@@ -68,7 +68,7 @@ public class DouglasPeuckerLineSimplifier {
   }
 
   private void simplifySection(int i, int j) {
-    if ((i + 1) == j) {
+    if (i + 1 == j) {
       return;
     }
 

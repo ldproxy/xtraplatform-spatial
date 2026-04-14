@@ -44,6 +44,7 @@ import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import de.ii.xtraplatform.geometries.domain.Surface;
 import java.util.Optional;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public class CrsSetter implements GeometryTransformer {
 
   private final Optional<EpsgCrs> crs;

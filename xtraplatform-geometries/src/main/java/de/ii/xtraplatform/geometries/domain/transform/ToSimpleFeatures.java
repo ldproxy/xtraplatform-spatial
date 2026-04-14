@@ -27,6 +27,7 @@ import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public class ToSimpleFeatures implements GeometryTransformer {
 
   private final OptionalDouble maxDeviation;

@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
 public class GeometryEncoderWkt {
 
   private final int[] precision;
@@ -57,7 +58,7 @@ public class GeometryEncoderWkt {
     this.precision =
         precision.stream().anyMatch(v -> v > 0)
             ? precision.stream().mapToInt(v -> v).toArray()
-            : null;
+            : new int[] {};
     this.multiPointAsFlatList = multiPointAsFlatList;
   }
 
@@ -67,6 +68,7 @@ public class GeometryEncoderWkt {
     return builder.toString();
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void writeGeometry(StringBuilder builder, Geometry<?> geometry, boolean withType)
       throws IOException {
     if (withType) {
@@ -78,7 +80,7 @@ public class GeometryEncoderWkt {
     if (geometry.isEmpty()) {
       builder.append(" EMPTY");
     } else {
-      builder.append("(");
+      builder.append('(');
       switch (geometry.getType()) {
         case POINT -> writePoint(builder, (Point) geometry);
         case MULTI_POINT -> writeMultiPoint(builder, (MultiPoint) geometry);
@@ -93,8 +95,10 @@ public class GeometryEncoderWkt {
         case MULTI_SURFACE -> writeMultiSurface(builder, (MultiSurface) geometry);
         case GEOMETRY_COLLECTION -> writeGeometryCollection(builder, (GeometryCollection) geometry);
         case POLYHEDRAL_SURFACE -> writePolyhedralSurface(builder, (PolyhedralSurface) geometry);
+        default -> throw new IllegalStateException(
+            "Unsupported geometry type: " + geometry.getType());
       }
-      builder.append(")");
+      builder.append(')');
     }
   }
 
@@ -102,7 +106,7 @@ public class GeometryEncoderWkt {
     double[] coordinates = position.getCoordinates();
     int dimension = position.getAxes().size();
     if (inParentheses) {
-      builder.append("(");
+      builder.append('(');
     }
     for (int i = 0; i < coordinates.length; i++) {
       int axisIndex = i % dimension;
@@ -113,11 +117,11 @@ public class GeometryEncoderWkt {
                   .toPlainString()
               : String.valueOf(coordinates[i]);
       if (i > 0) {
-        builder.append(" ");
+        builder.append(' ');
       }
       builder.append(value);
       if (inParentheses) {
-        builder.append(")");
+        builder.append(')');
       }
     }
   }
@@ -127,7 +131,7 @@ public class GeometryEncoderWkt {
     double[] coordinates = positionList.getCoordinates();
     int dimension = positionList.getAxes().size();
     if (inParentheses) {
-      builder.append("(");
+      builder.append('(');
     }
     for (int i = 0; i < coordinates.length; i++) {
       int axisIndex = i % dimension;
@@ -139,14 +143,14 @@ public class GeometryEncoderWkt {
               : String.valueOf(coordinates[i]);
       if (i > 0) {
         if (axisIndex == 0) {
-          builder.append(",");
+          builder.append(',');
         } else {
-          builder.append(" ");
+          builder.append(' ');
         }
       }
       builder.append(value);
       if (inParentheses) {
-        builder.append(")");
+        builder.append(')');
       }
     }
   }
@@ -159,15 +163,15 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Point point : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       if (multiPointAsFlatList) {
         writePosition(builder, point.getValue(), false);
       } else {
-        builder.append("(");
+        builder.append('(');
         writePosition(builder, point.getValue(), false);
-        builder.append(")");
+        builder.append(')');
       }
     }
   }
@@ -181,7 +185,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (LineString lineString : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, lineString, false);
@@ -193,9 +197,9 @@ public class GeometryEncoderWkt {
       if (ring.isEmpty()) {
         builder.append("EMPTY");
       } else {
-        builder.append("(");
+        builder.append('(');
         writePositionList(builder, ring.getValue(), false);
-        builder.append(")");
+        builder.append(')');
       }
     }
   }
@@ -204,7 +208,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Polygon polygon : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, polygon, false);
@@ -220,7 +224,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Curve<?> curve : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, curve, !(curve instanceof LineString));
@@ -231,7 +235,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Curve<?> curve : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, curve, !(curve instanceof LineString));
@@ -243,7 +247,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Polygon polygon : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, polygon, false);
@@ -255,7 +259,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Geometry<?> geometry1 : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, geometry1, true);
@@ -266,7 +270,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Surface<?> surface : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, surface, !(surface instanceof Polygon));
@@ -277,7 +281,7 @@ public class GeometryEncoderWkt {
     boolean first = true;
     for (Curve<?> curve : geometry.getValue()) {
       if (!first) {
-        builder.append(",");
+        builder.append(',');
       }
       first = false;
       writeGeometry(builder, curve, !(curve instanceof LineString));
