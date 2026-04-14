@@ -8,6 +8,8 @@
 package de.ii.xtraplatform.features.geoparquet.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
@@ -42,22 +44,39 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   @Override
   public String getId() {
-    return "";
+    return ID;
   }
 
   @Override
   public SqlDialect getDialect() {
-    return null;
+    return dialect;
   }
 
   @Override
-  public DataSource createDataSource(String providerId, ConnectionInfoSql connectionInfoSql) {
-    return null;
+  public DataSource createDataSource(String providerId, ConnectionInfoSql connectionInfo) {
+    HikariConfig hikariConfig = new HikariConfig();
+    hikariConfig.setDriverClassName("org.duckdb.DuckDBDriver");
+    hikariConfig.setJdbcUrl("jdbc:duckdb:");
+    return new HikariDataSource(hikariConfig);
   }
 
   @Override
   public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
-    return Optional.empty();
+    StringBuilder query = new StringBuilder(256);
+    query.append("INSTALL spatial;");
+    query.append("LOAD spatial;");
+
+    // ToDo: Build absolute path from relative path
+    query.append(String.format("SET file_search_path = '%s';", connectionInfo.getDatabase()));
+
+    for (int i = 0; i < connectionInfo.getSchemas().size(); i++) {
+      String parquetFile = connectionInfo.getSchemas().get(i);
+      query.append(
+          String.format(
+              "CREATE TABLE %s AS SELECT * FROM '%s.parquet';", parquetFile, parquetFile));
+    }
+
+    return Optional.of(query.toString());
   }
 
   @Override
@@ -67,12 +86,12 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   @Override
   public DatabaseType getRxType() {
-    return null;
+    return DatabaseType.OTHER;
   }
 
   @Override
   public List<String> getSystemSchemas() {
-    return List.of();
+    return List.of("public");
   }
 
   @Override
@@ -87,7 +106,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   @Override
   public DbInfo getDbInfo(Connection connection) throws SQLException {
-    return null;
+    return new DbInfo() {};
   }
 
   @Override
