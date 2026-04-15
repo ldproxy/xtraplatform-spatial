@@ -13,6 +13,9 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.Collator;
@@ -30,11 +33,13 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   static final String ID = "DUCKDB";
 
+  private final ResourceStore featuresStore;
   private final String applicationName;
   private final SqlDialect dialect;
 
   @Inject
   public SqlDbmsAdapterDuckdb(AppContext appContext, ResourceStore resourceStore) {
+    this.featuresStore = resourceStore.with("features");
     this.applicationName =
         String.format("%s %s - %%s", appContext.getName(), appContext.getVersion());
     this.dialect = new SqlDialectDuckdb();
@@ -58,17 +63,37 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
   @Override
   public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
     StringBuilder query = new StringBuilder(256);
+
+    // Install and load the spatial extension of DuckDB to access spatial functions
     query.append("INSTALL spatial;");
     query.append("LOAD spatial;");
 
-    // ToDo: Build absolute path from relative path
-    query.append(String.format("SET file_search_path = '%s';", connectionInfo.getDatabase()));
+    // Create absolute Path to the data directory, inspired from SqlDbmsAdapterGpkg.java
+    Optional<Path> absoluteFeaturesPath = Optional.empty();
+    try {
+      absoluteFeaturesPath = featuresStore.asLocalPath(Path.of(""), false);
+    } catch (IOException e) {
+      // continue
+    }
+    if (absoluteFeaturesPath.isEmpty()) {
+      throw new IllegalStateException("Creation of absolute path to resources/features failed.");
+    }
 
+    // Set the absolute path of resources/features as the search-path
+    query.append(String.format("SET file_search_path = '%s';", absoluteFeaturesPath.get()));
+
+    // Create tables in-memory to access them with their name instead of a 'read_parquet(PATH)'
+    // statement
     for (int i = 0; i < connectionInfo.getSchemas().size(); i++) {
       String parquetFile = connectionInfo.getSchemas().get(i);
-      query.append(
-          String.format(
-              "CREATE TABLE %s AS SELECT * FROM '%s.parquet';", parquetFile, parquetFile));
+
+      if (!Files.exists(absoluteFeaturesPath.get().resolve(parquetFile + ".parquet"))) {
+        throw new IllegalStateException("Parquet file not found: " + parquetFile + ".parquet");
+      } else {
+        query.append(
+            String.format(
+                "CREATE TABLE %s AS SELECT * FROM '%s.parquet';", parquetFile, parquetFile));
+      }
     }
 
     return Optional.of(query.toString());
