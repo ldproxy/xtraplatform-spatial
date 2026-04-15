@@ -21,6 +21,7 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlParseException;
 import de.ii.xtraplatform.cql.domain.CqlToText;
 import de.ii.xtraplatform.cql.domain.CqlVisitorExtractParameters;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.TemporalFunction;
 import de.ii.xtraplatform.cql.domain.TemporalLiteral;
 import de.ii.xtraplatform.cql.infra.CqlTextParser;
@@ -133,7 +134,16 @@ public class CqlImpl implements Cql {
 
   @Override
   public void checkTypes(Cql2Expression cqlPredicate, Map<String, String> propertyTypes) {
-    CqlTypeAndFunctionChecker visitor = new CqlTypeAndFunctionChecker(propertyTypes, this);
+    checkTypes(cqlPredicate, propertyTypes, List.of());
+  }
+
+  @Override
+  public void checkTypes(
+      Cql2Expression cqlPredicate,
+      Map<String, String> propertyTypes,
+      List<CustomFunction> customFunctions) {
+    CqlTypeAndFunctionChecker visitor =
+        new CqlTypeAndFunctionChecker(propertyTypes, this, customFunctions);
 
     cqlPredicate.accept(visitor, true);
   }

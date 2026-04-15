@@ -12,6 +12,7 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
 import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.domain.Cql
 import de.ii.xtraplatform.cql.domain.Cql2Expression
+import de.ii.xtraplatform.cql.domain.CustomFunction
 import de.ii.xtraplatform.cql.domain.CqlParseException
 import de.ii.xtraplatform.cql.domain.In
 import de.ii.xtraplatform.cql.domain.Interval
@@ -1838,6 +1839,30 @@ class CqlTextSpec extends Specification {
         when: 'reading text'
 
         cql.checkTypes(cql.read(cqlText, Cql.Format.TEXT), propertyTypes)
+
+        then:
+
+        noExceptionThrown()
+    }
+
+    def 'Test checkTypes with custom functions'() {
+
+        given:
+
+        def propertyTypes = ImmutableMap.of(
+                "geometry", "GEOMETRY",
+                "bereich", "STRING"
+        )
+
+        def customFunctions = List.of(
+                CustomFunction.of("IST_IN_BEREICH", List.of("GEOMETRY", "STRING"), "BOOLEAN")
+        )
+
+        String cqlText = "IST_IN_BEREICH(geometry, bereich) = true"
+
+        when: 'reading text'
+
+        cql.checkTypes(cql.read(cqlText, Cql.Format.TEXT), propertyTypes, customFunctions)
 
         then:
 

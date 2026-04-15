@@ -12,6 +12,7 @@ import com.google.common.collect.ImmutableMap
 import de.ii.xtraplatform.cql.domain.Accenti
 import de.ii.xtraplatform.cql.domain.Casei
 import de.ii.xtraplatform.cql.domain.Cql
+import de.ii.xtraplatform.cql.domain.CustomFunction
 import de.ii.xtraplatform.cql.domain.Function
 import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
@@ -184,5 +185,39 @@ class CqlFunctionCheckerSpec extends Specification {
 
         then:
         thrown IllegalArgumentException
+    }
+
+    def 'Custom function: valid expression'() {
+        given:
+        def customFunctions = ImmutableList.of(
+                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of("GEOMETRY", "STRING"), "BOOLEAN")
+        )
+        def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
+                "geometry", "GEOMETRY",
+                "name", "STRING"
+        ), cql, customFunctions)
+
+        when:
+        Function.of("IST_IN_BEREICH", ImmutableList.of(Property.of("geometry"), Property.of("name"))).accept(customVisitor)
+
+        then:
+        noExceptionThrown()
+    }
+
+    def 'Custom function: incompatible argument type'() {
+        given:
+        def customFunctions = ImmutableList.of(
+                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of("GEOMETRY", "STRING"), "BOOLEAN")
+        )
+        def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
+                "geometry", "GEOMETRY",
+                "id", "INTEGER"
+        ), cql, customFunctions)
+
+        when:
+        Function.of("IST_IN_BEREICH", ImmutableList.of(Property.of("geometry"), Property.of("id"))).accept(customVisitor)
+
+        then:
+        thrown CqlIncompatibleTypes
     }
 }
