@@ -8,8 +8,6 @@
 package de.ii.xtraplatform.features.geoparquet.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
@@ -54,10 +52,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   @Override
   public DataSource createDataSource(String providerId, ConnectionInfoSql connectionInfo) {
-    HikariConfig hikariConfig = new HikariConfig();
-    hikariConfig.setDriverClassName("org.duckdb.DuckDBDriver");
-    hikariConfig.setJdbcUrl("jdbc:duckdb:");
-    return new HikariDataSource(hikariConfig);
+    return new DuckdbDataSource();
   }
 
   @Override
