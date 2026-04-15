@@ -1,4 +1,3 @@
-
 maturity = 'PROPOSAL'
 maintenance = 'NONE'
 description = 'GeoParquet feature provider.'
@@ -19,4 +18,3 @@ dependencies {
 
     embedded(libs.duckdb)
 }
-
