@@ -8,9 +8,14 @@
 package de.ii.xtraplatform.features.sql.app
 
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
+import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Eq
+import de.ii.xtraplatform.cql.domain.Function
+import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.app.CqlFilterExamples
 import de.ii.xtraplatform.cql.app.CqlImpl
+import de.ii.xtraplatform.cql.domain.ScalarLiteral
 import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
@@ -31,6 +36,9 @@ class FilterEncoderSqlSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoder2
 
+    @Shared
+    FilterEncoderSql filterEncoderCustom
+
     def setupSpec() {
 
         filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
@@ -40,6 +48,40 @@ class FilterEncoderSqlSpec extends Specification {
         CrsTransformerFactoryProj transformerFactory = new CrsTransformerFactoryProj(new ProjLoaderImpl(Path.of(System.getProperty("java.io.tmpdir"), "proj", "data")), resourceStore, volatileRegistry)
         transformerFactory.onStart(false).toCompletableFuture().join()
         filterEncoder2 = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), (CrsTransformerFactory) transformerFactory, null, new CqlImpl(), null)
+        def customFunction = Stub(CustomFunction)
+        customFunction.getName() >> "my_concat"
+        customFunction.getArgumentTypes() >> ["string", "string"]
+        customFunction.getReturnType() >> "string"
+        customFunction.getSqlExpression() >> "concat(\$arg1, '-', \$arg2)"
+        filterEncoderCustom = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [customFunction],
+                null)
+
+    }
+
+    def 'custom function template with property and literal'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), ScalarLiteral.of("x")]),
+                        ScalarLiteral.of("foo-x")
+                ])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE concat(AA.name, '-', 'x') = 'foo-x')"
+
+        String actual = filterEncoderCustom.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
 
     }
 

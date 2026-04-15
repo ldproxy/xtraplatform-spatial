@@ -17,6 +17,7 @@ import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
 import de.ii.xtraplatform.cql.domain.Bbox;
@@ -31,6 +32,7 @@ import de.ii.xtraplatform.cql.domain.Cql.Format;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlToText;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
@@ -71,6 +73,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
@@ -94,6 +98,7 @@ public class FilterEncoderSql {
   private final CrsInfo crsInfo;
   private final Cql cql;
   private final String accentiCollation;
+  private final Map<String, CustomFunction> customFunctions;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -103,13 +108,89 @@ public class FilterEncoderSql {
       CrsInfo crsInfo,
       Cql cql,
       String accentiCollation) {
+    this(nativeCrs, sqlDialect, crsTransformerFactory, crsInfo, cql, List.of(), accentiCollation);
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation) {
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
     this.crsInfo = crsInfo;
     this.cql = cql;
     this.accentiCollation = accentiCollation;
+    this.customFunctions =
+        ImmutableMap.copyOf(
+            customFunctions.stream()
+                .collect(
+                    java.util.stream.Collectors.toMap(
+                        function -> function.getName().toUpperCase(Locale.ROOT),
+                        function -> function,
+                        (left, right) -> right)));
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
+  }
+
+  private Optional<String> renderCustomFunction(
+      de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+    CustomFunction customFunction =
+        customFunctions.get(function.getName().toUpperCase(Locale.ROOT));
+    if (Objects.isNull(customFunction) || Objects.isNull(customFunction.getSqlExpression())) {
+      return Optional.empty();
+    }
+
+    final String marker = "__ARG__";
+    int anchorIndex = -1;
+    for (int i = 0; i < children.size(); i++) {
+      if (operandHasSelectForTemplate(children.get(i))) {
+        anchorIndex = i;
+        break;
+      }
+    }
+
+    String expression = customFunction.getSqlExpression();
+    for (int i = 0; i < children.size(); i++) {
+      String replacement =
+          i == anchorIndex ? marker : reduceSelectToColumnForTemplate(children.get(i));
+      expression = expression.replace("$arg" + (i + 1), replacement);
+    }
+
+    if (anchorIndex < 0) {
+      return Optional.of(expression);
+    }
+
+    String anchorExpression = children.get(anchorIndex);
+    int markerIndex = expression.indexOf(marker);
+    if (markerIndex < 0 || !operandHasSelectForTemplate(anchorExpression)) {
+      return Optional.of(
+          expression.replace(marker, reduceSelectToColumnForTemplate(anchorExpression)));
+    }
+
+    String prefix = expression.substring(0, markerIndex);
+    String suffix = expression.substring(markerIndex + marker.length());
+
+    return Optional.of(String.format(anchorExpression, "%1$s" + prefix, suffix + "%2$s"));
+  }
+
+  private boolean operandHasSelectForTemplate(String expression) {
+    return expression.contains("%1$s") && expression.contains("%2$s");
+  }
+
+  private String reduceSelectToColumnForTemplate(String expression) {
+    if (operandHasSelectForTemplate(expression)) {
+      return String.format(
+          expression.contains(" WHERE ")
+              ? expression.substring(expression.indexOf(" WHERE ") + 7, expression.length() - 1)
+              : expression,
+          "",
+          "");
+    }
+    return expression;
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -533,6 +614,11 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+      Optional<String> customExpression = renderCustomFunction(function, children);
+      if (customExpression.isPresent()) {
+        return customExpression.get();
+      }
+
       if (function.isPosition()) {
         return "%1$s" + ROW_NUMBER + "%2$s";
       } else if (function.isUpper()) {
@@ -1542,6 +1628,11 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+      Optional<String> customExpression = renderCustomFunction(function, children);
+      if (customExpression.isPresent()) {
+        return customExpression.get();
+      }
+
       if (function.isPosition()) {
         return "%1$s" + ROW_NUMBER + "%2$s";
       } else if (function.isUpper()) {

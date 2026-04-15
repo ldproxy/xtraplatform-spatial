@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -20,6 +21,12 @@ public interface CustomFunction {
   List<String> getArgumentTypes();
 
   String getReturnType();
+
+  @Nullable
+  @Value.Default
+  default String getSqlExpression() {
+    return null;
+  }
 
   static CustomFunction of(String name, List<String> argumentTypes, String returnType) {
     return new ImmutableCustomFunction.Builder()
