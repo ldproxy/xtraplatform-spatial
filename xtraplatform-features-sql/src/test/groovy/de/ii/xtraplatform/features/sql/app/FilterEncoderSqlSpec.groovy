@@ -39,6 +39,12 @@ class FilterEncoderSqlSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoderCustom
 
+    @Shared
+    FilterEncoderSql filterEncoderCustomBoolean
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomGeometry
+
     def setupSpec() {
 
         filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
@@ -62,6 +68,33 @@ class FilterEncoderSqlSpec extends Specification {
                 [customFunction],
                 null)
 
+        def booleanFunction = Stub(CustomFunction)
+        booleanFunction.getName() >> "my_upper_match"
+        booleanFunction.getArgumentTypes() >> ["STRING", "STRING"]
+        booleanFunction.getReturnType() >> "BOOLEAN"
+        booleanFunction.getSqlExpression() >> "UPPER(\$arg1) LIKE UPPER(\$arg2)"
+        filterEncoderCustomBoolean = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [booleanFunction],
+                null)
+
+        def geometryFunction = Stub(CustomFunction)
+        geometryFunction.getName() >> "ist_in_bereich"
+        geometryFunction.getArgumentTypes() >> ["GEOMETRY", "STRING"]
+        geometryFunction.getReturnType() >> "BOOLEAN"
+        geometryFunction.getSqlExpression() >> "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"
+        filterEncoderCustomGeometry = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [geometryFunction],
+                null)
     }
 
     def 'custom function template with property and literal'() {
@@ -81,6 +114,38 @@ class FilterEncoderSqlSpec extends Specification {
 
         then:
 
+        actual == expected
+
+    }
+
+    def 'custom boolean function with two string properties'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Function.of("my_upper_match", [Property.of("name"), ScalarLiteral.of("kupp%")])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE UPPER(AA.name) LIKE UPPER('kupp%'))"
+
+        String actual = filterEncoderCustomBoolean.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom boolean geometry function (IST_IN_BEREICH pattern)'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_GEOMETRY
+        def filter = Function.of("ist_in_bereich", [Property.of("location"), ScalarLiteral.of("Bereich Saar")])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, (SELECT geometrie FROM bereiche WHERE name='Bereich Saar')))"
+
+        String actual = filterEncoderCustomGeometry.encode(filter, instanceContainer)
+
+        then:
         actual == expected
 
     }

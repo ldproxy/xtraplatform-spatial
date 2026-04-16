@@ -181,7 +181,7 @@ public class FilterEncoderSql {
     // Non-BOOLEAN functions are used as operands in an outer operation (e.g. Eq) which will
     // fill in the placeholders itself.
     if ("BOOLEAN".equalsIgnoreCase(customFunction.getReturnType())) {
-      result = String.format(result, "", "");
+      result = result.replace("%1$s", "").replace("%2$s", "");
     }
     return Optional.of(result);
   }
