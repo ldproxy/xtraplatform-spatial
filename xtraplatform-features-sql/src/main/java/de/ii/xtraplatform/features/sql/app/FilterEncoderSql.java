@@ -174,7 +174,16 @@ public class FilterEncoderSql {
     String prefix = expression.substring(0, markerIndex);
     String suffix = expression.substring(markerIndex + marker.length());
 
-    return Optional.of(String.format(anchorExpression, "%1$s" + prefix, suffix + "%2$s"));
+    String result = String.format(anchorExpression, "%1$s" + prefix, suffix + "%2$s");
+
+    // BOOLEAN-returning functions are top-level predicates — finalize the subquery template
+    // by replacing the remaining %1$s/%2$s placeholders with empty strings.
+    // Non-BOOLEAN functions are used as operands in an outer operation (e.g. Eq) which will
+    // fill in the placeholders itself.
+    if ("BOOLEAN".equalsIgnoreCase(customFunction.getReturnType())) {
+      result = String.format(result, "", "");
+    }
+    return Optional.of(result);
   }
 
   private boolean operandHasSelectForTemplate(String expression) {
