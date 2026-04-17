@@ -22,6 +22,7 @@ import java.text.Collator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.sql.DataSource;
@@ -62,38 +63,51 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   @Override
   public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
-    StringBuilder query = new StringBuilder(256);
+    StringBuilder query = new StringBuilder(512);
 
     // Install and load the spatial extension of DuckDB to access spatial functions
     query.append("INSTALL spatial;");
     query.append("LOAD spatial;");
 
-    // Create absolute Path to the data directory, inspired from SqlDbmsAdapterGpkg.java
-    Optional<Path> absoluteFeaturesPath = Optional.empty();
+    // Find absolute Path to resources/features, inspired from SqlDbmsAdapterGpkg.java
+    Optional<Path> featuresPath = Optional.empty();
     try {
-      absoluteFeaturesPath = featuresStore.asLocalPath(Path.of(""), false);
+      featuresPath = featuresStore.asLocalPath(Path.of(""), false);
     } catch (IOException e) {
       // continue
     }
-    if (absoluteFeaturesPath.isEmpty()) {
+    if (featuresPath.isEmpty()) {
       throw new IllegalStateException("Creation of absolute path to resources/features failed.");
     }
 
-    // Set the absolute path of resources/features as the search-path
-    query.append(String.format("SET file_search_path = '%s';", absoluteFeaturesPath.get()));
+    // Make Path-Object to the data directory
+    final Path dataDirectory = featuresPath.get().resolve(connectionInfo.getDatabase());
+    if (!Files.exists(dataDirectory)) {
+      throw new IllegalStateException("Directory does not exist: " + dataDirectory);
+    }
+    if (!Files.isDirectory(dataDirectory)) {
+      throw new IllegalStateException("Is not a directory: " + dataDirectory);
+    }
 
-    // Create tables in-memory to access them with their name instead of a 'read_parquet(PATH)'
-    // statement
-    for (int i = 0; i < connectionInfo.getSchemas().size(); i++) {
-      String parquetFile = connectionInfo.getSchemas().get(i);
+    // Set the absolute path to the data directory as the search path
+    query.append(String.format("SET file_search_path = '%s';", dataDirectory));
 
-      if (!Files.exists(absoluteFeaturesPath.get().resolve(parquetFile + ".parquet"))) {
-        throw new IllegalStateException("Parquet file not found: " + parquetFile + ".parquet");
-      } else {
-        query.append(
-            String.format(
-                "CREATE TABLE %s AS SELECT * FROM '%s.parquet';", parquetFile, parquetFile));
-      }
+    // Walk the tree of the data directory and generate a query to add the content of every parquet
+    // file as an in-memory table. To increase the collision resistance, '/' is replaced with '__'
+    // instead of '_'.
+    try (Stream<Path> pathStream = Files.walk(dataDirectory)) {
+      pathStream
+          .filter(Files::isRegularFile)
+          .filter(path -> path.getFileName().toString().endsWith(".parquet"))
+          .map(dataDirectory::relativize)
+          .forEach(
+              path ->
+                  query.append(
+                      String.format(
+                          "CREATE TABLE '%s' AS SELECT * FROM '%s';",
+                          path.toString().replace("/", "__").replace(".parquet", ""), path)));
+    } catch (IOException e) {
+      throw new IllegalStateException("Error traversing the data directory: " + e.getMessage());
     }
 
     return Optional.of(query.toString());
