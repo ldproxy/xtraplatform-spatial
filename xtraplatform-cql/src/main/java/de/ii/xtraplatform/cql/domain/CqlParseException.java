@@ -12,4 +12,8 @@ public class CqlParseException extends RuntimeException {
   public CqlParseException(String message) {
     super(message);
   }
+
+  public CqlParseException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

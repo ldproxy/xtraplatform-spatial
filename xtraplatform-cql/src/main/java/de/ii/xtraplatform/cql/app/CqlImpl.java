@@ -69,58 +69,59 @@ public class CqlImpl implements Cql {
   }
 
   @Override
-  public Cql2Expression read(String cql, Format format) throws CqlParseException {
+  public Cql2Expression read(String cql, Format format) {
     return read(cql, format, OgcCrs.CRS84, false);
   }
 
   @Override
-  public Cql2Expression read(String cql, Format format, EpsgCrs crs) throws CqlParseException {
+  public Cql2Expression read(String cql, Format format, EpsgCrs crs) {
     return read(cql, format, crs, false);
   }
 
   @Override
-  public Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters)
-      throws CqlParseException {
-    switch (format) {
-      case TEXT:
-        return cqlTextParser.parse(cql, crs);
-      case JSON:
-        cqlJsonMapper.setInjectableValues(
-            new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
-        try {
-          Cql2Expression expression = cqlJsonMapper.readValue(cql, Cql2Expression.class);
-
-          // parameters are a CQL2-JSON extension used in stored queries; they must not appear in
-          // normal CQL2 expressions
-          if (!allowParameters
-              && !expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
-            throw new CqlParseException(
-                "Parameters are not allowed in CQL2 filter expressions, except in stored queries.");
-          }
-
-          return expression;
-        } catch (IOException e) {
-          throw new CqlParseException(e.getMessage());
-        }
+  public Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters) {
+    if (format == Format.TEXT) {
+      return cqlTextParser.parse(cql, crs);
     }
 
-    throw new IllegalStateException();
+    if (format == Format.JSON) {
+      cqlJsonMapper.setInjectableValues(
+          new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
+      try {
+        Cql2Expression expression = cqlJsonMapper.readValue(cql, Cql2Expression.class);
+
+        // parameters are a CQL2-JSON extension used in stored queries; they must not appear in
+        // normal CQL2 expressions
+        if (!allowParameters
+            && !expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
+          throw new CqlParseException(
+              "Parameters are not allowed in CQL2 filter expressions, except in stored queries.");
+        }
+
+        return expression;
+      } catch (IOException e) {
+        throw new CqlParseException(e.getMessage(), e);
+      }
+    }
+
+    throw new IllegalStateException(String.format("Unsupported CQL format: %s", format));
   }
 
   @Override
   public String write(Cql2Expression cql, Format format) {
-    switch (format) {
-      case TEXT:
-        return cql.accept(new CqlToText(), true);
-      case JSON:
-        try {
-          return cqlJsonMapper.writeValueAsString(cql);
-        } catch (IOException e) {
-          throw new IllegalStateException();
-        }
+    if (format == Format.TEXT) {
+      return cql.accept(new CqlToText(), true);
     }
 
-    throw new IllegalStateException();
+    if (format == Format.JSON) {
+      try {
+        return cqlJsonMapper.writeValueAsString(cql);
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed to write CQL JSON.", e);
+      }
+    }
+
+    throw new IllegalStateException(String.format("Unsupported CQL format: %s", format));
   }
 
   @Override
@@ -180,8 +181,8 @@ public class CqlImpl implements Cql {
     @Override
     public List<String> convert(Interval value) {
       return ImmutableList.of(
-          value.getStart() == Instant.MIN ? ".." : value.getStart().toString(),
-          value.getEnd() == Instant.MAX ? ".." : value.getEnd().toString());
+          Instant.MIN.equals(value.getStart()) ? ".." : value.getStart().toString(),
+          Instant.MAX.equals(value.getEnd()) ? ".." : value.getEnd().toString());
     }
   }
 

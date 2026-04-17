@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings("PMD.GodClass")
 public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
 
   private final Set<TemporalFunction> supportedOperators;

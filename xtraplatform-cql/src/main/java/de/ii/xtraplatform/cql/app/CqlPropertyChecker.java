@@ -24,6 +24,7 @@ public class CqlPropertyChecker extends CqlVisitorBase<List<String>> {
   private final List<String> invalidProperties = new ArrayList<>();
 
   public CqlPropertyChecker(Collection<String> allowedProperties) {
+    super();
     this.allowedProperties =
         ImmutableList.<String>builder().addAll(allowedProperties).add(ID_PLACEHOLDER).build();
   }
