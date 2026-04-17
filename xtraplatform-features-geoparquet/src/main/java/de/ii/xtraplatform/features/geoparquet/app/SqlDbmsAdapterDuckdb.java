@@ -66,17 +66,37 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     return new DuckdbDataSource();
   }
 
-  private void logCollision(Path filePath, Path otherFilePath) {
+  /**
+   * Debug-logs when two file paths share the same file name.
+   *
+   * @param filePath The first file path
+   * @param otherFilePath The second file path
+   */
+  private void logSharedFilename(Path filePath, Path otherFilePath) {
     if (filePath.getFileName().equals(otherFilePath.getFileName())) {
-      LOGGER.debug("Parquet file name collision: {} with {}", filePath, otherFilePath);
+      LOGGER.debug(
+          "The following files share the same file name: {} and {}", filePath, otherFilePath);
     }
   }
 
-  private void addTable(StringBuilder query, Path filePath, List<Path> addedFilePaths) {
-    addedFilePaths.forEach(otherFilePath -> logCollision(filePath, otherFilePath));
+  /**
+   * Adds a query to create an in-memory table containing the content of the parquet file found
+   * under filePath. The name of the new table equals to the filePath with every '/' replaced with
+   * '__'. This is done to make sure every table name is unique even when multiple files in
+   * different directories share the same name. The choice of replacing the slashes with '__' has
+   * been made to avoid collisions with files whose names contain underscores (A/a.parquet and
+   * A_a.parquet would collide).
+   *
+   * @param queryBuilder The StringBuilder of the init query.
+   * @param filePath The file path of the parquet file to add.
+   * @param addedFilePaths List containing every file path added yet. Necessary to log files that
+   *     share the same file name.
+   */
+  private void addTable(StringBuilder queryBuilder, Path filePath, List<Path> addedFilePaths) {
+    addedFilePaths.forEach(otherFilePath -> logSharedFilename(filePath, otherFilePath));
     addedFilePaths.add(filePath);
 
-    query.append(
+    queryBuilder.append(
         String.format(
             "CREATE TABLE '%s' AS SELECT * FROM '%s';",
             filePath.toString().replace("/", "__").replace(".parquet", ""), filePath));
