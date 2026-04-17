@@ -20,6 +20,7 @@ import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -584,6 +585,7 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
+            getData().getCustomFunctions(),
             accentiCollation);
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
@@ -1480,6 +1482,11 @@ public class FeatureProviderSql
   @Override
   public boolean supportsIsNull() {
     return true;
+  }
+
+  @Override
+  public List<CustomFunction> getCustomFunctions() {
+    return getData().getCustomFunctions();
   }
 
   @Override

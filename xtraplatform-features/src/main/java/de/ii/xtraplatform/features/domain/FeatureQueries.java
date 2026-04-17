@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import java.util.List;
 
 public interface FeatureQueries {
@@ -30,6 +31,10 @@ public interface FeatureQueries {
   // TODO: replace with capabilities
   default boolean supportsIsNull() {
     return false;
+  }
+
+  default List<CustomFunction> getCustomFunctions() {
+    return List.of();
   }
 
   default boolean skipUnusedPipelineSteps() {

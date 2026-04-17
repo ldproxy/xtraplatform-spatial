@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonMerge;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.AutoEntity;
@@ -133,6 +134,16 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    * @default `[ POINT, MULTI_POINT, LINE_STRING, MULTI_LINE_STRING, POLYGON, MULTI_POLYGON ]`
    */
   List<GeometryType> getProvidesGeometryTypes();
+
+  /**
+   * @langEn Optional custom CQL functions that can be used in filters.
+   * @langDe Optionale benutzerdefinierte CQL-Funktionen, die in Filtern genutzt werden können.
+   * @default []
+   */
+  @Value.Default
+  default List<CustomFunction> getCustomFunctions() {
+    return List.of();
+  }
 
   /**
    * @langEn Definition of extensions, see [Extensions](90-extensions/README.md).

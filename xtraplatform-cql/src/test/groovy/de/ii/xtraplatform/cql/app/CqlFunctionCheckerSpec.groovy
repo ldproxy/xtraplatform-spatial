@@ -220,4 +220,12 @@ class CqlFunctionCheckerSpec extends Specification {
         then:
         thrown CqlIncompatibleTypes
     }
+
+        def 'unknown function name is invalid'() {
+        when:
+        Function.of("MY_UNKNOWN_FUNCTION", ImmutableList.of()).accept(visitor)
+
+        then:
+        thrown IllegalArgumentException
+    }
 }
