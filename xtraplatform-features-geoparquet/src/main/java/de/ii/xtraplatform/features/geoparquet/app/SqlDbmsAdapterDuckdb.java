@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.Collator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,12 +28,16 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
 public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   static final String ID = "DUCKDB";
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterDuckdb.class);
 
   private final ResourceStore featuresStore;
   private final String applicationName;
@@ -59,6 +64,22 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
   @Override
   public DataSource createDataSource(String providerId, ConnectionInfoSql connectionInfo) {
     return new DuckdbDataSource();
+  }
+
+  private void logCollision(Path filePath, Path otherFilePath) {
+    if (filePath.getFileName().equals(otherFilePath.getFileName())) {
+      LOGGER.debug("Parquet file name collision: {} with {}", filePath, otherFilePath);
+    }
+  }
+
+  private void addTable(StringBuilder query, Path filePath, List<Path> addedFilePaths) {
+    addedFilePaths.forEach(otherFilePath -> logCollision(filePath, otherFilePath));
+    addedFilePaths.add(filePath);
+
+    query.append(
+        String.format(
+            "CREATE TABLE '%s' AS SELECT * FROM '%s';",
+            filePath.toString().replace("/", "__").replace(".parquet", ""), filePath));
   }
 
   @Override
@@ -95,17 +116,13 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     // Walk the tree of the data directory and generate a query to add the content of every parquet
     // file as an in-memory table. To increase the collision resistance, '/' is replaced with '__'
     // instead of '_'.
+    List<Path> addedFilePaths = new ArrayList<>();
     try (Stream<Path> pathStream = Files.walk(dataDirectory)) {
       pathStream
           .filter(Files::isRegularFile)
-          .filter(path -> path.getFileName().toString().endsWith(".parquet"))
+          .filter(filePath -> filePath.getFileName().toString().endsWith(".parquet"))
           .map(dataDirectory::relativize)
-          .forEach(
-              path ->
-                  query.append(
-                      String.format(
-                          "CREATE TABLE '%s' AS SELECT * FROM '%s';",
-                          path.toString().replace("/", "__").replace(".parquet", ""), path)));
+          .forEach(filePath -> addTable(query, filePath, addedFilePaths));
     } catch (IOException e) {
       throw new IllegalStateException("Error traversing the data directory: " + e.getMessage());
     }
