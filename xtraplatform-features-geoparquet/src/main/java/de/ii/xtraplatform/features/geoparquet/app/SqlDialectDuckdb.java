@@ -21,33 +21,50 @@ import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
 
+/** This implementation of the DuckDB SQL-dialect is for the purpose of reading GeoParquet-files. */
 @SuppressWarnings("PMD.TooManyMethods")
 public class SqlDialectDuckdb implements SqlDialect {
 
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
+  /**
+   * As of v.1.1.0, the GeoParquet standard curve geometries are not supported and all exterior
+   * polygon rings must already be ordered in CCW directorion, see "geometry_types" under <a
+   * href="https://geoparquet.org/releases/v1.1.0/">https://geoparquet.org/releases/v1.1.0/</a>
+   */
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    // ToDo: Add support for forcePolygonCCW and linearizeCurves, if applicable
     return String.format("ST_AsText(%s)", column);
   }
 
+  /**
+   * As of v.1.1.0, geometries are encoded using WKB or the single-geometry type encodings based on
+   * the GeoArrow specification, see <a
+   * href="https://geoparquet.org/releases/v1.1.0/">https://geoparquet.org/releases/v1.1.0/</a>.
+   * Therefore this function should not be necessary when working with GeoParquet files.
+   */
   @Override
   public String applyToWkt(String wkt, int srid) {
-    // ToDo: Add support for srid, if applicable
+    // return String.format("ST_TRANSFORM(ST_GeomFromText('%s'), 'EPSG:%s')", wkt, srid);
     return String.format("ST_GeomFromText('%s')", wkt);
   }
 
+  /**
+   * As of v.1.1.0, the GeoParquet standard curve geometries are not supported and all exterior
+   * polygon rings must already be ordered in CCW directorion, see "geometry_types" under <a
+   * href="https://geoparquet.org/releases/v1.1.0/">https://geoparquet.org/releases/v1.1.0/</a>
+   */
   @Override
   public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    // ToDo: Add support for forcePolygonCCW and linearizeCurves, if applicable
     return String.format("ST_AsWKB(%s)", column);
   }
 
   @Override
   public String applyToExtent(String column, boolean is3d) {
-    // ToDo: Add support for 3d, if applicable
+    if (is3d)
+      throw new IllegalArgumentException("3d is not supported for GeoParquet feature providers.");
+
     return String.format("ST_AsText(ST_Extent(%s))", column);
   }
 
@@ -57,7 +74,7 @@ public class SqlDialectDuckdb implements SqlDialect {
       return Optional.empty();
     }
 
-    // Example for what DUCKDB returns: BOX(7.1053586 50.6424865, 7.2106794 50.7177159)
+    // Example for what DuckDB returns: BOX(7.1053586 50.6424865, 7.2106794 50.7177159)
     if (extent.contains("BOX")) {
       extent = extent.replaceFirst("BOX", "");
     }
@@ -123,14 +140,16 @@ public class SqlDialectDuckdb implements SqlDialect {
 
   @Override
   public String applyToDate(String column, Optional<String> format) {
-    // ToDo: Add support for format, see https://duckdb.org/docs/current/sql/functions/dateformat
-    return String.format("CAST(%s AS DATE)", column);
+    if (format.isEmpty()) return String.format("CAST(%s AS DATE)", column);
+
+    return String.format("strftime(CAST(%s AS DATE), '%s')", column, format);
   }
 
   @Override
   public String applyToDatetime(String column, Optional<String> format) {
-    // ToDo: Add support for format, see https://duckdb.org/docs/current/sql/functions/dateformat
-    return String.format("CAST(%s AS TIMESTAMP)", column);
+    if (format.isEmpty()) return String.format("CAST(%s AS TIMESTAMP)", column);
+
+    return String.format("strftime(CAST(%s AS TIMESTAMP), '%s')", column, format);
   }
 
   @Override
@@ -162,7 +181,7 @@ public class SqlDialectDuckdb implements SqlDialect {
   @Override
   public String applyToJsonValue(
       String alias, String column, String path, PropertyTypeInfo typeInfo) {
-    // ToDo: Implement, if applicable
+    // ToDo: Implement
     throw new IllegalArgumentException(
         "JSON is not supported for GeoParquet feature providers yet.");
   }
