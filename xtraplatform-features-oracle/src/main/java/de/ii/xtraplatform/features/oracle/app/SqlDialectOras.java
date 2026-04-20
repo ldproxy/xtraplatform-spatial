@@ -33,6 +33,11 @@ import org.threeten.extra.Interval;
 @SuppressWarnings("PMD.TooManyMethods")
 public class SqlDialectOras implements SqlDialect {
 
+  @Override
+  public String getId() {
+    return "ORAS";
+  }
+
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 

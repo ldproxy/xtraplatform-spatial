@@ -9,6 +9,8 @@ package de.ii.xtraplatform.features.sql.app
 
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
 import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
 import de.ii.xtraplatform.cql.domain.Eq
 import de.ii.xtraplatform.cql.domain.Function
 import de.ii.xtraplatform.cql.domain.Property
@@ -20,6 +22,7 @@ import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
+import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
 import de.ii.xtraplatform.proj.domain.ProjLoaderImpl
 import spock.lang.Shared
@@ -45,6 +48,12 @@ class FilterEncoderSqlSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoderCustomGeometry
 
+    @Shared
+    FilterEncoderSql filterEncoderCustomConcatPgis
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomConcatGpkg
+
     def setupSpec() {
 
         filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
@@ -56,9 +65,12 @@ class FilterEncoderSqlSpec extends Specification {
         filterEncoder2 = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), (CrsTransformerFactory) transformerFactory, null, new CqlImpl(), null)
         def customFunction = Stub(CustomFunction)
         customFunction.getName() >> "my_concat"
-        customFunction.getArgumentTypes() >> ["string", "string"]
-        customFunction.getReturnType() >> "string"
-        customFunction.getSqlExpression() >> "concat(\$arg1, '-', \$arg2)"
+        customFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("string").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("string").build()
+        ]
+        customFunction.getReturns() >> ["string"]
+        customFunction.getExpression() >> ["SQL": "concat(\$arg1, '-', \$arg2)"]
         filterEncoderCustom = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),
@@ -70,9 +82,12 @@ class FilterEncoderSqlSpec extends Specification {
 
         def booleanFunction = Stub(CustomFunction)
         booleanFunction.getName() >> "my_upper_match"
-        booleanFunction.getArgumentTypes() >> ["STRING", "STRING"]
-        booleanFunction.getReturnType() >> "BOOLEAN"
-        booleanFunction.getSqlExpression() >> "UPPER(\$arg1) LIKE UPPER(\$arg2)"
+        booleanFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        booleanFunction.getReturns() >> ["BOOLEAN"]
+        booleanFunction.getExpression() >> ["SQL": "UPPER(\$arg1) LIKE UPPER(\$arg2)"]
         filterEncoderCustomBoolean = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),
@@ -84,9 +99,12 @@ class FilterEncoderSqlSpec extends Specification {
 
         def geometryFunction = Stub(CustomFunction)
         geometryFunction.getName() >> "ist_in_bereich"
-        geometryFunction.getArgumentTypes() >> ["GEOMETRY", "STRING"]
-        geometryFunction.getReturnType() >> "BOOLEAN"
-        geometryFunction.getSqlExpression() >> "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"
+        geometryFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        geometryFunction.getReturns() >> ["BOOLEAN"]
+        geometryFunction.getExpression() >> ["SQL": "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"]
         filterEncoderCustomGeometry = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),
@@ -95,6 +113,71 @@ class FilterEncoderSqlSpec extends Specification {
                 new CqlImpl(),
                 [geometryFunction],
                 null)
+
+        def concatDialectFunction = Stub(CustomFunction)
+        concatDialectFunction.getName() >> "my_concat"
+        concatDialectFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        concatDialectFunction.getReturns() >> ["STRING"]
+        concatDialectFunction.getExpression() >> ["SQL/GPKG": "concat(\$arg1, ' (', \$arg2, ')')", "SQL/PGIS": "\$arg1 || ' (' || \$arg2 || ')'"]
+        filterEncoderCustomConcatPgis = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [concatDialectFunction],
+                null)
+        filterEncoderCustomConcatGpkg = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectGpkg(),
+                null,
+                null,
+                new CqlImpl(),
+                [concatDialectFunction],
+                null)
+    }
+
+    def 'custom function dialect-specific expression: SQL/PGIS'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), Property.of("created")]),
+                        ScalarLiteral.of("Kupp (Serrig)")
+                ])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.name || ' (' || AA.created || ')' = 'Kupp (Serrig)')"
+
+        String actual = filterEncoderCustomConcatPgis.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom function dialect-specific expression: SQL/GPKG'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), Property.of("created")]),
+                        ScalarLiteral.of("Kupp (Serrig)")
+                ])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE concat(AA.name, ' (', AA.created, ')') = 'Kupp (Serrig)')"
+
+        String actual = filterEncoderCustomConcatGpkg.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
     }
 
     def 'custom function template with property and literal'() {

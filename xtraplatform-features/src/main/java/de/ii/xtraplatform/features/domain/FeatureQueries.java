@@ -33,7 +33,7 @@ public interface FeatureQueries {
     return false;
   }
 
-  default List<CustomFunction> getCustomFunctions() {
+  default List<CustomFunction> getCql2Functions() {
     return List.of();
   }
 

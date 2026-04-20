@@ -25,6 +25,11 @@ import org.threeten.extra.Interval;
 
 public class SqlDialectGpkg implements SqlDialect {
 
+  @Override
+  public String getId() {
+    return "GPKG";
+  }
+
   private QueryGeneratorSettings settings;
 
   private static final Splitter BBOX_SPLITTER =

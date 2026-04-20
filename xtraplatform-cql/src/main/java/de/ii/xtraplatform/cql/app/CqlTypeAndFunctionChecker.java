@@ -252,7 +252,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
     Optional<CustomFunction> customFunction = getCustomFunction(function);
     if (customFunction.isPresent()) {
-      return fromSchemaType(customFunction.get().getReturnType());
+      return fromSchemaType(customFunction.get().getReturns().get(0));
     }
 
     return Type.valueOf(function.getType().getSimpleName());
@@ -399,27 +399,28 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private void checkCustomFunction(
       Function function, List<Type> types, CustomFunction customFunction) {
-    if (function.getArgs().size() != customFunction.getArgumentTypes().size()) {
+    if (function.getArgs().size() != customFunction.getArguments().size()) {
       throw new IllegalArgumentException(
           String.format(
               "Function %s expects %d argument(s), but got %d",
-              function.getName(),
-              customFunction.getArgumentTypes().size(),
-              function.getArgs().size()));
+              function.getName(), customFunction.getArguments().size(), function.getArgs().size()));
     }
 
     IntStream.range(0, types.size())
         .forEach(
             i -> {
-              Type expected = fromSchemaType(customFunction.getArgumentTypes().get(i));
+              List<Type> expected =
+                  customFunction.getArguments().get(i).getType().stream()
+                      .map(this::fromSchemaType)
+                      .collect(Collectors.toList());
               Type actual = types.get(i);
 
-              if (!(actual.equals(expected) || actual.equals(Type.UNKNOWN))) {
+              if (!(expected.contains(actual) || actual.equals(Type.UNKNOWN))) {
                 throw new CqlIncompatibleTypes(
                     getText(function),
                     i + 1,
                     actual.schemaType(),
-                    ImmutableList.of(expected.schemaType()));
+                    customFunction.getArguments().get(i).getType());
               }
             });
   }

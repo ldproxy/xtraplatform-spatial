@@ -13,6 +13,8 @@ import de.ii.xtraplatform.cql.domain.Accenti
 import de.ii.xtraplatform.cql.domain.Casei
 import de.ii.xtraplatform.cql.domain.Cql
 import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
 import de.ii.xtraplatform.cql.domain.Function
 import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
@@ -190,7 +192,10 @@ class CqlFunctionCheckerSpec extends Specification {
     def 'Custom function: valid expression'() {
         given:
         def customFunctions = ImmutableList.of(
-                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of("GEOMETRY", "STRING"), "BOOLEAN")
+                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of(
+                        new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                        new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+                ), ImmutableList.of("BOOLEAN"))
         )
         def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
                 "geometry", "GEOMETRY",
@@ -207,7 +212,10 @@ class CqlFunctionCheckerSpec extends Specification {
     def 'Custom function: incompatible argument type'() {
         given:
         def customFunctions = ImmutableList.of(
-                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of("GEOMETRY", "STRING"), "BOOLEAN")
+                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of(
+                        new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                        new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+                ), ImmutableList.of("BOOLEAN"))
         )
         def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
                 "geometry", "GEOMETRY",

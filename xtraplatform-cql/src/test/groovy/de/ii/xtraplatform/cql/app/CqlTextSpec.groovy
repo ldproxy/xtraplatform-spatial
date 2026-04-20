@@ -13,6 +13,8 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.domain.Cql
 import de.ii.xtraplatform.cql.domain.Cql2Expression
 import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
 import de.ii.xtraplatform.cql.domain.CqlParseException
 import de.ii.xtraplatform.cql.domain.In
 import de.ii.xtraplatform.cql.domain.Interval
@@ -1855,7 +1857,10 @@ class CqlTextSpec extends Specification {
         )
 
         def customFunctions = List.of(
-                CustomFunction.of("IST_IN_BEREICH", List.of("GEOMETRY", "STRING"), "BOOLEAN")
+                CustomFunction.of("IST_IN_BEREICH", List.of(
+                        new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                        new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+                ), List.of("BOOLEAN"))
         )
 
         String cqlText = "IST_IN_BEREICH(geometry, bereich) = true"

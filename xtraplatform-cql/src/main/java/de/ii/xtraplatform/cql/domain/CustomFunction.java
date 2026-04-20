@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -18,21 +19,24 @@ public interface CustomFunction {
 
   String getName();
 
-  List<String> getArgumentTypes();
-
-  String getReturnType();
-
   @Nullable
   @Value.Default
-  default String getSqlExpression() {
+  default String getDescription() {
     return null;
   }
 
-  static CustomFunction of(String name, List<String> argumentTypes, String returnType) {
+  List<Cql2FunctionArgument> getArguments();
+
+  List<String> getReturns();
+
+  Map<String, String> getExpression();
+
+  static CustomFunction of(
+      String name, List<Cql2FunctionArgument> arguments, List<String> returns) {
     return new ImmutableCustomFunction.Builder()
         .name(name)
-        .argumentTypes(argumentTypes)
-        .returnType(returnType)
+        .arguments(arguments)
+        .returns(returns)
         .build();
   }
 }

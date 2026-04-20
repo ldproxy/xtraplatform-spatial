@@ -129,7 +129,7 @@ public class FilterEncoderSql {
         ImmutableMap.copyOf(
             customFunctions.stream()
                 .collect(
-                    java.util.stream.Collectors.toMap(
+                    Collectors.toMap(
                         function -> function.getName().toUpperCase(Locale.ROOT),
                         function -> function,
                         (left, right) -> right)));
@@ -140,7 +140,12 @@ public class FilterEncoderSql {
       de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
     CustomFunction customFunction =
         customFunctions.get(function.getName().toUpperCase(Locale.ROOT));
-    if (Objects.isNull(customFunction) || Objects.isNull(customFunction.getSqlExpression())) {
+    if (Objects.isNull(customFunction)) {
+      return Optional.empty();
+    }
+
+    Optional<String> resolvedExpression = resolveExpression(customFunction);
+    if (resolvedExpression.isEmpty()) {
       return Optional.empty();
     }
 
@@ -153,11 +158,19 @@ public class FilterEncoderSql {
       }
     }
 
-    String expression = customFunction.getSqlExpression();
+    String expression = resolvedExpression.get();
     for (int i = 0; i < children.size(); i++) {
       String replacement =
           i == anchorIndex ? marker : reduceSelectToColumnForTemplate(children.get(i));
+      // Positional substitution
       expression = expression.replace("$arg" + (i + 1), replacement);
+      // Named substitution (if argument has a name)
+      if (i < customFunction.getArguments().size()) {
+        String argName = customFunction.getArguments().get(i).getName();
+        if (argName != null && !argName.isEmpty()) {
+          expression = expression.replace("$" + argName, replacement);
+        }
+      }
     }
 
     if (anchorIndex < 0) {
@@ -180,10 +193,22 @@ public class FilterEncoderSql {
     // by replacing the remaining %1$s/%2$s placeholders with empty strings.
     // Non-BOOLEAN functions are used as operands in an outer operation (e.g. Eq) which will
     // fill in the placeholders itself.
-    if ("BOOLEAN".equalsIgnoreCase(customFunction.getReturnType())) {
+    if (!customFunction.getReturns().isEmpty()
+        && "BOOLEAN".equalsIgnoreCase(customFunction.getReturns().get(0))) {
       result = result.replace("%1$s", "").replace("%2$s", "");
     }
     return Optional.of(result);
+  }
+
+  private Optional<String> resolveExpression(CustomFunction customFunction) {
+    String dialectKey = "SQL/" + sqlDialect.getId();
+    if (customFunction.getExpression().containsKey(dialectKey)) {
+      return Optional.of(customFunction.getExpression().get(dialectKey));
+    }
+    if (customFunction.getExpression().containsKey("SQL")) {
+      return Optional.of(customFunction.getExpression().get("SQL"));
+    }
+    return Optional.empty();
   }
 
   private boolean operandHasSelectForTemplate(String expression) {

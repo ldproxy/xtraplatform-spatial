@@ -585,7 +585,7 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
-            getData().getCustomFunctions(),
+            getData().getCql2Functions(),
             accentiCollation);
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
@@ -1485,8 +1485,8 @@ public class FeatureProviderSql
   }
 
   @Override
-  public List<CustomFunction> getCustomFunctions() {
-    return getData().getCustomFunctions();
+  public List<CustomFunction> getCql2Functions() {
+    return getData().getCql2Functions();
   }
 
   @Override
