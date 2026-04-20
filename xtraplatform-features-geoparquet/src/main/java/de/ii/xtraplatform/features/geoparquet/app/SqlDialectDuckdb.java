@@ -102,11 +102,12 @@ public class SqlDialectDuckdb implements SqlDialect {
     DateTimeFormatter parser;
     if (Objects.isNull(timeZone)) {
       parser =
-          DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]")
+          DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.S[S[S]]][X]")
               .withZone(ZoneOffset.UTC);
     } else {
       parser =
-          DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]").withZone(timeZone);
+          DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.S[S[S]]][X]")
+              .withZone(timeZone);
     }
 
     // Necessary because DUCKDB supports INFINITY
