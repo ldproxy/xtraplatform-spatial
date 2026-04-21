@@ -29,7 +29,10 @@ public interface CustomFunction {
 
   List<String> getReturns();
 
-  Map<String, String> getExpression();
+  @Value.Default
+  default Map<String, String> getExpression() {
+    return Map.of();
+  }
 
   static CustomFunction of(
       String name, List<Cql2FunctionArgument> arguments, List<String> returns) {
@@ -37,6 +40,21 @@ public interface CustomFunction {
         .name(name)
         .arguments(arguments)
         .returns(returns)
+        .build();
+  }
+
+  static CustomFunction of(
+      String name,
+      @Nullable String description,
+      List<Cql2FunctionArgument> arguments,
+      List<String> returns,
+      Map<String, String> expression) {
+    return new ImmutableCustomFunction.Builder()
+        .name(name)
+        .description(description)
+        .arguments(arguments)
+        .returns(returns)
+        .expression(expression)
         .build();
   }
 }

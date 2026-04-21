@@ -20,6 +20,7 @@ import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
 import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
@@ -585,7 +586,7 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
-            getData().getCql2Functions(),
+            getCql2Functions(),
             accentiCollation);
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
@@ -1486,7 +1487,7 @@ public class FeatureProviderSql
 
   @Override
   public List<CustomFunction> getCql2Functions() {
-    return getData().getCql2Functions();
+    return CqlBuiltInFunctions.prependBuiltInFunctions(getData().getCql2Functions());
   }
 
   @Override
