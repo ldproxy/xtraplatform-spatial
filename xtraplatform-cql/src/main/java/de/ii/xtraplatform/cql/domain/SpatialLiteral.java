@@ -16,6 +16,7 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableSpatialLiteral.Builder.class)
 public interface SpatialLiteral extends Spatial, Literal, CqlNode {
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   static SpatialLiteral of(String literal) throws CqlParseException {
     return new SpatialLiteral.Builder(literal).build();
   }
@@ -48,6 +49,7 @@ public interface SpatialLiteral extends Spatial, Literal, CqlNode {
     }
 
     @JsonCreator
+    @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
     public Builder(String literal) throws CqlParseException {
       super();
       value(literal);

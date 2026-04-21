@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.util.LambdaWithException;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -30,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterator;
@@ -42,16 +42,13 @@ public interface Operand extends CqlNode {
 
   class OperandDeserializer extends StdDeserializer<Operand> {
 
-    private static final List<String> ARRAY =
-        Arrays.stream(ArrayFunction.values()).map(op -> op.toString().toLowerCase()).toList();
-    private static final List<String> SPATIAL =
-        Arrays.stream(SpatialFunction.values()).map(op -> op.toString().toLowerCase()).toList();
+    private static final long serialVersionUID = 1L;
+
     private static final List<String> TEMPORAL =
-        Arrays.stream(TemporalFunction.values()).map(op -> op.toString().toLowerCase()).toList();
-    private static final List<String> SCALAR =
-        ImmutableList.of(
-            "value", "list", "args", "eq", "neq", "gt", "gte", "lt", "lte", "between", "in",
-            "isnull");
+        Arrays.stream(TemporalFunction.values())
+            .map(op -> op.toString().toLowerCase(Locale.ROOT))
+            .toList();
+    private static final String INTERVAL_KEY = "interval";
 
     protected OperandDeserializer() {
       this(null);
@@ -62,14 +59,23 @@ public interface Operand extends CqlNode {
     }
 
     private Scalar getScalar(JsonNode node) {
-      if (node.isBoolean()) return ScalarLiteral.of(node.asBoolean());
-      if (node.isInt()) return ScalarLiteral.of(node.asInt());
-      if (node.isLong()) return ScalarLiteral.of(node.asLong());
-      if (node.isDouble()) return ScalarLiteral.of(node.asDouble());
+      if (node.isBoolean()) {
+        return ScalarLiteral.of(node.asBoolean());
+      }
+      if (node.isInt()) {
+        return ScalarLiteral.of(node.asInt());
+      }
+      if (node.isLong()) {
+        return ScalarLiteral.of(node.asLong());
+      }
+      if (node.isDouble()) {
+        return ScalarLiteral.of(node.asDouble());
+      }
 
       return ScalarLiteral.of(node.asText());
     }
 
+    @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
     private Operand getOperand(JsonParser parser, JsonNode node, String parent)
         throws JsonProcessingException {
       ObjectCodec oc = parser.getCodec();
@@ -80,10 +86,10 @@ public interface Operand extends CqlNode {
           return oc.treeToValue(node.get("date"), TemporalLiteral.class);
         } else if (Objects.nonNull(node.get("timestamp"))) {
           return oc.treeToValue(node.get("timestamp"), TemporalLiteral.class);
-        } else if (Objects.nonNull(node.get("interval"))) {
-          if (node.get("interval").isArray()) {
-            Temporal op1 = (Temporal) getOperand(parser, node.get("interval").get(0), parent);
-            Temporal op2 = (Temporal) getOperand(parser, node.get("interval").get(1), parent);
+        } else if (Objects.nonNull(node.get(INTERVAL_KEY))) {
+          if (node.get(INTERVAL_KEY).isArray()) {
+            Temporal op1 = (Temporal) getOperand(parser, node.get(INTERVAL_KEY).get(0), parent);
+            Temporal op2 = (Temporal) getOperand(parser, node.get(INTERVAL_KEY).get(1), parent);
 
             return TemporalLiteral.interval(op1, op2);
           }
@@ -155,7 +161,8 @@ public interface Operand extends CqlNode {
       JsonStreamContext parent = parser.getParsingContext().getParent();
 
       // Get name of the parent key
-      String parentName = Objects.requireNonNullElse(parent.getCurrentName(), "null").toLowerCase();
+      String parentName =
+          Objects.requireNonNullElse(parent.getCurrentName(), "null").toLowerCase(Locale.ROOT);
 
       return getOperand(parser, node, parentName);
     }

@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.cql.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.Locale;
 import org.immutables.value.Value;
 
 public interface BinarySpatialOperation extends BinaryOperation2<Spatial>, CqlNode {
@@ -15,7 +16,7 @@ public interface BinarySpatialOperation extends BinaryOperation2<Spatial>, CqlNo
   @JsonIgnore
   @Value.Derived
   default SpatialFunction getSpatialOperator() {
-    return SpatialFunction.valueOf(getOp().toUpperCase());
+    return SpatialFunction.valueOf(getOp().toUpperCase(Locale.ROOT));
   }
 
   static BinarySpatialOperation of(SpatialFunction operator, Spatial spatial1, Spatial spatial2) {

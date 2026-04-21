@@ -22,6 +22,7 @@ public interface AEquals extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
+  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AEquals of(Vector vector1, Vector vector2) {
     return new ImmutableAEquals.Builder().addArgs(vector1, vector2).build();
   }

@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -41,17 +42,19 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
   private final Set<TemporalFunction> supportedOperators;
 
   public CqlVisitorMapTemporalOperators(Set<TemporalFunction> supportedOperators) {
+    super();
     this.supportedOperators = supportedOperators;
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public CqlNode visit(BinaryTemporalOperation temporalOperation, List<CqlNode> children) {
 
     Temporal temporal1 = (Temporal) children.get(0);
     Temporal temporal2 = (Temporal) children.get(1);
 
     TemporalFunction temporalFunction =
-        TemporalFunction.valueOf(temporalOperation.getOp().toUpperCase());
+        TemporalFunction.valueOf(temporalOperation.getOp().toUpperCase(Locale.ROOT));
 
     // if the next visitor supports a temporal operator, we keep it
     if (supportedOperators.contains(temporalFunction)) {
@@ -204,6 +207,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
     throw new IllegalStateException("unknown temporal operator: " + temporalFunction);
   }
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   private boolean instantsOfSameGranularity(Temporal temporal1, Temporal temporal2) {
 
     // try to determine the data types of the operands
@@ -222,19 +226,23 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
 
     // if one is a property and the other a literal instant, we assume that both are of the same
     // type
-    if (temporal1 instanceof Property && Objects.nonNull(type2)) {
-      if (type2.equals(LocalDate.class) || type2.equals(Instant.class)) {
-        type1 = type2;
-      }
-    } else if (Objects.nonNull(type1) && temporal2 instanceof Property) {
-      if (type1.equals(LocalDate.class) || type1.equals(Instant.class)) {
-        type2 = type1;
-      }
+    if (temporal1 instanceof Property
+        && Objects.nonNull(type2)
+        && (type2.equals(LocalDate.class) || type2.equals(Instant.class))) {
+      type1 = type2;
+    } else if (Objects.nonNull(type1)
+        && temporal2 instanceof Property
+        && (type1.equals(LocalDate.class) || type1.equals(Instant.class))) {
+      type2 = type1;
     }
 
     // fold intervals
-    if (de.ii.xtraplatform.cql.domain.Interval.class.equals(type1)) type1 = Interval.class;
-    if (de.ii.xtraplatform.cql.domain.Interval.class.equals(type2)) type2 = Interval.class;
+    if (de.ii.xtraplatform.cql.domain.Interval.class.equals(type1)) {
+      type1 = Interval.class;
+    }
+    if (de.ii.xtraplatform.cql.domain.Interval.class.equals(type2)) {
+      type2 = Interval.class;
+    }
 
     return Objects.nonNull(type1)
         && Objects.nonNull(type2)
@@ -242,6 +250,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
         && !type1.equals(Interval.class);
   }
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   private Optional<Class<?>> getGranularity(Temporal temporal1, Temporal temporal2) {
 
     // try to determine the data types of the operands
@@ -316,6 +325,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
     return Optional.empty();
   }
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   private Temporal getStart(
       Temporal temporal, @SuppressWarnings("unused") Optional<Class<?>> granularity) {
     if (temporal instanceof Property) {
@@ -334,7 +344,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
       return temporal;
     } else if (temporal instanceof de.ii.xtraplatform.cql.domain.Interval) {
       de.ii.xtraplatform.cql.domain.Interval interval =
-          ((de.ii.xtraplatform.cql.domain.Interval) temporal);
+          (de.ii.xtraplatform.cql.domain.Interval) temporal;
       return getStart((Temporal) interval.getArgs().get(0), granularity);
     } else if (temporal instanceof Function) {
       Temporal start = (Temporal) ((Function) temporal).getArgs().get(0);
@@ -349,6 +359,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
         "unknown temporal type: " + temporal.getClass().getSimpleName());
   }
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   private Temporal getEnd(Temporal temporal, Optional<Class<?>> granularity) {
     if (temporal instanceof Property) {
       return temporal;
@@ -380,7 +391,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
       return temporal;
     } else if (temporal instanceof de.ii.xtraplatform.cql.domain.Interval) {
       de.ii.xtraplatform.cql.domain.Interval interval =
-          ((de.ii.xtraplatform.cql.domain.Interval) temporal);
+          (de.ii.xtraplatform.cql.domain.Interval) temporal;
       return getEnd((Temporal) interval.getArgs().get(1), granularity);
     } else if (temporal instanceof Function) {
       Temporal end = (Temporal) ((Function) temporal).getArgs().get(1);

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
 
   @Override
@@ -73,6 +74,8 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
         case 1:
         case 2:
           builder.addArgs((Scalar) cqlNode);
+          break;
+        default:
           break;
       }
     }
@@ -156,6 +159,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   }
 
   @Override
+  @SuppressWarnings("PMD.ReplaceVectorWithList")
   public CqlNode visit(BinaryArrayOperation arrayOperation, List<CqlNode> children) {
     List<Vector> vectors =
         children.stream()

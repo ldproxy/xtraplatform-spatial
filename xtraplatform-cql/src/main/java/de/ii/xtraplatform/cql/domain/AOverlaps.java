@@ -22,6 +22,7 @@ public interface AOverlaps extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
+  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AOverlaps of(Vector vector1, Vector vector2) {
     return new ImmutableAOverlaps.Builder().addArgs(vector1, vector2).build();
   }

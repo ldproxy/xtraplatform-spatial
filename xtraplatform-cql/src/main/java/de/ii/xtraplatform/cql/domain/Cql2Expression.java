@@ -20,6 +20,8 @@ public interface Cql2Expression extends Operand, CqlNode {
 
   class Cql2JsonDeserializer extends StdDeserializer<Cql2Expression> {
 
+    private static final long serialVersionUID = 1L;
+
     protected Cql2JsonDeserializer() {
       this(null);
     }
@@ -41,7 +43,7 @@ public interface Cql2Expression extends Operand, CqlNode {
       try {
         return parser.getCodec().treeToValue(node, Operation.class);
       } catch (IOException e) {
-        throw new CqlParseException(e.getMessage());
+        throw new CqlParseException(e.getMessage(), e);
       }
     }
   }

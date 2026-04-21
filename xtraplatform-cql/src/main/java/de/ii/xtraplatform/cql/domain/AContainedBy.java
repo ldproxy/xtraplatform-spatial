@@ -22,6 +22,7 @@ public interface AContainedBy extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
+  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AContainedBy of(Vector vector1, Vector vector2) {
     return new ImmutableAContainedBy.Builder().addArgs(vector1, vector2).build();
   }

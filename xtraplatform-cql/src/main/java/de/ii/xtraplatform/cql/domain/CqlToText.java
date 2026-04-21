@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,7 +32,10 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
 public class CqlToText implements CqlVisitor<String> {
+
+  private static final String NOT_OPERATOR_FORMAT = "%s %s";
 
   protected static final Set<String> KEYWORDS =
       new ImmutableSet.Builder<String>()
@@ -177,21 +181,21 @@ public class CqlToText implements CqlVisitor<String> {
     String operation = children.get(0);
 
     if (not.getArgs().get(0) instanceof Like) {
-      String like = Like.TYPE.toUpperCase();
+      String like = Like.TYPE.toUpperCase(Locale.ROOT);
 
-      return operation.replace(like, String.format("%s %s", operator, like));
+      return operation.replace(like, String.format(NOT_OPERATOR_FORMAT, operator, like));
     } else if (not.getArgs().get(0) instanceof IsNull) {
-      String isNull = IsNull.TEXT;
+      String nullText = IsNull.TEXT;
 
-      return operation.replace(isNull, "IS NOT NULL");
+      return operation.replace(nullText, "IS NOT NULL");
     } else if (not.getArgs().get(0) instanceof Between) {
-      String between = Between.TYPE.toUpperCase();
+      String between = Between.TYPE.toUpperCase(Locale.ROOT);
 
-      return operation.replace(between, String.format("%s %s", operator, between));
+      return operation.replace(between, String.format(NOT_OPERATOR_FORMAT, operator, between));
     } else if (not.getArgs().get(0) instanceof In) {
-      String in = In.TYPE.toUpperCase();
+      String in = In.TYPE.toUpperCase(Locale.ROOT);
 
-      return operation.replace(in, String.format("%s %s", operator, in));
+      return operation.replace(in, String.format(NOT_OPERATOR_FORMAT, operator, in));
     }
 
     return String.format("NOT (%s)", operation);
@@ -255,21 +259,21 @@ public class CqlToText implements CqlVisitor<String> {
 
   @Override
   public String visit(BinaryTemporalOperation temporalOperation, List<String> children) {
-    String operator = temporalOperation.getOp().toUpperCase();
+    String operator = temporalOperation.getOp().toUpperCase(Locale.ROOT);
 
     return String.format("%s(%s, %s)", operator, children.get(0), children.get(1));
   }
 
   @Override
   public String visit(BinarySpatialOperation spatialOperation, List<String> children) {
-    String operator = spatialOperation.getOp().toUpperCase();
+    String operator = spatialOperation.getOp().toUpperCase(Locale.ROOT);
 
     return String.format("%s(%s, %s)", operator, children.get(0), children.get(1));
   }
 
   @Override
   public String visit(BinaryArrayOperation arrayOperation, List<String> children) {
-    String operator = arrayOperation.getOp().toUpperCase();
+    String operator = arrayOperation.getOp().toUpperCase(Locale.ROOT);
 
     return String.format("%s(%s, %s)", operator, children.get(0), children.get(1));
   }
@@ -309,6 +313,7 @@ public class CqlToText implements CqlVisitor<String> {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public String visit(TemporalLiteral temporalLiteral, List<String> children) {
     if (temporalLiteral.getType() == Interval.class) {
       String start;
@@ -325,7 +330,9 @@ public class CqlToText implements CqlVisitor<String> {
       return String.format("INTERVAL('%s','%s')", start, end);
     } else if (temporalLiteral.getType() == Instant.class) {
       Instant instant = (Instant) temporalLiteral.getValue();
-      if (instant == Instant.MIN || instant == Instant.MAX) return "'..'";
+      if (instant.equals(Instant.MIN) || instant.equals(Instant.MAX)) {
+        return "'..'";
+      }
       return String.format("TIMESTAMP('%s')", DateTimeFormatter.ISO_INSTANT.format(instant));
     } else if (temporalLiteral.getType() == LocalDate.class) {
       return String.format(
@@ -368,32 +375,34 @@ public class CqlToText implements CqlVisitor<String> {
 
   @Override
   public String visit(Property property, List<String> children) {
-    if (!property.getNestedFilters().isEmpty()) {
+    if (property.getNestedFilters().isEmpty()) {
+      if (isNestedFilter) {
+        return addDoubleQuotes(property.getPath().get(property.getPath().size() - 1));
+      } else {
+        return property.getPath().stream()
+            .map(this::addDoubleQuotes)
+            .collect(Collectors.joining("."));
+      }
+    } else {
       Map<String, Cql2Expression> nestedFilters = property.getNestedFilters();
       StringJoiner sj = new StringJoiner(".");
+      CqlToText nestedVisitor = new CqlToText(true);
       for (String element : property.getPath()) {
         if (nestedFilters.containsKey(element)) {
           sj.add(
               String.format(
                   "%s[%s]",
-                  addDoubleQuotes(element),
-                  nestedFilters.get(element).accept(new CqlToText(true))));
+                  addDoubleQuotes(element), nestedFilters.get(element).accept(nestedVisitor)));
         } else {
           sj.add(addDoubleQuotes(element));
         }
       }
       return sj.toString();
-    } else if (isNestedFilter) {
-      return addDoubleQuotes(property.getPath().get(property.getPath().size() - 1));
-    } else {
-      return property.getPath().stream()
-          .map(this::addDoubleQuotes)
-          .collect(Collectors.joining("."));
     }
   }
 
   private String addDoubleQuotes(String identifier) {
-    if (KEYWORDS.contains(identifier.toUpperCase())) {
+    if (KEYWORDS.contains(identifier.toUpperCase(Locale.ROOT))) {
       return "\"" + identifier + "\"";
     }
     return identifier;

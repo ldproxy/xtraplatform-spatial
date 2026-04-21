@@ -9,6 +9,8 @@ package de.ii.xtraplatform.cql.domain;
 
 public class CqlParseException extends RuntimeException {
 
+  private static final long serialVersionUID = 1L;
+
   public CqlParseException(String message) {
     super(message);
   }

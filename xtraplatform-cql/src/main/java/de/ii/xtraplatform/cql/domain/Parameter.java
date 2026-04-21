@@ -42,6 +42,8 @@ public interface Parameter extends Scalar, Spatial, Temporal, Operand, Vector, C
 
   class ParameterDeserializer extends StdDeserializer<Parameter> {
 
+    private static final long serialVersionUID = 1L;
+
     protected ParameterDeserializer() {
       this(null);
     }
@@ -95,6 +97,8 @@ public interface Parameter extends Scalar, Spatial, Temporal, Operand, Vector, C
   }
 
   class ParameterSerializer extends StdSerializer<Parameter> {
+
+    private static final long serialVersionUID = 1L;
 
     protected ParameterSerializer() {
       this(null);

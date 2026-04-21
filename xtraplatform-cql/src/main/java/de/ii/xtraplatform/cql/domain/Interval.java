@@ -41,6 +41,8 @@ public interface Interval extends CqlNode, Temporal, Operand {
 
   class Serializer extends StdSerializer<Interval> {
 
+    private static final long serialVersionUID = 1L;
+
     protected Serializer() {
       this(null);
     }

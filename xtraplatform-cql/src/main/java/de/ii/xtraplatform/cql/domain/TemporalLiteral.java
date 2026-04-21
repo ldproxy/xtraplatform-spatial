@@ -27,12 +27,14 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import org.immutables.value.Value;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings("PMD.FieldDeclarationsShouldBeAtStartOfClass")
 @Value.Immutable
 @JsonDeserialize(builder = TemporalLiteral.Builder.class)
 public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
@@ -104,6 +106,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
     return new Builder(startInclusive, endExclusive).build();
   }
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   static TemporalLiteral of(String instantLiteral) throws CqlParseException {
     return new Builder(instantLiteral).build();
   }
@@ -155,6 +158,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
     }
 
     @JsonCreator
+    @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
     public Builder(String instantLiteral) throws CqlParseException {
       super();
       Object castedLiteral = castToType(instantLiteral);
@@ -162,6 +166,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
       type(castedLiteral.getClass());
     }
 
+    @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
     public Builder(TemporalLiteral startInclusive, TemporalLiteral endInclusive)
         throws CqlParseException {
       super();
@@ -181,36 +186,41 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
     }
 
     private Instant getStartInclusive(Object instant) {
-      if (instant instanceof OPEN) return Instant.MIN;
-      else if (instant instanceof LocalDate)
+      if (instant instanceof OPEN) {
+        return Instant.MIN;
+      } else if (instant instanceof LocalDate) {
         return ((LocalDate) instant).atStartOfDay(ZoneOffset.UTC).toInstant();
+      }
       return (Instant) instant;
     }
 
     private Instant getEndExclusive(Object instant) {
-      if (instant instanceof OPEN) return Instant.MAX;
-      else if (instant instanceof LocalDate)
+      if (instant instanceof OPEN) {
+        return Instant.MAX;
+      } else if (instant instanceof LocalDate) {
         return ((LocalDate) instant).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-      return ((Instant) instant);
+      }
+      return (Instant) instant;
     }
 
+    @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
     private Object castToType(String instantLiteral) throws CqlParseException {
 
       // If the datetime parameter uses dates, not timestamps, the result is always an interval that
       // starts on the first second of the start date and ends at the last second of the end date.
       try {
-        if (TIMESTAMP_PATTERN.test(instantLiteral.toUpperCase())) {
+        if (TIMESTAMP_PATTERN.test(instantLiteral.toUpperCase(Locale.ROOT))) {
           // a fully specified datetime instant
           // Instant does not support timezones, convert to UTC
           return ZonedDateTime.parse(instantLiteral).toInstant();
-        } else if (DATE_PATTERN.test(instantLiteral.toUpperCase())) {
+        } else if (DATE_PATTERN.test(instantLiteral.toUpperCase(Locale.ROOT))) {
           // a date only instant
           return LocalDate.parse(instantLiteral);
-        } else if (instantLiteral.equalsIgnoreCase("NOW")
-            || instantLiteral.equalsIgnoreCase("NOW()")) {
+        } else if ("NOW".equalsIgnoreCase(instantLiteral)
+            || "NOW()".equalsIgnoreCase(instantLiteral)) {
           // now
           return Instant.now();
-        } else if (instantLiteral.equals("..")) {
+        } else if ("..".equals(instantLiteral)) {
           // an open interval boundary, we do not know, if this is start or end, so we need a
           // special value
           return OPEN.OPEN;
@@ -224,6 +234,8 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
   }
 
   class TemporalLiteralSerializer extends StdSerializer<TemporalLiteral> {
+
+    private static final long serialVersionUID = 1L;
 
     private final JsonSerializer<TemporalLiteral> defaultSerializer;
 
@@ -260,6 +272,9 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
   }
 
   class TemporalLiteralSerializerModifier extends BeanSerializerModifier {
+
+    private static final long serialVersionUID = 1L;
+
     @Override
     public JsonSerializer<?> modifySerializer(
         SerializationConfig config, BeanDescription beanDesc, JsonSerializer<?> serializer) {

@@ -22,6 +22,7 @@ public interface AContains extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
+  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AContains of(Vector vector1, Vector vector2) {
     return new ImmutableAContains.Builder().addArgs(vector1, vector2).build();
   }
