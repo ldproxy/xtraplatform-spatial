@@ -215,7 +215,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
       return fromSchemaType(customFunction.get().getReturns().get(0));
     }
 
-    return Type.valueOf(function.getType().getSimpleName());
+    throw new IllegalArgumentException("Unknown function: " + function.getName());
   }
 
   @Override

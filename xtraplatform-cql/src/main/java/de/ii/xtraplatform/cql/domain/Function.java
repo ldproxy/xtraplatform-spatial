@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.cql.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -38,69 +37,6 @@ public interface Function extends CqlNode, Scalar, Temporal, Operand, Cql2Expres
         getArgs().stream().map(argument -> argument.accept(visitor)).collect(Collectors.toList());
 
     return visitor.visit(this, arguments);
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default Class<?> getType() {
-    if (isLower() || isUpper()) {
-      return String.class;
-    } else if (isPosition()) {
-      return Integer.class;
-    } else if (isDiameter()) {
-      return Double.class;
-    } else if (isAlike()) {
-      return Boolean.class;
-    }
-    return Object.class;
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isCasei() {
-    return "casei".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isAccenti() {
-    return "accenti".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isInterval() {
-    return "interval".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isLower() {
-    return "lower".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isUpper() {
-    return "upper".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isPosition() {
-    return "position".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isDiameter() {
-    return "diameter2d".equalsIgnoreCase(getName()) || "diameter3d".equalsIgnoreCase(getName());
-  }
-
-  @JsonIgnore
-  @Value.Lazy
-  default boolean isAlike() {
-    return "alike".equalsIgnoreCase(getName());
   }
 
   class Serializer extends StdSerializer<Function> {
