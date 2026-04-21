@@ -30,6 +30,7 @@ import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql.Format;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlToText;
 import de.ii.xtraplatform.cql.domain.CustomFunction;
@@ -127,7 +128,7 @@ public class FilterEncoderSql {
     this.accentiCollation = accentiCollation;
     this.customFunctions =
         ImmutableMap.copyOf(
-            customFunctions.stream()
+            CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
                 .collect(
                     Collectors.toMap(
                         function -> function.getName().toUpperCase(Locale.ROOT),
@@ -651,44 +652,6 @@ public class FilterEncoderSql {
       Optional<String> customExpression = renderCustomFunction(function, children);
       if (customExpression.isPresent()) {
         return customExpression.get();
-      }
-
-      if (function.isPosition()) {
-        return "%1$s" + ROW_NUMBER + "%2$s";
-      } else if (function.isUpper()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sUPPER(", ")%2$s");
-        }
-        return String.format("UPPER(%s)", children.get(0));
-      } else if (function.isLower()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sLOWER(", ")%2$s");
-        }
-        return String.format("LOWER(%s)", children.get(0));
-      } else if (function.isDiameter()) {
-        return sqlDialect.applyToDiameter(
-            children.get(0), "diameter3d".equalsIgnoreCase(function.getName()));
-      } else if (function.isAlike()) {
-        String operator = "LIKE";
-
-        List<String> expressions = processBinary(function.getArgs(), children);
-
-        // we may need to change the second expression
-        String secondExpression = expressions.get(1);
-
-        String string = sqlDialect.applyToString("DUMMY");
-        String functionStart = string.substring(0, string.indexOf("DUMMY"));
-        String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
-
-        String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
-
-        return String.format(expressions.get(0), functionStart, operation);
       }
 
       return super.visit(function, children);
@@ -1665,44 +1628,6 @@ public class FilterEncoderSql {
       Optional<String> customExpression = renderCustomFunction(function, children);
       if (customExpression.isPresent()) {
         return customExpression.get();
-      }
-
-      if (function.isPosition()) {
-        return "%1$s" + ROW_NUMBER + "%2$s";
-      } else if (function.isUpper()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sUPPER(", ")%2$s");
-        }
-        return String.format("UPPER(%s)", children.get(0));
-      } else if (function.isLower()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sLOWER(", ")%2$s");
-        }
-        return String.format("LOWER(%s)", children.get(0));
-      } else if (function.isDiameter()) {
-        return sqlDialect.applyToDiameter(
-            children.get(0), "diameter3d".equalsIgnoreCase(function.getName()));
-      } else if (function.isAlike()) {
-        String operator = "LIKE";
-
-        List<String> expressions = processBinary(function.getArgs(), children);
-
-        // we may need to change the second expression
-        String secondExpression = expressions.get(1);
-
-        String string = sqlDialect.applyToString("DUMMY");
-        String functionStart = string.substring(0, string.indexOf("DUMMY"));
-        String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
-
-        String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
-
-        return String.format(expressions.get(0), functionStart, operation);
       }
 
       return super.visit(function, children);

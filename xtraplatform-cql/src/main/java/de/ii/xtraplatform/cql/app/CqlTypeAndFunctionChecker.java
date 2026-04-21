@@ -107,36 +107,6 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
           .put("ACCENTI", ImmutableSet.of(TEXT))
           .build();
 
-  private static final Map<String, List<Set<Class<?>>>> COMPATIBILITY_FUNCTION_ARGUMENTS =
-      new ImmutableMap.Builder<String, List<Set<Class<?>>>>()
-          .put(
-              "UPPER",
-              ImmutableList.of(
-                  ImmutableSet.of(
-                      Property.class,
-                      Function.class,
-                      Accenti.class,
-                      Casei.class,
-                      ScalarLiteral.class)))
-          .put(
-              "LOWER",
-              ImmutableList.of(
-                  ImmutableSet.of(
-                      Property.class,
-                      Function.class,
-                      Accenti.class,
-                      Casei.class,
-                      ScalarLiteral.class)))
-          .put("POSITION", ImmutableList.of())
-          .put("DIAMETER2D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
-          .put("DIAMETER3D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
-          .put(
-              "ALIKE",
-              ImmutableList.of(
-                  ImmutableSet.of(Property.class, Function.class),
-                  ImmutableSet.of(ScalarLiteral.class)))
-          .build();
-
   private final Map<String, String> propertyTypes;
   private final Cql cql;
   private final Map<String, CustomFunction> customFunctions;
@@ -341,37 +311,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private void checkCustomFunction(
       Function function, List<Type> types, CustomFunction customFunction) {
-    final List<Set<Class<?>>> expectedNodes =
-        Objects.requireNonNullElse(
-            COMPATIBILITY_FUNCTION_ARGUMENTS.get(function.getName().toUpperCase(Locale.ROOT)),
-            ImmutableList.of());
-
     if (function.getArgs().size() != customFunction.getArguments().size()) {
       throw new IllegalArgumentException(
           String.format(
               "Function %s expects %d argument(s), but got %d",
               function.getName(), customFunction.getArguments().size(), function.getArgs().size()));
-    }
-
-    if (!expectedNodes.isEmpty()) {
-      IntStream.range(0, function.getArgs().size())
-          .forEach(
-              i -> {
-                CqlNode child = function.getArgs().get(i);
-                Set<Class<?>> expected = expectedNodes.get(i);
-                if (expected.stream()
-                    .noneMatch(expectedNode -> expectedNode.isAssignableFrom(child.getClass()))) {
-                  throw new IllegalArgumentException(
-                      String.format(
-                          "Function %s expects argument %d to be a %s, but got %s",
-                          function.getName(),
-                          i + 1,
-                          expected.stream()
-                              .map(Class::getSimpleName)
-                              .collect(Collectors.joining("/")),
-                          child.getClass().getSimpleName().replace("Immutable", "")));
-                }
-              });
     }
 
     IntStream.range(0, types.size())
