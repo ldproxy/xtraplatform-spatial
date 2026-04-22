@@ -136,8 +136,11 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
   List<GeometryType> getProvidesGeometryTypes();
 
   /**
-   * @langEn Optional custom CQL2 functions that can be used in filters.
+   * @langEn Optional custom CQL2 functions that can be used in filters. See [Custom CQL2
+   *     Functions](#custom-cql2-functions) for details and examples.
    * @langDe Optionale benutzerdefinierte CQL2-Funktionen, die in Filtern genutzt werden können.
+   *     Weitere Details und Beispiele siehe [Benutzerdefinierte
+   *     CQL2-Funktionen](#benutzerdefinierte-cql2-funktionen).
    * @default []
    */
   @Value.Default
