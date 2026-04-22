@@ -11,9 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -27,43 +25,16 @@ import org.immutables.value.Value;
 public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
 
   /**
-   * @langEn The name of the database.
-   * @langDe Der Name der Datenbank.
+   * @langEn The relative path starting from `/resources/features` to the directory containing the
+   *     (Geo)Parquet files (and subdirectories containing (Geo)Parquet files).
+   * @langDe Der zu `/resources/features` relative Pfad zum Ordner, in dem die GeoParquet-Dateien
+   *     (sowie Unterordner mit (Geo)Parquet-Dateien) liegen.
    */
   @Override
   String getDatabase();
 
-  /**
-   * @langEn The database host. To use a non-default port, add it to the host separated by `:`, e.g.
-   *     `db:1523`.
-   * @langDe Der Datenbankhost. Wird ein anderer Port als der Standardport verwendet, ist dieser
-   *     durch einen Doppelpunkt getrennt anzugeben, z.B. `db:1523`.
-   */
-  @Override
-  Optional<String> getHost();
-
-  /**
-   * @langEn The user name.
-   * @langDe Der Benutzername.
-   */
-  @Override
-  Optional<String> getUser();
-
-  /**
-   * @langEn The base64 encoded password of the user.
-   * @langDe Das mit base64 kodierte Passwort des Benutzers.
-   */
-  @Override
-  Optional<String> getPassword();
-
-  /**
-   * @langEn The names of database schemas that should be used.
-   * @langDe Die Namen der Schemas in der Datenbank, auf die zugegriffen werden soll.
-   * @default []
-   */
-  @Override
-  List<String> getSchemas();
-
+  @DocIgnore
+  @JsonIgnore
   @Nullable
   @Override
   PoolSettings getPool();

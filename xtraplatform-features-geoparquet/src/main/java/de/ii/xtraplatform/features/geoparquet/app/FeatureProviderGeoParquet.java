@@ -42,6 +42,51 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * @title GeoParquet
+ * @sortPriority 80
+ * @langEn The features are stored using one or multiple (Geo)Parquet files.
+ * @langDe Die Features sind in einem oder mehreren (Geo)Parquet Dateien gespeichert.
+ * @limitationsEn
+ *     <p>The following limitations are known:
+ *     <p><code>
+ *   - Files with 2 consecutive underscores may lead to unexpected behavior.
+ *   - Only 2D geometries are supported.
+ *   - The option `linearizeCurves` is not supported. All geometries must be encoded with WKB or according to the geometry types "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" from the GeoArrow specification.
+ *   - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
+ *   - CRUD operations are not supported.
+ *   - Columns with JSON content are not *yet* supported.
+ *     </code>
+ * @limitationsDe
+ *     <p>Die folgenden Einschränkungen sind bekannt:
+ *     <p><code>
+ *   - Dateien mit 2 aufeinanderfolgenden Unterstrichen können zu unerwartetem Verhalten führen.
+ *   - Es werden nur 2D-Geometrien unterstützt.
+ *   - Die Option `linearizeCurves` wird nicht unterstützt. Alle Geometrien müssen mit WKB oder gemäß den Geometrietypen "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" aus der GeoArrow-Spezifikation kodiert werden.
+ *   - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
+ *   - CRUD-Operationen werden nicht unterstützt.
+ *   - Spalten mit JSON-Inhalt werden *noch* nicht unterstützt.
+ * </code>
+ * @cfgPropertiesAdditionalEn ### Connection Info
+ *     <p>The connection info object for GeoParquet has the following properties:
+ *     <p>{@docTable:connectionInfo}
+ *     <p>### Path Syntax
+ *     <p>The path to the required (Geo)Parquet file is specified in `sourcePath`. The path is
+ *     relative to the directory specified in `database`, where all slashes except the first `/`
+ *     must be replaced with `__` and the `.parquet` extension is omitted. Example: <code>
+ *     Assuming the (Geo)Parquet files are located in `/resources/features/Datenordner` and `database` is set to `Datenordner` accordingly. For the file `/resources/features/Datenordner/Unterordner/geo_parquet_file.parquet` the path in `sourcePath` must be specified as `/Unterordner__geo_parquet_file`.
+ *     </code>
+ * @cfgPropertiesAdditionalDe ### Connection Info
+ *     <p>Das Connection-Info-Objekt für GeoParquet wird wie folgt beschrieben:
+ *     <p>{@docTable:connectionInfo}
+ *     <p>### Pfadsyntax
+ *     <p>Der Pfad zu der jeweils benötigten (Geo)Parquet-Datei wird in `sourcePath` angegeben. Der
+ *     Pfad wird dabei relativ zu dem in `database` angegebenen Ordner angegeben, wobei alle
+ *     Schrägstriche bis auf den ersten `/` durch `__` ersetzt werden müssen und die
+ *     `.parquet`-Endung weggelassen wird. Beispiel: <code>
+ *       Angenommen die (Geo)Parquet-Dateien liegen in `/resources/features/Datenordner` und `database` wird entsprechend mit `Datenordner` angegeben. Für die Datei `/resources/features/Datenordner/Unterordner/geo_parquet_file.parquet` muss der Pfad in `sourcePath` dann als `/Unterordner__geo_parquet_file` angegeben werden.
+ *     </code>
+ */
 @DocDefs(
     tables = {
       @DocTable(
@@ -102,6 +147,8 @@ public class FeatureProviderGeoParquet extends FeatureProviderSql {
 
   @Override
   protected boolean onStartup() throws InterruptedException {
+    // ToDo: Remove check, because in the context of the GeoParquet Feature Provider dialects do not
+    // exist
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsAdapterDuckdb.ID)) {
       LOGGER.error(
           "Feature provider with id '{}' could not be started: dialect '{}' is not supported",
