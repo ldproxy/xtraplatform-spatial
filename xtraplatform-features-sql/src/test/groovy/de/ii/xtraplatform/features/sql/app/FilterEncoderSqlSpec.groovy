@@ -12,6 +12,7 @@ import de.ii.xtraplatform.cql.domain.CustomFunction
 import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
 import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
 import de.ii.xtraplatform.cql.domain.Eq
+import de.ii.xtraplatform.cql.domain.Gt
 import de.ii.xtraplatform.cql.domain.Function
 import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.blobs.domain.ResourceStore
@@ -971,6 +972,39 @@ class FilterEncoderSqlSpec extends Specification {
 
         then:
 
+        actual == expected
+    }
+
+    def 'built-in ALIKE function, no join'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Function.of("ALIKE", [Property.of("name"), ScalarLiteral.of("kupp%")])
+
+        when:
+        // ALIKE returns BOOLEAN — used directly as filter predicate
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.name::varchar LIKE 'kupp%')"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+    }
+
+    def 'built-in DIAMETER2D function, 1:n join'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = Gt.ofFunction(
+                Function.of("DIAMETER2D", [Property.of("location")]),
+                ScalarLiteral.of(100))
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Length(ST_BoundingDiagonal(Box2D(ST_Transform(AB.location,3857)))) > 100)"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
         actual == expected
     }
 
