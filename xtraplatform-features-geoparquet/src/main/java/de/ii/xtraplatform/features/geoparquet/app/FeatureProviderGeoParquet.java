@@ -86,6 +86,8 @@ import org.slf4j.LoggerFactory;
  *     `.parquet`-Endung weggelassen wird. Beispiel: <code>
  *       Angenommen die (Geo)Parquet-Dateien liegen in `/resources/features/Datenordner` und `database` wird entsprechend mit `Datenordner` angegeben. Für die Datei `/resources/features/Datenordner/Unterordner/geo_parquet_file.parquet` muss der Pfad in `sourcePath` dann als `/Unterordner__geo_parquet_file` angegeben werden.
  *     </code>
+ * @ref:connectionInfo {@link
+ *     de.ii.xtraplatform.features.geoparquet.domain.ImmutableConnectionInfoGeoParquet}
  */
 @DocDefs(
     tables = {
