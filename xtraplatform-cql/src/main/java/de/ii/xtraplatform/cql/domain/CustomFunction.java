@@ -28,12 +28,12 @@ import org.immutables.value.Value;
  *     <p>#### Expression
  *     <p>The `expression` map contains SQL templates, either generic or dialect-specific. The
  *     following keys are supported:
- *     <ul>
- *       <li>`SQL` – generic, used as fallback for all dialects
- *       <li>`SQL/PGIS` – PostgreSQL/PostGIS
- *       <li>`SQL/GPKG` – GeoPackage (SQLite)
- *       <li>`SQL/ORAS` – Oracle
- *     </ul>
+ *     <p><code>
+ * - `SQL` – generic, used as fallback for all dialects
+ * - `SQL/PGIS` – PostgreSQL/PostGIS
+ * - `SQL/GPKG` – GeoPackage (SQLite)
+ * - `SQL/ORAS` – Oracle
+ * </code>
  *     <p>The dialect-specific key takes precedence over `SQL` if both are present. Arguments are
  *     referenced using `$argName` placeholders.
  *     <p>#### Example
@@ -72,12 +72,12 @@ import org.immutables.value.Value;
  *     <p>#### Ausdruck
  *     <p>Die `expression`-Map enthält SQL-Templates, entweder generisch oder dialektspezifisch.
  *     Folgende Schlüssel werden unterstützt:
- *     <ul>
- *       <li>`SQL` – generisch, wird als Fallback für alle Dialekte verwendet
- *       <li>`SQL/PGIS` – PostgreSQL/PostGIS
- *       <li>`SQL/GPKG` – GeoPackage (SQLite)
- *       <li>`SQL/ORAS` – Oracle
- *     </ul>
+ *     <p><code>
+ * - `SQL` – generisch, wird als Fallback für alle Dialekte verwendet
+ * - `SQL/PGIS` – PostgreSQL/PostGIS
+ * - `SQL/GPKG` – GeoPackage (SQLite)
+ * - `SQL/ORAS` – Oracle
+ * </code>
  *     <p>Der dialektspezifische Schlüssel hat Vorrang vor `SQL`, wenn beide vorhanden sind.
  *     Argumente werden mit `$argName`-Platzhaltern referenziert.
  *     <p>#### Beispiel
