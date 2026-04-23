@@ -102,14 +102,8 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
             filePath.toString().replace("/", "__").replace(".parquet", ""), filePath));
   }
 
-  @Override
-  public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
-    StringBuilder query = new StringBuilder(512);
-
-    // Install and load the spatial extension of DuckDB to access spatial functions
-    query.append("INSTALL spatial;");
-    query.append("LOAD spatial;");
-
+  private Optional<String> handleLocalFiles(
+      StringBuilder queryBuilder, ConnectionInfoSql connectionInfo) {
     // Find absolute Path to resources/features, inspired from SqlDbmsAdapterGpkg.java
     Optional<Path> featuresPath = Optional.empty();
     try {
@@ -131,7 +125,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     }
 
     // Set the absolute path to the data directory as the search path
-    query.append(String.format("SET file_search_path = '%s';", dataDirectory));
+    queryBuilder.append(String.format("SET file_search_path = '%s';", dataDirectory));
 
     // Walk the tree of the data directory and generate a query to add the content of every parquet
     // file as an in-memory table. To increase the collision resistance, '/' is replaced with '__'
@@ -142,12 +136,55 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
           .filter(Files::isRegularFile)
           .filter(filePath -> filePath.getFileName().toString().endsWith(".parquet"))
           .map(dataDirectory::relativize)
-          .forEach(filePath -> addTable(query, filePath, addedFilePaths));
+          .forEach(filePath -> addTable(queryBuilder, filePath, addedFilePaths));
     } catch (IOException e) {
       throw new IllegalStateException("Error traversing the data directory: " + e.getMessage());
     }
 
-    return Optional.of(query.toString());
+    return Optional.of(queryBuilder.toString());
+  }
+
+  // Todo: Create custom ConnectionInfo for GeoParquet
+  private Optional<String> handleS3(StringBuilder queryBuilder, ConnectionInfoSql connectionInfo) {
+    // Install and load the httpfs extension of DuckDB to access files via S3
+    queryBuilder.append("INSTALL httpfs;");
+    queryBuilder.append("LOAD httpfs;");
+
+    // Add region
+    queryBuilder.append(String.format("SET s3_region='%s';", connectionInfo.getDatabase()));
+
+    // Add credentials if avaible
+    connectionInfo
+        .getUser()
+        .ifPresent(key -> queryBuilder.append(String.format("SET s3_access_key_id='%s';", key)));
+    connectionInfo
+        .getPassword()
+        .ifPresent(
+            secret -> queryBuilder.append(String.format("SET s3_secret_access_key='%s';", secret)));
+
+    Map<String, String> s3Mapping = connectionInfo.getDriverOptions();
+    for (var key : s3Mapping.keySet()) {
+      queryBuilder.append(
+          String.format("CREATE TABLE '%s' AS SELECT * FROM '%s';", key, s3Mapping.get(key)));
+    }
+
+    return Optional.of(queryBuilder.toString());
+  }
+
+  @Override
+  public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
+    StringBuilder queryBuilder = new StringBuilder(512);
+
+    // Install and load the spatial extension of DuckDB to access spatial functions
+    queryBuilder.append("INSTALL spatial;");
+    queryBuilder.append("LOAD spatial;");
+
+    // Data is retrieved from S3
+    if (connectionInfo.getHost().isPresent() && connectionInfo.getHost().get().equals("s3"))
+      return handleS3(queryBuilder, connectionInfo);
+
+    // Data is avaible as local GeoParquet files
+    return handleLocalFiles(queryBuilder, connectionInfo);
   }
 
   @Override
