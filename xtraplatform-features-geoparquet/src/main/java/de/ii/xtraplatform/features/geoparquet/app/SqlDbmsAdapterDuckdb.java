@@ -92,13 +92,13 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
    * @param addedFilePaths List containing every file path added yet. Necessary to log files that
    *     share the same file name.
    */
-  private void addTable(StringBuilder queryBuilder, Path filePath, List<Path> addedFilePaths) {
+  private void addView(StringBuilder queryBuilder, Path filePath, List<Path> addedFilePaths) {
     addedFilePaths.forEach(otherFilePath -> logSharedFilename(filePath, otherFilePath));
     addedFilePaths.add(filePath);
 
     queryBuilder.append(
         String.format(
-            "CREATE TABLE '%s' AS SELECT * FROM '%s';",
+            "CREATE VIEW '%s' AS SELECT * FROM '%s';",
             filePath.toString().replace("/", "__").replace(".parquet", ""), filePath));
   }
 
@@ -136,7 +136,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
           .filter(Files::isRegularFile)
           .filter(filePath -> filePath.getFileName().toString().endsWith(".parquet"))
           .map(dataDirectory::relativize)
-          .forEach(filePath -> addTable(queryBuilder, filePath, addedFilePaths));
+          .forEach(filePath -> addView(queryBuilder, filePath, addedFilePaths));
     } catch (IOException e) {
       throw new IllegalStateException("Error traversing the data directory: " + e.getMessage());
     }
@@ -150,8 +150,9 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     queryBuilder.append("INSTALL httpfs;");
     queryBuilder.append("LOAD httpfs;");
 
-    // Add region
-    queryBuilder.append(String.format("SET s3_region='%s';", connectionInfo.getDatabase()));
+    // ToDo: Extract and explicity set the region. This prevents DuckDB from going on round-trips
+    // when authenticating (by default it tries to authenticate in us-east-1)
+    // queryBuilder.append(String.format("SET s3_region='%s';", REGION));
 
     // Add credentials if avaible
     connectionInfo
@@ -162,10 +163,19 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
         .ifPresent(
             secret -> queryBuilder.append(String.format("SET s3_secret_access_key='%s';", secret)));
 
-    Map<String, String> s3Mapping = connectionInfo.getDriverOptions();
-    for (var key : s3Mapping.keySet()) {
-      queryBuilder.append(
-          String.format("CREATE TABLE '%s' AS SELECT * FROM '%s';", key, s3Mapping.get(key)));
+    // Get the bucket
+    String bucket = connectionInfo.getHost().get();
+    if (!bucket.endsWith("/")) bucket += '/';
+
+    // Create the views based on the mapping of tableName to fileName
+    Map<String, String> tableFileMapping = connectionInfo.getDriverOptions();
+    for (var tableName : tableFileMapping.keySet()) {
+      if (tableName.startsWith("table.")) {
+        queryBuilder.append(
+            String.format(
+                "CREATE VIEW '%s' AS SELECT * FROM '%s';",
+                tableName.substring("table.".length()), bucket + tableFileMapping.get(tableName)));
+      }
     }
 
     return Optional.of(queryBuilder.toString());
@@ -180,7 +190,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     queryBuilder.append("LOAD spatial;");
 
     // Data is retrieved from S3
-    if (connectionInfo.getHost().isPresent() && connectionInfo.getHost().get().equals("s3"))
+    if (connectionInfo.getHost().isPresent() && connectionInfo.getHost().get().startsWith("s3"))
       return handleS3(queryBuilder, connectionInfo);
 
     // Data is avaible as local GeoParquet files
