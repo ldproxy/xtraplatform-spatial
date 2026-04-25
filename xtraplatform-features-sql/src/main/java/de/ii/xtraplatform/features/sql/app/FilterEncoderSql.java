@@ -1356,6 +1356,15 @@ public class FilterEncoderSql {
 
         return sqlDialect.applyToJsonValue(alias, column.getName(), path, typeInfo);
       }
+      if (column
+          .getOperationParameter(Operation.CONNECTOR)
+          .filter("EXPRESSION"::equals)
+          .isPresent()) {
+        String columnResolved =
+            SqlQueryColumnOperations.getQualifiedColumnResolved(alias, column, sqlDialect);
+
+        return columnResolved.replace("AS " + column.getName(), "");
+      }
 
       throw new IllegalStateException(
           String.format(
