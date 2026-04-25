@@ -10,6 +10,7 @@ package de.ii.xtraplatform.geometries.domain.transform;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.geometries.domain.PositionList.Interpolation;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.OptionalInt;
 import org.immutables.value.Value;
@@ -28,14 +29,24 @@ public abstract class CrsTransform implements CoordinatesTransformation {
       Optional<Interpolation> interpolation,
       OptionalInt minNumberOfPositions)
       throws IOException {
-    double[] transformed =
-        getCrsTransformer().transform(coordinates, length / dimension, dimension);
+    final int positions = length / dimension;
+    double[] transformed = getCrsTransformer().transform(coordinates, positions, dimension);
+
+    final int targetDimension = getCrsTransformer().getTargetDimension();
+    if (dimension == 3 && targetDimension == 2) {
+      transformed = Arrays.copyOfRange(transformed, 0, positions * 2);
+    }
 
     if (getNext().isEmpty()) {
       return transformed;
     }
     return getNext()
         .get()
-        .onCoordinates(transformed, length, dimension, interpolation, minNumberOfPositions);
+        .onCoordinates(
+            transformed,
+            positions * targetDimension,
+            targetDimension,
+            interpolation,
+            minNumberOfPositions);
   }
 }

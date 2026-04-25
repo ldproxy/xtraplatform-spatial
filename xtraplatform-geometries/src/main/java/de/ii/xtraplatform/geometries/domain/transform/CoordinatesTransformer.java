@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.geometries.domain.transform;
 
+import de.ii.xtraplatform.geometries.domain.Axes;
 import de.ii.xtraplatform.geometries.domain.CircularString;
 import de.ii.xtraplatform.geometries.domain.Geometry;
 import de.ii.xtraplatform.geometries.domain.LineString;
@@ -24,26 +25,32 @@ public class CoordinatesTransformer implements GeometryTransformer {
 
   private final CoordinatesTransformation transformationChain;
   private final boolean simplifiesArcs;
+  private final Axes resultAxes;
 
   public CoordinatesTransformer(CoordinatesTransformation transformationChain) {
     this.transformationChain = transformationChain;
     CoordinatesTransformation current = transformationChain;
     boolean simplifiesArcs = false;
+    Axes resultAxes = null;
     while (Objects.nonNull(current)) {
       if (current.simplifiesArcs()) {
         simplifiesArcs = true;
-        break;
+      }
+      if (current instanceof CrsTransform transform) {
+        final int targetDimension = transform.getCrsTransformer().getTargetDimension();
+        resultAxes = targetDimension == 3 ? Axes.XYZ : Axes.XY;
       }
       current = current.getNext().orElse(null);
     }
     this.simplifiesArcs = simplifiesArcs;
+    this.resultAxes = resultAxes;
   }
 
   @Override
   public Geometry<?> visit(Point geometry) {
     return Point.of(
         Position.of(
-            geometry.getAxes(),
+            Objects.requireNonNullElse(resultAxes, geometry.getAxes()),
             processPositions(
                 geometry.getValue().getCoordinates(),
                 geometry.getAxes().size(),
@@ -59,7 +66,7 @@ public class CoordinatesTransformer implements GeometryTransformer {
     if (geometry instanceof CircularString) {
       PositionList posList =
           PositionList.of(
-              geometry.getAxes(),
+              Objects.requireNonNullElse(resultAxes, geometry.getAxes()),
               processPositions(
                   coordinates,
                   dimension,
@@ -71,7 +78,7 @@ public class CoordinatesTransformer implements GeometryTransformer {
     }
     return LineString.of(
         PositionList.of(
-            geometry.getAxes(),
+            Objects.requireNonNullElse(resultAxes, geometry.getAxes()),
             processPositions(
                 coordinates,
                 dimension,
