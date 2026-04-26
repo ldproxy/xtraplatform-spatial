@@ -36,7 +36,6 @@ configurations.api {
 }
 
 ext {
-    antlrOutDir = new File(buildDir, "/generated/src/main/antlr")
     javaOutRootDir = new File(buildDir, "/generated/src/main/java")
     javaOutDir = new File(javaOutRootDir, "de/ii/xtraplatform/cql/infra")
 }
@@ -47,7 +46,7 @@ compileJava {
 }
 
 generateGrammarSource {
-    outputDirectory = antlrOutDir
+    outputDirectory = javaOutDir
     outputs.dir(javaOutDir)
     arguments += [
             '-visitor',
@@ -55,16 +54,6 @@ generateGrammarSource {
             '-package', 'de.ii.xtraplatform.cql.infra',
             '-Xexact-output-dir'
     ]
-    doLast {
-
-        javaOutDir.mkdirs()
-        copy {
-            from antlrOutDir
-            into javaOutDir
-        }
-        println javaOutDir
-        println outputs.files.files
-    }
 }
 
 //prevent antlr from leaking into the module path
