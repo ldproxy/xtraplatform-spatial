@@ -16,9 +16,6 @@ import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import java.lang.module.Configuration;
 import java.lang.module.ModuleFinder;
-import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.text.Collator;
 import java.util.List;
 import java.util.Map;
@@ -90,13 +87,13 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
           .invoke(ds, String.format(applicationName, providerId));
       oracleDataSource.getDeclaredMethod("setDriverType", String.class).invoke(ds, "thin");
 
-      if (host.contains(":")) {
+      if (host.indexOf(':') >= 0) {
         oracleDataSource
             .getDeclaredMethod("setServerName", String.class)
-            .invoke(ds, host.substring(0, host.indexOf(":")));
+            .invoke(ds, host.substring(0, host.indexOf(':')));
         oracleDataSource
             .getDeclaredMethod("setPortNumber", int.class)
-            .invoke(ds, Integer.parseInt(host.substring(host.lastIndexOf(":") + 1)));
+            .invoke(ds, Integer.parseInt(host.substring(host.lastIndexOf(':') + 1)));
       } else {
         oracleDataSource.getDeclaredMethod("setServerName", String.class).invoke(ds, host);
       }
@@ -111,7 +108,8 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
 
   private Class<?> loadDriver() {
     try {
-      Path driverPath = driverStore.asLocalPath(Path.of(""), false).get();
+      java.nio.file.Path driverPath =
+          driverStore.asLocalPath(java.nio.file.Path.of(""), false).get();
       ModuleFinder finder = ModuleFinder.of(driverPath);
       ModuleLayer parent = ModuleLayer.boot();
       Configuration cf =
@@ -150,12 +148,13 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
   }
 
   @Override
-  public Map<String, GeoInfo> getGeoInfo(Connection connection, DbInfo dbInfo) throws SQLException {
+  public Map<String, GeoInfo> getGeoInfo(java.sql.Connection connection, DbInfo dbInfo)
+      throws java.sql.SQLException {
     return Map.of();
   }
 
   @Override
-  public DbInfo getDbInfo(Connection connection) throws SQLException {
+  public DbInfo getDbInfo(java.sql.Connection connection) throws java.sql.SQLException {
     return new DbInfo() {};
   }
 
