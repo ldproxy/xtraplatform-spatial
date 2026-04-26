@@ -4,7 +4,7 @@ when:
 steps:
 
   load-cache:
-    image: drillster/drone-volume-cache
+    image: drillster/drone-volume-cache@sha256:b82e143081dfb04ba300ce7854dfcecd31e7858e1998bf89806ec74a80a78e94
     volumes: [/var/lib/docker/tmp:/cache]
     settings:
       restore: true
@@ -13,7 +13,7 @@ steps:
         - .gradle/wrapper
 
   build:
-    image: eclipse-temurin:17
+    image: eclipse-temurin:21@sha256:e58e492628c1428ceb838afc1a1b8762673d5eaa09296f560c363daea0fdcf3b
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew build -Pbranch=$CI_COMMIT_BRANCH -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -22,7 +22,7 @@ steps:
       event: push
 
   build-release:
-    image: eclipse-temurin:17
+    image: eclipse-temurin:21@sha256:e58e492628c1428ceb838afc1a1b8762673d5eaa09296f560c363daea0fdcf3b
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew build -Prelease=true -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -31,7 +31,7 @@ steps:
       event: tag
 
   publish-snapshot:
-    image: eclipse-temurin:17
+    image: eclipse-temurin:21@sha256:e58e492628c1428ceb838afc1a1b8762673d5eaa09296f560c363daea0fdcf3b
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew publish -Pbranch=$CI_COMMIT_BRANCH -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -40,7 +40,7 @@ steps:
       event: push
 
   publish-release:
-    image: eclipse-temurin:17
+    image: eclipse-temurin:21@sha256:e58e492628c1428ceb838afc1a1b8762673d5eaa09296f560c363daea0fdcf3b
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew publish -Prelease=true -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -49,7 +49,7 @@ steps:
       event: tag
 
   save-cache:
-    image: drillster/drone-volume-cache
+    image: drillster/drone-volume-cache@sha256:b82e143081dfb04ba300ce7854dfcecd31e7858e1998bf89806ec74a80a78e94
     volumes: [/var/lib/docker/tmp:/cache]
     settings:
       rebuild: true
