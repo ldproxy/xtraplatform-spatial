@@ -41,7 +41,6 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableFeatureProviderSqlData.Bu
 import de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings;
 import de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults;
-import de.ii.xtraplatform.features.sql.domain.SqlClientBasicFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,6 +52,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.TooManyMethods")
 public class FeatureProviderOracleFactory
     extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderOracle>
     implements EntityFactory {
@@ -74,9 +74,15 @@ public class FeatureProviderOracleFactory
   }
 
   // for ldproxy-cfg
-  public FeatureProviderOracleFactory(SqlClientBasicFactory sqlClientBasicFactory) {
+  public FeatureProviderOracleFactory() {
     super(null);
-    this.schemaResolvers = null;
+    this.schemaResolvers =
+        new Lazy<>() {
+          @Override
+          public Set<SchemaFragmentResolver> get() {
+            return Set.of();
+          }
+        };
     this.skipHydration = true;
     this.connectors = Set.of();
   }
@@ -145,11 +151,11 @@ public class FeatureProviderOracleFactory
 
   @Override
   public EntityData hydrateData(EntityData entityData) {
-    FeatureProviderSqlData data = (FeatureProviderSqlData) entityData;
-
     if (skipHydration) {
       return entityData;
     }
+
+    FeatureProviderSqlData data = (FeatureProviderSqlData) entityData;
 
     try {
       List<TypesResolver> resolvers =
@@ -190,7 +196,8 @@ public class FeatureProviderOracleFactory
 
     while (resolver.needsResolving(types)) {
       types = resolver.resolve(types);
-      if (++rounds >= resolver.maxRounds()) {
+      rounds++;
+      if (rounds >= resolver.maxRounds()) {
         resolver.maxRoundsWarning().ifPresent(LOGGER::warn);
         break;
       }
