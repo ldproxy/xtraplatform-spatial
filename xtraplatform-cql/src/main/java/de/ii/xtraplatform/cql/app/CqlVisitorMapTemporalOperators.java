@@ -207,7 +207,7 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
     throw new IllegalStateException("unknown temporal operator: " + temporalFunction);
   }
 
-  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private boolean instantsOfSameGranularity(Temporal temporal1, Temporal temporal2) {
 
     // try to determine the data types of the operands
@@ -250,64 +250,14 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
         && !type1.equals(Interval.class);
   }
 
-  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   private Optional<Class<?>> getGranularity(Temporal temporal1, Temporal temporal2) {
 
     // try to determine the data types of the operands
     // for properties, it is either date or timestamp, but we do not have the type information at
     // this point
 
-    Class<?> type1 = null;
-    if (temporal1 instanceof TemporalLiteral) {
-      if (((TemporalLiteral) temporal1)
-          .getType()
-          .equals(de.ii.xtraplatform.cql.domain.Interval.class)) {
-        List<Operand> arguments =
-            ((de.ii.xtraplatform.cql.domain.Interval) ((TemporalLiteral) temporal1).getValue())
-                .getArgs();
-        if (arguments.stream()
-            .anyMatch(
-                arg ->
-                    arg instanceof TemporalLiteral
-                        && ((TemporalLiteral) arg).getType().equals(LocalDate.class))) {
-          type1 = LocalDate.class;
-        } else if (arguments.stream()
-            .anyMatch(
-                arg ->
-                    arg instanceof TemporalLiteral
-                        && ((TemporalLiteral) arg).getType().equals(Instant.class))) {
-          type1 = Instant.class;
-        }
-      } else {
-        type1 = ((TemporalLiteral) temporal1).getType();
-      }
-    }
-
-    Class<?> type2 = null;
-    if (temporal2 instanceof TemporalLiteral) {
-      if (((TemporalLiteral) temporal2)
-          .getType()
-          .equals(de.ii.xtraplatform.cql.domain.Interval.class)) {
-        List<Operand> arguments =
-            ((de.ii.xtraplatform.cql.domain.Interval) ((TemporalLiteral) temporal2).getValue())
-                .getArgs();
-        if (arguments.stream()
-            .anyMatch(
-                arg ->
-                    arg instanceof TemporalLiteral
-                        && ((TemporalLiteral) arg).getType().equals(LocalDate.class))) {
-          type2 = LocalDate.class;
-        } else if (arguments.stream()
-            .anyMatch(
-                arg ->
-                    arg instanceof TemporalLiteral
-                        && ((TemporalLiteral) arg).getType().equals(Instant.class))) {
-          type2 = Instant.class;
-        }
-      } else {
-        type2 = ((TemporalLiteral) temporal2).getType();
-      }
-    }
+    Class<?> type1 = resolveTemporalGranularityType(temporal1);
+    Class<?> type2 = resolveTemporalGranularityType(temporal2);
 
     if (Objects.isNull(type1) && Objects.isNull(type2)) {
       // we have no indication
@@ -323,6 +273,40 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
     }
 
     return Optional.empty();
+  }
+
+  private Class<?> resolveTemporalGranularityType(Temporal temporal) {
+    if (!(temporal instanceof TemporalLiteral)) {
+      return null;
+    }
+
+    TemporalLiteral temporalLiteral = (TemporalLiteral) temporal;
+    if (temporalLiteral.getType().equals(de.ii.xtraplatform.cql.domain.Interval.class)) {
+      de.ii.xtraplatform.cql.domain.Interval interval =
+          (de.ii.xtraplatform.cql.domain.Interval) temporalLiteral.getValue();
+      return resolveTypeFromIntervalArguments(interval.getArgs());
+    }
+
+    return temporalLiteral.getType();
+  }
+
+  private Class<?> resolveTypeFromIntervalArguments(List<Operand> arguments) {
+    if (containsTemporalLiteralOfType(arguments, LocalDate.class)) {
+      return LocalDate.class;
+    }
+
+    if (containsTemporalLiteralOfType(arguments, Instant.class)) {
+      return Instant.class;
+    }
+
+    return null;
+  }
+
+  private boolean containsTemporalLiteralOfType(List<Operand> arguments, Class<?> type) {
+    return arguments.stream()
+        .anyMatch(
+            arg ->
+                arg instanceof TemporalLiteral && ((TemporalLiteral) arg).getType().equals(type));
   }
 
   @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
@@ -359,36 +343,11 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
         "unknown temporal type: " + temporal.getClass().getSimpleName());
   }
 
-  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   private Temporal getEnd(Temporal temporal, Optional<Class<?>> granularity) {
     if (temporal instanceof Property) {
       return temporal;
     } else if (temporal instanceof TemporalLiteral) {
-      if (((TemporalLiteral) temporal).getType() == Interval.class) {
-        Instant end = ((Interval) ((TemporalLiteral) temporal).getValue()).getEnd();
-        return TemporalLiteral.of(end);
-      } else if (((TemporalLiteral) temporal).getType() == TemporalLiteral.OPEN.class) {
-        return TemporalLiteral.of(Instant.MAX);
-      } else if (((TemporalLiteral) temporal).getType()
-          == de.ii.xtraplatform.cql.domain.Interval.class) {
-        de.ii.xtraplatform.cql.domain.Interval interval =
-            (de.ii.xtraplatform.cql.domain.Interval) ((TemporalLiteral) temporal).getValue();
-        return getEnd((Temporal) interval.getArgs().get(1), granularity);
-      } else if (((TemporalLiteral) temporal).getType() == LocalDate.class) {
-        // if we know that the temporal granularity is "day", we return the value
-        if (granularity.isPresent() && LocalDate.class.equals(granularity.get())) {
-          return temporal;
-        }
-        // otherwise we assume "second" and convert to last second of the day,
-        // since we currently may not know, whether we are comparing against a timestamp or a date;
-        // if we would know the data type of the other operand this could be improved
-        return TemporalLiteral.of(
-            ((LocalDate) ((TemporalLiteral) temporal).getValue())
-                .atTime(23, 59, 59)
-                .atZone(ZoneOffset.UTC)
-                .toInstant());
-      }
-      return temporal;
+      return getEndFromLiteral((TemporalLiteral) temporal, granularity);
     } else if (temporal instanceof de.ii.xtraplatform.cql.domain.Interval) {
       de.ii.xtraplatform.cql.domain.Interval interval =
           (de.ii.xtraplatform.cql.domain.Interval) temporal;
@@ -404,5 +363,39 @@ public class CqlVisitorMapTemporalOperators extends CqlVisitorCopy {
 
     throw new IllegalStateException(
         "unknown temporal type: " + temporal.getClass().getSimpleName());
+  }
+
+  private Temporal getEndFromLiteral(
+      TemporalLiteral temporalLiteral, Optional<Class<?>> granularity) {
+    if (temporalLiteral.getType() == Interval.class) {
+      Instant end = ((Interval) temporalLiteral.getValue()).getEnd();
+      return TemporalLiteral.of(end);
+    }
+
+    if (temporalLiteral.getType() == TemporalLiteral.OPEN.class) {
+      return TemporalLiteral.of(Instant.MAX);
+    }
+
+    if (temporalLiteral.getType() == de.ii.xtraplatform.cql.domain.Interval.class) {
+      de.ii.xtraplatform.cql.domain.Interval interval =
+          (de.ii.xtraplatform.cql.domain.Interval) temporalLiteral.getValue();
+      return getEnd((Temporal) interval.getArgs().get(1), granularity);
+    }
+
+    if (temporalLiteral.getType() == LocalDate.class) {
+      if (granularity.filter(LocalDate.class::equals).isPresent()) {
+        return temporalLiteral;
+      }
+      // otherwise we assume "second" and convert to last second of the day,
+      // since we currently may not know, whether we are comparing against a timestamp or a date;
+      // if we would know the data type of the other operand this could be improved
+      return TemporalLiteral.of(
+          ((LocalDate) temporalLiteral.getValue())
+              .atTime(23, 59, 59)
+              .atZone(ZoneOffset.UTC)
+              .toInstant());
+    }
+
+    return temporalLiteral;
   }
 }

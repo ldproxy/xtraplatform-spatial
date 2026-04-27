@@ -15,7 +15,7 @@ import java.util.Locale;
 import org.immutables.value.Value;
 import org.threeten.extra.Interval;
 
-public interface BinaryTemporalOperation extends BinaryOperation2<Temporal>, CqlNode {
+public interface BinaryTemporalOperation extends BinaryOperation2<Temporal> {
 
   List<TemporalFunction> INTERVAL_ONLY =
       ImmutableList.of(
@@ -36,6 +36,7 @@ public interface BinaryTemporalOperation extends BinaryOperation2<Temporal>, Cql
     return TemporalFunction.valueOf(getOp().toUpperCase(Locale.ROOT));
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static BinaryTemporalOperation of(
       TemporalFunction operator, Temporal temporal1, Temporal temporal2) {
     switch (operator) {

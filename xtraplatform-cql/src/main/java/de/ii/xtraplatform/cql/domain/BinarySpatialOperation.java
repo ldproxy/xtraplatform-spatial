@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Locale;
 import org.immutables.value.Value;
 
-public interface BinarySpatialOperation extends BinaryOperation2<Spatial>, CqlNode {
+public interface BinarySpatialOperation extends BinaryOperation2<Spatial> {
 
   @JsonIgnore
   @Value.Derived
@@ -19,6 +19,7 @@ public interface BinarySpatialOperation extends BinaryOperation2<Spatial>, CqlNo
     return SpatialFunction.valueOf(getOp().toUpperCase(Locale.ROOT));
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static BinarySpatialOperation of(SpatialFunction operator, Spatial spatial1, Spatial spatial2) {
     switch (operator) {
       case S_INTERSECTS:

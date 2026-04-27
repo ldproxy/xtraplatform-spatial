@@ -13,7 +13,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableScalarLiteral.Builder.class)
-public interface ScalarLiteral extends Scalar, Literal, CqlNode {
+public interface ScalarLiteral extends Scalar, Literal {
 
   static ScalarLiteral of(Double literal) {
     return new Builder(literal).build();

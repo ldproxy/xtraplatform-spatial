@@ -79,9 +79,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods", "PMD.CyclomaticComplexity"})
-public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
-    implements CqlParserVisitor<CqlNode> {
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.TooManyMethods",
+  "PMD.CyclomaticComplexity",
+  "PMD.CouplingBetweenObjects"
+})
+public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
 
   private final EpsgCrs defaultCrs;
 
@@ -228,7 +232,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
             .map(v -> (Scalar) v.accept(this))
             .collect(Collectors.toList());
 
-    // TODO IN currently requires a property on the left side and literals on the right side
+    // IN currently requires a property on the left side and literals on the right side
     in =
         new ImmutableIn.Builder()
             .addArgs((Scalar) ctx.scalarExpression(0).accept(this))
@@ -289,7 +293,6 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   }
 
   @Override
-  @SuppressWarnings("PMD.ReplaceVectorWithList")
   public CqlNode visitArrayPredicate(CqlParser.ArrayPredicateContext ctx) {
 
     if (Objects.isNull(ctx.ArrayFunction())) {
@@ -512,7 +515,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
         ctx.polygonDef().stream()
             .map(
                 polygonDefContext ->
-                    (Polygon) ((GeometryNode) (polygonDefContext.accept(this))).getGeometry())
+                    (Polygon) ((GeometryNode) polygonDefContext.accept(this)).getGeometry())
             .toList();
 
     return GeometryNode.of(MultiPolygon.of(polygons, Optional.of(defaultCrs)));

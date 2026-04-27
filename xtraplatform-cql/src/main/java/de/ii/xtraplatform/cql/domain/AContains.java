@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAContains.Builder.class)
-public interface AContains extends BinaryArrayOperation, CqlNode {
+@FunctionalInterface
+public interface AContains extends BinaryArrayOperation {
 
   String TYPE = "a_contains";
 
@@ -22,7 +23,6 @@ public interface AContains extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
-  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AContains of(Vector vector1, Vector vector2) {
     return new ImmutableAContains.Builder().addArgs(vector1, vector2).build();
   }

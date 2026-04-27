@@ -318,7 +318,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
         ImmutableList.<Type>builder().add(firstType).addAll(compatibleTypes).build();
     final List<Type> otherTypes = types.subList(1, types.size());
     otherTypes.stream()
-        .filter(type -> !expectedTypes.contains(type) && !type.equals(Type.UNKNOWN))
+        .filter(type -> !expectedTypes.contains(type) && type != Type.UNKNOWN)
         .findFirst()
         .ifPresent(
             type -> {
@@ -366,7 +366,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
             i -> {
               Type type = types.get(i);
               Set<Type> expected = expectedTypes.get(i);
-              if (expected.stream().noneMatch(expectedType -> expectedType.equals(type))) {
+              if (expected.stream().noneMatch(expectedType -> expectedType == type)) {
                 throw new CqlIncompatibleTypes(
                     getText(function), i + 1, type.schemaType(), asSchemaTypesFunction(expected));
               }
@@ -382,8 +382,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     if (expectedTypes.stream()
         .noneMatch(
             typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
+                types.stream().allMatch(type -> typeList.contains(type) || type == Type.UNKNOWN))) {
       throw new CqlIncompatibleTypes(
           getText(node), asSchemaTypes(types), asSchemaTypes(expectedTypes));
     }
@@ -398,8 +397,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     if (expectedTypes.stream()
         .noneMatch(
             typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
+                types.stream().allMatch(type -> typeList.contains(type) || type == Type.UNKNOWN))) {
       throw new CqlIncompatibleTypes(
           getText(node), asSchemaTypes(types), asSchemaTypes(expectedTypes));
     }

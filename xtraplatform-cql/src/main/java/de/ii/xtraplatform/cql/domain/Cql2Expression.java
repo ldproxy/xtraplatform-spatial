@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import java.io.IOException;
 
 @JsonDeserialize(using = Cql2Expression.Cql2JsonDeserializer.class)
-public interface Cql2Expression extends Operand, CqlNode {
+public interface Cql2Expression extends Operand {
 
   class Cql2JsonDeserializer extends StdDeserializer<Cql2Expression> {
 

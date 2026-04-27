@@ -75,6 +75,17 @@ public interface Operand extends CqlNode {
       return ScalarLiteral.of(node.asText());
     }
 
+    private Temporal getIntervalOperand(JsonParser parser, JsonNode intervalNode, String parent)
+        throws JsonProcessingException {
+      if (!intervalNode.isArray()) {
+        throw new JsonParseException(parser, "Interval has to be an array.");
+      }
+
+      Temporal op1 = (Temporal) getOperand(parser, intervalNode.get(0), parent);
+      Temporal op2 = (Temporal) getOperand(parser, intervalNode.get(1), parent);
+      return TemporalLiteral.interval(op1, op2);
+    }
+
     @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
     private Operand getOperand(JsonParser parser, JsonNode node, String parent)
         throws JsonProcessingException {
@@ -87,13 +98,7 @@ public interface Operand extends CqlNode {
         } else if (Objects.nonNull(node.get("timestamp"))) {
           return oc.treeToValue(node.get("timestamp"), TemporalLiteral.class);
         } else if (Objects.nonNull(node.get(INTERVAL_KEY))) {
-          if (node.get(INTERVAL_KEY).isArray()) {
-            Temporal op1 = (Temporal) getOperand(parser, node.get(INTERVAL_KEY).get(0), parent);
-            Temporal op2 = (Temporal) getOperand(parser, node.get(INTERVAL_KEY).get(1), parent);
-
-            return TemporalLiteral.interval(op1, op2);
-          }
-          throw new JsonParseException(parser, "Interval has to be an array.");
+          return getIntervalOperand(parser, node.get(INTERVAL_KEY), parent);
         } else if (Objects.nonNull(node.get("bbox"))) {
           return SpatialLiteral.of(oc.treeToValue(node, Bbox.class));
         } else if (Objects.nonNull(node.get("type"))) {
@@ -175,7 +180,7 @@ public interface Operand extends CqlNode {
           if (value instanceof EpsgCrs) {
             return Optional.of((EpsgCrs) value);
           }
-        } catch (Throwable e) {
+        } catch (IllegalArgumentException e) {
           // continue if filterCrs not found
         }
       }

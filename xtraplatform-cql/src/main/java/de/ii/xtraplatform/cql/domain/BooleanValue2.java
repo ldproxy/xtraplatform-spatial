@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableBooleanValue2.Builder.class)
-public interface BooleanValue2 extends Cql2Expression, Literal, CqlNode {
+@FunctionalInterface
+public interface BooleanValue2 extends Cql2Expression, Literal {
 
   @Value.Derived
   @Override

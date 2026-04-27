@@ -14,7 +14,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableSpatialLiteral.Builder.class)
-public interface SpatialLiteral extends Spatial, Literal, CqlNode {
+public interface SpatialLiteral extends Spatial, Literal {
 
   @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   static SpatialLiteral of(String literal) throws CqlParseException {

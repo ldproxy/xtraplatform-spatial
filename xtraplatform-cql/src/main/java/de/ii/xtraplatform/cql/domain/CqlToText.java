@@ -32,7 +32,7 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import org.threeten.extra.Interval;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 public class CqlToText implements CqlVisitor<String> {
 
   private static final String NOT_OPERATOR_FORMAT = "%s %s";

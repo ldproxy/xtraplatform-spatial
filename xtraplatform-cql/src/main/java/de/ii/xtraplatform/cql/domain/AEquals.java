@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAEquals.Builder.class)
-public interface AEquals extends BinaryArrayOperation, CqlNode {
+@FunctionalInterface
+public interface AEquals extends BinaryArrayOperation {
 
   String TYPE = "a_equals";
 
@@ -22,7 +23,6 @@ public interface AEquals extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
-  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AEquals of(Vector vector1, Vector vector2) {
     return new ImmutableAEquals.Builder().addArgs(vector1, vector2).build();
   }

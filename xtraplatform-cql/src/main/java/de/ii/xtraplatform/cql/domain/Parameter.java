@@ -28,7 +28,7 @@ import org.immutables.value.Value;
 @Value.Style(of = "new")
 @JsonSerialize(using = Parameter.ParameterSerializer.class)
 @JsonDeserialize(using = Parameter.ParameterDeserializer.class)
-public interface Parameter extends Scalar, Spatial, Temporal, Operand, Vector, CqlNode {
+public interface Parameter extends Temporal, Spatial, Vector {
 
   static Parameter of(String name, JsonSchema schema) {
     return ImmutableParameter.builder().name(name).schema(schema).build();
@@ -59,7 +59,7 @@ public interface Parameter extends Scalar, Spatial, Temporal, Operand, Vector, C
       JsonNode node = parser.getCodec().readTree(parser);
 
       // Using '$ref' directly inside '$parameter' is deprecated.
-      // TODO: Remove support in future versions.
+      // Support is kept for backward compatibility.
       if (node.has("$ref")) {
         JsonNode value = node.get("$ref");
         if (!value.isTextual()) {
@@ -70,7 +70,7 @@ public interface Parameter extends Scalar, Spatial, Temporal, Operand, Vector, C
         if (name.startsWith("#/parameters/")) {
           name = name.substring("#/parameters/".length());
         }
-        return Parameter.of(name, new ImmutableJsonSchemaRef.Builder().ref(value.asText()).build());
+        return of(name, new ImmutableJsonSchemaRef.Builder().ref(value.asText()).build());
       }
 
       if (!node.isObject()) {
@@ -91,8 +91,7 @@ public interface Parameter extends Scalar, Spatial, Temporal, Operand, Vector, C
 
       Entry<String, JsonNode> param = node.properties().iterator().next();
 
-      return Parameter.of(
-          param.getKey(), parser.getCodec().treeToValue(param.getValue(), JsonSchema.class));
+      return of(param.getKey(), parser.getCodec().treeToValue(param.getValue(), JsonSchema.class));
     }
   }
 

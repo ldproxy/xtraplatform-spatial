@@ -44,6 +44,7 @@ import org.threeten.extra.Interval;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class CqlImpl implements Cql {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CqlImpl.class);
@@ -151,7 +152,9 @@ public class CqlImpl implements Cql {
         new CqlCoordinateChecker(crsTransformerFactory, crsInfo, filterCrs, nativeCrs);
 
     cqlPredicate.accept(visitor, true);
-    LOGGER.debug("Coordinate validation took {}ms.", System.currentTimeMillis() - start);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Coordinate validation took {}ms.", System.currentTimeMillis() - start);
+    }
   }
 
   @Override

@@ -31,7 +31,7 @@ public class CqlPropertyChecker extends CqlVisitorBase<List<String>> {
 
   @Override
   public List<String> postProcess(CqlNode node, List<String> strings) {
-    ImmutableList<String> result = ImmutableList.copyOf(invalidProperties);
+    List<String> result = ImmutableList.copyOf(invalidProperties);
     invalidProperties.clear();
     return result;
   }

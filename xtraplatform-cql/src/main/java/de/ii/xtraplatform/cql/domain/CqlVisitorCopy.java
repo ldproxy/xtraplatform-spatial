@@ -7,12 +7,11 @@
  */
 package de.ii.xtraplatform.cql.domain;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
 
   @Override
@@ -67,17 +66,8 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   public CqlNode visit(Between between, List<CqlNode> children) {
     Between.Builder builder = new ImmutableBetween.Builder();
 
-    int i = 0;
-    for (CqlNode cqlNode : children) {
-      switch (i++) {
-        case 0:
-        case 1:
-        case 2:
-          builder.addArgs((Scalar) cqlNode);
-          break;
-        default:
-          break;
-      }
+    for (int i = 0; i < Math.min(children.size(), 3); i++) {
+      builder.addArgs((Scalar) children.get(i));
     }
     return builder.build();
   }
@@ -128,7 +118,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
     ImmutableIn.Builder builder = new ImmutableIn.Builder();
 
     builder.addArgs((Scalar) children.get(0));
-    ArrayList<Scalar> list = new ArrayList<>();
+    List<Scalar> list = new java.util.ArrayList<>();
     for (int i = 1; i < children.size(); i++) {
       list.add((Scalar) children.get(i));
     }
@@ -159,7 +149,6 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   }
 
   @Override
-  @SuppressWarnings("PMD.ReplaceVectorWithList")
   public CqlNode visit(BinaryArrayOperation arrayOperation, List<CqlNode> children) {
     List<Vector> vectors =
         children.stream()

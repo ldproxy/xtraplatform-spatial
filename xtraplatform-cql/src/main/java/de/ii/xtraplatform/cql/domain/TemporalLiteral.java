@@ -37,7 +37,7 @@ import org.threeten.extra.Interval;
 @SuppressWarnings("PMD.FieldDeclarationsShouldBeAtStartOfClass")
 @Value.Immutable
 @JsonDeserialize(builder = TemporalLiteral.Builder.class)
-public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
+public interface TemporalLiteral extends Temporal, Literal {
 
   @JsonIgnore
   @JsonValue(false)
@@ -86,8 +86,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
   }
 
   static TemporalLiteral of(String startInclusive, String endInclusive) {
-    return new Builder(TemporalLiteral.of(startInclusive), TemporalLiteral.of(endInclusive))
-        .build();
+    return new Builder(of(startInclusive), of(endInclusive)).build();
   }
 
   static TemporalLiteral of(TemporalLiteral startInclusive, TemporalLiteral endInclusive) {
@@ -96,10 +95,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
 
   static TemporalLiteral of(List<String> startEndInclusive) {
     assert startEndInclusive.size() >= 2;
-    return new Builder(
-            TemporalLiteral.of(startEndInclusive.get(0)),
-            TemporalLiteral.of(startEndInclusive.get(1)))
-        .build();
+    return new Builder(of(startEndInclusive.get(0)), of(startEndInclusive.get(1))).build();
   }
 
   static TemporalLiteral of(Instant startInclusive, Instant endExclusive) {
@@ -111,6 +107,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
     return new Builder(instantLiteral).build();
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static Temporal interval(Temporal op1, Temporal op2) {
     // if at least one parameter is a property, we create a function, otherwise a fixed interval
     if (op1 instanceof Property && op2 instanceof Property) {
@@ -123,7 +120,7 @@ public interface TemporalLiteral extends Temporal, Scalar, Literal, CqlNode {
       return de.ii.xtraplatform.cql.domain.Interval.of(
           ImmutableList.of((TemporalLiteral) op1, (Property) op2));
     } else if (op1 instanceof TemporalLiteral && op2 instanceof TemporalLiteral) {
-      return TemporalLiteral.of((TemporalLiteral) op1, (TemporalLiteral) op2);
+      return of((TemporalLiteral) op1, (TemporalLiteral) op2);
     }
 
     throw new IllegalStateException(

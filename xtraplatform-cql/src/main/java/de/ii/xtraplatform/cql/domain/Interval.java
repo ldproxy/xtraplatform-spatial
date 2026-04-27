@@ -21,7 +21,8 @@ import org.immutables.value.Value;
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableInterval.Builder.class)
 @JsonSerialize(using = Interval.Serializer.class)
-public interface Interval extends CqlNode, Temporal, Operand {
+@FunctionalInterface
+public interface Interval extends Temporal {
 
   @JsonProperty("interval")
   List<Operand> getArgs();

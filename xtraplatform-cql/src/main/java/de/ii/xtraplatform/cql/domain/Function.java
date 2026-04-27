@@ -21,7 +21,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableFunction.Builder.class)
 @JsonSerialize(using = Function.Serializer.class)
-public interface Function extends CqlNode, Scalar, Temporal, Operand, Cql2Expression {
+public interface Function extends Temporal, Cql2Expression {
 
   String getName();
 

@@ -57,6 +57,7 @@ public interface Bbox extends CqlNode {
   }
 
   @Value.Check
+  @SuppressWarnings("PMD.NPathComplexity")
   default void check() {
     Preconditions.checkArgument(
         getCrs().isPresent()

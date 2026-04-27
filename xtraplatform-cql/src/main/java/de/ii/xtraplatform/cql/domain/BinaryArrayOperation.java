@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Locale;
 import org.immutables.value.Value;
 
-public interface BinaryArrayOperation extends BinaryOperation2<Vector>, CqlNode {
+public interface BinaryArrayOperation extends BinaryOperation2<Vector> {
 
   @JsonIgnore
   @Value.Derived
@@ -19,7 +19,6 @@ public interface BinaryArrayOperation extends BinaryOperation2<Vector>, CqlNode 
     return ArrayFunction.valueOf(getOp().toUpperCase(Locale.ROOT));
   }
 
-  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static BinaryArrayOperation of(ArrayFunction operator, Vector vector1, Vector vector2) {
     switch (operator) {
       case A_EQUALS:

@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAOverlaps.Builder.class)
-public interface AOverlaps extends BinaryArrayOperation, CqlNode {
+@FunctionalInterface
+public interface AOverlaps extends BinaryArrayOperation {
 
   String TYPE = "a_overlaps";
 
@@ -22,7 +23,6 @@ public interface AOverlaps extends BinaryArrayOperation, CqlNode {
     return TYPE;
   }
 
-  @SuppressWarnings("PMD.ReplaceVectorWithList")
   static AOverlaps of(Vector vector1, Vector vector2) {
     return new ImmutableAOverlaps.Builder().addArgs(vector1, vector2).build();
   }
