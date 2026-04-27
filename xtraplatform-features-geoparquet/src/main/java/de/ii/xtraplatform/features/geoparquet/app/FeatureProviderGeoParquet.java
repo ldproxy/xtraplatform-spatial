@@ -50,41 +50,62 @@ import org.slf4j.LoggerFactory;
  * @limitationsEn
  *     <p>The following limitations are known:
  *     <p><code>
- *   - Files with 2 consecutive underscores may lead to unexpected behavior.
  *   - Only 2D geometries are supported.
  *   - The option `linearizeCurves` is not supported. All geometries must be encoded with WKB or according to the geometry types "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" from the GeoArrow specification.
  *   - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
  *   - CRUD operations are not supported.
  *   - Columns with JSON content are not *yet* supported.
+ *   - When working with large files, the data might not be available immediately after application start, especially if no cache has been built beforehand. Requesting the data before it is ready may return `HTTP Error 503`. After some minutes the data should become available, the exact time depends on the size of the files.
+ *   - Populating a table with the content of multiple specific (Geo)Parquet files is not *yet* supported. However, it is possible to select multiple files using the `*` and `?` wildcard operators.
+ *   - The S3-URL and the S3-credentials are not checked for errors.
  *     </code>
  * @limitationsDe
  *     <p>Die folgenden Einschränkungen sind bekannt:
  *     <p><code>
- *   - Dateien mit 2 aufeinanderfolgenden Unterstrichen können zu unerwartetem Verhalten führen.
  *   - Es werden nur 2D-Geometrien unterstützt.
  *   - Die Option `linearizeCurves` wird nicht unterstützt. Alle Geometrien müssen mit WKB oder gemäß den Geometrietypen "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" aus der GeoArrow-Spezifikation kodiert werden.
  *   - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
  *   - CRUD-Operationen werden nicht unterstützt.
  *   - Spalten mit JSON-Inhalt werden *noch* nicht unterstützt.
+ *   - Bei großen Dateien sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
+ *   - Das Befüllen einer Tabelle mit dem Inhalt mehrerer spezifischer (Geo)Parquet-Dateien wird *noch* nicht unterstützt. Es ist jedoch möglich, mehrere Dateien mit den Wildcard-Operatoren `*` und `?` auszuwählen.
+ *   - Die S3-Url und die S3-Zugangsdaten werden nicht auf korrektheit überprüft.
  * </code>
  * @cfgPropertiesAdditionalEn ### Connection Info
  *     <p>The connection info object for GeoParquet has the following properties:
  *     <p>{@docTable:connectionInfo}
- *     <p>### Path Syntax
- *     <p>The path to the required (Geo)Parquet file is specified in `sourcePath`. The path is
- *     relative to the directory specified in `database`, where all slashes except the first `/`
- *     must be replaced with `__` and the `.parquet` extension is omitted. Example: <code>
- *     Assuming the (Geo)Parquet files are located in `/resources/features/Datenordner` and `database` is set to `Datenordner` accordingly. For the file `/resources/features/Datenordner/Unterordner/geo_parquet_file.parquet` the path in `sourcePath` must be specified as `/Unterordner__geo_parquet_file`.
+ *     <p>### Mapping of tables to (Geo)Parquet files
+ *     <p>To work with (Geo)Parquet files, a mapping of table names to the files containing the data
+ *     is required. This mapping is set in `driverOptions`. The following is important to note:
+ *     <code>
+ *     - The table names must be in the `table` namespace by preceding them with `table.`, e.g. `table.FOO`.
+ *     - For S3, the path must be relative to the URL in `host`. For local files, it must be relative to the path set in `database`.
+ *     - Currently it is not possible to populate a table with the content of multiple specific files. However, the wildcard operators `*` and `?` can be used to select all files matching a specific pattern.
+ *     </code> Examples: <code>
+ *     driverOptions:
+ *      table.FOO: "Unterordner/foo.parquet" # Match one specific file
+ *      table.BAR: "Unterordner/Unterordner_2/*.parquet" # All parquet files inside Unterordner/Unterordner_2/
+ *      table.FOOBAR: "**\/*.parquet" # Match all parquet files at any depth
+ *     </code> Finally the table names can be referenced in `sourcePath`: <code>
+ *     sourcePath: /FOOBAR
  *     </code>
  * @cfgPropertiesAdditionalDe ### Connection Info
- *     <p>Das Connection-Info-Objekt für GeoParquet wird wie folgt beschrieben:
+ *     <p>Das Connection-Info-Objekt für GeoParquet hat die folgenden Eigenschaften:
  *     <p>{@docTable:connectionInfo}
- *     <p>### Pfadsyntax
- *     <p>Der Pfad zu der jeweils benötigten (Geo)Parquet-Datei wird in `sourcePath` angegeben. Der
- *     Pfad wird dabei relativ zu dem in `database` angegebenen Ordner angegeben, wobei alle
- *     Schrägstriche bis auf den ersten `/` durch `__` ersetzt werden müssen und die
- *     `.parquet`-Endung weggelassen wird. Beispiel: <code>
- *       Angenommen die (Geo)Parquet-Dateien liegen in `/resources/features/Datenordner` und `database` wird entsprechend mit `Datenordner` angegeben. Für die Datei `/resources/features/Datenordner/Unterordner/geo_parquet_file.parquet` muss der Pfad in `sourcePath` dann als `/Unterordner__geo_parquet_file` angegeben werden.
+ *     <p>### Zuordnung von Tabellen zu (Geo)Parquet-Dateien
+ *     <p>Um mit (Geo)Parquet-Dateien zu arbeiten, ist eine Zuordnung von Tabellennamen zu den
+ *     Dateien mit den entsprechenden Daten erforderlich. Diese Zuordnung wird in `driverOptions`
+ *     festgelegt. Folgendes ist zu beachten: <code>
+ *     - Die Tabellennamen müssen im `table` Namensraum liegen, indem ihnen `table.` vorangestellt wird z. B. `table.FOO`
+ *     - Bei S3 muss der Pfad relativ zur in `host` angegebenen URL sein. Bei lokalen Dateien muss er relativ zum Pfad in `database` sein.
+ *     - Derzeit ist es nicht möglich, eine Tabelle mit dem Inhalt mehrerer spezifischer Dateien zu befüllen. Die Wildcard-Operatoren `*` und `?` können jedoch verwendet werden, um Dateien nach einem bestimmten Muster auszuwählen.
+ *     </code> Beispiele: <code>
+ *     driverOptions:
+ *      table.FOO: "Unterordner/foo.parquet" # Wähle eine bestimmte Datei aus
+ *      table.BAR: "Unterordner/Unterordner_2/*.parquet" # Alle Parquet-Dateien in Unterordner/Unterordner_2/
+ *      table.FOOBAR: "**\/*.parquet" # Alle Parquet-Dateien in beliebiger Tiefe
+ *     </code> Die Tabellennamen können anschließend in `sourcePath` referenziert werden: <code>
+ *     sourcePath: /FOOBAR
  *     </code>
  * @ref:connectionInfo {@link
  *     de.ii.xtraplatform.features.geoparquet.domain.ImmutableConnectionInfoGeoParquet}

@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -25,13 +26,51 @@ import org.immutables.value.Value;
 public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
 
   /**
-   * @langEn The relative path starting from `/resources/features` to the directory containing the
-   *     (Geo)Parquet files (and subdirectories containing (Geo)Parquet files).
-   * @langDe Der zu `/resources/features` relative Pfad zum Ordner, in dem die GeoParquet-Dateien
-   *     (sowie Unterordner mit (Geo)Parquet-Dateien) liegen.
+   * @langEn Only relevant for local (Geo)Parquet files: The relative path starting from
+   *     `/resources/features` to the directory containing the (Geo)Parquet files (including
+   *     subdirectories). Must be left empty when working with S3.
+   * @langDe Nur relevant für lokale (Geo)Parquet-Dateien: Der relative Pfad ausgehend von
+   *     `/resources/features` zum Verzeichnis mit den (Geo)Parquet-Dateien (sowie Unterordner).
+   *     Muss bei der Verwendung von S3 leer gelassen werden.
    */
   @Override
   String getDatabase();
+
+  /**
+   * @langEn Only relevant for S3: The URL of the bucket containing the (Geo)Parquet files. A
+   *     subdirectory can be appended to the URL to limit access, e.g.
+   *     `s3://bucket-eu-central-1/subdirectory`.
+   * @langDe Nur relevant für S3: Die URL des Buckets mit den (Geo)Parquet-Dateien. Um den Zugriff
+   *     einzuschränken, können Unterordner an die URL angehängt werden, z.B.
+   *     `s3://bucket-eu-central-1/Unterordner`.
+   */
+  Optional<String> getHost();
+
+  /**
+   * @langEn Only relevant for S3: The `access key` required to access the bucket. Must not be set
+   *     for public buckets.
+   * @langDe Nur relevant für S3: Der `access key` für den Zugriff auf den Bucket. Darf für den
+   *     Zugriff auf öffentlichen Buckets nicht gesetzt werden.
+   */
+  Optional<String> getUser();
+
+  /**
+   * @langEn Only relevant for S3: The `secret access key` required to access the bucket. Must not
+   *     be set for public buckets.
+   * @langDe Nur relevant für S3: Der `secret access key` für den Zugriff auf den Bucket. Darf für
+   *     den Zugriff auf öffentlichen Buckets nicht gesetzt werden.
+   */
+  Optional<String> getPassword();
+
+  /**
+   * @langEn A mapping of table names to the paths of (Geo)Parquet files containing the data to
+   *     populate the tables. See [below](#mapping-of-tables-to-(geo)parquet-files) for details.
+   * @langDe Eine Zuordnung von Tabellennamen zu den Pfaden der (Geo)Parquet-Dateien mit den Daten
+   *     zum Befüllen der Tabellen. Siehe [unten](#zuordnung-von-tabellen-zu-(geo)parquet-dateien)
+   *     für Details.
+   */
+  @Override
+  Map<String, String> getDriverOptions();
 
   @DocIgnore
   @JsonIgnore
@@ -46,9 +85,4 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
   default String getDialect() {
     return ConnectionInfoSql.super.getDialect();
   }
-
-  @DocIgnore
-  @JsonIgnore
-  @Override
-  Map<String, String> getDriverOptions();
 }
