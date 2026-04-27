@@ -19,11 +19,9 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.Collator;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.sql.DataSource;
@@ -37,6 +35,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   static final String ID = "DUCKDB";
 
+  // ToDo: Log errors
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterDuckdb.class);
 
   private final ResourceStore featuresStore;
@@ -66,40 +65,16 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     return new DuckdbDataSource();
   }
 
-  /**
-   * Debug-logs when two file paths share the same file name.
-   *
-   * @param filePath The first file path
-   * @param otherFilePath The second file path
-   */
-  private void logSharedFilename(Path filePath, Path otherFilePath) {
-    if (filePath.getFileName().equals(otherFilePath.getFileName())) {
-      LOGGER.debug(
-          "The following files share the same file name: {} and {}", filePath, otherFilePath);
+  private static void addViews(
+      StringBuilder queryBuilder, String prefix, Map<String, String> tableFileMapping) {
+    for (var tableName : tableFileMapping.keySet()) {
+      if (tableName.startsWith("table.")) {
+        queryBuilder.append(
+            String.format(
+                "CREATE VIEW '%s' AS SELECT * FROM '%s';",
+                tableName.substring("table.".length()), prefix + tableFileMapping.get(tableName)));
+      }
     }
-  }
-
-  /**
-   * Adds a query to create an in-memory table containing the content of the parquet file found
-   * under filePath. The name of the new table equals to the filePath with every '/' replaced with
-   * '__'. This is done to make sure every table name is unique even when multiple files in
-   * different directories share the same name. The choice of replacing the slashes with '__' has
-   * been made to avoid collisions with files whose names contain underscores (A/a.parquet and
-   * A_a.parquet would collide).
-   *
-   * @param queryBuilder The StringBuilder of the init query.
-   * @param filePath The file path of the parquet file to add.
-   * @param addedFilePaths List containing every file path added yet. Necessary to log files that
-   *     share the same file name.
-   */
-  private void addView(StringBuilder queryBuilder, Path filePath, List<Path> addedFilePaths) {
-    addedFilePaths.forEach(otherFilePath -> logSharedFilename(filePath, otherFilePath));
-    addedFilePaths.add(filePath);
-
-    queryBuilder.append(
-        String.format(
-            "CREATE VIEW '%s' AS SELECT * FROM '%s';",
-            filePath.toString().replace("/", "__").replace(".parquet", ""), filePath));
   }
 
   private Optional<String> handleLocalFiles(
@@ -127,24 +102,12 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     // Set the absolute path to the data directory as the search path
     queryBuilder.append(String.format("SET file_search_path = '%s';", dataDirectory));
 
-    // Walk the tree of the data directory and generate a query to add the content of every parquet
-    // file as an in-memory table. To increase the collision resistance, '/' is replaced with '__'
-    // instead of '_'.
-    List<Path> addedFilePaths = new ArrayList<>();
-    try (Stream<Path> pathStream = Files.walk(dataDirectory)) {
-      pathStream
-          .filter(Files::isRegularFile)
-          .filter(filePath -> filePath.getFileName().toString().endsWith(".parquet"))
-          .map(dataDirectory::relativize)
-          .forEach(filePath -> addView(queryBuilder, filePath, addedFilePaths));
-    } catch (IOException e) {
-      throw new IllegalStateException("Error traversing the data directory: " + e.getMessage());
-    }
+    Map<String, String> tableFileMapping = connectionInfo.getDriverOptions();
+    addViews(queryBuilder, "", tableFileMapping);
 
     return Optional.of(queryBuilder.toString());
   }
 
-  // Todo: Create custom ConnectionInfo for GeoParquet
   private Optional<String> handleS3(StringBuilder queryBuilder, ConnectionInfoSql connectionInfo) {
     // Install and load the httpfs extension of DuckDB to access files via S3
     queryBuilder.append("INSTALL httpfs;");
@@ -154,7 +117,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     // when authenticating (by default it tries to authenticate in us-east-1)
     // queryBuilder.append(String.format("SET s3_region='%s';", REGION));
 
-    // Add credentials if avaible
+    // Add credentials if available
     connectionInfo
         .getUser()
         .ifPresent(key -> queryBuilder.append(String.format("SET s3_access_key_id='%s';", key)));
@@ -167,16 +130,8 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     String bucket = connectionInfo.getHost().get();
     if (!bucket.endsWith("/")) bucket += '/';
 
-    // Create the views based on the mapping of tableName to fileName
     Map<String, String> tableFileMapping = connectionInfo.getDriverOptions();
-    for (var tableName : tableFileMapping.keySet()) {
-      if (tableName.startsWith("table.")) {
-        queryBuilder.append(
-            String.format(
-                "CREATE VIEW '%s' AS SELECT * FROM '%s';",
-                tableName.substring("table.".length()), bucket + tableFileMapping.get(tableName)));
-      }
-    }
+    addViews(queryBuilder, bucket, tableFileMapping);
 
     return Optional.of(queryBuilder.toString());
   }
@@ -193,7 +148,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     if (connectionInfo.getHost().isPresent() && connectionInfo.getHost().get().startsWith("s3"))
       return handleS3(queryBuilder, connectionInfo);
 
-    // Data is avaible as local GeoParquet files
+    // Data is available as local GeoParquet files
     return handleLocalFiles(queryBuilder, connectionInfo);
   }
 
