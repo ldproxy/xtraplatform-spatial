@@ -56,7 +56,7 @@ public class DouglasPeuckerLineSimplifier {
       simplifySection(0, numPts - 1);
     }
 
-    List<Double> coordList = new ArrayList();
+    List<Double> coordList = new ArrayList<>();
     for (int i = 0; i < numPts; i++) {
       if (usePts[i]) {
         coordList.add(pts[i * 2]);

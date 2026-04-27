@@ -24,7 +24,6 @@ import de.ii.xtraplatform.geometries.domain.Position;
 import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.SingleCurve;
 
-@SuppressWarnings("PMD.TooManyMethods")
 public class FirstCoordinates implements GeometryVisitor<PositionList> {
 
   @Override

@@ -49,7 +49,7 @@ public interface MultiCurve extends AbstractGeometryCollection<Curve<?>> {
   @Value.Check
   default void check() {
     Preconditions.checkArgument(
-        getValue().stream().allMatch(g -> g.getAxes().equals(getAxes())),
+        getValue().stream().allMatch(g -> g.getAxes() == getAxes()),
         "All geometries must have the same axes.");
     Preconditions.checkArgument(
         getValue().stream()

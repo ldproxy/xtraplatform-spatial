@@ -37,17 +37,17 @@ public enum Axes {
     if (geometryTypeCode >= SPECIAL_SHIFT) {
       // In Oracle, CIRCULARSTRING, COMPOUNDCURVE, CURVEPOLYGON, MULTICURVE, and MULTISURFACE
       // with axes XY have a different geometry type code 100000x.
-      return Axes.XY;
+      return XY;
     }
-    if (geometryTypeCode >= Axes.XYZM.wkbShift) {
-      return Axes.XYZM;
+    if (geometryTypeCode >= XYZM.wkbShift) {
+      return XYZM;
     }
-    if (geometryTypeCode >= Axes.XYM.wkbShift) {
-      return Axes.XYM;
+    if (geometryTypeCode >= XYM.wkbShift) {
+      return XYM;
     }
-    if (geometryTypeCode >= Axes.XYZ.wkbShift) {
-      return Axes.XYZ;
+    if (geometryTypeCode >= XYZ.wkbShift) {
+      return XYZ;
     }
-    return Axes.XY;
+    return XY;
   }
 }

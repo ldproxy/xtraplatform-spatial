@@ -19,8 +19,7 @@ public final class ArcInterpolator {
     int numberOfPositions = coordinates.length / dimension;
     List<double[]> arcSegments = new ArrayList<>();
     for (int i = 0; i <= numberOfPositions - 2; i += 2) {
-      arcSegments.add(
-          ArcInterpolator.interpolateArc3Points(coordinates, i, dimension, maxDeviation));
+      arcSegments.add(interpolateArc3Points(coordinates, i, dimension, maxDeviation));
     }
 
     // Flatten the list of arrays into a single array
@@ -46,7 +45,8 @@ public final class ArcInterpolator {
     "PMD.CognitiveComplexity",
     "PMD.CyclomaticComplexity",
     "PMD.NPathComplexity",
-    "PMD.AvoidInstantiatingObjectsInLoops"
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.AvoidArrayLoops"
   })
   public static double[] interpolateArc3Points(
       double[] coordinates, int index, int dimension, double maxDeviation) {
@@ -61,9 +61,7 @@ public final class ArcInterpolator {
     }
 
     double radius =
-        distance2d(
-            center2d,
-            new double[] {coordinates[index * dimension], coordinates[index * dimension + 1]});
+        distance2d(center2d, coordinates[index * dimension], coordinates[index * dimension + 1]);
 
     double angle1 =
         Math.atan2(

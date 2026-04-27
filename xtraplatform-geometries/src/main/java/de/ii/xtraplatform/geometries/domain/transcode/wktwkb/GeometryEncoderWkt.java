@@ -30,7 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.GodClass")
 public class GeometryEncoderWkt {
 
   private final int[] precision;

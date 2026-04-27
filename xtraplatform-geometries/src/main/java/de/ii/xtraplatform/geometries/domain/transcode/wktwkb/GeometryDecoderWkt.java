@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
 public class GeometryDecoderWkt extends AbstractGeometryDecoder {
 
   private static final Splitter COMMA_SPLITTER = Splitter.on(',').omitEmptyStrings().trimResults();
@@ -112,7 +111,7 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
       throw new IllegalStateException(
           "Unexpected geometry type " + type + ". Allowed: " + allowedTypes);
     }
-    if (allowedAxes != null && !allowedAxes.equals(axes)) {
+    if (allowedAxes != null && allowedAxes != axes) {
       throw new IllegalStateException(
           "Geometry axes " + axes + " do not match expected axes " + allowedAxes);
     }

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-@SuppressWarnings("PMD.GodClass")
 public class GeometryDecoderWkb extends AbstractGeometryDecoder {
 
   private final WkbDialect dialect;
@@ -53,7 +52,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     }
   }
 
-  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public Geometry<?> decode(
       DataInputStream dis,
       Optional<EpsgCrs> crs,
@@ -73,7 +72,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     }
 
     Axes axes = Axes.fromWkbCode(typeCode);
-    if (allowedAxes != null && !allowedAxes.equals(axes)) {
+    if (allowedAxes != null && allowedAxes != axes) {
       throw new IOException("Geometry axes " + axes + " do not match expected " + allowedAxes);
     }
 

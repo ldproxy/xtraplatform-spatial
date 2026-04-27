@@ -22,7 +22,6 @@ import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
 import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import java.util.Optional;
 
-@SuppressWarnings("PMD.TooManyMethods")
 public interface GeometryVisitor<T> {
 
   @SuppressWarnings("PMD.CyclomaticComplexity")

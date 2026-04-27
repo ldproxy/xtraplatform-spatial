@@ -31,7 +31,6 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
-@SuppressWarnings("PMD.TooManyMethods")
 public class GeometryEncoderJson implements GeometryVisitor<Void> {
 
   private static final String FIELD_TYPE = "type";

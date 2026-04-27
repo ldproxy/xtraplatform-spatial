@@ -24,7 +24,6 @@ public interface LineString extends SingleCurve {
     return ImmutableLineString.builder().value(PositionList.of(Axes.XY, xyCoordinates)).build();
   }
 
-  @SuppressWarnings("PMD.UseVarargs")
   static LineString of(double[] xyCoordinates, EpsgCrs crs) {
     return of(crs, xyCoordinates);
   }

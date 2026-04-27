@@ -21,7 +21,7 @@ public interface PolyhedralSurface extends Surface<List<Polygon>>, CompositeGeom
   }
 
   static PolyhedralSurface of(List<Polygon> polygons) {
-    return PolyhedralSurface.of(polygons, false);
+    return of(polygons, false);
   }
 
   static PolyhedralSurface of(List<Polygon> polygons, boolean closed) {
@@ -77,7 +77,7 @@ public interface PolyhedralSurface extends Surface<List<Polygon>>, CompositeGeom
   @Value.Check
   default void check() {
     Preconditions.checkArgument(
-        getValue().stream().allMatch(g -> g.getAxes().equals(getAxes())),
+        getValue().stream().allMatch(g -> g.getAxes() == getAxes()),
         "All geometries must have the same axes.");
     Preconditions.checkArgument(
         getValue().stream()

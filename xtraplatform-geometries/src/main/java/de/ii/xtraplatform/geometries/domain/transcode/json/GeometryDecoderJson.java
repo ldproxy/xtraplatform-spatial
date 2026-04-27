@@ -27,12 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-@SuppressWarnings({
-  "PMD.GodClass",
-  "PMD.CyclomaticComplexity",
-  "PMD.TooManyMethods",
-  "PMD.ExcessiveMethodCount"
-})
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.CouplingBetweenObjects"})
 public class GeometryDecoderJson extends AbstractGeometryDecoder {
 
   private static final String UNSUPPORTED_GEOMETRY_TYPE = "Unsupported geometry type: ";
@@ -66,7 +61,12 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
     this.geoJsonOnly = geoJsonOnly;
   }
 
-  @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   public Geometry<?> decode(JsonParser parser, Optional<EpsgCrs> crs, Optional<Axes> axes)
       throws IOException {
     JsonToken token = parser.currentToken();
@@ -369,7 +369,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
     List<?> list = (List<?>) obj;
     double[] arr = new double[list.size()];
     for (int i = 0; i < list.size(); i++) {
-      arr[i] = ((Double) list.get(i)).doubleValue();
+      arr[i] = (Double) list.get(i);
     }
     return arr;
   }
@@ -420,7 +420,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
     return flat.stream().mapToDouble(Double::doubleValue).toArray();
   }
 
-  @SuppressWarnings("PMD.CognitiveComplexity")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
   private Optional<EpsgCrs> parseCoordRefSys(JsonParser parser) throws IOException {
     JsonToken token = parser.nextToken();
     if (token == JsonToken.VALUE_STRING) {

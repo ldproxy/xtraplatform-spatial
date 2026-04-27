@@ -42,7 +42,7 @@ public abstract class ToChars implements DoubleArrayProcessor<Void> {
       String value = String.valueOf(coordinates[i]);
 
       /*
-      TODO: will not be applied when no transformations are given
+      FIXME: will not be applied when no transformations are given
        move to separate step
       */
       if (precision[axisIndex] > 0) {

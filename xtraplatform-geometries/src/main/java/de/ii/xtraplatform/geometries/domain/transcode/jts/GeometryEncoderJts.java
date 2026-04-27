@@ -32,7 +32,7 @@ import org.locationtech.jts.geom.CoordinateSequenceFactory;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class GeometryEncoderJts implements GeometryVisitor<org.locationtech.jts.geom.Geometry> {
 
   private final GeometryFactory geometryFactory;
@@ -53,7 +53,6 @@ public class GeometryEncoderJts implements GeometryVisitor<org.locationtech.jts.
     return coordinate;
   }
 
-  @SuppressWarnings("PMD.UselessParentheses")
   private CoordinateSequence getJtsCoordinateSequence(PositionList positionList) {
     CoordinateSequenceFactory factory = geometryFactory.getCoordinateSequenceFactory();
     double[] coordinates = positionList.getCoordinates();

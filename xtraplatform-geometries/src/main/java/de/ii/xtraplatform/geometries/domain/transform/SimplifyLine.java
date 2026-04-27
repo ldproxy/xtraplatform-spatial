@@ -133,7 +133,8 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
     for (int i = 0; i < numberOfPositions; i++) {
       if (keepPoints[i]) {
         for (int j = i * dimension; j < i * dimension + dimension; j++) {
-          simplifiedPoints[cursor++] = coordinates[j];
+          simplifiedPoints[cursor] = coordinates[j];
+          cursor++;
         }
       }
     }

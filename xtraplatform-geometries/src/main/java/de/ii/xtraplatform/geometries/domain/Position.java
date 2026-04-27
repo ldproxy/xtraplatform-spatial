@@ -13,7 +13,6 @@ import javax.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
 public abstract class Position {
 
   @NotNull
@@ -33,22 +32,19 @@ public abstract class Position {
   }
 
   public static Position ofXY(double x, double y) {
-    return ImmutablePosition.builder().axes(Axes.XY).coordinates(new double[] {x, y}).build();
+    return of(Axes.XY, x, y);
   }
 
   public static Position ofXYZ(double x, double y, double z) {
-    return ImmutablePosition.builder().axes(Axes.XYZ).coordinates(new double[] {x, y, z}).build();
+    return of(Axes.XYZ, x, y, z);
   }
 
   public static Position ofXYM(double x, double y, double m) {
-    return ImmutablePosition.builder().axes(Axes.XYM).coordinates(new double[] {x, y, m}).build();
+    return of(Axes.XYM, x, y, m);
   }
 
   public static Position ofXYZM(double x, double y, double z, double m) {
-    return ImmutablePosition.builder()
-        .axes(Axes.XYZM)
-        .coordinates(new double[] {x, y, z, m})
-        .build();
+    return of(Axes.XYZM, x, y, z, m);
   }
 
   @Value.Derived

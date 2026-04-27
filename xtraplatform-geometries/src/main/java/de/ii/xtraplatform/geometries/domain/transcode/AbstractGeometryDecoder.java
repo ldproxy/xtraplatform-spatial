@@ -33,7 +33,6 @@ import de.ii.xtraplatform.geometries.domain.Surface;
 import java.util.List;
 import java.util.Optional;
 
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
 public class AbstractGeometryDecoder {
 
   @SuppressWarnings("PMD.CyclomaticComplexity")

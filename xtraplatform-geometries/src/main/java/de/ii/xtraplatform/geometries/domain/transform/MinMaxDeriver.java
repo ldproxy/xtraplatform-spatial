@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
 
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.ReturnEmptyCollectionRatherThanNull"})
+@SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
 public class MinMaxDeriver implements GeometryVisitor<double[][]> {
 
   @Override

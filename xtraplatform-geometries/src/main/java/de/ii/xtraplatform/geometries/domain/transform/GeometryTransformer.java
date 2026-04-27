@@ -27,7 +27,6 @@ import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
 import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import de.ii.xtraplatform.geometries.domain.Surface;
 
-@SuppressWarnings("PMD.TooManyMethods")
 public interface GeometryTransformer extends GeometryVisitor<Geometry<?>> {
 
   @Override

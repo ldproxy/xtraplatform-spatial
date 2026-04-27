@@ -28,7 +28,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
-@SuppressWarnings("PMD.TooManyMethods")
 public class GeometryEncoderWkb {
 
   static final byte[] ENDIANNESS =

@@ -24,7 +24,6 @@ public interface Polygon extends SingleSurface<LineString> {
     return ImmutablePolygon.builder().value(List.of(LineString.of(xyOuterRing))).build();
   }
 
-  @SuppressWarnings("PMD.UseVarargs")
   static Polygon of(double[] xyOuterRing, EpsgCrs crs) {
     return of(crs, xyOuterRing);
   }
@@ -38,11 +37,7 @@ public interface Polygon extends SingleSurface<LineString> {
 
   static Polygon of(List<PositionList> rings) {
     return ImmutablePolygon.builder()
-        .value(
-            rings.stream()
-                .map(ring -> LineString.of(ring))
-                .filter(ring -> !ring.isEmpty())
-                .toList())
+        .value(rings.stream().map(LineString::of).filter(ring -> !ring.isEmpty()).toList())
         .build();
   }
 
@@ -94,7 +89,7 @@ public interface Polygon extends SingleSurface<LineString> {
         "All rings must be closed. Not closed: %s",
         getValue().stream().filter(c -> !c.isClosed()).toList());
     Preconditions.checkArgument(
-        getValue().stream().allMatch(g -> g.getAxes().equals(getAxes())),
+        getValue().stream().allMatch(g -> g.getAxes() == getAxes()),
         "All geometries must have the same axes.");
     Preconditions.checkArgument(
         getValue().stream()

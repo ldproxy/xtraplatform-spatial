@@ -62,7 +62,7 @@ public interface CurvePolygon extends SingleSurface<Curve<?>> {
     Preconditions.checkState(
         getValue().stream().allMatch(Curve::isClosed), "All rings must be closed.");
     Preconditions.checkArgument(
-        getValue().stream().allMatch(g -> g.getAxes().equals(getAxes())),
+        getValue().stream().allMatch(g -> g.getAxes() == getAxes()),
         "All geometries must have the same axes.");
     Preconditions.checkArgument(
         getValue().stream()
