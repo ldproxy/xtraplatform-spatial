@@ -36,12 +36,13 @@ public abstract class AbstractTile3dProvider<T extends Tile3dProviderData>
   }
 
   @Override
+  @SuppressWarnings("PMD.UnusedLocalVariable")
   protected void onStarted() {
     super.onStarted();
 
     onStateChange(
         (from, to) -> {
-          try (MDC.MDCCloseable closeable = // NOPMD
+          try (MDC.MDCCloseable closeable =
               LogContext.putCloseable(CONTEXT.SERVICE, getData().getId())) {
             if (LOGGER.isInfoEnabled()) {
               LOGGER.info("3dTile provider with id '{}' state changed: {}", getId(), getState());
