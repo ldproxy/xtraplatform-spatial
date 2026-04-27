@@ -18,8 +18,6 @@ import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.tiles.domain.TileResult;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFilesData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dQuery;
@@ -44,8 +42,7 @@ import org.slf4j.LoggerFactory;
           value = Tile3dProviderFilesData.PROVIDER_SUBTYPE)
     },
     data = Tile3dProviderFilesData.class)
-public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFilesData>
-    implements Tile3dProvider, Tile3dAccess {
+public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFilesData> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFiles.class);
 
@@ -63,7 +60,7 @@ public class Tile3dProviderFiles extends AbstractTile3dProvider<Tile3dProviderFi
       @Assisted Tile3dProviderFilesData data) {
     super(volatileRegistry, data, "access");
 
-    this.rootStore = blobStore.with(Tile3dProvider.STORE_DIR_NAME);
+    this.rootStore = blobStore.with(STORE_DIR_NAME);
     this.volatileRegistry = volatileRegistry;
     this.objectMapper = jackson.getDefaultObjectMapper();
     this.metadata = new LinkedHashMap<>();

@@ -104,7 +104,6 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   }
 
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
   default void init(Map<String, Object> parameters) {
     if (parameters.containsKey(PARAM_TILE_SET)
         && parameters.containsKey(PARAM_TILE_MATRIX_SET)
@@ -123,7 +122,6 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   }
 
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
   default Map<String, Object> initJson(Map<String, Object> params) {
     Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
 
@@ -229,7 +227,7 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
 
       Tileset3dProgress progress = getTileSets().get(details.getTileSet()).getProgress();
 
-      progress.getCurrent().addAndGet(-(job.getCurrent().get()));
+      progress.getCurrent().addAndGet(-job.getCurrent().get());
 
       if (progress.getLevels().containsKey(details.getTileMatrixSet())) {
         int level = details.getSubMatrices().get(0).getLevel();

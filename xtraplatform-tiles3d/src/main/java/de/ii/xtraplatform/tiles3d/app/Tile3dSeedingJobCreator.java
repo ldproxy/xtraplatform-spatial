@@ -43,6 +43,7 @@ import org.threeten.extra.AmountFormats;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeedingJobSet> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dSeedingJobCreator.class);
@@ -73,7 +74,7 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
   }
 
   @Override
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
     Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
     boolean isCleanup = getDetails(job, jobQueue);

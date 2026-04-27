@@ -15,7 +15,6 @@ import de.ii.xtraplatform.docs.DocStep.Step;
 import de.ii.xtraplatform.docs.DocTable;
 import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.docs.DocVar;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import java.util.Locale;
 import java.util.Map;
@@ -107,8 +106,7 @@ public interface Tile3dProviderFilesData extends Tile3dProviderData {
   Map<String, Tileset3dFiles> getTilesets();
 
   abstract class Builder
-      extends Tile3dProviderData.Builder<ImmutableTile3dProviderFilesData.Builder>
-      implements EntityDataBuilder<Tile3dProviderData> {
+      extends Tile3dProviderData.Builder<ImmutableTile3dProviderFilesData.Builder> {
     @Override
     public ImmutableTile3dProviderFilesData.Builder fillRequiredFieldsWithPlaceholders() {
       return this.id(EntityDataDefaults.PLACEHOLDER)

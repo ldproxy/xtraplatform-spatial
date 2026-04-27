@@ -40,7 +40,6 @@ import de.ii.xtraplatform.tiles3d.domain.ImmutableCache3d;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableSeedingOptions3d;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dQuery;
 import de.ii.xtraplatform.tiles3d.domain.SeedingOptions3d;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerationParameters;
@@ -91,9 +90,9 @@ import org.slf4j.LoggerFactory;
           value = Tile3dProviderFeaturesData.PROVIDER_SUBTYPE)
     },
     data = Tile3dProviderFeaturesData.class)
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProviderFeaturesData>
-    implements Tile3dProvider, Tile3dAccess, Tile3dSeeding {
+    implements Tile3dSeeding {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFeatures.class);
   private static final byte[] NO_CONTENT = new byte[0];
@@ -121,8 +120,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     super(volatileRegistry, data, "access", "seeding", "generation");
 
     this.rootStore =
-        blobStore.with(
-            Tile3dProvider.STORE_DIR_NAME, Tile3dProvider.clean(data.getId()), "cache_dyn");
+        blobStore.with(STORE_DIR_NAME, Tile3dProvider.clean(data.getId()), "cache_dyn");
     this.metadata = new LinkedHashMap<>();
     this.stores = new LinkedHashMap<>();
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
@@ -356,7 +354,11 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     }
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private byte[] seedSubtree(
       TileSubMatrix coords,
       Tileset3dFeatures tileset,
@@ -446,7 +448,11 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     }
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private byte[] seedTiles(
       TileSubMatrix subMatrix,
       Tileset3dFeatures tileset,

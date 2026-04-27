@@ -26,6 +26,7 @@ public interface Tile3dSeedingJob extends JobDetails {
   String TYPE_SUBTREE = Tile3dSeedingJobSet.type("subtree", "binary");
   String TYPE_GLTF = Tile3dSeedingJobSet.type("content", "glb");
 
+  @SuppressWarnings("PMD.DataClass")
   final class Context {
     private final String tileProvider;
     private final String tileSet;

@@ -22,7 +22,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.shape.fractal.MortonCode;
 
 @Value.Immutable
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
 public interface TileTree {
 
   TileTree ROOT = of(0, 0, 0);
@@ -31,6 +30,7 @@ public interface TileTree {
     return new ImmutableTileTree.Builder().level(level).col(col).row(row).build();
   }
 
+  @FunctionalInterface
   interface TileTreeVisitor<T> {
     T visit(TileTree tileTree, List<T> childResults);
   }

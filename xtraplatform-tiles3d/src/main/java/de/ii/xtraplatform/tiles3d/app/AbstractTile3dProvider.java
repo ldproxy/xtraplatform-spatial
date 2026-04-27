@@ -41,7 +41,7 @@ public abstract class AbstractTile3dProvider<T extends Tile3dProviderData>
 
     onStateChange(
         (from, to) -> {
-          try (MDC.MDCCloseable closeable =
+          try (MDC.MDCCloseable closeable = // NOPMD
               LogContext.putCloseable(CONTEXT.SERVICE, getData().getId())) {
             if (LOGGER.isInfoEnabled()) {
               LOGGER.info("3dTile provider with id '{}' state changed: {}", getId(), getState());

@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.tiles3d.domain;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface Tileset3dCommon extends Tileset3dCommonDefaults {
   /**
    * @langEn The tileset id.

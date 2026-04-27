@@ -14,7 +14,6 @@ import de.ii.xtraplatform.docs.DocStep.Step;
 import de.ii.xtraplatform.docs.DocTable;
 import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.docs.DocVar;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import java.util.List;
@@ -233,8 +232,7 @@ public interface Tile3dProviderFeaturesData extends Tile3dProviderData {
   List<Cache3d> getCaches();
 
   abstract class Builder
-      extends Tile3dProviderData.Builder<ImmutableTile3dProviderFeaturesData.Builder>
-      implements EntityDataBuilder<Tile3dProviderData> {
+      extends Tile3dProviderData.Builder<ImmutableTile3dProviderFeaturesData.Builder> {
     @Override
     public ImmutableTile3dProviderFeaturesData.Builder fillRequiredFieldsWithPlaceholders() {
       return this.id(EntityDataDefaults.PLACEHOLDER)

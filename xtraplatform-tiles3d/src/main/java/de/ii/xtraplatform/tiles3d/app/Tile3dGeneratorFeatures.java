@@ -85,7 +85,12 @@ import org.locationtech.jts.shape.fractal.MortonCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods",
+  "PMD.CouplingBetweenObjects"
+})
 public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements Tile3dGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dGeneratorFeatures.class);
@@ -405,7 +410,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       }
 
       outputStream.flush();
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       throw new IllegalStateException("Could not write 3D Tiles Subtree output", e);
     }
 
@@ -468,7 +473,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
                           subtreeBytes, subtreeWithEmptyBuffers, bufferOffset, i)));
 
       return builder.build();
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       throw new IllegalStateException("Could not read 3D Tiles Subtree output", e);
     }
   }
@@ -480,7 +485,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     if (async) {
       DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
 
-      // TODO: only crs, extents, queries needed
+      // FIXME: only crs, extents, queries needed
       if (!provider.isAvailable()) {
         throw new VolatileUnavailableException(
             String.format("Feature provider with id '%s' is not available.", featureProviderId));
@@ -513,11 +518,11 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
         // not needed for TileWalker, but mandatory
         .scaleDenominator(BigDecimal.valueOf(0))
         .cellSize(BigDecimal.valueOf(0))
-        .pointOfOrigin(new BigDecimal[] {BigDecimal.valueOf(0), BigDecimal.valueOf(0)})
+        .pointOfOrigin(BigDecimal.valueOf(0), BigDecimal.valueOf(0))
         .build();
   }
 
-  @SuppressWarnings("PMD.CognitiveComplexity")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
   private void processZ(
       FeatureProvider featureProvider,
       Tileset3dFeatures tileset,
@@ -688,7 +693,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     availability[byteIndex] |= 1 << bitIndex;
   }
 
-  @SuppressWarnings({"PMD.ExcessiveMethodLength", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   private static ImmutableSubtree buildSubtree(
       int subtreeLevels,
       int size,
@@ -745,9 +750,10 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           ImmutableAvailability.builder().constant(tileAvailabilityConstantValue ? 1 : 0).build());
     } else {
       builder
-          .tileAvailability(getAvailability(bitstream++, tileAvailabilityCount))
+          .tileAvailability(getAvailability(bitstream, tileAvailabilityCount))
           .addBufferViews(getBufferView(tileAvailability, byteOffset));
       byteOffset += tileAvailability.length;
+      bitstream++;
     }
     if (Objects.nonNull(contentAvailabilityConstantValue)) {
       builder.contentAvailability(
@@ -758,9 +764,10 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     } else {
       builder
           .contentAvailability(
-              ImmutableList.of(getAvailability(bitstream++, contentAvailabilityCount)))
+              ImmutableList.of(getAvailability(bitstream, contentAvailabilityCount)))
           .addBufferViews(getBufferView(contentAvailability, byteOffset));
       byteOffset += contentAvailability.length;
+      bitstream++;
     }
     if (Objects.nonNull(childSubtreeAvailabilityConstantValue)) {
       builder.childSubtreeAvailability(

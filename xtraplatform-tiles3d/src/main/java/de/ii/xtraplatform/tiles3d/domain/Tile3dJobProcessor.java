@@ -57,7 +57,6 @@ public abstract class Tile3dJobProcessor
       throws IOException;
 
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
   public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
     Tile3dSeedingJob seedingJob = getDetails(job, jobQueue);
     Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
@@ -95,7 +94,7 @@ public abstract class Tile3dJobProcessor
         executeJob(job.getType(), tileProvider, seedingJob, seedingJobSet, updateProgress);
       } catch (IOException e) {
         return JobResult.retry(e.getMessage());
-      } catch (Throwable e) {
+      } catch (Throwable e) { // NOPMD AvoidCatchingThrowable
         updateProgress.accept(job.getTotal().get());
         throw e;
       }

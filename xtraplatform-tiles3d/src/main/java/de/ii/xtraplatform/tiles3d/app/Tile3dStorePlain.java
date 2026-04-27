@@ -19,7 +19,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveMethodCount"})
 final class Tile3dStorePlain implements Tile3dStore {
 
   private static final String UNKNOWN_PATH = "__unknown__";
