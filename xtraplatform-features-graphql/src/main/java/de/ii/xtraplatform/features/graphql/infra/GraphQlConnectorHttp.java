@@ -55,10 +55,8 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
       @Assisted String providerId,
       @Assisted ConnectionInfoGraphQlHttp connectionInfo) {
     super(volatileRegistry);
-    /*
-     workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
-    */
+    // workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // TODO: remove when fixed //NOPMD ForbiddenContent
     Optional.ofNullable(
             Strings.emptyToNull(
                 connectionInfo
@@ -70,7 +68,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
     URI host = connectionInfo.getUri();
 
-    // TODO: get maxParallelRequests and idleTimeout from connectionInfo
+    // TODO: get maxParallelRequests and idleTimeout from connectionInfo //NOPMD ForbiddenContent
     this.httpClient = http.getHostClient(host, 16, 30);
 
     this.providerId = providerId;
@@ -78,7 +76,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
   }
 
   GraphQlConnectorHttp() {
-    // TODO
+    // TODO //NOPMD ForbiddenContent
     super(null);
     httpClient = null;
     providerId = null;
@@ -92,7 +90,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
   @Override
   public void start() {
-    // TODO: implement polling
+    // TODO: implement polling //NOPMD ForbiddenContent
     setState(State.AVAILABLE);
   }
 
@@ -104,7 +102,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
     return providerId;
   }
 
-  // TODO
+  // TODO //NOPMD ForbiddenContent
   @Override
   public boolean isConnected() {
     return true;
@@ -124,7 +122,9 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
             MediaType.APPLICATION_JSON_TYPE,
             Map.of("Accept", MediaType.APPLICATION_JSON))) {
       byte[] bytes = inputStream.readAllBytes();
-      LOGGER.debug("Response \n{}", new String(bytes, StandardCharsets.UTF_8));
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Response \n{}", new String(bytes, StandardCharsets.UTF_8));
+      }
 
       return httpClient.getAsSource(new ByteArrayInputStream(bytes));
     } catch (IOException e) {

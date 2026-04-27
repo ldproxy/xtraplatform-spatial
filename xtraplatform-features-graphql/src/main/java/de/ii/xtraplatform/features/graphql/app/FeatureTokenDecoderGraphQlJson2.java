@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("PMD.AvoidDeeplyNestedIfStmts")
 public class FeatureTokenDecoderGraphQlJson2
     extends FeatureTokenDecoder<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
@@ -101,7 +102,7 @@ public class FeatureTokenDecoderGraphQlJson2
     List<List<String>> arrayPaths =
         context.mapping().getSchemasByTargetPath().entrySet().stream()
             .filter(entry -> entry.getValue().get(0).isArray())
-            .map(entry -> entry.getKey())
+            .map(Map.Entry::getKey)
             .collect(Collectors.toList());
 
     this.decoderJsonProperties =
@@ -143,7 +144,11 @@ public class FeatureTokenDecoderGraphQlJson2
     }
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidCatchingThrowable"
+  })
   public boolean advanceParser() {
 
     boolean feedMeMore = false;

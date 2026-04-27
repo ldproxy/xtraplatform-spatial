@@ -52,7 +52,7 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class FilterEncoderGraphQl {
 
   private final EpsgCrs nativeCrs;
@@ -99,7 +99,7 @@ public class FilterEncoderGraphQl {
     return Doubles.asList(transformed);
   }
 
-  // TODO: reverse FeatureSchema for nested mappings?
+  // TODO: reverse FeatureSchema for nested mappings? //NOPMD ForbiddenContent
   private Optional<String> getPrefixedPropertyName(FeatureSchema schema, String property) {
     return schema.getProperties().stream()
         .filter(
@@ -109,11 +109,8 @@ public class FilterEncoderGraphQl {
                 return false;
               }
 
-              if (featurePropertyName.equalsIgnoreCase(property)) {
-                return true;
-              }
-
-              return Objects.equals(property, ID_PLACEHOLDER) && featureProperty.isId();
+              return featurePropertyName.equalsIgnoreCase(property)
+                  || (Objects.equals(property, ID_PLACEHOLDER) && featureProperty.isId());
             })
         .map(FeatureSchema::getSourcePath)
         .filter(Optional::isPresent)
@@ -128,7 +125,7 @@ public class FilterEncoderGraphQl {
             });
   }
 
-  class CqlToGraphQl implements CqlVisitor<Map<String, String>> {
+  public class CqlToGraphQl implements CqlVisitor<Map<String, String>> {
 
     private final FeatureSchema schema;
 
@@ -183,7 +180,7 @@ public class FilterEncoderGraphQl {
               .flatMap(single -> single.getArguments().getId())
               .or(queryGeneration.getCollection().getArguments()::getId);
 
-      if (children.size() != 2 || !(children.get(1).containsKey("scalar")) || template.isEmpty()) {
+      if (children.size() != 2 || !children.get(1).containsKey("scalar") || template.isEmpty()) {
         throw new IllegalArgumentException(
             "IN predicates are not supported in filter expressions for GraphQL feature providers.");
       }

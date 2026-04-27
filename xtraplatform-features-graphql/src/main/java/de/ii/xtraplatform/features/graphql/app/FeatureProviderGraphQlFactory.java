@@ -13,7 +13,6 @@ import dagger.assisted.AssistedFactory;
 import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ConnectorFactory;
 import de.ii.xtraplatform.features.domain.FeatureProviderDataV2;
@@ -36,8 +35,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @AutoBind
 public class FeatureProviderGraphQlFactory
-    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderGraphQl>
-    implements EntityFactory {
+    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderGraphQl> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderGraphQlFactory.class);
 
@@ -104,6 +102,7 @@ public class FeatureProviderGraphQlFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface ProviderGraphQlFactoryAssisted
       extends FactoryAssisted<FeatureProviderDataV2, FeatureProviderGraphQl> {
     @Override

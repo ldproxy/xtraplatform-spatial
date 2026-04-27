@@ -74,7 +74,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
 
   @Override
   public FeatureProviderCapabilities getCapabilities() {
-    // TODO: derive from queryGeneration
+    // TODO: derive from queryGeneration //NOPMD ForbiddenContent
     return ImmutableFeatureProviderCapabilities.builder().level(Level.BASIC).build();
   }
 
@@ -84,10 +84,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
 
   public String getTypeName(final FeatureQuery query) {
     FeatureSchema featureSchema = featureSchemas.get(query.getType());
-    String name =
-        featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);
-
-    return name;
+    return featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);
   }
 
   private String getNestedFields(String sourcePath) {
@@ -113,7 +110,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
         .map(
             prop -> {
               if (prop.isValue()) {
-                return prop.getSourcePath().map(obj -> getNestedFields(obj));
+                return prop.getSourcePath().map(this::getNestedFields);
               } else if (prop.isObject()) {
                 return prop.getSourcePath()
                     .map(obj -> obj + " " + getFields(prop, indentation + "  "));
