@@ -22,6 +22,7 @@ import de.ii.xtraplatform.features.domain.SchemaMapping;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -33,7 +34,6 @@ public class DecoderJson implements Decoder {
   private final JsonParser parser;
   private final ByteArrayFeeder feeder;
   private final Optional<String> nullValue;
-  private List<List<String>> arrayPaths;
   private Optional<DecoderJsonProperties> decoderJsonProperties = Optional.empty();
   private boolean inProperties;
   private boolean isArray;
@@ -79,10 +79,10 @@ public class DecoderJson implements Decoder {
 
   private void init(Pipeline pipeline, boolean isValues) {
     if (!isValues && decoderJsonProperties.isEmpty()) {
-      this.arrayPaths =
+      List<List<String>> arrayPaths =
           pipeline.context().mapping().getSchemasBySourcePath().entrySet().stream()
               .filter(entry -> entry.getValue().get(0).isArray())
-              .map(entry -> entry.getKey())
+              .map(Entry::getKey)
               .collect(Collectors.toList());
 
       this.decoderJsonProperties =
@@ -130,7 +130,7 @@ public class DecoderJson implements Decoder {
     try {
       JsonToken nextToken = parser.nextToken();
 
-      // TODO: null is end-of-input
+      // TODO: null is end-of-input //NOPMD ForbiddenContent
       if (Objects.isNull(nextToken)) {
         return true;
       }
@@ -267,8 +267,9 @@ public class DecoderJson implements Decoder {
             context.setValue(parser.getValueAsString());
           }
           if (isArray) {
-            ArrayList<Integer> indexes = new ArrayList<>(context.indexes());
-            indexes.add(++valueIndex);
+            List<Integer> indexes = new ArrayList<>(context.indexes());
+            valueIndex++;
+            indexes.add(valueIndex);
             context.setIndexes(indexes);
           }
 

@@ -14,6 +14,7 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandler;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.MultiplicityTracker;
+import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import java.nio.charset.StandardCharsets;
@@ -72,7 +73,7 @@ public class DecoderJsonProperties {
     "PMD.NPathComplexity"
   })
   public boolean parse(JsonToken nextToken, String currentName, int featureDepth) {
-    // TODO: null is end-of-input
+    // TODO: null is end-of-input //NOPMD ForbiddenContent
     if (Objects.isNull(nextToken)) {
       return true; // or completestage???
     }
@@ -193,8 +194,10 @@ public class DecoderJsonProperties {
         List<FeatureSchema> parentSchemas = context.parentSchemas();
 
         if (schema.filter(s -> s.isValue() && s.isArray()).isPresent()) {
-          ArrayList<Integer> indexes = new ArrayList<>(context.indexes());
-          indexes.add(++valueIndex);
+          List<Integer> indexes = new ArrayList<>(context.indexes());
+          int newIndex = valueIndex + 1;
+          valueIndex = newIndex;
+          indexes.add(newIndex);
           context.setIndexes(indexes);
         }
         if (schema
@@ -205,7 +208,7 @@ public class DecoderJsonProperties {
                         && parentSchemas.get(0).isArray()
                         && parentSchemas.get(0).getSourcePath().isEmpty())
             .isPresent()) {
-          ArrayList<Integer> indexes =
+          List<Integer> indexes =
               new ArrayList<>(
                   context.indexes().isEmpty()
                       ? List.of()
@@ -217,7 +220,7 @@ public class DecoderJsonProperties {
           context.setIndexes(indexes);
         }
 
-        if (schema.filter(s -> s.isSimpleFeatureGeometry()).isPresent()
+        if (schema.filter(SchemaBase::isSimpleFeatureGeometry).isPresent()
             && geometryDecoder.isPresent()) {
           // used by GraphQL provider, is this needed?
           geometryDecoder

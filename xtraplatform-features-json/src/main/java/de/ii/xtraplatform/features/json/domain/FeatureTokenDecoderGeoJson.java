@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
 
-// TODO: how to handle name collisions for id, geometry, or place
+// TODO: null is end-of-input //NOPMD ForbiddenContent
 @SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
 public class FeatureTokenDecoderGeoJson
     extends FeatureTokenDecoderSimple<
@@ -116,7 +116,7 @@ public class FeatureTokenDecoderGeoJson
     try {
       JsonToken nextToken = parser.nextToken();
 
-      // TODO: null is end-of-input
+      // TODO: null is end-of-input //NOPMD ForbiddenContent
       if (Objects.isNull(nextToken)) {
         return true; // or completestage???
       }
@@ -159,7 +159,7 @@ public class FeatureTokenDecoderGeoJson
                   break;
               }
               // nested array_object start
-            } else if (context.pathTracker().asList().size() > 0 && started) {
+            } else if (!context.pathTracker().asList().isEmpty() && started) {
               downstream.onObjectStart(context);
               // feature in collection start
             } else if (depth == featureDepth - 2 && inFeature) {
@@ -296,6 +296,7 @@ public class FeatureTokenDecoderGeoJson
                 if (!"Feature".equals(parser.getValueAsString())) {
                   break;
                 }
+                // fall through
               case "id":
                 startIfNecessary(false);
                 if (!"id".equals(currentName)) {

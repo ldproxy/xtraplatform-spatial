@@ -60,7 +60,7 @@ public class FeatureDecoderJson extends FeatureDecoder<byte[]> implements Decode
   protected void cleanup() {
     try {
       decoderJson.close();
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       // ignore
     }
   }
