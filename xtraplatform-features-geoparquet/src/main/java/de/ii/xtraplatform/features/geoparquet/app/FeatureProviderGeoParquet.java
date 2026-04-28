@@ -172,8 +172,6 @@ public class FeatureProviderGeoParquet extends FeatureProviderSql {
 
   @Override
   protected boolean onStartup() throws InterruptedException {
-    // ToDo: Remove check, because in the context of the GeoParquet Feature Provider dialects do not
-    // exist
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsAdapterDuckdb.ID)) {
       LOGGER.error(
           "Feature provider with id '{}' could not be started: dialect '{}' is not supported",
