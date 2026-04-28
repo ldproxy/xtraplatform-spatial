@@ -31,9 +31,9 @@ public interface BoundingBox {
             .map(Double::valueOf)
             .collect(Collectors.toUnmodifiableList());
     if (coords.size() == 4) {
-      return BoundingBox.of(coords.get(0), coords.get(1), coords.get(2), coords.get(3), crs);
+      return of(coords.get(0), coords.get(1), coords.get(2), coords.get(3), crs);
     } else if (coords.size() == 6) {
-      return BoundingBox.of(
+      return of(
           coords.get(0),
           coords.get(1),
           coords.get(2),
