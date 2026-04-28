@@ -14,6 +14,7 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import java.io.IOException;
 import java.lang.module.Configuration;
 import java.lang.module.ModuleFinder;
 import java.text.Collator;
@@ -101,7 +102,7 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
       oracleDataSource.getDeclaredMethod("setServiceName", String.class).invoke(ds, database);
 
       return ds;
-    } catch (Throwable e) {
+    } catch (ReflectiveOperationException | IllegalArgumentException | SecurityException e) {
       throw new IllegalStateException("Could not create Oracle data source", e);
     }
   }
@@ -117,7 +118,10 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
       ModuleLayer layer = parent.defineModulesWithOneLoader(cf, ClassLoader.getSystemClassLoader());
 
       return layer.findLoader(JDBC_MODULE).loadClass(JDBC_DS_CLASS);
-    } catch (Throwable e) {
+    } catch (IllegalArgumentException
+        | SecurityException
+        | IOException
+        | ClassNotFoundException e) {
       throw new IllegalStateException("Could not load Oracle driver", e);
     }
   }

@@ -15,7 +15,6 @@ import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.AutoEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.entities.domain.ValidationResult.MODE;
 import de.ii.xtraplatform.features.domain.ConstantsResolver;
@@ -52,10 +51,8 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
-@SuppressWarnings("PMD.TooManyMethods")
 public class FeatureProviderOracleFactory
-    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderOracle>
-    implements EntityFactory {
+    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderOracle> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderOracleFactory.class);
 
@@ -176,7 +173,7 @@ public class FeatureProviderOracleFactory
 
       return data;
 
-    } catch (Throwable e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
       LogContext.error(
           LOGGER, e, "Feature provider with id '{}' could not be started", data.getId());
     }
@@ -211,6 +208,7 @@ public class FeatureProviderOracleFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface ProviderOracleFactoryAssisted
       extends FactoryAssisted<FeatureProviderDataV2, FeatureProviderOracle> {
     @Override
