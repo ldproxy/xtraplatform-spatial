@@ -93,7 +93,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class RoutesQueriesSql implements FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutesQueriesSql.class);
@@ -215,15 +215,11 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
               if (Objects.isNull(throwable)) {
                 return;
               }
-              try {
-                if (LOGGER.isDebugEnabled()) {
-                  LOGGER.debug(
-                      "Inserting into temp table failed, dropping it ({})", throwable.getMessage());
-                }
-                deleteTempTable(sqlClient, name);
-              } catch (Throwable t) {
-                // ignore
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug(
+                    "Inserting into temp table failed, dropping it ({})", throwable.getMessage());
               }
+              deleteTempTableAsync(sqlClient, name);
             })
         .join();
   }
@@ -232,6 +228,12 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
     String query = String.format("DROP TABLE IF EXISTS %s", name);
 
     sqlClient.run(query, SqlQueryOptions.ddl()).join();
+  }
+
+  private void deleteTempTableAsync(SqlClient sqlClient, String name) {
+    String query = String.format("DROP TABLE IF EXISTS %s", name);
+
+    sqlClient.run(query, SqlQueryOptions.ddl());
   }
 
   private String getTempTableName(RouteQuery query) {
