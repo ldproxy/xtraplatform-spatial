@@ -22,7 +22,7 @@ import org.immutables.value.Value;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public abstract class JsonSchema {
 
-  @SuppressWarnings({"UnstableApiUsage", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings("UnstableApiUsage")
   public static final Funnel<JsonSchema> FUNNEL =
       (from, into) -> {
         from.getTitle().ifPresent(s -> into.putString(s, StandardCharsets.UTF_8));
@@ -116,7 +116,6 @@ public abstract class JsonSchema {
     return visitor.visit(this);
   }
 
-  @SuppressWarnings("PMD.TooManyMethods")
   public abstract static class Builder {
     public abstract Builder title(String title);
 

@@ -22,8 +22,8 @@ public abstract class JsonSchemaNumber extends JsonSchema {
   public static final Funnel<JsonSchemaNumber> FUNNEL =
       (from, into) -> {
         into.putString(from.getType(), StandardCharsets.UTF_8);
-        from.getMinimum().ifPresent(val -> into.putDouble(val));
-        from.getMaximum().ifPresent(val -> into.putDouble(val));
+        from.getMinimum().ifPresent(into::putDouble);
+        from.getMaximum().ifPresent(into::putDouble);
         from.getUnit().ifPresent(val -> into.putString(val, StandardCharsets.UTF_8));
       };
 

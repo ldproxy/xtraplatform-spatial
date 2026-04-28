@@ -41,12 +41,7 @@ public class JsonSchemaDeserializer extends StdDeserializer<JsonSchema> {
   }
 
   @Override
-  @SuppressWarnings({
-    "PMD.NcssCount",
-    "PMD.CognitiveComplexity",
-    "PMD.NPathComplexity",
-    "PMD.CyclomaticComplexity"
-  })
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public JsonSchema deserialize(
       JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
     JsonNode schemaNode = jsonParser.getCodec().readTree(jsonParser);
@@ -70,42 +65,36 @@ public class JsonSchemaDeserializer extends StdDeserializer<JsonSchema> {
     }
 
     if (schemaNode.hasNonNull("type")) {
-      JsonNode type = schemaNode.get("type");
-      if (type.isArray()) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn(
-              "JSON Schema type arrays are not supported. Using the first value. Found: {}",
-              schemaNode);
-        }
-        if (type.has(0)) {
-          type = type.get(0);
-        }
+      JsonNode typeNode = schemaNode.get("type");
+      if (typeNode.isArray()) {
+        warn(
+            "JSON Schema type arrays are not supported. Using the first value. Found: {}",
+            schemaNode);
+        typeNode = typeNode.path(0);
       }
-      if (type.isTextual()) {
-        switch (type.asText()) {
-          case "array":
-            return mapper.treeToValue(schemaNode, JsonSchemaArray.class);
-          case "boolean":
-            return mapper.treeToValue(schemaNode, JsonSchemaBoolean.class);
-          case "integer":
-            return mapper.treeToValue(schemaNode, JsonSchemaInteger.class);
-          case "null":
-            return mapper.treeToValue(schemaNode, JsonSchemaNull.class);
-          case "number":
-            return mapper.treeToValue(schemaNode, JsonSchemaNumber.class);
-          case "object":
-            return mapper.treeToValue(schemaNode, JsonSchemaObject.class);
-          case "string":
-            return mapper.treeToValue(schemaNode, JsonSchemaString.class);
-          default:
-            break;
-        }
-      } else {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn(
-              "Invalid JSON Schema, 'type' is not a string. Using 'false'. Found: {}", schemaNode);
-        }
+
+      if (!typeNode.isTextual()) {
+        warn("Invalid JSON Schema, 'type' is not a string. Using 'false'. Found: {}", schemaNode);
         return ImmutableJsonSchemaFalse.builder().build();
+      }
+
+      switch (typeNode.asText()) {
+        case "array":
+          return mapper.treeToValue(schemaNode, JsonSchemaArray.class);
+        case "boolean":
+          return mapper.treeToValue(schemaNode, JsonSchemaBoolean.class);
+        case "integer":
+          return mapper.treeToValue(schemaNode, JsonSchemaInteger.class);
+        case "null":
+          return mapper.treeToValue(schemaNode, JsonSchemaNull.class);
+        case "number":
+          return mapper.treeToValue(schemaNode, JsonSchemaNumber.class);
+        case "object":
+          return mapper.treeToValue(schemaNode, JsonSchemaObject.class);
+        case "string":
+          return mapper.treeToValue(schemaNode, JsonSchemaString.class);
+        default:
+          break;
       }
     } else if (schemaNode.hasNonNull("constant")) {
       return mapper.treeToValue(schemaNode, JsonSchemaConstant.class);
@@ -123,10 +112,13 @@ public class JsonSchemaDeserializer extends StdDeserializer<JsonSchema> {
       return mapper.treeToValue(schemaNode, JsonSchemaGeometry.class);
     }
 
-    if (LOGGER.isWarnEnabled()) {
-      LOGGER.warn(
-          "The provided JSON Schema is not supported. Using 'false'. Found: {}", schemaNode);
-    }
+    warn("The provided JSON Schema is not supported. Using 'false'. Found: {}", schemaNode);
     return ImmutableJsonSchemaFalse.builder().build();
+  }
+
+  private static void warn(String message, JsonNode schemaNode) {
+    if (LOGGER.isWarnEnabled()) {
+      LOGGER.warn(message, schemaNode);
+    }
   }
 }

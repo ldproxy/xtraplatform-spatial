@@ -92,7 +92,6 @@ public abstract class JsonSchemaDocument extends JsonSchemaObject {
     }
   }
 
-  @SuppressWarnings("PMD.TooManyMethods")
   public abstract static class Builder extends JsonSchema.Builder {
     public abstract Builder id(Optional<String> id);
 
@@ -110,7 +109,6 @@ public abstract class JsonSchemaDocument extends JsonSchemaObject {
     public abstract Builder name(String name);
 
     @Override
-    @SuppressWarnings("PMD.LinguisticNaming")
     public abstract Builder isRequired(boolean isRequired);
 
     public abstract Builder required(Iterable<String> elements);
