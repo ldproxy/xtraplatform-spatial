@@ -242,9 +242,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
         if ("posList".equals(localName)) {
           throw new IllegalStateException("<gml:posList> is not allowed for Point coordinates.");
         }
-        if (currentGeometry.coordinates != null) {
-          addCoordinates(coords);
-        }
+        addCoordinates(coords);
         Position position =
             Position.of(coords.length == 3 ? Axes.XYZ : Axes.XY, currentGeometry.coordinates);
         currentGeometry.geometry = ImmutablePoint.copyOf((Point) geom).withValue(position);
