@@ -58,6 +58,7 @@ import org.slf4j.LoggerFactory;
  *   - When working with large files, the data might not be available immediately after application start, especially if no cache has been built beforehand. Requesting the data before it is ready may return `HTTP Error 503`. After some minutes the data should become available, the exact time depends on the size of the files.
  *   - Populating a table with the content of multiple specific (Geo)Parquet files is not *yet* supported. However, it is possible to select multiple files using the `*` and `?` wildcard operators.
  *   - The S3-URL and the S3-credentials are not checked for errors.
+ *   - The S3-access may fail, if S3-credentials are provided although the bucket is public.
  *     </code>
  * @limitationsDe
  *     <p>Die folgenden Einschränkungen sind bekannt:
@@ -70,6 +71,7 @@ import org.slf4j.LoggerFactory;
  *   - Bei großen Dateien sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
  *   - Das Befüllen einer Tabelle mit dem Inhalt mehrerer spezifischer (Geo)Parquet-Dateien wird *noch* nicht unterstützt. Es ist jedoch möglich, mehrere Dateien mit den Wildcard-Operatoren `*` und `?` auszuwählen.
  *   - Die S3-Url und die S3-Zugangsdaten werden nicht auf korrektheit überprüft.
+ *   - Der S3-Zugriff kann fehlschlagen, wenn S3-Zugangsdaten angegeben werden, obwohl der Bucket öffentlich ist.
  * </code>
  * @cfgPropertiesAdditionalEn ### Connection Info
  *     <p>The connection info object for GeoParquet has the following properties:

@@ -28,10 +28,9 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
   /**
    * @langEn Only relevant for local (Geo)Parquet files: The relative path starting from
    *     `/resources/features` to the directory containing the (Geo)Parquet files (including
-   *     subdirectories). Must be left empty when working with S3.
+   *     subdirectories).
    * @langDe Nur relevant für lokale (Geo)Parquet-Dateien: Der relative Pfad ausgehend von
-   *     `/resources/features` zum Verzeichnis mit den (Geo)Parquet-Dateien (sowie Unterordner).
-   *     Muss bei der Verwendung von S3 leer gelassen werden.
+   *     `/resources/features` zum Verzeichnis mit den (Geo)Parquet-Dateien (inklusive Unterordner).
    */
   @Override
   String getDatabase();
