@@ -27,9 +27,9 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlConnector;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsPgis;
-import java.sql.Connection; // NOPMD
-import java.sql.SQLException; // NOPMD
-import java.sql.Statement; // NOPMD
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,7 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
-@SuppressWarnings("PMD.DoNotUseThreads")
+@SuppressWarnings({"PMD.DoNotUseThreads", "PMD.CouplingBetweenObjects"})
 public class FeatureChangesPgListener implements FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureChangesPgListener.class);
@@ -236,7 +236,7 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
       }
 
       featureChangeHandler.handle(featureChange);
-    } catch (Throwable e) {
+    } catch (IllegalArgumentException e) {
       LogContext.errorAsInfo(
           LOGGER, e, "Could not parse feature change notification, the notification is ignored");
     }
@@ -257,7 +257,8 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
           }
         });
 
-    final int[] count = {1};
+    final java.util.concurrent.atomic.AtomicInteger count =
+        new java.util.concurrent.atomic.AtomicInteger(1);
 
     return types.stream()
         .filter(type -> includes.isEmpty() || includes.contains(type.getName()))
@@ -269,13 +270,13 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
                             ImmutableSubscription.builder()
                                 .connectionFactory(connectionSupplier)
                                 .notificationPoller(notificationPoller)
-                                .index(count[0]++)
+                                .index(count.getAndIncrement())
                                 .type(type.getName())
                                 .table(
                                     sourcePath.substring(
                                         1,
                                         sourcePath.contains("{")
-                                            ? sourcePath.indexOf("{")
+                                            ? sourcePath.indexOf('{')
                                             : sourcePath.length()))
                                 .idColumn(
                                     type.getIdProperty()

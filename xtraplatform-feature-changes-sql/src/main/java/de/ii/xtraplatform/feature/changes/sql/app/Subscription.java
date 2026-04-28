@@ -9,8 +9,8 @@ package de.ii.xtraplatform.feature.changes.sql.app;
 
 import com.google.common.base.Strings;
 import de.ii.xtraplatform.base.domain.util.Tuple;
-import java.sql.Connection; // NOPMD
-import java.sql.SQLException; // NOPMD
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
