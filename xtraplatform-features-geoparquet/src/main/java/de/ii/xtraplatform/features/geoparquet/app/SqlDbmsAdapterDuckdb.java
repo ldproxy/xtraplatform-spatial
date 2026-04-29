@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.Collator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +38,12 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   // ToDo: Log errors
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterDuckdb.class);
+
+  // Constants for ConnectionInfo
+  private static final String TABLE_PREFIX = "table.";
+  private static final String DRIVER_OPT_ENDPOINT = "endpoint";
+  private static final String DRIVER_OPT_USE_SSL = "use_ssl";
+  private static final String DRIVER_OPT_URL_STYLE = "url_style";
 
   private final ResourceStore featuresStore;
   private final String applicationName;
@@ -67,12 +74,18 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
   private static void addViews(
       StringBuilder queryBuilder, String prefix, Map<String, String> tableFileMapping) {
+    // Add '/' to prefix (bucket or path)
+    if (!prefix.isEmpty() && !prefix.endsWith("/")) {
+      prefix += "/";
+    }
+
     for (var tableName : tableFileMapping.keySet()) {
-      if (tableName.startsWith("table.")) {
+      if (tableName.startsWith(TABLE_PREFIX)) {
         queryBuilder.append(
             String.format(
                 "CREATE VIEW '%s' AS SELECT * FROM '%s';",
-                tableName.substring("table.".length()), prefix + tableFileMapping.get(tableName)));
+                tableName.substring(TABLE_PREFIX.length()),
+                prefix + tableFileMapping.get(tableName)));
       }
     }
   }
@@ -102,8 +115,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     // Set the absolute path to the data directory as the search path
     queryBuilder.append(String.format("SET file_search_path = '%s';", dataDirectory));
 
-    Map<String, String> tableFileMapping = connectionInfo.getDriverOptions();
-    addViews(queryBuilder, "", tableFileMapping);
+    addViews(queryBuilder, "", connectionInfo.getDriverOptions());
 
     return Optional.of(queryBuilder.toString());
   }
@@ -113,25 +125,46 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     queryBuilder.append("INSTALL httpfs;");
     queryBuilder.append("LOAD httpfs;");
 
-    // ToDo: Extract and explicity set the region. This prevents DuckDB from going on round-trips
-    // when authenticating (by default it tries to authenticate in us-east-1)
-    // queryBuilder.append(String.format("SET s3_region='%s';", REGION));
+    // Extract all parameter necessary to connect to the S3 service
+    ArrayList<String> connectingParameter = new ArrayList<>();
+    Map<String, String> driverOptions = connectionInfo.getDriverOptions();
 
-    // Add credentials if available
+    // Extract key
     connectionInfo
         .getUser()
-        .ifPresent(key -> queryBuilder.append(String.format("SET s3_access_key_id='%s';", key)));
+        .ifPresent(key -> connectingParameter.add(String.format("KEY_ID '%s'", key)));
+
+    // Extract secret key
     connectionInfo
         .getPassword()
-        .ifPresent(
-            secret -> queryBuilder.append(String.format("SET s3_secret_access_key='%s';", secret)));
+        .ifPresent(secret -> connectingParameter.add(String.format("SECRET '%s'", secret)));
 
-    // Get the bucket
-    String bucket = connectionInfo.getHost().get();
-    if (!bucket.endsWith("/")) bucket += '/';
+    // Extract custom endpoint
+    if (driverOptions.containsKey(DRIVER_OPT_ENDPOINT)) {
+      connectingParameter.add(
+          String.format("ENDPOINT '%s'", driverOptions.get(DRIVER_OPT_ENDPOINT)));
+    }
 
-    Map<String, String> tableFileMapping = connectionInfo.getDriverOptions();
-    addViews(queryBuilder, bucket, tableFileMapping);
+    // Extract USE_SLL
+    if (driverOptions.containsKey(DRIVER_OPT_USE_SSL)) {
+      connectingParameter.add(String.format("USE_SSL %s", driverOptions.get(DRIVER_OPT_USE_SSL)));
+    }
+
+    // Extract URL_STYLE
+    if (driverOptions.containsKey(DRIVER_OPT_URL_STYLE)) {
+      connectingParameter.add(
+          String.format("URL_STYLE '%s'", driverOptions.get(DRIVER_OPT_URL_STYLE)));
+    }
+
+    // Create DuckDB Secret containing all the connection parameter
+    if (!connectingParameter.isEmpty()) {
+      queryBuilder.append("CREATE SECRET (TYPE s3,");
+      queryBuilder.append(String.join(",", connectingParameter));
+      queryBuilder.append(");");
+    }
+
+    // Host (bucket) is present because it was checked in getInitSql)
+    addViews(queryBuilder, connectionInfo.getHost().get(), driverOptions);
 
     return Optional.of(queryBuilder.toString());
   }
