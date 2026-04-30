@@ -211,9 +211,8 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
         case "s3" -> queryBuilder.append("CREATE SECRET (TYPE s3");
         case "r2" -> queryBuilder.append("CREATE SECRET (TYPE r2");
         case "gcs" -> queryBuilder.append("CREATE SECRET (TYPE gcs");
-        default ->
-            throw new IllegalArgumentException(
-                "Unknown provider type. Use S3 with a custom endpoint instead.");
+        default -> throw new IllegalArgumentException(
+            "Unknown provider type. Use S3 with a custom endpoint instead.");
       }
     } else {
       queryBuilder.append("CREATE SECRET (TYPE s3");
