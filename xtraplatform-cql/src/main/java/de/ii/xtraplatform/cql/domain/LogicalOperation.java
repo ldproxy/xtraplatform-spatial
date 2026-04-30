@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
 
-public interface LogicalOperation extends Operation<Cql2Expression>, CqlNode {
+public interface LogicalOperation extends Operation<Cql2Expression> {
 
   @Value.Check
   default void check() {

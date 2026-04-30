@@ -17,6 +17,7 @@ public class CqlVisitorPropertyPrefix extends CqlVisitorCopy {
   private final String prefix;
 
   public CqlVisitorPropertyPrefix(String prefix) {
+    super();
     this.prefix = prefix + ".";
   }
 

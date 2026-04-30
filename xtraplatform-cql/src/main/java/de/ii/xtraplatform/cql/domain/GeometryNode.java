@@ -38,6 +38,8 @@ public interface GeometryNode extends CqlNode {
 
   class Serializer extends StdSerializer<GeometryNode> {
 
+    private static final long serialVersionUID = 1L;
+
     protected Serializer() {
       this(null);
     }

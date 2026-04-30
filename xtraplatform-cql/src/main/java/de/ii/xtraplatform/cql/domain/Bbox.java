@@ -57,48 +57,49 @@ public interface Bbox extends CqlNode {
   }
 
   @Value.Check
+  @SuppressWarnings("PMD.NPathComplexity")
   default void check() {
     Preconditions.checkArgument(
         getCrs().isPresent()
             || getCrs().filter(crs -> crs.equals(OgcCrs.CRS84)).isEmpty()
-            || (getCoordinates().get(0) >= -180.0 && getCoordinates().get(0) <= 180.0),
+            || getCoordinates().get(0) >= -180.0 && getCoordinates().get(0) <= 180.0,
         "longitude (%s) must be between -180 and 180 degrees",
         getCoordinates().get(0));
     Preconditions.checkArgument(
         getCrs().isPresent()
             || getCrs().filter(crs -> crs.equals(OgcCrs.CRS84)).isEmpty()
-            || (getCoordinates().get(1) >= -90.0 && getCoordinates().get(1) <= 90.0),
+            || getCoordinates().get(1) >= -90.0 && getCoordinates().get(1) <= 90.0,
         "latitude (%s) must be less between -90 and 90 degrees",
         getCoordinates().get(1));
     Preconditions.checkArgument(
         getCrs().isPresent()
             || getCrs().filter(crs -> crs.equals(OgcCrs.CRS84)).isEmpty()
-            || (getCoordinates().get(2) >= -180.0 && getCoordinates().get(2) <= 180.0),
+            || getCoordinates().get(2) >= -180.0 && getCoordinates().get(2) <= 180.0,
         "longitude (%s) must be less between -180 and 180 degrees",
         getCoordinates().get(2));
     Preconditions.checkArgument(
         getCrs().isPresent()
             || getCrs().filter(crs -> crs.equals(OgcCrs.CRS84)).isEmpty()
-            || (getCoordinates().get(3) >= -90.0 && getCoordinates().get(3) <= 90.0),
+            || getCoordinates().get(3) >= -90.0 && getCoordinates().get(3) <= 90.0,
         "latitude (%s) must be less between -90 and 90 degrees",
         getCoordinates().get(3));
   }
 
-  class Serializer extends StdSerializer<de.ii.xtraplatform.cql.domain.Bbox> {
+  class Serializer extends StdSerializer<Bbox> {
+
+    private static final long serialVersionUID = 1L;
 
     protected Serializer() {
       this(null);
     }
 
-    protected Serializer(Class<de.ii.xtraplatform.cql.domain.Bbox> t) {
+    protected Serializer(Class<Bbox> t) {
       super(t);
     }
 
     @Override
     public void serialize(
-        de.ii.xtraplatform.cql.domain.Bbox geom,
-        JsonGenerator jsonGenerator,
-        SerializerProvider serializerProvider)
+        Bbox geom, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
         throws IOException {
       jsonGenerator.writeStartObject();
       jsonGenerator.writeFieldName("bbox");
