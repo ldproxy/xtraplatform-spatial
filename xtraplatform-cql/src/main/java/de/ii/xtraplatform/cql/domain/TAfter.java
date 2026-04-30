@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTAfter.Builder.class)
-public interface TAfter extends BinaryTemporalOperation, CqlNode {
+public interface TAfter extends BinaryTemporalOperation {
 
   String TYPE = "t_after";
 

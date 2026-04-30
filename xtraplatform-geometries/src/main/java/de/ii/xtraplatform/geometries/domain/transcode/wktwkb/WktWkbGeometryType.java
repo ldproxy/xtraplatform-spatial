@@ -27,6 +27,7 @@ public enum WktWkbGeometryType {
   GEOMETRY,
   NONE;
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public static WktWkbGeometryType fromWkbType(int type) {
     if (type > Axes.SPECIAL_SHIFT) {
       // Special encoding used by Oracle; For example, 1000003 is a CURVEPOLYGON
@@ -58,6 +59,7 @@ public enum WktWkbGeometryType {
     };
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public static WktWkbGeometryType fromGeometryType(GeometryType type) {
     return switch (type) {
       case POINT -> POINT;
@@ -78,6 +80,7 @@ public enum WktWkbGeometryType {
     };
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public int toWkbCode(Axes axes) {
     int baseCode =
         switch (this) {
@@ -106,6 +109,7 @@ public enum WktWkbGeometryType {
     };
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public GeometryType toGeometryType() {
     return switch (this) {
       case POINT -> GeometryType.POINT;

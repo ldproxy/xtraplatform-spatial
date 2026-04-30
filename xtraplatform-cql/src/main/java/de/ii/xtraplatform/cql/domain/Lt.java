@@ -14,7 +14,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableLt.Builder.class)
-public interface Lt extends BinaryScalarOperation, CqlNode {
+@FunctionalInterface
+public interface Lt extends BinaryScalarOperation {
 
   String TYPE = "<";
 
