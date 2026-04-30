@@ -10,6 +10,12 @@ package de.ii.xtraplatform.crs.domain;
 /**
  * @author fischer
  */
+@SuppressWarnings({
+  "PMD.UseVarargs",
+  "PMD.ConstructorCallsOverridableMethod",
+  "PMD.ArrayIsStoredDirectly",
+  "PMD.MethodReturnsInternalArray"
+})
 public class CoordinateTuple {
 
   protected double[] c;

@@ -13,7 +13,7 @@ public enum Axes {
   XYM(3, " M", 2000),
   XYZM(4, " ZM", 3000);
 
-  public static final int SPECIAL_SHIFT = 1000000;
+  public static final int SPECIAL_SHIFT = 1_000_000;
 
   private final int size;
   private final String wktSuffix;
@@ -37,12 +37,17 @@ public enum Axes {
     if (geometryTypeCode >= SPECIAL_SHIFT) {
       // In Oracle, CIRCULARSTRING, COMPOUNDCURVE, CURVEPOLYGON, MULTICURVE, and MULTISURFACE
       // with axes XY have a different geometry type code 100000x.
-      return Axes.XY;
+      return XY;
     }
-    return (geometryTypeCode >= Axes.XYZM.wkbShift)
-        ? Axes.XYZM
-        : (geometryTypeCode >= Axes.XYM.wkbShift)
-            ? Axes.XYM
-            : (geometryTypeCode >= Axes.XYZ.wkbShift) ? Axes.XYZ : Axes.XY;
+    if (geometryTypeCode >= XYZM.wkbShift) {
+      return XYZM;
+    }
+    if (geometryTypeCode >= XYM.wkbShift) {
+      return XYM;
+    }
+    if (geometryTypeCode >= XYZ.wkbShift) {
+      return XYZ;
+    }
+    return XY;
   }
 }

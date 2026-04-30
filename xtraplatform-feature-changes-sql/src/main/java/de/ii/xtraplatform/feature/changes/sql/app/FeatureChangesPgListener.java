@@ -78,6 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
+@SuppressWarnings({"PMD.DoNotUseThreads", "PMD.CouplingBetweenObjects"})
 public class FeatureChangesPgListener implements FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureChangesPgListener.class);
@@ -105,9 +106,11 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
       return false;
     }
     if (!((FeatureProviderSqlData) data).getDatasetChanges().isModeTrigger()) {
-      LOGGER.warn(
-          "Feature provider with id '{}' does not support change listeners: datasetChanges.mode is not 'TRIGGER'",
-          data.getId());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Feature provider with id '{}' does not support change listeners: datasetChanges.mode is not 'TRIGGER'",
+            data.getId());
+      }
       return false;
     }
 
@@ -122,15 +125,10 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
     Optional<FeatureChangesPgConfiguration> configuration =
         getConfiguration(provider.getData().getExtensions());
 
-    if (configuration.isPresent()) {
+    if (configuration.isPresent() && hook == LIFECYCLE_HOOK.STARTED) {
       SqlClient sqlClient = ((SqlConnector) connector).getSqlClient();
-
-      switch (hook) {
-        case STARTED:
-          subscribe(
-              provider, configuration.get(), sqlClient::getConnection, sqlClient::getNotifications);
-          break;
-      }
+      subscribe(
+          provider, configuration.get(), sqlClient::getConnection, sqlClient::getNotifications);
     }
   }
 
@@ -211,7 +209,9 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
   private void poll(
       String provider, FeatureChanges featureChangeHandler, Subscription subscription) {
     if (!subscription.isConnected()) {
-      LOGGER.debug("Lost connection to retrieve feature changes for {}", subscription.getLabel());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Lost connection to retrieve feature changes for {}", subscription.getLabel());
+      }
       subscriptions.get(provider).remove(subscription.getChannel());
       subscribe(provider, subscription);
 
@@ -236,7 +236,7 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
       }
 
       featureChangeHandler.handle(featureChange);
-    } catch (Throwable e) {
+    } catch (IllegalArgumentException e) {
       LogContext.errorAsInfo(
           LOGGER, e, "Could not parse feature change notification, the notification is ignored");
     }
@@ -250,13 +250,15 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
     includes.forEach(
         include -> {
           if (types.stream()
-              .map(FeatureSchema::getName)
-              .noneMatch(type -> Objects.equals(type, include))) {
+                  .map(FeatureSchema::getName)
+                  .noneMatch(type -> Objects.equals(type, include))
+              && LOGGER.isWarnEnabled()) {
             LOGGER.warn("Change listener: unknown type '{}' in listenForTypes", include);
           }
         });
 
-    final int[] count = {1};
+    final java.util.concurrent.atomic.AtomicInteger count =
+        new java.util.concurrent.atomic.AtomicInteger(1);
 
     return types.stream()
         .filter(type -> includes.isEmpty() || includes.contains(type.getName()))
@@ -268,13 +270,13 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
                             ImmutableSubscription.builder()
                                 .connectionFactory(connectionSupplier)
                                 .notificationPoller(notificationPoller)
-                                .index(count[0]++)
+                                .index(count.getAndIncrement())
                                 .type(type.getName())
                                 .table(
                                     sourcePath.substring(
                                         1,
                                         sourcePath.contains("{")
-                                            ? sourcePath.indexOf("{")
+                                            ? sourcePath.indexOf('{')
                                             : sourcePath.length()))
                                 .idColumn(
                                     type.getIdProperty()

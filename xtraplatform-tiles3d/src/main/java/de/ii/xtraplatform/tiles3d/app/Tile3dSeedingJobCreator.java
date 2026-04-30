@@ -27,6 +27,7 @@ import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +43,7 @@ import org.threeten.extra.AmountFormats;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeedingJobSet> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dSeedingJobCreator.class);
@@ -72,6 +74,7 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
     Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
     boolean isCleanup = getDetails(job, jobQueue);
@@ -105,6 +108,7 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
             tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
         final int[] numSubtrees = {0};
+        Map<Integer, TileMatrixPartitions> tileMatrixPartitionsByJobSize = new HashMap<>();
         Set<String> tilesets = new HashSet<>();
         Set<Integer> levels = new HashSet<>();
 
@@ -117,16 +121,19 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
 
           tileMatrixSets.forEach(
               (tileMatrixSet, limits) -> {
+                Tile3dSeedingJob.Context jobContext =
+                    createJobContext(tileProvider, seedingJobSet, jobSet, tileSet, tileMatrixSet);
                 TileTree tileTree = null;
 
                 for (TileMatrixSetLimits limit : limits) {
-                  TileTree next = TileTree.from(TileSubMatrix.of(limit), cfg.getSubtreeLevels());
-                  tileTree = tileTree == null ? next : tileTree.merge(next);
+                  tileTree = mergeTileTree(tileTree, limit, cfg);
                 }
 
                 if (Objects.nonNull(tileTree)) {
                   int jobSize = getJobSize(tileTree);
-                  TileMatrixPartitions tileMatrixPartitions = new TileMatrixPartitions(jobSize);
+                  TileMatrixPartitions tileMatrixPartitions =
+                      tileMatrixPartitionsByJobSize.computeIfAbsent(
+                          jobSize, TileMatrixPartitions::new);
 
                   Job rootJob =
                       tileTree.accept(
@@ -134,13 +141,9 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
                             Job subtreeJob =
                                 Tile3dSeedingJob.subtree(
                                     jobSet.getPriority(),
-                                    tileProvider.getId(),
-                                    tileSet,
-                                    tileMatrixSet,
+                                    jobContext,
                                     seedingJobSet.isReseed(),
-                                    Set.of(tt.toSubMatrix()),
-                                    Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
-                                    jobSet.getId());
+                                    Set.of(tt.toSubMatrix()));
 
                             int total = subtreeJob.getTotal().get();
                             numSubtrees[0] += total;
@@ -169,14 +172,9 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
                                 Job contentJob =
                                     Tile3dSeedingJob.content(
                                         jobSet.getPriority(),
-                                        tileProvider.getId(),
-                                        tileSet,
-                                        tileMatrixSet,
+                                        jobContext,
                                         seedingJobSet.isReseed(),
-                                        Set.of(partition),
-                                        Optional.of(
-                                            seedingJobSet.getTileSetParameters().get(tileSet)),
-                                        jobSet.getId());
+                                        Set.of(partition));
 
                                 subtreeJob = subtreeJob.with(contentJob);
 
@@ -240,10 +238,30 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
       return 8;
     } else if (numberOfTiles <= 4096) {
       return 16;
-    } else if (numberOfTiles <= 16384) {
+    } else if (numberOfTiles <= 16_384) {
       return 64;
     }
     return 256;
+  }
+
+  private static TileTree mergeTileTree(
+      TileTree currentTree, TileMatrixSetLimits limit, Tileset3dFeatures cfg) {
+    TileTree next = TileTree.from(TileSubMatrix.of(limit), cfg.getSubtreeLevels());
+    return currentTree == null ? next : currentTree.merge(next);
+  }
+
+  private static Tile3dSeedingJob.Context createJobContext(
+      Tile3dProviderFeatures tileProvider,
+      Tile3dSeedingJobSet seedingJobSet,
+      JobSet jobSet,
+      String tileSet,
+      String tileMatrixSet) {
+    return new Tile3dSeedingJob.Context(
+        tileProvider.getId(),
+        tileSet,
+        tileMatrixSet,
+        Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
+        jobSet.getId());
   }
 
   private void cleanup(

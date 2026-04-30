@@ -27,9 +27,9 @@ import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
 import de.ii.xtraplatform.schemas.ext.domain.JsonSchemaConfiguration;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,6 +43,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.jimblackler.jsonschemafriend.CacheLoader;
+import net.jimblackler.jsonschemafriend.GenerationException;
 import net.jimblackler.jsonschemafriend.Schema;
 import net.jimblackler.jsonschemafriend.SchemaStore;
 import org.slf4j.Logger;
@@ -84,6 +85,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.CouplingBetweenObjects"})
 public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonSchemaResolver.class);
@@ -95,7 +97,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
   @Inject
   public JsonSchemaResolver(ResourceStore blobStore) {
     this.schemaStore = blobStore.with("schemas");
-    // TODO: custom loader with HttpClient
+    // NOTE: custom loader with HttpClient
     this.schemaParser = new SchemaStore(new CacheLoader());
   }
 
@@ -120,12 +122,12 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       URI schemaUri = URI.create(ref);
 
       if (SCHEMES.contains(schemaUri.getScheme())
-          || ((Objects.isNull(schemaUri.getScheme())
+          || Objects.isNull(schemaUri.getScheme())
               && !schemaUri.getSchemeSpecificPart().isBlank()
-              && !schemaUri.getSchemeSpecificPart().startsWith("/")))) {
+              && !schemaUri.getSchemeSpecificPart().startsWith("/")) {
         return true;
       }
-    } catch (Throwable e) {
+    } catch (IllegalArgumentException e) {
       // ignore
     }
     return false;
@@ -167,7 +169,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       if (Objects.isNull(schemaUri.getScheme())
           && !schemaUri.getSchemeSpecificPart().isBlank()
           && !schemaUri.getSchemeSpecificPart().startsWith("/")) {
-        Path path = Path.of(schemaUri.getSchemeSpecificPart());
+        java.nio.file.Path path = java.nio.file.Path.of(schemaUri.getSchemeSpecificPart());
 
         if (!schemaStore.has(path)) {
           LOGGER.error("Cannot load schema '{}', not found in 'resources/schemas'.", schemaSource);
@@ -178,16 +180,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
           Schema schema = schemaParser.loadSchema(inputStream);
 
           if (Objects.nonNull(schemaUri.getFragment())) {
-            Map<URI, Schema> subSchemas = schema.getSubSchemas();
-            URI fullUri =
-                URI.create(
-                    String.format("%s#%s", schema.getUri().toString(), schemaUri.getFragment()));
-            if (Objects.nonNull(subSchemas) && subSchemas.containsKey(fullUri)) {
-              schema = subSchemas.get(fullUri);
-            } else {
-              LOGGER.error(
-                  "Cannot load sub-schema '{}', not found in '{}'.", schemaUri.getFragment(), path);
-            }
+            schema = resolveSubSchema(schema, schemaUri, path);
           }
 
           return Optional.ofNullable(schema);
@@ -197,13 +190,17 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       LOGGER.error(
           "Cannot load schema '{}', only http/https URLs and relative paths allowed.",
           schemaSource);
-    } catch (Throwable e) {
+    } catch (IOException
+        | GenerationException
+        | IllegalArgumentException
+        | IllegalStateException e) {
       LogContext.error(LOGGER, e, "Error resolving external schema");
     }
 
     return Optional.empty();
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private List<Schema> resolveComposition(Schema schema, FeatureProviderDataV2 data) {
     if (Objects.nonNull(schema.getRef())) {
       return resolveComposition(schema.getRef(), data);
@@ -237,18 +234,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       int compositionIndex =
           getCompositionIndex(schema.getUri().toString(), schema.getAllOf().size(), data);
 
-      if (compositionIndex > 0) {
-        List<Schema> reordered = new ArrayList<>();
-        reordered.add(resolved.get(compositionIndex));
-        for (int i = 0; i < resolved.size(); i++) {
-          if (i != compositionIndex) {
-            reordered.add(resolved.get(i));
-          }
-        }
-        return reordered;
-      }
-
-      return resolved;
+      return compositionIndex > 0 ? reorderSchemas(resolved, compositionIndex) : resolved;
     }
     return List.of(schema);
   }
@@ -269,11 +255,13 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
             .from(original)
             .schema(Optional.empty())
             .propertyMap(Map.of());
+    Map<String, FeatureSchema> originalPropertyMap =
+        Objects.nonNull(original) ? original.getPropertyMap() : Map.of();
 
     if (Objects.nonNull(s.getProperties())) {
       resolveProperties(
           s.getProperties(),
-          Objects.nonNull(original) ? original.getPropertyMap() : null,
+          originalPropertyMap,
           schema,
           builder::putPropertyMap,
           data,
@@ -293,6 +281,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
     return builder.build();
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   private FeatureSchema toFeatureSchema(
       String name,
       Schema schema,
@@ -300,24 +289,28 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       @Nullable FeatureSchema original,
       FeatureProviderDataV2 data,
       boolean isRequired) {
-    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder();
     List<Schema> resolved = resolveComposition(schema, data);
     Schema s = resolved.get(0);
-    boolean isRoot = Objects.isNull(root);
-
-    Schema r = isRoot ? schema : root;
-    Type t = toType(s.getExplicitTypes());
 
     if (Objects.equals(s, root)) {
       return null;
     }
 
+    if (Objects.nonNull(original) && original.getIgnore()) {
+      return null;
+    }
+
+    boolean isRoot = Objects.isNull(root);
+    Schema r = isRoot ? schema : root;
+    Type t = toType(s.getExplicitTypes());
+    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder();
+
     if (Objects.nonNull(original)) {
-      if (original.getIgnore()) {
-        return null;
-      }
       builder.from(original).schema(Optional.empty()).propertyMap(Map.of());
     }
+
+    Map<String, FeatureSchema> originalPropertyMap =
+        Objects.nonNull(original) ? original.getPropertyMap() : Map.of();
 
     builder
         .name(name)
@@ -339,41 +332,10 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       constrained = true;
     }
 
-    t =
-        applyTypeRefs(
-            s.getUri().toString(),
-            builder,
-            t,
-            Optional.ofNullable(original).flatMap(FeatureSchema::getSourcePath).orElse(name),
-            isRoot,
-            data);
+    t = applyTypeRefs(s.getUri().toString(), builder, t, isRoot, data);
 
     if (t == Type.OBJECT) {
-      if (Objects.nonNull(s.getProperties()) || resolved.size() > 1) {
-        if (Objects.nonNull(s.getProperties())) {
-          resolveProperties(
-              s.getProperties(),
-              Objects.nonNull(original) ? original.getPropertyMap() : null,
-              r,
-              builder::putPropertyMap,
-              data,
-              s.getRequiredProperties());
-        }
-        if (resolved.size() > 1) {
-          for (int i = 1; i < resolved.size(); i++) {
-            Schema add = resolved.get(i);
-            if (Objects.nonNull(add.getProperties())) {
-              resolveProperties(
-                  add.getProperties(),
-                  Objects.nonNull(original) ? original.getPropertyMap() : null,
-                  r,
-                  builder::putPropertyMap,
-                  data,
-                  s.getRequiredProperties());
-            }
-          }
-        }
-      }
+      resolveObjectProperties(resolved, s, originalPropertyMap, r, builder, data);
     } else if (t == Type.OBJECT_ARRAY && Objects.nonNull(s.getItems())) {
       Schema is = Objects.nonNull(s.getItems().getRef()) ? s.getItems().getRef() : s.getItems();
       Type it = toType(is.getExplicitTypes());
@@ -382,14 +344,11 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       } else {
         FeatureSchema featureSchema = toFeatureSchema(name, is, r, original, data, false);
         if (Objects.nonNull(featureSchema)) {
-          builder
-              .path(List.of())
-              .parentPath(List.of())
-              .from(featureSchema)
-              .type(
-                  featureSchema.getType() == Type.FEATURE_REF
-                      ? Type.FEATURE_REF_ARRAY
-                      : Type.OBJECT_ARRAY);
+          Type arrayType =
+              featureSchema.getType() == Type.FEATURE_REF
+                  ? Type.FEATURE_REF_ARRAY
+                  : Type.OBJECT_ARRAY;
+          builder.path(List.of()).parentPath(List.of()).from(featureSchema).type(arrayType);
         }
 
         if (s.getMinItems() != null) {
@@ -412,21 +371,12 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
             s.getEnums().stream().map(Object::toString).collect(Collectors.toList()));
         constrained = true;
       }
-      if (t == Type.STRING) {
-        if (s.getPattern() != null) {
-          constraintsBuilder.regex(s.getPattern());
-          constrained = true;
-        }
+      if (t == Type.STRING && s.getPattern() != null) {
+        constraintsBuilder.regex(s.getPattern());
+        constrained = true;
       }
       if (t == Type.INTEGER || t == Type.FLOAT) {
-        if (s.getMinimum() != null) {
-          constraintsBuilder.min(s.getMinimum().doubleValue());
-          constrained = true;
-        }
-        if (s.getMaximum() != null) {
-          constraintsBuilder.max(s.getMaximum().doubleValue());
-          constrained = true;
-        }
+        constrained = applyNumericConstraints(s, constraintsBuilder) || constrained;
       }
     }
 
@@ -460,13 +410,75 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
         });
   }
 
-  private Type applyTypeRefs(
-      String uri,
-      Builder builder,
-      Type type,
-      String sourcePath,
-      boolean isRoot,
+  private Schema resolveSubSchema(Schema schema, URI schemaUri, java.nio.file.Path path) {
+    Map<URI, Schema> subSchemas = schema.getSubSchemas();
+    URI fullUri =
+        URI.create(String.format("%s#%s", schema.getUri().toString(), schemaUri.getFragment()));
+    if (Objects.isNull(subSchemas) || !subSchemas.containsKey(fullUri)) {
+      LOGGER.error(
+          "Cannot load sub-schema '{}', not found in '{}'.", schemaUri.getFragment(), path);
+      return schema;
+    }
+    return subSchemas.get(fullUri);
+  }
+
+  private boolean applyNumericConstraints(
+      Schema schema, ImmutableSchemaConstraints.Builder constraintsBuilder) {
+    boolean constrained = false;
+    if (schema.getMinimum() != null) {
+      constraintsBuilder.min(schema.getMinimum().doubleValue());
+      constrained = true;
+    }
+    if (schema.getMaximum() != null) {
+      constraintsBuilder.max(schema.getMaximum().doubleValue());
+      constrained = true;
+    }
+    return constrained;
+  }
+
+  private List<Schema> reorderSchemas(List<Schema> resolved, int compositionIndex) {
+    List<Schema> reordered = new ArrayList<>();
+    reordered.add(resolved.get(compositionIndex));
+    for (int i = 0; i < resolved.size(); i++) {
+      if (i != compositionIndex) {
+        reordered.add(resolved.get(i));
+      }
+    }
+    return reordered;
+  }
+
+  private void resolveObjectProperties(
+      List<Schema> resolved,
+      Schema primary,
+      Map<String, FeatureSchema> originalPropertyMap,
+      Schema root,
+      ImmutableFeatureSchema.Builder builder,
       FeatureProviderDataV2 data) {
+    if (Objects.nonNull(primary.getProperties())) {
+      resolveProperties(
+          primary.getProperties(),
+          originalPropertyMap,
+          root,
+          builder::putPropertyMap,
+          data,
+          primary.getRequiredProperties());
+    }
+    for (int i = 1; i < resolved.size(); i++) {
+      Schema add = resolved.get(i);
+      if (Objects.nonNull(add.getProperties())) {
+        resolveProperties(
+            add.getProperties(),
+            originalPropertyMap,
+            root,
+            builder::putPropertyMap,
+            data,
+            primary.getRequiredProperties());
+      }
+    }
+  }
+
+  private Type applyTypeRefs(
+      String uri, Builder builder, Type type, boolean isRoot, FeatureProviderDataV2 data) {
     Optional<JsonSchemaConfiguration> cfg = getConfiguration(data);
     if (cfg.isPresent() && (type == Type.OBJECT || type == Type.OBJECT_ARRAY)) {
       Optional<String> geometryTypeRef =

@@ -85,10 +85,16 @@ import org.locationtech.jts.shape.fractal.MortonCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods",
+  "PMD.CouplingBetweenObjects"
+})
 public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements Tile3dGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dGeneratorFeatures.class);
-  private static ObjectMapper MAPPER =
+  private static final ObjectMapper MAPPER =
       new ObjectMapper()
           .registerModule(new Jdk8Module())
           .registerModule(new GuavaModule())
@@ -162,11 +168,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       }
 
       DelayedVolatile<FeatureProvider> delayedVolatile =
-          new DelayedVolatile<>(
-              volatileRegistry,
-              String.format("generator.%s", featureProviderId),
-              false,
-              "generation");
+          createDelayedVolatile(volatileRegistry, featureProviderId);
 
       addSubcomponent(delayedVolatile, true);
 
@@ -257,19 +259,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
                     .build());
 
     for (int level = 0; level <= levels.upperEndpoint(); level++) {
-      double resolution = 360.0 / (256 * Math.pow(2, level));
-      builder.addTileMatrices(
-          new ImmutableTileMatrix.Builder()
-              .id(String.valueOf(level))
-              .tileWidth(256)
-              .tileHeight(256)
-              .matrixWidth((long) Math.pow(2, level))
-              .matrixHeight((long) Math.pow(2, level))
-              // not needed for TileWalker, but mandatory
-              .scaleDenominator(BigDecimal.valueOf(0))
-              .cellSize(BigDecimal.valueOf(0))
-              .pointOfOrigin(new BigDecimal[] {BigDecimal.valueOf(0), BigDecimal.valueOf(0)})
-              .build());
+      builder.addTileMatrices(createTileMatrix(level));
     }
 
     return builder.build();
@@ -329,11 +319,11 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     int localLevel = tile.getLevel() % subtreeLevels;
 
     return always
-        || (buffer.length > 0
+        || buffer.length > 0
             && getAvailability(
                 buffer,
                 localLevel,
-                TileTree.getMortonCurveIndex(localLevel, tile.getCol(), tile.getRow())));
+                TileTree.getMortonCurveIndex(localLevel, tile.getCol(), tile.getRow()));
   }
 
   @Override
@@ -348,7 +338,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
             && childSubtreeAvailability.getConstant().filter(c -> c == 1).isPresent();
 
     return always
-        || (buffer.length > 0 && getAvailability(buffer, child.getMortonCurveIndex(subtreeLevels)));
+        || buffer.length > 0 && getAvailability(buffer, child.getMortonCurveIndex(subtreeLevels));
   }
 
   @Override
@@ -420,7 +410,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       }
 
       outputStream.flush();
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       throw new IllegalStateException("Could not write 3D Tiles Subtree output", e);
     }
 
@@ -483,7 +473,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
                           subtreeBytes, subtreeWithEmptyBuffers, bufferOffset, i)));
 
       return builder.build();
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       throw new IllegalStateException("Could not read 3D Tiles Subtree output", e);
     }
   }
@@ -495,7 +485,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     if (async) {
       DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
 
-      // TODO: only crs, extents, queries needed
+      // NOTE: actually only crs, extents, queries would be needed
       if (!provider.isAvailable()) {
         throw new VolatileUnavailableException(
             String.format("Feature provider with id '%s' is not available.", featureProviderId));
@@ -512,6 +502,27 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
                     String.format("Feature provider with id '%s' not found.", featureProviderId)));
   }
 
+  private DelayedVolatile<FeatureProvider> createDelayedVolatile(
+      VolatileRegistry volatileRegistry, String featureProviderId) {
+    return new DelayedVolatile<>(
+        volatileRegistry, String.format("generator.%s", featureProviderId), false, "generation");
+  }
+
+  private ImmutableTileMatrix createTileMatrix(int level) {
+    return new ImmutableTileMatrix.Builder()
+        .id(String.valueOf(level))
+        .tileWidth(256)
+        .tileHeight(256)
+        .matrixWidth((long) Math.pow(2, level))
+        .matrixHeight((long) Math.pow(2, level))
+        // not needed for TileWalker, but mandatory
+        .scaleDenominator(BigDecimal.valueOf(0))
+        .cellSize(BigDecimal.valueOf(0))
+        .pointOfOrigin(BigDecimal.valueOf(0), BigDecimal.valueOf(0))
+        .build();
+  }
+
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
   private void processZ(
       FeatureProvider featureProvider,
       Tileset3dFeatures tileset,
@@ -682,7 +693,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     availability[byteIndex] |= 1 << bitIndex;
   }
 
-  @SuppressWarnings("PMD.ExcessiveMethodLength")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   private static ImmutableSubtree buildSubtree(
       int subtreeLevels,
       int size,
@@ -739,9 +750,10 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
           ImmutableAvailability.builder().constant(tileAvailabilityConstantValue ? 1 : 0).build());
     } else {
       builder
-          .tileAvailability(getAvailability(bitstream++, tileAvailabilityCount))
+          .tileAvailability(getAvailability(bitstream, tileAvailabilityCount))
           .addBufferViews(getBufferView(tileAvailability, byteOffset));
       byteOffset += tileAvailability.length;
+      bitstream++;
     }
     if (Objects.nonNull(contentAvailabilityConstantValue)) {
       builder.contentAvailability(
@@ -752,9 +764,10 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     } else {
       builder
           .contentAvailability(
-              ImmutableList.of(getAvailability(bitstream++, contentAvailabilityCount)))
+              ImmutableList.of(getAvailability(bitstream, contentAvailabilityCount)))
           .addBufferViews(getBufferView(contentAvailability, byteOffset));
       byteOffset += contentAvailability.length;
+      bitstream++;
     }
     if (Objects.nonNull(childSubtreeAvailabilityConstantValue)) {
       builder.childSubtreeAvailability(
@@ -815,7 +828,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     */
 
     // handle the special cases first
-    if (tile.getCol() == 0 && tile.getRow() == (factor - 1)) {
+    if (tile.getCol() == 0 && tile.getRow() == factor - 1) {
       return Optional.empty();
     } else if (tile.getCol() == 0) {
       double xmin = bbox.getXmin() + dx / factor * tile.getCol();
@@ -823,7 +836,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
       double ymin = bbox.getYmin() + dy / factor * (tile.getRow() + 1);
       double ymax = ymin + dy / factor;
       return Optional.of(Polygon.ofBbox(xmin, ymin, xmax, ymax, OgcCrs.CRS84));
-    } else if (tile.getRow() == (factor - 1)) {
+    } else if (tile.getRow() == factor - 1) {
       double xmin = bbox.getXmin() + dx / factor * (tile.getCol() - 1);
       double xmax = xmin + dx / factor;
       double ymin = bbox.getYmin() + dy / factor * tile.getRow();

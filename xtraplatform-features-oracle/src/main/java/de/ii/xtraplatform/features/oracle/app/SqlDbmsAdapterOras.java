@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.AvoidCatchingGenericException")
 public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterOras.class);

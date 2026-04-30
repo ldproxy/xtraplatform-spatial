@@ -36,6 +36,7 @@ public abstract class AbstractTile3dProvider<T extends Tile3dProviderData>
   }
 
   @Override
+  @SuppressWarnings("PMD.UnusedLocalVariable")
   protected void onStarted() {
     super.onStarted();
 
@@ -43,22 +44,30 @@ public abstract class AbstractTile3dProvider<T extends Tile3dProviderData>
         (from, to) -> {
           try (MDC.MDCCloseable closeable =
               LogContext.putCloseable(CONTEXT.SERVICE, getData().getId())) {
-            LOGGER.info("3dTile provider with id '{}' state changed: {}", getId(), getState());
+            if (LOGGER.isInfoEnabled()) {
+              LOGGER.info("3dTile provider with id '{}' state changed: {}", getId(), getState());
+            }
           }
         },
         true);
 
-    LOGGER.info("3dTile provider with id '{}' started successfully.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("3dTile provider with id '{}' started successfully.", getId());
+    }
   }
 
   @Override
   protected void onReloaded(boolean forceReload) {
-    LOGGER.info("3dTile provider with id '{}' reloaded successfully.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("3dTile provider with id '{}' reloaded successfully.", getId());
+    }
   }
 
   @Override
   protected void onStopped() {
-    LOGGER.info("3dTile provider with id '{}' stopped.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("3dTile provider with id '{}' stopped.", getId());
+    }
   }
 
   @Override

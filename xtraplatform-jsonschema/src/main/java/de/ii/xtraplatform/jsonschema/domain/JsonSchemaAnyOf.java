@@ -16,13 +16,13 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaAnyOf.Builder.class)
 public abstract class JsonSchemaAnyOf extends JsonSchema {
 
-  public abstract List<JsonSchema> getAnyOf();
-
-  public abstract static class Builder extends JsonSchema.Builder {}
-
   @SuppressWarnings("UnstableApiUsage")
   public static final Funnel<JsonSchemaAnyOf> FUNNEL =
       (from, into) -> {
         from.getAnyOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
       };
+
+  public abstract List<JsonSchema> getAnyOf();
+
+  public abstract static class Builder extends JsonSchema.Builder {}
 }
