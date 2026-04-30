@@ -20,7 +20,6 @@ import org.immutables.value.Value;
 @Value.Immutable
 @Value.Style(builder = "new")
 @JsonDeserialize(builder = ImmutableEpsgCrs.Builder.class)
-// TODO: test //NOPMD
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public interface EpsgCrs {
 

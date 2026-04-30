@@ -62,8 +62,6 @@ import org.opengis.referencing.cs.CoordinateSystem;
 import org.opengis.referencing.cs.EllipsoidalCS;
 import org.opengis.referencing.cs.RangeMeaning;
 import org.opengis.referencing.operation.CoordinateOperation;
-import org.opengis.referencing.operation.TransformException;
-import org.opengis.util.FactoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +70,12 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
-@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects", "PMD.CyclomaticComplexity"})
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.CouplingBetweenObjects",
+  "PMD.CyclomaticComplexity",
+  "PMD.AvoidCatchingGenericException"
+})
 public class CrsTransformerFactoryProj extends AbstractVolatile
     implements CrsTransformerFactory, CrsInfo, AppLifeCycle {
 
@@ -162,7 +165,7 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
                 System.setProperty("org.kortforsyningen.proj.maxThreadsPerInstance", "16");
 
                 setState(state);
-              } catch (IllegalStateException | IllegalArgumentException e) {
+              } catch (Throwable e) {
                 LogContext.error(LOGGER, e, "Could not initialize PROJ");
                 setMessage("Could not initialize PROJ: " + e.getMessage());
 
@@ -298,7 +301,7 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
                         geoBbox.getNorthBoundLatitude(),
                         OgcCrs.CRS84);
                   }
-                  // TODO support also bounding polygons? //NOPMD
+                  // NOTE: support also bounding polygons?
                   return null;
                 })
             .filter(Objects::nonNull)
@@ -450,7 +453,7 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
         return Optional.of(compoundCrs);
       }
       return Optional.of(coordinateReferenceSystem);
-    } catch (FactoryException | IllegalStateException | IllegalArgumentException e) {
+    } catch (Throwable e) {
       if (logError) {
         LogContext.error(LOGGER, e, PROJ);
       } else {
@@ -600,7 +603,7 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     } catch (IllegalStateException ex) {
       LogContext.errorAsDebug(LOGGER, ex, PROJ);
       throw ex;
-    } catch (FactoryException | IllegalArgumentException ex) {
+    } catch (Throwable ex) {
       LogContext.errorAsDebug(LOGGER, ex, PROJ);
       throw new IllegalArgumentException(ex.getMessage(), ex);
     } finally {
@@ -622,7 +625,7 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
             e);
       }
       throw new IllegalStateException(e.getMessage(), e);
-    } catch (TransformException | IllegalArgumentException | IllegalStateException e) {
+    } catch (Throwable e) {
       // ignore
     }
   }
