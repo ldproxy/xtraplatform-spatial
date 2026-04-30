@@ -12,6 +12,9 @@ import com.google.common.collect.ImmutableMap
 import de.ii.xtraplatform.cql.domain.Accenti
 import de.ii.xtraplatform.cql.domain.Casei
 import de.ii.xtraplatform.cql.domain.Cql
+import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
 import de.ii.xtraplatform.cql.domain.Function
 import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
@@ -181,6 +184,54 @@ class CqlFunctionCheckerSpec extends Specification {
         when:
         Function.of("ALIKE", ImmutableList.of(Property.of("value_array"), SpatialLiteral.of("POINT(0 0"))).accept(visitor)
         Function.of("ALIKE", ImmutableList.of(SpatialLiteral.of("POINT(0 0"), ScalarLiteral.of("A%"))).accept(visitor)
+
+        then:
+        thrown IllegalArgumentException
+    }
+
+    def 'Custom function: valid expression'() {
+        given:
+        def customFunctions = ImmutableList.of(
+                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of(
+                        new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                        new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+                ), ImmutableList.of("BOOLEAN"))
+        )
+        def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
+                "geometry", "GEOMETRY",
+                "name", "STRING"
+        ), cql, customFunctions)
+
+        when:
+        Function.of("IST_IN_BEREICH", ImmutableList.of(Property.of("geometry"), Property.of("name"))).accept(customVisitor)
+
+        then:
+        noExceptionThrown()
+    }
+
+    def 'Custom function: incompatible argument type'() {
+        given:
+        def customFunctions = ImmutableList.of(
+                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of(
+                        new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                        new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+                ), ImmutableList.of("BOOLEAN"))
+        )
+        def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
+                "geometry", "GEOMETRY",
+                "id", "INTEGER"
+        ), cql, customFunctions)
+
+        when:
+        Function.of("IST_IN_BEREICH", ImmutableList.of(Property.of("geometry"), Property.of("id"))).accept(customVisitor)
+
+        then:
+        thrown CqlIncompatibleTypes
+    }
+
+        def 'unknown function name is invalid'() {
+        when:
+        Function.of("MY_UNKNOWN_FUNCTION", ImmutableList.of()).accept(visitor)
 
         then:
         thrown IllegalArgumentException

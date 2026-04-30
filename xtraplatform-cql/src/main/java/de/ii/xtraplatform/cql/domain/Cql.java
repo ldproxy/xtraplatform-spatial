@@ -39,6 +39,11 @@ public interface Cql {
 
   void checkTypes(Cql2Expression cqlPredicate, Map<String, String> propertyTypes);
 
+  void checkTypes(
+      Cql2Expression cqlPredicate,
+      Map<String, String> propertyTypes,
+      List<CustomFunction> customFunctions);
+
   void checkCoordinates(
       Cql2Expression cqlPredicate,
       CrsTransformerFactory crsTransformerFactory,

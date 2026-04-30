@@ -17,6 +17,7 @@ import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
 import de.ii.xtraplatform.cql.domain.Bbox;
@@ -29,8 +30,10 @@ import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql.Format;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlToText;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
@@ -71,6 +74,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
@@ -94,6 +99,7 @@ public class FilterEncoderSql {
   private final CrsInfo crsInfo;
   private final Cql cql;
   private final String accentiCollation;
+  private final Map<String, CustomFunction> customFunctions;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -103,13 +109,123 @@ public class FilterEncoderSql {
       CrsInfo crsInfo,
       Cql cql,
       String accentiCollation) {
+    this(nativeCrs, sqlDialect, crsTransformerFactory, crsInfo, cql, List.of(), accentiCollation);
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation) {
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
     this.crsInfo = crsInfo;
     this.cql = cql;
     this.accentiCollation = accentiCollation;
+    this.customFunctions =
+        ImmutableMap.copyOf(
+            CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
+                .collect(
+                    Collectors.toMap(
+                        function -> function.getName().toUpperCase(Locale.ROOT),
+                        function -> function,
+                        (left, right) -> right)));
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
+  }
+
+  private Optional<String> renderCustomFunction(
+      de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+    CustomFunction customFunction =
+        customFunctions.get(function.getName().toUpperCase(Locale.ROOT));
+    if (Objects.isNull(customFunction)) {
+      return Optional.empty();
+    }
+
+    Optional<String> resolvedExpression = resolveExpression(customFunction);
+    if (resolvedExpression.isEmpty()) {
+      return Optional.empty();
+    }
+
+    final String marker = "__ARG__";
+    int anchorIndex = -1;
+    for (int i = 0; i < children.size(); i++) {
+      if (operandHasSelectForTemplate(children.get(i))) {
+        anchorIndex = i;
+        break;
+      }
+    }
+
+    String expression = resolvedExpression.get();
+    for (int i = 0; i < children.size(); i++) {
+      String replacement =
+          i == anchorIndex ? marker : reduceSelectToColumnForTemplate(children.get(i));
+      // Positional substitution
+      expression = expression.replace("$arg" + (i + 1), replacement);
+      // Named substitution (if argument has a name)
+      if (i < customFunction.getArguments().size()) {
+        String argName = customFunction.getArguments().get(i).getName();
+        if (argName != null && !argName.isEmpty()) {
+          expression = expression.replace("$" + argName, replacement);
+        }
+      }
+    }
+
+    if (anchorIndex < 0) {
+      return Optional.of(expression);
+    }
+
+    String anchorExpression = children.get(anchorIndex);
+    int markerIndex = expression.indexOf(marker);
+    if (markerIndex < 0 || !operandHasSelectForTemplate(anchorExpression)) {
+      return Optional.of(
+          expression.replace(marker, reduceSelectToColumnForTemplate(anchorExpression)));
+    }
+
+    String prefix = expression.substring(0, markerIndex);
+    String suffix = expression.substring(markerIndex + marker.length());
+
+    String result = String.format(anchorExpression, "%1$s" + prefix, suffix + "%2$s");
+
+    // BOOLEAN-returning functions are top-level predicates — finalize the subquery template
+    // by replacing the remaining %1$s/%2$s placeholders with empty strings.
+    // Non-BOOLEAN functions are used as operands in an outer operation (e.g. Eq) which will
+    // fill in the placeholders itself.
+    if (!customFunction.getReturns().isEmpty()
+        && "BOOLEAN".equalsIgnoreCase(customFunction.getReturns().get(0))) {
+      result = result.replace("%1$s", "").replace("%2$s", "");
+    }
+    return Optional.of(result);
+  }
+
+  private Optional<String> resolveExpression(CustomFunction customFunction) {
+    String dialectKey = "SQL/" + sqlDialect.getId();
+    if (customFunction.getExpression().containsKey(dialectKey)) {
+      return Optional.of(customFunction.getExpression().get(dialectKey));
+    }
+    if (customFunction.getExpression().containsKey("SQL")) {
+      return Optional.of(customFunction.getExpression().get("SQL"));
+    }
+    return Optional.empty();
+  }
+
+  private boolean operandHasSelectForTemplate(String expression) {
+    return expression.contains("%1$s") && expression.contains("%2$s");
+  }
+
+  private String reduceSelectToColumnForTemplate(String expression) {
+    if (operandHasSelectForTemplate(expression)) {
+      return String.format(
+          expression.contains(" WHERE ")
+              ? expression.substring(expression.indexOf(" WHERE ") + 7, expression.length() - 1)
+              : expression,
+          "",
+          "");
+    }
+    return expression;
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -533,42 +649,9 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
-      if (function.isPosition()) {
-        return "%1$s" + ROW_NUMBER + "%2$s";
-      } else if (function.isUpper()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sUPPER(", ")%2$s");
-        }
-        return String.format("UPPER(%s)", children.get(0));
-      } else if (function.isLower()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sLOWER(", ")%2$s");
-        }
-        return String.format("LOWER(%s)", children.get(0));
-      } else if (function.isDiameter()) {
-        return sqlDialect.applyToDiameter(
-            children.get(0), "diameter3d".equalsIgnoreCase(function.getName()));
-      } else if (function.isAlike()) {
-        String operator = "LIKE";
-
-        List<String> expressions = processBinary(function.getArgs(), children);
-
-        // we may need to change the second expression
-        String secondExpression = expressions.get(1);
-
-        String string = sqlDialect.applyToString("DUMMY");
-        String functionStart = string.substring(0, string.indexOf("DUMMY"));
-        String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
-
-        String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
-
-        return String.format(expressions.get(0), functionStart, operation);
+      Optional<String> customExpression = renderCustomFunction(function, children);
+      if (customExpression.isPresent()) {
+        return customExpression.get();
       }
 
       return super.visit(function, children);
@@ -1551,42 +1634,9 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
-      if (function.isPosition()) {
-        return "%1$s" + ROW_NUMBER + "%2$s";
-      } else if (function.isUpper()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sUPPER(", ")%2$s");
-        }
-        return String.format("UPPER(%s)", children.get(0));
-      } else if (function.isLower()) {
-        if (function.getArgs().get(0) instanceof ScalarLiteral) {
-          return children.get(0).toLowerCase();
-        }
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return String.format(children.get(0), "%1$sLOWER(", ")%2$s");
-        }
-        return String.format("LOWER(%s)", children.get(0));
-      } else if (function.isDiameter()) {
-        return sqlDialect.applyToDiameter(
-            children.get(0), "diameter3d".equalsIgnoreCase(function.getName()));
-      } else if (function.isAlike()) {
-        String operator = "LIKE";
-
-        List<String> expressions = processBinary(function.getArgs(), children);
-
-        // we may need to change the second expression
-        String secondExpression = expressions.get(1);
-
-        String string = sqlDialect.applyToString("DUMMY");
-        String functionStart = string.substring(0, string.indexOf("DUMMY"));
-        String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
-
-        String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
-
-        return String.format(expressions.get(0), functionStart, operation);
+      Optional<String> customExpression = renderCustomFunction(function, children);
+      if (customExpression.isPresent()) {
+        return customExpression.get();
       }
 
       return super.visit(function, children);

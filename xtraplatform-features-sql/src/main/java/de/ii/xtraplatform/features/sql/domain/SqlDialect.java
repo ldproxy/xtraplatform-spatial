@@ -24,6 +24,8 @@ import org.threeten.extra.Interval;
 
 public interface SqlDialect {
 
+  String getId();
+
   String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves);
 
   String applyToWkt(String wkt, int srid);

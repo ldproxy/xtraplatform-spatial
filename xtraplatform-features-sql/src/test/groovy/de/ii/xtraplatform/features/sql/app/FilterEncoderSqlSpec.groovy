@@ -8,13 +8,22 @@
 package de.ii.xtraplatform.features.sql.app
 
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
+import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.Eq
+import de.ii.xtraplatform.cql.domain.Gt
+import de.ii.xtraplatform.cql.domain.Function
+import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.app.CqlFilterExamples
 import de.ii.xtraplatform.cql.app.CqlImpl
+import de.ii.xtraplatform.cql.domain.ScalarLiteral
 import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
+import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
 import de.ii.xtraplatform.proj.domain.ProjLoaderImpl
 import spock.lang.Shared
@@ -31,6 +40,21 @@ class FilterEncoderSqlSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoder2
 
+    @Shared
+    FilterEncoderSql filterEncoderCustom
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomBoolean
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomGeometry
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomConcatPgis
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomConcatGpkg
+
     def setupSpec() {
 
         filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
@@ -40,6 +64,173 @@ class FilterEncoderSqlSpec extends Specification {
         CrsTransformerFactoryProj transformerFactory = new CrsTransformerFactoryProj(new ProjLoaderImpl(Path.of(System.getProperty("java.io.tmpdir"), "proj", "data")), resourceStore, volatileRegistry)
         transformerFactory.onStart(false).toCompletableFuture().join()
         filterEncoder2 = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), (CrsTransformerFactory) transformerFactory, null, new CqlImpl(), null)
+        def customFunction = Stub(CustomFunction)
+        customFunction.getName() >> "my_concat"
+        customFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("string").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("string").build()
+        ]
+        customFunction.getReturns() >> ["string"]
+        customFunction.getExpression() >> ["SQL": "concat(\$arg1, '-', \$arg2)"]
+        filterEncoderCustom = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [customFunction],
+                null)
+
+        def booleanFunction = Stub(CustomFunction)
+        booleanFunction.getName() >> "my_upper_match"
+        booleanFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        booleanFunction.getReturns() >> ["BOOLEAN"]
+        booleanFunction.getExpression() >> ["SQL": "UPPER(\$arg1) LIKE UPPER(\$arg2)"]
+        filterEncoderCustomBoolean = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [booleanFunction],
+                null)
+
+        def geometryFunction = Stub(CustomFunction)
+        geometryFunction.getName() >> "ist_in_bereich"
+        geometryFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        geometryFunction.getReturns() >> ["BOOLEAN"]
+        geometryFunction.getExpression() >> ["SQL": "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"]
+        filterEncoderCustomGeometry = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [geometryFunction],
+                null)
+
+        def concatDialectFunction = Stub(CustomFunction)
+        concatDialectFunction.getName() >> "my_concat"
+        concatDialectFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        concatDialectFunction.getReturns() >> ["STRING"]
+        concatDialectFunction.getExpression() >> ["SQL/GPKG": "concat(\$arg1, ' (', \$arg2, ')')", "SQL/PGIS": "\$arg1 || ' (' || \$arg2 || ')'"]
+        filterEncoderCustomConcatPgis = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [concatDialectFunction],
+                null)
+        filterEncoderCustomConcatGpkg = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectGpkg(),
+                null,
+                null,
+                new CqlImpl(),
+                [concatDialectFunction],
+                null)
+    }
+
+    def 'custom function dialect-specific expression: SQL/PGIS'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), Property.of("created")]),
+                        ScalarLiteral.of("Kupp (Serrig)")
+                ])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.name || ' (' || AA.created || ')' = 'Kupp (Serrig)')"
+
+        String actual = filterEncoderCustomConcatPgis.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom function dialect-specific expression: SQL/GPKG'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), Property.of("created")]),
+                        ScalarLiteral.of("Kupp (Serrig)")
+                ])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE concat(AA.name, ' (', AA.created, ')') = 'Kupp (Serrig)')"
+
+        String actual = filterEncoderCustomConcatGpkg.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom function template with property and literal'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), ScalarLiteral.of("x")]),
+                        ScalarLiteral.of("foo-x")
+                ])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE concat(AA.name, '-', 'x') = 'foo-x')"
+
+        String actual = filterEncoderCustom.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
+
+    }
+
+    def 'custom boolean function with two string properties'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Function.of("my_upper_match", [Property.of("name"), ScalarLiteral.of("kupp%")])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE UPPER(AA.name) LIKE UPPER('kupp%'))"
+
+        String actual = filterEncoderCustomBoolean.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom boolean geometry function (IST_IN_BEREICH pattern)'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_GEOMETRY
+        def filter = Function.of("ist_in_bereich", [Property.of("location"), ScalarLiteral.of("Bereich Saar")])
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, (SELECT geometrie FROM bereiche WHERE name='Bereich Saar')))"
+
+        String actual = filterEncoderCustomGeometry.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
 
     }
 
@@ -781,6 +972,39 @@ class FilterEncoderSqlSpec extends Specification {
 
         then:
 
+        actual == expected
+    }
+
+    def 'built-in ALIKE function, no join'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Function.of("ALIKE", [Property.of("name"), ScalarLiteral.of("kupp%")])
+
+        when:
+        // ALIKE returns BOOLEAN — used directly as filter predicate
+        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.name::varchar LIKE 'kupp%')"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+    }
+
+    def 'built-in DIAMETER2D function, 1:n join'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = Gt.ofFunction(
+                Function.of("DIAMETER2D", [Property.of("location")]),
+                ScalarLiteral.of(100))
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Length(ST_BoundingDiagonal(Box2D(ST_Transform(AB.location,3857)))) > 100)"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
         actual == expected
     }
 

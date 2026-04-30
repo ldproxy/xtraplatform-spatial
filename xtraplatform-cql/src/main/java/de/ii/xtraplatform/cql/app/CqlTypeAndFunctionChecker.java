@@ -9,7 +9,6 @@ package de.ii.xtraplatform.cql.app;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
@@ -21,8 +20,10 @@ import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
 import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.ImmutableBetween;
@@ -53,6 +54,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -106,53 +108,27 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
           .put("ACCENTI", ImmutableSet.of(TEXT))
           .build();
 
-  private static final Map<String, List<Set<Type>>> COMPATIBILITY_FUNCTION =
-      new ImmutableMap.Builder<String, List<Set<Type>>>()
-          .put("UPPER", ImmutableList.of(TEXT))
-          .put("LOWER", ImmutableList.of(TEXT))
-          .put("POSITION", ImmutableList.of(INTEGER))
-          .put("DIAMETER2D", ImmutableList.of(SPATIAL))
-          .put("DIAMETER3D", ImmutableList.of(SPATIAL))
-          .put("ALIKE", ImmutableList.of(ImmutableSet.of(Type.List), ImmutableSet.of(Type.String)))
-          .build();
-
-  private static final Map<String, List<Set<Class<?>>>> COMPATIBILITY_FUNCTION_ARGUMENTS =
-      new Builder<String, List<Set<Class<?>>>>()
-          .put(
-              "UPPER",
-              ImmutableList.of(
-                  ImmutableSet.of(
-                      Property.class,
-                      Function.class,
-                      Accenti.class,
-                      Casei.class,
-                      ScalarLiteral.class)))
-          .put(
-              "LOWER",
-              ImmutableList.of(
-                  ImmutableSet.of(
-                      Property.class,
-                      Function.class,
-                      Accenti.class,
-                      Casei.class,
-                      ScalarLiteral.class)))
-          .put("POSITION", ImmutableList.of())
-          .put("DIAMETER2D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
-          .put("DIAMETER3D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
-          .put(
-              "ALIKE",
-              ImmutableList.of(
-                  ImmutableSet.of(Property.class, Function.class),
-                  ImmutableSet.of(ScalarLiteral.class)))
-          .build();
-
   private final Map<String, String> propertyTypes;
   private final Cql cql;
+  private final Map<String, CustomFunction> customFunctions;
 
   public CqlTypeAndFunctionChecker(Map<String, String> propertyTypes, Cql cql) {
+    this(propertyTypes, cql, ImmutableList.of());
+  }
+
+  public CqlTypeAndFunctionChecker(
+      Map<String, String> propertyTypes, Cql cql, List<CustomFunction> customFunctions) {
     super();
     this.propertyTypes = propertyTypes;
     this.cql = cql;
+    this.customFunctions =
+        ImmutableMap.copyOf(
+            CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
+                .collect(
+                    Collectors.toMap(
+                        customFunction -> customFunction.getName().toUpperCase(Locale.ROOT),
+                        customFunction -> customFunction,
+                        (left, right) -> right)));
   }
 
   @Override
@@ -235,7 +211,13 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   @Override
   public Type visit(Function function, List<Type> children) {
     checkFunction(function, children);
-    return Type.valueOf(function.getType().getSimpleName());
+
+    Optional<CustomFunction> customFunction = getCustomFunction(function);
+    if (customFunction.isPresent()) {
+      return fromSchemaType(customFunction.get().getReturns().get(0));
+    }
+
+    throw new IllegalArgumentException("Unknown function: " + function.getName());
   }
 
   @Override
@@ -328,49 +310,61 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   }
 
   private void checkFunction(Function function, List<Type> types) {
-    final List<Set<Class<?>>> expectedNodes =
-        Objects.requireNonNullElse(
-            COMPATIBILITY_FUNCTION_ARGUMENTS.get(function.getName().toUpperCase(Locale.ROOT)),
-            ImmutableList.of());
-    if (function.getArgs().size() != expectedNodes.size()) {
+    Optional<CustomFunction> customFunction = getCustomFunction(function);
+
+    if (customFunction.isPresent()) {
+      checkCustomFunction(function, types, customFunction.get());
+      return;
+    }
+
+    throw new IllegalArgumentException("Unknown function: " + function.getName());
+  }
+
+  private void checkCustomFunction(
+      Function function, List<Type> types, CustomFunction customFunction) {
+    if (function.getArgs().size() != customFunction.getArguments().size()) {
       throw new IllegalArgumentException(
           String.format(
               "Function %s expects %d argument(s), but got %d",
-              function.getName(), expectedNodes.size(), function.getArgs().size()));
+              function.getName(), customFunction.getArguments().size(), function.getArgs().size()));
     }
-    IntStream.range(0, function.getArgs().size())
-        .forEach(
-            i -> {
-              CqlNode child = function.getArgs().get(i);
-              Set<Class<?>> expected = expectedNodes.get(i);
-              if (expected.stream()
-                  .noneMatch(expectedNode -> expectedNode.isAssignableFrom(child.getClass()))) {
-                throw new IllegalArgumentException(
-                    String.format(
-                        "Function %s expects argument %d to be a %s, but got %s",
-                        function.getName(),
-                        i + 1,
-                        expected.stream()
-                            .map(Class::getSimpleName)
-                            .collect(Collectors.joining("/")),
-                        child.getClass().getSimpleName().replace("Immutable", "")));
-              }
-            });
 
-    final List<Set<Type>> expectedTypes =
-        Objects.requireNonNullElse(
-            COMPATIBILITY_FUNCTION.get(function.getName().toUpperCase(Locale.ROOT)),
-            ImmutableList.of());
     IntStream.range(0, types.size())
         .forEach(
             i -> {
-              Type type = types.get(i);
-              Set<Type> expected = expectedTypes.get(i);
-              if (expected.stream().noneMatch(expectedType -> expectedType == type)) {
+              List<Type> expected =
+                  customFunction.getArguments().get(i).getType().stream()
+                      .map(this::fromSchemaType)
+                      .collect(Collectors.toList());
+              Type actual = types.get(i);
+
+              if (!(expected.contains(actual) || actual.equals(Type.UNKNOWN))) {
                 throw new CqlIncompatibleTypes(
-                    getText(function), i + 1, type.schemaType(), asSchemaTypesFunction(expected));
+                    getText(function),
+                    i + 1,
+                    actual.schemaType(),
+                    customFunction.getArguments().get(i).getType());
               }
             });
+  }
+
+  private Optional<CustomFunction> getCustomFunction(Function function) {
+    return Optional.ofNullable(customFunctions.get(function.getName().toUpperCase(Locale.ROOT)));
+  }
+
+  private Type fromSchemaType(String schemaType) {
+    return switch (schemaType.toUpperCase(Locale.ROOT)) {
+      case "STRING" -> Type.String;
+      case "BOOLEAN" -> Type.Boolean;
+      case "INTEGER" -> Type.Integer;
+      case "FLOAT" -> Type.Double;
+      case "DATE" -> Type.LocalDate;
+      case "DATETIME", "INSTANT" -> Type.Instant;
+      case "INTERVAL" -> Type.Interval;
+      case "GEOMETRY" -> Type.Geometry;
+      case "VALUE_ARRAY", "OBJECT_ARRAY", "ARRAY" -> Type.List;
+      default -> Type.UNKNOWN;
+    };
   }
 
   private void checkString(CqlNode node, List<Type> types) {
