@@ -34,7 +34,7 @@ public class AggregateStatsReaderGraphQl implements AggregateStatsReader<Feature
 
   @Override
   public Stream<Long> getCount(List<FeatureSchema> sourceSchemas) {
-    // TODO: hits query //NOPMD ForbiddenContent
+    // NOPMD - TODO: hits query
     return Reactive.Source.single(-1L).to(Reactive.Sink.head());
   }
 

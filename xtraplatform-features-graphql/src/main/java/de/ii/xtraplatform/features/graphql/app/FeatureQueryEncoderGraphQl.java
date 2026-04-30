@@ -74,7 +74,6 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
 
   @Override
   public FeatureProviderCapabilities getCapabilities() {
-    // TODO: derive from queryGeneration //NOPMD ForbiddenContent
     return ImmutableFeatureProviderCapabilities.builder().level(Level.BASIC).build();
   }
 

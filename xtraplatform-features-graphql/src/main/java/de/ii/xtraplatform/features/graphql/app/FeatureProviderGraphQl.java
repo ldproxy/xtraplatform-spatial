@@ -284,7 +284,7 @@ public class FeatureProviderGraphQl
             ? getData().getQueries().getSingle().get().getName(name)
             : getData().getQueries().getCollection().getName(name);
 
-    // TODO: does mapping need SchemaDeriverGraphQl applied? //NOPMD ForbiddenContent
+    // NOTE: does mapping need SchemaDeriverGraphQl applied?
     return new FeatureTokenDecoderGraphQlJson2(
         featureSchema, featureQuery, mappings, name, wrapper);
   }
@@ -305,7 +305,7 @@ public class FeatureProviderGraphQl
   }
 
   @Override
-  @SuppressWarnings("PMD.AvoidCatchingThrowable")
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public long getFeatureCount(String typeName) {
     if (getData().getTypes().containsKey(typeName)) {
       return -1;
@@ -351,7 +351,7 @@ public class FeatureProviderGraphQl
   }
 
   @Override
-  @SuppressWarnings("PMD.AvoidCatchingThrowable")
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
     if (getData().getTypes().containsKey(typeName)) {
       return Optional.empty();

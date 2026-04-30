@@ -50,8 +50,8 @@ public interface FeatureProviderGraphQlData
 
   @Value.Check
   default FeatureProviderGraphQlData initNestedDefault() {
-    // workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-    // TODO: remove when fixed //NOPMD ForbiddenContent
+    // NOTE: workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // remove when fixed
     if (Objects.isNull(getConnectionInfo()) || Objects.isNull(getConnectionInfo().getUri())) {
       ImmutableFeatureProviderGraphQlData.Builder builder =
           new ImmutableFeatureProviderGraphQlData.Builder().from(this);

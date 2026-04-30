@@ -55,8 +55,8 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
       @Assisted String providerId,
       @Assisted ConnectionInfoGraphQlHttp connectionInfo) {
     super(volatileRegistry);
-    // workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-    // TODO: remove when fixed //NOPMD ForbiddenContent
+    // NOTE: workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // remove when fixed
     Optional.ofNullable(
             Strings.emptyToNull(
                 connectionInfo
@@ -68,7 +68,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
     URI host = connectionInfo.getUri();
 
-    // TODO: get maxParallelRequests and idleTimeout from connectionInfo //NOPMD ForbiddenContent
+    // NOTE: get maxParallelRequests and idleTimeout from connectionInfo
     this.httpClient = http.getHostClient(host, 16, 30);
 
     this.providerId = providerId;
@@ -76,7 +76,6 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
   }
 
   GraphQlConnectorHttp() {
-    // TODO //NOPMD ForbiddenContent
     super(null);
     httpClient = null;
     providerId = null;
@@ -90,7 +89,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
   @Override
   public void start() {
-    // TODO: implement polling //NOPMD ForbiddenContent
+    // NOPMD - TODO: implement polling
     setState(State.AVAILABLE);
   }
 
@@ -102,7 +101,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
     return providerId;
   }
 
-  // TODO //NOPMD ForbiddenContent
+  // NOPMD - TODO: implement
   @Override
   public boolean isConnected() {
     return true;

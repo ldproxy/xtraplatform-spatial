@@ -99,7 +99,7 @@ public class FilterEncoderGraphQl {
     return Doubles.asList(transformed);
   }
 
-  // TODO: reverse FeatureSchema for nested mappings? //NOPMD ForbiddenContent
+  // NOTE: reverse FeatureSchema for nested mappings?
   private Optional<String> getPrefixedPropertyName(FeatureSchema schema, String property) {
     return schema.getProperties().stream()
         .filter(

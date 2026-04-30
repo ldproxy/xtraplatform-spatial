@@ -147,7 +147,8 @@ public class FeatureTokenDecoderGraphQlJson2
   @SuppressWarnings({
     "PMD.CognitiveComplexity",
     "PMD.CyclomaticComplexity",
-    "PMD.AvoidCatchingThrowable"
+    "PMD.AvoidCatchingGenericException",
+    "PMD.ExceptionAsFlowControl"
   })
   public boolean advanceParser() {
 
