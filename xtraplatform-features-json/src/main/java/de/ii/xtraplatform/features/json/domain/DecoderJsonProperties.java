@@ -73,7 +73,7 @@ public class DecoderJsonProperties {
     "PMD.NPathComplexity"
   })
   public boolean parse(JsonToken nextToken, String currentName, int featureDepth) {
-    // TODO: null is end-of-input //NOPMD ForbiddenContent
+    // NOTE: null is end-of-input
     if (Objects.isNull(nextToken)) {
       return true; // or completestage???
     }

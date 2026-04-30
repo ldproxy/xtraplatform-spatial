@@ -130,7 +130,7 @@ public class DecoderJson implements Decoder {
     try {
       JsonToken nextToken = parser.nextToken();
 
-      // TODO: null is end-of-input //NOPMD ForbiddenContent
+      // NOTE: null is end-of-input
       if (Objects.isNull(nextToken)) {
         return true;
       }

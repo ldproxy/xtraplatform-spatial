@@ -15,7 +15,6 @@ import java.util.List;
 /**
  * @author zahnen
  */
-// TODO: make XMLPathTracker extension of this //NOPMD ForbiddenContent
 public class JsonPathTracker {
 
   private static final Joiner JOINER = Joiner.on('.').skipNulls();
