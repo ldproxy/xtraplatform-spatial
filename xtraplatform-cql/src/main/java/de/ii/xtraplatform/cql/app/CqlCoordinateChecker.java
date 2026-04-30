@@ -57,6 +57,7 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
       CrsInfo crsInfo,
       EpsgCrs filterCrs,
       EpsgCrs nativeCrs) {
+    super();
     this.crsInfo = crsInfo;
     this.filterCrs = filterCrs;
     this.nativeCrs = Optional.ofNullable(nativeCrs);
@@ -106,8 +107,10 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
             .getValue()
             .forEach(geometry -> GeometryNode.of(geometry).accept(this));
         return null;
+      default:
+        throw new IllegalStateException(
+            String.format("Unsupported geometry type: %s", geom.getType()));
     }
-    return null;
   }
 
   @Override
@@ -123,7 +126,7 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
         .forEach(
             axis -> {
               if (axisWithWraparound != axis
-                  && ll.getCoordinates()[axis] > ur.getCoordinates()[axis])
+                  && ll.getCoordinates()[axis] > ur.getCoordinates()[axis]) {
                 throw new IllegalArgumentException(
                     String.format(
                         "The coordinates of the bounding box [[ %s ], [ %s ]] do not form a valid bounding box for coordinate reference system '%s'. The first value is larger than the second value for the %s axis.",
@@ -131,6 +134,7 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
                         getCoordinatesAsString(ur),
                         getCrsText(filterCrs),
                         AXES.get(axis)));
+              }
             });
 
     return null;
@@ -148,11 +152,12 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
     crsTransformerFilterToNative.ifPresent(
         t -> {
           CoordinateTuple transformed = t.transform(pos.x(), pos.y());
-          if (Objects.isNull(transformed))
+          if (Objects.isNull(transformed)) {
             throw new IllegalArgumentException(
                 String.format(
                     "Filter is invalid. Coordinate '%s' cannot be transformed to %s.",
                     getCoordinatesAsString(pos), getCrsText(nativeCrs.get())));
+          }
           checkPosition(Position.ofXY(transformed.getX(), transformed.getY()), nativeCrs.get());
         });
 
@@ -182,7 +187,7 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
                   .get(i)
                   .ifPresent(
                       min -> {
-                        if (position.getCoordinates()[i] < min)
+                        if (position.getCoordinates()[i] < min) {
                           throw new IllegalArgumentException(
                               String.format(
                                   "The coordinate '%s' in the filter expression is invalid for %s. The value of the %s axis is smaller than the minimum value for the axis: %f.",
@@ -190,12 +195,13 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
                                   getCrsText(crs),
                                   AXES.get(i),
                                   min));
+                        }
                       });
               maximums
                   .get(i)
                   .ifPresent(
                       max -> {
-                        if (position.getCoordinates()[i] > max)
+                        if (position.getCoordinates()[i] > max) {
                           throw new IllegalArgumentException(
                               String.format(
                                   "The coordinate '%s' in the filter expression is invalid for %s. The value of the %s axis is larger than the maximum value for the axis: %f.",
@@ -203,6 +209,7 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
                                   getCrsText(crs),
                                   AXES.get(i),
                                   max));
+                        }
                       });
             });
   }
@@ -225,12 +232,13 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
   }
 
   private String getCrsText(EpsgCrs crs) {
-    if (crs.equals(filterCrs))
+    if (crs.equals(filterCrs)) {
       return String.format(
           "the coordinate reference system '%s' used in the query", crs.toHumanReadableString());
-    else if (nativeCrs.isPresent() && crs.equals(nativeCrs.get()))
+    } else if (nativeCrs.isPresent() && crs.equals(nativeCrs.get())) {
       return String.format(
           "the native coordinate reference system '%s' of the data", crs.toHumanReadableString());
+    }
     return String.format("the coordinate reference system '%s'", crs.toHumanReadableString());
   }
 

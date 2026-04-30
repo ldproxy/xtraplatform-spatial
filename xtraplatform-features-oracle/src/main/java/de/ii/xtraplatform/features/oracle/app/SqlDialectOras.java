@@ -30,7 +30,6 @@ import org.threeten.extra.Interval;
 // - only 2D geometries are supported / have been tested
 // - S_CROSSES not supported
 // - identifiers must be unquoted, that is, in uppercase in Oracle
-@SuppressWarnings("PMD.TooManyMethods")
 public class SqlDialectOras implements SqlDialect {
 
   private static final Splitter BBOX_SPLITTER =

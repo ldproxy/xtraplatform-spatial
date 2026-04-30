@@ -12,7 +12,6 @@ import dagger.assisted.AssistedFactory;
 import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dProviderFilesData;
@@ -25,8 +24,7 @@ import javax.inject.Singleton;
 @Singleton
 @AutoBind
 public class Tile3dProviderFilesFactory
-    extends AbstractEntityFactory<Tile3dProviderFilesData, Tile3dProviderFiles>
-    implements EntityFactory {
+    extends AbstractEntityFactory<Tile3dProviderFilesData, Tile3dProviderFiles> {
 
   private final boolean skipHydration;
 
@@ -93,6 +91,7 @@ public class Tile3dProviderFilesFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface Tile3dProviderFilesFactoryAssisted
       extends FactoryAssisted<Tile3dProviderFilesData, Tile3dProviderFiles> {
     @Override

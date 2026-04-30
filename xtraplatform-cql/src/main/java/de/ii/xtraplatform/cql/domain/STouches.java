@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSTouches.Builder.class)
-public interface STouches extends BinarySpatialOperation, CqlNode {
+public interface STouches extends BinarySpatialOperation {
 
   String TYPE = "s_touches";
 

@@ -15,8 +15,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@FunctionalInterface
 public interface JsonSchemaTransformer extends JsonSchemaVisitor<JsonSchema> {
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   default JsonSchema visitProperties(JsonSchema schema) {
     if (schema instanceof JsonSchemaAllOf allOf) {
       return new ImmutableJsonSchemaAllOf.Builder()

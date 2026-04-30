@@ -12,7 +12,6 @@ import dagger.assisted.AssistedFactory;
 import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dProviderFeaturesData;
@@ -28,8 +27,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @AutoBind
 public class Tile3dProviderFeaturesFactory
-    extends AbstractEntityFactory<Tile3dProviderFeaturesData, Tile3dProviderFeatures>
-    implements EntityFactory {
+    extends AbstractEntityFactory<Tile3dProviderFeaturesData, Tile3dProviderFeatures> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFeaturesFactory.class);
 
@@ -99,6 +97,7 @@ public class Tile3dProviderFeaturesFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface Tile3dProviderFeaturesFactoryAssisted
       extends FactoryAssisted<Tile3dProviderFeaturesData, Tile3dProviderFeatures> {
     @Override
