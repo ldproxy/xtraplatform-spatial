@@ -59,6 +59,7 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
         null);
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public Geometry<?> decode(
       StreamTokenizer tokenizer,
       Optional<EpsgCrs> crs,
@@ -66,19 +67,18 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
       Set<GeometryType> allowedTypes,
       Axes allowedAxes)
       throws IOException {
-    GeometryType type;
+    Optional<GeometryType> resolvedType = Optional.empty();
     Axes axes = Axes.XY;
     boolean isEmpty = false;
 
-    type = null;
     String t = getNextToken(tokenizer);
     if (implicitType != null) {
       // check if the type is implicit (that is, the next token is "EMPTY" or "(")
-      if (t.equals(EMPTY)) {
-        type = implicitType;
+      if (EMPTY.equals(t)) {
+        resolvedType = Optional.of(implicitType);
         isEmpty = true;
-      } else if (t.equals(L_PAREN)) {
-        type = implicitType;
+      } else if (L_PAREN.equals(t)) {
+        resolvedType = Optional.of(implicitType);
         tokenizer.pushBack();
       }
     } else {
@@ -98,19 +98,20 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
       }
     }
 
-    if (type == null) {
+    if (resolvedType.isEmpty()) {
       try {
-        type = WktWkbGeometryType.valueOf(t).toGeometryType();
+        resolvedType = Optional.of(WktWkbGeometryType.valueOf(t).toGeometryType());
       } catch (IllegalArgumentException e) {
-        throw new IllegalStateException("Unknown geometry type: " + t);
+        throw new IllegalStateException("Unknown geometry type: " + t, e);
       }
     }
+    GeometryType type = resolvedType.orElseThrow();
 
     if (!allowedTypes.isEmpty() && !allowedTypes.contains(type)) {
       throw new IllegalStateException(
           "Unexpected geometry type " + type + ". Allowed: " + allowedTypes);
     }
-    if (allowedAxes != null && !allowedAxes.equals(axes)) {
+    if (allowedAxes != null && allowedAxes != axes) {
       throw new IllegalStateException(
           "Geometry axes " + axes + " do not match expected axes " + allowedAxes);
     }
@@ -120,7 +121,7 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
     }
 
     return switch (type) {
-      case POINT -> point(readPosition(tokenizer, crs, axes), crs);
+      case POINT -> point(readPosition(tokenizer, axes), crs);
       case MULTI_POINT -> multiPoint(readPositions(tokenizer, axes), crs);
       case LINE_STRING -> lineString(readPositionList(tokenizer, axes), crs);
       case CIRCULAR_STRING -> circularString(readPositionList(tokenizer, axes), crs);
@@ -186,8 +187,7 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
     };
   }
 
-  private Position readPosition(StreamTokenizer tokenizer, Optional<EpsgCrs> crs, Axes axes)
-      throws IOException {
+  private Position readPosition(StreamTokenizer tokenizer, Axes axes) throws IOException {
     expectToken(tokenizer, L_PAREN);
     Position pos =
         Position.of(
@@ -237,10 +237,10 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
     while (COMMA.equals(next)) {
       next = getNextToken(tokenizer);
       if (!EMPTY.equals(next)) {
-        if (!first) {
-          builder.append(COMMA);
-        } else {
+        if (first) {
           first = false;
+        } else {
+          builder.append(COMMA);
         }
         builder.append(next);
       }
@@ -343,13 +343,16 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
 
   private void expectToken(StreamTokenizer t, String expected) throws IOException {
     String next = getNextToken(t);
-    if (!expected.equals(next))
+    if (!expected.equals(next)) {
       throw new IllegalStateException("Expected '" + expected + "', but found: " + next);
+    }
   }
 
   private String getCommaOrCloser(StreamTokenizer t) throws IOException {
     String next = getNextToken(t);
-    if (COMMA.equals(next) || R_PAREN.equals(next)) return next;
+    if (COMMA.equals(next) || R_PAREN.equals(next)) {
+      return next;
+    }
     throw new IllegalStateException("Expected ',' or ')', but found: " + next);
   }
 }

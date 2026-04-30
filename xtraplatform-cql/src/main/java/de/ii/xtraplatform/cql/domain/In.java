@@ -16,7 +16,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableIn.Builder.class)
-public interface In extends BinaryOperation2<Scalar>, CqlNode {
+@FunctionalInterface
+public interface In extends BinaryOperation2<Scalar> {
 
   String TYPE = "in";
   String ID_PLACEHOLDER = "_ID_";
