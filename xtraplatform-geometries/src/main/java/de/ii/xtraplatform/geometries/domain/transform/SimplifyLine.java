@@ -92,6 +92,7 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
     return result;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public double[] simplifyLine(
       double[] coordinates, int numberOfPositions, int dimension, int minNumberOfPositions) {
 
@@ -132,7 +133,8 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
     for (int i = 0; i < numberOfPositions; i++) {
       if (keepPoints[i]) {
         for (int j = i * dimension; j < i * dimension + dimension; j++) {
-          simplifiedPoints[cursor++] = coordinates[j];
+          simplifiedPoints[cursor] = coordinates[j];
+          cursor++;
         }
       }
     }
@@ -141,8 +143,8 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
   }
 
   private void simplifySection(
-      double[] coordinates, int dimension, int start, int end, boolean[] keepPoints) {
-    if ((start + 1) == end) {
+      double[] coordinates, int dimension, int start, int end, boolean... keepPoints) {
+    if (start + 1 == end) {
       return;
     }
 

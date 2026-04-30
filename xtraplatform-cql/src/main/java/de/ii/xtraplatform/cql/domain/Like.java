@@ -13,7 +13,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableLike.Builder.class)
-public interface Like extends BinaryScalarOperation, CqlNode {
+@FunctionalInterface
+public interface Like extends BinaryScalarOperation {
 
   String TYPE = "like";
 

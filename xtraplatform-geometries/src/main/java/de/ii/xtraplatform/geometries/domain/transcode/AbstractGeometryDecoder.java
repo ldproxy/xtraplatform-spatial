@@ -33,8 +33,9 @@ import de.ii.xtraplatform.geometries.domain.Surface;
 import java.util.List;
 import java.util.Optional;
 
-public abstract class AbstractGeometryDecoder {
+public class AbstractGeometryDecoder {
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   protected Geometry<?> empty(GeometryType type, Axes axes) {
     return switch (type) {
       case POINT -> Point.empty(axes);

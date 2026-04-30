@@ -15,6 +15,7 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableCqlFilter.Builder.class)
 public interface CqlFilter extends CqlPredicate {
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   static CqlFilter of(CqlNode node) {
     if (node instanceof CqlFilter) {
       return of(((CqlFilter) node).getExpressions().get(0));

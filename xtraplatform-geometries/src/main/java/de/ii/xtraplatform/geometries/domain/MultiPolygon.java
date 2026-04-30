@@ -54,12 +54,12 @@ public interface MultiPolygon extends AbstractGeometryCollection<Polygon> {
   @Value.Check
   default void check() {
     Preconditions.checkArgument(
-        getValue().stream().allMatch(g -> g.getAxes().equals(getAxes())),
+        getValue().stream().allMatch(g -> g.getAxes() == getAxes()),
         "All geometries must have the same axes.");
     Preconditions.checkArgument(
         getValue().stream()
             .allMatch(
-                g -> (g.getCrs().isEmpty() && getCrs().isEmpty()) || (g.getCrs().equals(getCrs()))),
+                g -> g.getCrs().isEmpty() && getCrs().isEmpty() || g.getCrs().equals(getCrs())),
         "All geometries must have the same CRS.");
   }
 }

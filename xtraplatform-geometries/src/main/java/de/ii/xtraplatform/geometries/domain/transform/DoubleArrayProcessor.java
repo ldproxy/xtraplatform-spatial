@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+@FunctionalInterface
 public interface DoubleArrayProcessor<T> {
   T onCoordinates(
       double[] coordinates,

@@ -12,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 @JsonDeserialize(using = Operand.OperandDeserializer.class)
-public interface Literal extends Operand, CqlNode {
+public interface Literal extends Operand {
 
   @JsonValue
   Object getValue();
