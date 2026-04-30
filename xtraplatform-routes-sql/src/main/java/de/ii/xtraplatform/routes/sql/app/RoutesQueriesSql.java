@@ -93,6 +93,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class RoutesQueriesSql implements FeatureQueriesExtension {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutesQueriesSql.class);
@@ -117,30 +118,33 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
       FeatureProviderConnector<?, ?, ?> connector) {
     Optional<RoutesConfiguration> routesConfiguration = getRoutesConfiguration(provider.getData());
 
-    if (routesConfiguration.isPresent()) {
-      SqlClient sqlClient = ((SqlConnector) connector).getSqlClient();
-
-      switch (hook) {
-        case STARTED:
-          if (routesConfiguration.get().shouldWarmup()) {
-            LOGGER.debug("Warming up routes queries for {}", provider.getId());
-            List<String> queries = getWarmupSelects(routesConfiguration.get());
-            AtomicInteger completed = new AtomicInteger();
-            queries.forEach(
-                query ->
-                    sqlClient
-                        .run(query, SqlQueryOptions.ignoreResults())
-                        .whenComplete(
-                            (r, t) -> {
-                              completed.getAndIncrement();
-                              if (completed.get() == queries.size())
-                                LOGGER.debug(
-                                    "Routes queries for {} are warmed up", provider.getId());
-                            }));
-          }
-          break;
-      }
+    if (routesConfiguration.isEmpty() || hook != LIFECYCLE_HOOK.STARTED) {
+      return;
     }
+
+    RoutesConfiguration routesConfig = routesConfiguration.get();
+    if (!routesConfig.shouldWarmup()) {
+      return;
+    }
+
+    SqlClient sqlClient = ((SqlConnector) connector).getSqlClient();
+
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Warming up routes queries for {}", provider.getId());
+    }
+    List<String> queries = getWarmupSelects(routesConfig);
+    AtomicInteger completed = new AtomicInteger();
+    queries.forEach(
+        query ->
+            sqlClient
+                .run(query, SqlQueryOptions.ignoreResults())
+                .whenComplete(
+                    (r, t) -> {
+                      completed.getAndIncrement();
+                      if (completed.get() == queries.size() && LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("Routes queries for {} are warmed up", provider.getId());
+                      }
+                    }));
   }
 
   @Override
@@ -159,15 +163,11 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
     if (routesConfiguration.isPresent() && routeQuery.isPresent()) {
       SqlClient sqlClient = ((SqlConnector) connector).getSqlClient();
 
-      switch (hook) {
-        case BEFORE:
-          String tableName =
-              createRouteTable(routesConfiguration.get(), routeQuery.get(), sqlClient);
-          aliasResolver.accept("_route_", tableName);
-          break;
-        case AFTER:
-          deleteRouteTable(routesConfiguration.get(), routeQuery.get(), sqlClient);
-          break;
+      if (hook == QUERY_HOOK.BEFORE) {
+        String tableName = createRouteTable(routesConfiguration.get(), routeQuery.get(), sqlClient);
+        aliasResolver.accept("_route_", tableName);
+      } else if (hook == QUERY_HOOK.AFTER) {
+        deleteRouteTable(routeQuery.get(), sqlClient);
       }
     }
   }
@@ -184,8 +184,7 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
     return tableName;
   }
 
-  private void deleteRouteTable(
-      RoutesConfiguration routesConfiguration, RouteQuery routeQuery, SqlClient sqlClient) {
+  private void deleteRouteTable(RouteQuery routeQuery, SqlClient sqlClient) {
     String tableName = getTempTableName(routeQuery);
 
     deleteTempTable(sqlClient, tableName);
@@ -213,15 +212,14 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
         .run(query, SqlQueryOptions.mutation())
         .whenComplete(
             (result, throwable) -> {
-              if (Objects.nonNull(throwable)) {
-                try {
-                  LOGGER.debug(
-                      "Inserting into temp table failed, dropping it ({})", throwable.getMessage());
-                  deleteTempTable(sqlClient, name);
-                } catch (Throwable t) {
-                  // ignore
-                }
+              if (Objects.isNull(throwable)) {
+                return;
               }
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug(
+                    "Inserting into temp table failed, dropping it ({})", throwable.getMessage());
+              }
+              deleteTempTableAsync(sqlClient, name);
             })
         .join();
   }
@@ -230,6 +228,12 @@ public class RoutesQueriesSql implements FeatureQueriesExtension {
     String query = String.format("DROP TABLE IF EXISTS %s", name);
 
     sqlClient.run(query, SqlQueryOptions.ddl()).join();
+  }
+
+  private void deleteTempTableAsync(SqlClient sqlClient, String name) {
+    String query = String.format("DROP TABLE IF EXISTS %s", name);
+
+    sqlClient.run(query, SqlQueryOptions.ddl());
   }
 
   private String getTempTableName(RouteQuery query) {
