@@ -485,7 +485,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     if (async) {
       DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
 
-      // TODO: only crs, extents, queries needed //NOPMD ForbiddenContent
+      // NOTE: actually only crs, extents, queries would be needed
       if (!provider.isAvailable()) {
         throw new VolatileUnavailableException(
             String.format("Feature provider with id '%s' is not available.", featureProviderId));
