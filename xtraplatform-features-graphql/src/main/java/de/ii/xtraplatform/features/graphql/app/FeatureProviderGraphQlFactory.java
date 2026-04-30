@@ -13,7 +13,6 @@ import dagger.assisted.AssistedFactory;
 import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ConnectorFactory;
 import de.ii.xtraplatform.features.domain.FeatureProviderDataV2;
@@ -25,6 +24,7 @@ import de.ii.xtraplatform.features.domain.SchemaReferenceResolver;
 import de.ii.xtraplatform.features.graphql.domain.FeatureProviderGraphQlData;
 import de.ii.xtraplatform.features.graphql.domain.ImmutableFeatureProviderGraphQlData;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
@@ -35,13 +35,11 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @AutoBind
 public class FeatureProviderGraphQlFactory
-    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderGraphQl>
-    implements EntityFactory {
+    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderGraphQl> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderGraphQlFactory.class);
 
   private final Lazy<Set<SchemaFragmentResolver>> schemaResolvers;
-  private final ConnectorFactory connectorFactory;
 
   @Inject
   public FeatureProviderGraphQlFactory(
@@ -50,7 +48,7 @@ public class FeatureProviderGraphQlFactory
       ProviderGraphQlFactoryAssisted providerGraphQlFactoryAssisted) {
     super(providerGraphQlFactoryAssisted);
     this.schemaResolvers = schemaResolvers;
-    this.connectorFactory = connectorFactory;
+    Objects.requireNonNull(connectorFactory);
   }
 
   @Override
@@ -104,6 +102,7 @@ public class FeatureProviderGraphQlFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface ProviderGraphQlFactoryAssisted
       extends FactoryAssisted<FeatureProviderDataV2, FeatureProviderGraphQl> {
     @Override
