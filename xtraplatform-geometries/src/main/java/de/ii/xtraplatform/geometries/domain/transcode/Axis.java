@@ -12,5 +12,5 @@ enum Axis {
   Y,
   Z;
 
-  static final Axis[] fromInt = {X, Y, Z};
+  static final Axis[] FROM_INT = {X, Y, Z};
 }

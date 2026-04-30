@@ -30,6 +30,7 @@ public interface TileTree {
     return new ImmutableTileTree.Builder().level(level).col(col).row(row).build();
   }
 
+  @FunctionalInterface
   interface TileTreeVisitor<T> {
     T visit(TileTree tileTree, List<T> childResults);
   }
@@ -199,6 +200,7 @@ public interface TileTree {
         .build();
   }
 
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   static List<TileTree> subtrees(
       int level, int row, int col, TileSubMatrix contents, int subtreeLevels) {
     if (level > contents.getLevel()) {
@@ -224,9 +226,9 @@ public interface TileTree {
             TileSubMatrix.of(
                     contents.getLevel(),
                     r * sizeCon,
-                    (r * sizeCon) + (sizeCon) - 1,
+                    r * sizeCon + sizeCon - 1,
                     c * sizeCon,
-                    (c * sizeCon) + (sizeCon) - 1)
+                    c * sizeCon + sizeCon - 1)
                 .intersection(contents);
 
         if (content.isPresent()) {
