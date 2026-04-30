@@ -34,6 +34,13 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   String TYPE = "tile3d-seeding";
   String TYPE_SETUP = type("setup");
   String LABEL = "3D Tiles cache seeding";
+  String PARAM_TILE_SET = "tileSet";
+  String PARAM_TILE_MATRIX_SET = "tileMatrixSet";
+  String PARAM_LEVEL = "level";
+  String PARAM_COUNT = "count";
+  String PARAM_DELTA = "delta";
+  String PARAM_IS_FIRST_TILESET = "isFirstTileset";
+  String PARAM_IS_FIRST_LEVEL = "isFirstLevel";
   List<Integer> INITIAL_LEVELS = IntStream.range(0, 24).map(i -> -1).boxed().toList();
 
   static String type(String... parts) {
@@ -98,19 +105,19 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
 
   @Override
   default void init(Map<String, Object> parameters) {
-    if (parameters.containsKey("tileSet")
-        && parameters.containsKey("tileMatrixSet")
-        && parameters.containsKey("level")
-        && parameters.containsKey("count")) {
+    if (parameters.containsKey(PARAM_TILE_SET)
+        && parameters.containsKey(PARAM_TILE_MATRIX_SET)
+        && parameters.containsKey(PARAM_LEVEL)
+        && parameters.containsKey(PARAM_COUNT)) {
       init(
-          (String) parameters.get("tileSet"),
-          (String) parameters.get("tileMatrixSet"),
-          parameters.get("level") instanceof Integer
-              ? (Integer) parameters.get("level")
-              : Integer.parseInt((String) parameters.get("level")),
-          parameters.get("count") instanceof Integer
-              ? (Integer) parameters.get("count")
-              : Integer.parseInt((String) parameters.get("count")));
+          (String) parameters.get(PARAM_TILE_SET),
+          (String) parameters.get(PARAM_TILE_MATRIX_SET),
+          parameters.get(PARAM_LEVEL) instanceof Integer
+              ? (Integer) parameters.get(PARAM_LEVEL)
+              : Integer.parseInt((String) parameters.get(PARAM_LEVEL)),
+          parameters.get(PARAM_COUNT) instanceof Integer
+              ? (Integer) parameters.get(PARAM_COUNT)
+              : Integer.parseInt((String) parameters.get(PARAM_COUNT)));
     }
   }
 
@@ -118,34 +125,42 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   default Map<String, Object> initJson(Map<String, Object> params) {
     Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
 
-    if (params.containsKey("tileSet") && params.get("count") instanceof Integer) {
-      int delta = (Integer) params.get("count");
-      boolean isFirstTileset = Objects.equals(params.get("isFirstTileset"), true);
-      int tilesetDelta = isFirstTileset ? 1 : 0;
-
-      jsonPathUpdates.put(
-          "$.details.tileSets.%s.progress.total".formatted(params.get("tileSet")),
-          delta + tilesetDelta);
-
-      if (params.containsKey("tileMatrixSet")) {
-        if (isFirstTileset) {
-          jsonPathUpdates.put(
-              "$.details.tileSets.%s.progress.levels.%s"
-                  .formatted(params.get("tileSet"), params.get("tileMatrixSet")),
-              INITIAL_LEVELS);
-        }
-
-        if (params.containsKey("level")) {
-          int levelDelta = Objects.equals(params.get("isFirstLevel"), true) ? 1 : 0;
-
-          jsonPathUpdates.put(
-              "$.details.tileSets.%s.progress.levels.%s[%s]"
-                  .formatted(
-                      params.get("tileSet"), params.get("tileMatrixSet"), params.get("level")),
-              delta + levelDelta);
-        }
-      }
+    if (!(params.containsKey(PARAM_TILE_SET) && params.get(PARAM_COUNT) instanceof Integer)) {
+      return jsonPathUpdates;
     }
+
+    int delta = (Integer) params.get(PARAM_COUNT);
+    boolean isFirstTileset = Objects.equals(params.get(PARAM_IS_FIRST_TILESET), true);
+    int tilesetDelta = isFirstTileset ? 1 : 0;
+
+    jsonPathUpdates.put(
+        "$.details.tileSets.%s.progress.total".formatted(params.get(PARAM_TILE_SET)),
+        delta + tilesetDelta);
+
+    if (!params.containsKey(PARAM_TILE_MATRIX_SET)) {
+      return jsonPathUpdates;
+    }
+
+    if (isFirstTileset) {
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.levels.%s"
+              .formatted(params.get(PARAM_TILE_SET), params.get(PARAM_TILE_MATRIX_SET)),
+          INITIAL_LEVELS);
+    }
+
+    if (!params.containsKey(PARAM_LEVEL)) {
+      return jsonPathUpdates;
+    }
+
+    int levelDelta = Objects.equals(params.get(PARAM_IS_FIRST_LEVEL), true) ? 1 : 0;
+
+    jsonPathUpdates.put(
+        "$.details.tileSets.%s.progress.levels.%s[%s]"
+            .formatted(
+                params.get(PARAM_TILE_SET),
+                params.get(PARAM_TILE_MATRIX_SET),
+                params.get(PARAM_LEVEL)),
+        delta + levelDelta);
 
     return jsonPathUpdates;
   }
@@ -162,19 +177,19 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
 
   @Override
   default void update(Map<String, Object> parameters) {
-    if (parameters.containsKey("tileSet")
-        && parameters.containsKey("tileMatrixSet")
-        && parameters.containsKey("level")
-        && parameters.containsKey("delta")) {
+    if (parameters.containsKey(PARAM_TILE_SET)
+        && parameters.containsKey(PARAM_TILE_MATRIX_SET)
+        && parameters.containsKey(PARAM_LEVEL)
+        && parameters.containsKey(PARAM_DELTA)) {
       update(
-          (String) parameters.get("tileSet"),
-          (String) parameters.get("tileMatrixSet"),
-          parameters.get("level") instanceof Integer
-              ? (Integer) parameters.get("level")
-              : Integer.parseInt((String) parameters.get("level")),
-          parameters.get("delta") instanceof Integer
-              ? (Integer) parameters.get("delta")
-              : Integer.parseInt((String) parameters.get("delta")));
+          (String) parameters.get(PARAM_TILE_SET),
+          (String) parameters.get(PARAM_TILE_MATRIX_SET),
+          parameters.get(PARAM_LEVEL) instanceof Integer
+              ? (Integer) parameters.get(PARAM_LEVEL)
+              : Integer.parseInt((String) parameters.get(PARAM_LEVEL)),
+          parameters.get(PARAM_DELTA) instanceof Integer
+              ? (Integer) parameters.get(PARAM_DELTA)
+              : Integer.parseInt((String) parameters.get(PARAM_DELTA)));
     }
   }
 
@@ -182,21 +197,22 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   default Map<String, Object> updateJson(Map<String, Object> detailParameters) {
     Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
 
-    if (detailParameters.containsKey("tileSet")
-        && detailParameters.get("delta") instanceof Integer) {
-      int delta = (Integer) detailParameters.get("delta");
+    if (detailParameters.containsKey(PARAM_TILE_SET)
+        && detailParameters.get(PARAM_DELTA) instanceof Integer) {
+      int delta = (Integer) detailParameters.get(PARAM_DELTA);
 
       jsonPathUpdates.put(
-          "$.details.tileSets.%s.progress.current".formatted(detailParameters.get("tileSet")),
+          "$.details.tileSets.%s.progress.current".formatted(detailParameters.get(PARAM_TILE_SET)),
           delta);
 
-      if (detailParameters.containsKey("tileMatrixSet") && detailParameters.containsKey("level")) {
+      if (detailParameters.containsKey(PARAM_TILE_MATRIX_SET)
+          && detailParameters.containsKey(PARAM_LEVEL)) {
         jsonPathUpdates.put(
             "$.details.tileSets.%s.progress.levels.%s[%s]"
                 .formatted(
-                    detailParameters.get("tileSet"),
-                    detailParameters.get("tileMatrixSet"),
-                    detailParameters.get("level")),
+                    detailParameters.get(PARAM_TILE_SET),
+                    detailParameters.get(PARAM_TILE_MATRIX_SET),
+                    detailParameters.get(PARAM_LEVEL)),
             -1 * delta);
       }
     }
@@ -211,7 +227,7 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
 
       Tileset3dProgress progress = getTileSets().get(details.getTileSet()).getProgress();
 
-      progress.getCurrent().addAndGet(-(job.getCurrent().get()));
+      progress.getCurrent().addAndGet(-job.getCurrent().get());
 
       if (progress.getLevels().containsKey(details.getTileMatrixSet())) {
         int level = details.getSubMatrices().get(0).getLevel();
@@ -251,7 +267,7 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   interface Tileset3dProgress extends JobProgress {
     @JsonIgnore
     @Nullable
-    LinkedHashMap<String, AtomicIntegerArray> getLevels();
+    Map<String, AtomicIntegerArray> getLevels();
 
     @JsonProperty(value = "levels", access = Access.WRITE_ONLY)
     Map<String, List<Integer>> getLevelsInput();
@@ -275,10 +291,11 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
     }
 
     @Value.Check
+    @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
     default Tileset3dProgress deser() {
       // Ensure that levels is initialized
       if (getLevels() == null) {
-        LinkedHashMap<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
+        Map<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
         for (Map.Entry<String, List<Integer>> entry : getLevelsInput().entrySet()) {
           List<Integer> levelList = entry.getValue();
           AtomicIntegerArray atomicArray = new AtomicIntegerArray(levelList.size());
@@ -288,7 +305,10 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
           levelsMap.put(entry.getKey(), atomicArray);
         }
 
-        return new ImmutableTileset3dProgress.Builder().from(this).levels(levelsMap).build();
+        return new ImmutableTileset3dProgress.Builder()
+            .from(this)
+            .levels(new LinkedHashMap<>(levelsMap))
+            .build();
       }
       return this;
     }

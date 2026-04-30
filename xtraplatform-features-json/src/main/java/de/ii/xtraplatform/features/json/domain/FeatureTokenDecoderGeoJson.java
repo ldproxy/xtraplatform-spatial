@@ -25,15 +25,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-// TODO: how to handle name collisions for id, geometry, or place
+// NOPMD - TODO: how to handle name collisions for id, geometry, or place
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
 public class FeatureTokenDecoderGeoJson
     extends FeatureTokenDecoderSimple<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenDecoderGeoJson.class);
+  private static final String PROPERTIES = "properties";
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
 
   private final JsonParser parser;
@@ -44,13 +43,11 @@ public class FeatureTokenDecoderGeoJson
 
   private boolean started;
   private int depth = -1;
-  private int featureDepth = 0;
-  private boolean inFeature = false;
-  private boolean inProperties = false;
-  private boolean inGeometry = false;
-  private int lastNameIsArrayDepth = 0;
-  private int startArray = 0;
-  private int endArray = 0;
+  private int featureDepth;
+  private boolean inFeature;
+  private boolean inProperties;
+  private boolean inGeometry;
+  private int lastNameIsArrayDepth;
 
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
   private FeatureTokenBufferSimple<
@@ -58,6 +55,7 @@ public class FeatureTokenDecoderGeoJson
       downstream;
 
   public FeatureTokenDecoderGeoJson(Optional<String> nullValue, EpsgCrs crs, Axes axes) {
+    super();
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
@@ -86,7 +84,7 @@ public class FeatureTokenDecoderGeoJson
   }
 
   // for unit tests
-  void parse(String data) throws Exception {
+  void parse(String data) {
     byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8);
     feedInput(dataBytes);
     cleanup();
@@ -105,18 +103,25 @@ public class FeatureTokenDecoderGeoJson
     }
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.SwitchDensity"
+  })
   public boolean advanceParser() {
 
     boolean feedMeMore = false;
 
     try {
       JsonToken nextToken = parser.nextToken();
-      String currentName = parser.currentName();
 
-      // TODO: null is end-of-input
+      // NOTE: null is end-of-input
       if (Objects.isNull(nextToken)) {
         return true; // or completestage???
       }
+
+      String currentName = parser.currentName();
 
       switch (nextToken) {
         case NOT_AVAILABLE:
@@ -128,19 +133,19 @@ public class FeatureTokenDecoderGeoJson
 
         case START_OBJECT:
           if (Objects.nonNull(currentName)
-              && (currentName.equals("geometry") || currentName.equals("place"))) {
+              && ("geometry".equals(currentName) || "place".equals(currentName))) {
             Geometry<?> geometry =
                 new GeometryDecoderJson().decode(parser, Optional.of(crs), Optional.of(axes));
             context.setGeometry(geometry);
             context.pathTracker().track(currentName, 0);
             downstream.onGeometry(context);
           } else {
-            if (Objects.nonNull(currentName) && currentName.equals("properties") && !started) {
+            if (Objects.nonNull(currentName) && PROPERTIES.equals(currentName) && !started) {
               startIfNecessary(false);
             }
             if (Objects.nonNull(currentName) && started) {
               switch (currentName) {
-                case "properties":
+                case PROPERTIES:
                   inProperties = true;
                   context.pathTracker().track(0);
                   break;
@@ -154,7 +159,7 @@ public class FeatureTokenDecoderGeoJson
                   break;
               }
               // nested array_object start
-            } else if (context.pathTracker().asList().size() > 0 && started) {
+            } else if (!context.pathTracker().asList().isEmpty() && started) {
               downstream.onObjectStart(context);
               // feature in collection start
             } else if (depth == featureDepth - 2 && inFeature) {
@@ -165,8 +170,8 @@ public class FeatureTokenDecoderGeoJson
             if (Objects.nonNull(currentName) || lastNameIsArrayDepth == 0) {
               depth += 1;
               if (depth > featureDepth - 1
-                  && (inProperties)
-                  && !Objects.equals(currentName, "properties")) {
+                  && inProperties
+                  && !Objects.equals(currentName, PROPERTIES)) {
                 downstream.onObjectStart(context);
               }
             }
@@ -176,13 +181,11 @@ public class FeatureTokenDecoderGeoJson
         case START_ARRAY:
           // start features array
           if (depth == 0 && Objects.nonNull(currentName)) {
-            switch (currentName) {
-              case "features":
-                startIfNecessary(true);
-                break;
+            if ("features".equals(currentName)) {
+              startIfNecessary(true);
             }
             // start prop array
-          } else if (Objects.nonNull(currentName) && (inProperties)) {
+          } else if (Objects.nonNull(currentName) && inProperties) {
             context.pathTracker().track(currentName);
             lastNameIsArrayDepth += 1;
             depth += 1;
@@ -195,18 +198,11 @@ public class FeatureTokenDecoderGeoJson
         case END_ARRAY:
           // end features array
           if (depth == 0 && Objects.nonNull(currentName)) {
-            if (currentName.equals("features")) {
+            if ("features".equals(currentName)) {
               inFeature = false;
             }
             // end prop array
           } else if (Objects.nonNull(currentName) && inProperties) {
-            if (endArray > 0) {
-              for (int i = 0; i < endArray - 1; i++) {
-                downstream.onArrayEnd(context);
-              }
-              endArray = 0;
-            }
-
             downstream.onArrayEnd(context);
 
             depth -= 1;
@@ -223,7 +219,7 @@ public class FeatureTokenDecoderGeoJson
           if (Objects.nonNull(currentName) || lastNameIsArrayDepth == 0) {
             if (depth > featureDepth - 1
                 && (inProperties || inGeometry)
-                && !Objects.equals(currentName, "properties")) {
+                && !Objects.equals(currentName, PROPERTIES)) {
               downstream.onObjectEnd(context);
             }
 
@@ -241,11 +237,9 @@ public class FeatureTokenDecoderGeoJson
             // end feature in collection
           } else if (depth == featureDepth - 2 && inFeature) {
             downstream.onFeatureEnd(context);
-          } else if (inFeature) {
-            // featureConsumer.onPropertyEnd(pathTracker.asList());
           }
 
-          if (Objects.equals(currentName, "properties")) {
+          if (Objects.equals(currentName, PROPERTIES)) {
             inProperties = false;
           }
           if (inProperties) {
@@ -274,6 +268,8 @@ public class FeatureTokenDecoderGeoJson
             case VALUE_FALSE:
               context.setValueType(Type.BOOLEAN);
               break;
+            default:
+              throw new IllegalStateException("Unsupported JSON token: " + nextToken);
           }
 
           if (nextToken == JsonToken.VALUE_NULL && nullValue.isEmpty()) {
@@ -281,7 +277,7 @@ public class FeatureTokenDecoderGeoJson
           }
           if (nextToken == JsonToken.VALUE_NULL
               && nullValue.isPresent()
-              && Objects.equals(currentName, "properties")) {
+              && Objects.equals(currentName, PROPERTIES)) {
             context.pathTracker().track(0);
             context.setValue(nullValue.get());
             downstream.onValue(context);
@@ -297,12 +293,13 @@ public class FeatureTokenDecoderGeoJson
                 context.metadata().numberMatched(parser.getLongValue());
                 break;
               case "type":
-                if (!parser.getValueAsString().equals("Feature")) {
+                if (!"Feature".equals(parser.getValueAsString())) {
                   break;
                 }
+                // fall through
               case "id":
                 startIfNecessary(false);
-                if (!currentName.equals("id")) {
+                if (!"id".equals(currentName)) {
                   break;
                 }
 
@@ -313,20 +310,14 @@ public class FeatureTokenDecoderGeoJson
 
                 context.pathTracker().track(0);
                 break;
+              default:
+                break;
             }
             // feature id or props or geo value
-          } else if (((inProperties || inGeometry))
-              || (inFeature && Objects.equals(currentName, "id"))) {
+          } else if (inProperties || inGeometry || inFeature && Objects.equals(currentName, "id")) {
 
             if (Objects.nonNull(currentName)) {
               context.pathTracker().track(currentName);
-            }
-
-            if (inGeometry && startArray > 0) {
-              for (int i = 0; i < startArray - 1; i++) {
-                downstream.onArrayStart(context);
-              }
-              startArray = 0;
             }
 
             if (nextToken == JsonToken.VALUE_NULL && nullValue.isPresent()) {
@@ -345,9 +336,12 @@ public class FeatureTokenDecoderGeoJson
             context.pathTracker().track(depth - featureDepth);
           }
           break;
+
+        default:
+          throw new IllegalStateException("Unsupported JSON token: " + nextToken);
       }
     } catch (IOException e) {
-      throw new IllegalArgumentException("Could not parse GeoJSON: " + e.getMessage());
+      throw new IllegalArgumentException("Could not parse GeoJSON: " + e.getMessage(), e);
     }
 
     return feedMeMore;

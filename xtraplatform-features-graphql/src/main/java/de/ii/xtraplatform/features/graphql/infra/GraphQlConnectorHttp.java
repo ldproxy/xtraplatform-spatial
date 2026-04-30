@@ -55,10 +55,8 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
       @Assisted String providerId,
       @Assisted ConnectionInfoGraphQlHttp connectionInfo) {
     super(volatileRegistry);
-    /*
-     workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
-    */
+    // NOTE: workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // remove when fixed
     Optional.ofNullable(
             Strings.emptyToNull(
                 connectionInfo
@@ -70,7 +68,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
     URI host = connectionInfo.getUri();
 
-    // TODO: get maxParallelRequests and idleTimeout from connectionInfo
+    // NOTE: get maxParallelRequests and idleTimeout from connectionInfo
     this.httpClient = http.getHostClient(host, 16, 30);
 
     this.providerId = providerId;
@@ -78,7 +76,6 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
   }
 
   GraphQlConnectorHttp() {
-    // TODO
     super(null);
     httpClient = null;
     providerId = null;
@@ -92,7 +89,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
   @Override
   public void start() {
-    // TODO: implement polling
+    // NOPMD - TODO: implement polling
     setState(State.AVAILABLE);
   }
 
@@ -104,7 +101,7 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
     return providerId;
   }
 
-  // TODO
+  // NOPMD - TODO: implement
   @Override
   public boolean isConnected() {
     return true;
@@ -117,16 +114,16 @@ public class GraphQlConnectorHttp extends AbstractVolatile implements GraphQlCon
 
   @Override
   public Reactive.Source<byte[]> getSourceStream(String query) {
-    InputStream inputStream =
+    try (InputStream inputStream =
         httpClient.postAsInputStream(
             connectionInfo.getUri().toString(),
             query.getBytes(StandardCharsets.UTF_8),
             MediaType.APPLICATION_JSON_TYPE,
-            Map.of("Accept", MediaType.APPLICATION_JSON));
-
-    try {
+            Map.of("Accept", MediaType.APPLICATION_JSON))) {
       byte[] bytes = inputStream.readAllBytes();
-      LOGGER.debug("Response \n{}", new String(bytes, StandardCharsets.UTF_8));
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Response \n{}", new String(bytes, StandardCharsets.UTF_8));
+      }
 
       return httpClient.getAsSource(new ByteArrayInputStream(bytes));
     } catch (IOException e) {

@@ -12,6 +12,8 @@ package de.ii.xtraplatform.crs.domain;
  */
 public class CrsTransformationException extends Exception {
 
+  private static final long serialVersionUID = 1L;
+
   public CrsTransformationException(String message) {
     super(message);
   }

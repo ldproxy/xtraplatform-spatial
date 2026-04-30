@@ -29,8 +29,10 @@ import de.ii.xtraplatform.geometries.domain.Surface;
 
 public interface GeometryTransformer extends GeometryVisitor<Geometry<?>> {
 
+  @Override
   Geometry<?> visit(Point geometry);
 
+  @Override
   Geometry<?> visit(SingleCurve geometry);
 
   @Override

@@ -25,7 +25,7 @@ public abstract class PositionList {
     return ImmutablePositionList.builder().axes(axes).coordinates(new double[0]).build();
   }
 
-  public static PositionList of(Axes axes, double[] coordinates) {
+  public static PositionList of(Axes axes, double... coordinates) {
     return ImmutablePositionList.builder().axes(axes).coordinates(coordinates).build();
   }
 
@@ -52,7 +52,7 @@ public abstract class PositionList {
           i * position.getAxes().size(),
           position.getAxes().size());
     }
-    return PositionList.of(axes, coordinates);
+    return of(axes, coordinates);
   }
 
   public static PositionList concat(PositionList first, PositionList second) {
@@ -149,7 +149,7 @@ public abstract class PositionList {
         coordinates[newMPos] = m;
       }
     }
-    return PositionList.of(getAxes(), coordinates, getInterpolation());
+    return of(getAxes(), coordinates, getInterpolation());
   }
 
   public Position get(int index) {
@@ -175,6 +175,6 @@ public abstract class PositionList {
         coordinates,
         0,
         (toIndex - fromIndex) * getAxes().size());
-    return PositionList.of(getAxes(), coordinates);
+    return of(getAxes(), coordinates);
   }
 }

@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSIntersects.Builder.class)
-public interface SIntersects extends BinarySpatialOperation, CqlNode {
+public interface SIntersects extends BinarySpatialOperation {
 
   String TYPE = "s_intersects";
 
