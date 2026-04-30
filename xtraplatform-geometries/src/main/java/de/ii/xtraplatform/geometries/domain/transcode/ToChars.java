@@ -10,9 +10,8 @@ package de.ii.xtraplatform.geometries.domain.transcode;
 import de.ii.xtraplatform.geometries.domain.PositionList.Interpolation;
 import de.ii.xtraplatform.geometries.domain.transform.DoubleArrayProcessor;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
 import org.immutables.value.Value;
@@ -36,19 +35,18 @@ public abstract class ToChars implements DoubleArrayProcessor<Void> {
       Optional<Interpolation> interpolation,
       OptionalInt minNumberOfPositions)
       throws IOException {
-    Integer[] precision = getPrecision().toArray(getPrecision().toArray(new Integer[0]));
+    Integer[] precision = getPrecision().toArray(new Integer[0]);
     for (int i = 0; i < length; i++) {
       int axisIndex = i % dimension;
-      Axis axis = Axis.fromInt[axisIndex];
+      Axis axis = Axis.FROM_INT[axisIndex];
       String value = String.valueOf(coordinates[i]);
 
       /*
-      TODO: will not be applied when no transformations are given
+      FIXME: will not be applied when no transformations are given
        move to separate step
       */
       if (precision[axisIndex] > 0) {
-        BigDecimal bd = new BigDecimal(value).setScale(precision[axisIndex], RoundingMode.HALF_UP);
-        value = bd.toPlainString();
+        value = String.format(Locale.ROOT, "%." + precision[axisIndex] + "f", coordinates[i]);
       }
 
       switch (axis) {

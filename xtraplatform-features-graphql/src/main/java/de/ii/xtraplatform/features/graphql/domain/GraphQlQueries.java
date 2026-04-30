@@ -45,7 +45,7 @@ public interface GraphQlQueries {
     String getName();
 
     default String getName(String type) {
-      return StringTemplateFilters.applyTemplate(getName(), (Map.of("type", type))::get);
+      return StringTemplateFilters.applyTemplate(getName(), Map.of("type", type)::get);
     }
 
     /**
@@ -76,7 +76,7 @@ public interface GraphQlQueries {
     String getName();
 
     default String getName(String type) {
-      return StringTemplateFilters.applyTemplate(getName(), (Map.of("type", type))::get);
+      return StringTemplateFilters.applyTemplate(getName(), Map.of("type", type)::get);
     }
 
     /**
@@ -98,6 +98,7 @@ public interface GraphQlQueries {
 
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableQueryArgumentsSingle.Builder.class)
+  @FunctionalInterface
   interface QueryArgumentsSingle {
     /**
      * @langEn Argument to select a feature with a specific id. [String
@@ -197,6 +198,7 @@ public interface GraphQlQueries {
 
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableQueryFields.Builder.class)
+  @FunctionalInterface
   interface QueryFields {
     /**
      * @langEn Subfield or argument for properties of type `GEOMETRY`. [String

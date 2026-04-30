@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.cql.domain;
 
-public interface BinaryScalarOperation extends BinaryOperation2<Scalar>, CqlNode {
+public interface BinaryScalarOperation extends BinaryOperation2<Scalar> {
 
   abstract class Builder<T extends BinaryScalarOperation> extends Operation.Builder<Scalar, T> {}
 }

@@ -31,9 +31,7 @@ import java.nio.ByteOrder;
 public class GeometryEncoderWkb {
 
   static final byte[] ENDIANNESS =
-      ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN ? new byte[] {0} : new byte[] {1};
-
-  public GeometryEncoderWkb() {}
+      ByteOrder.BIG_ENDIAN.equals(ByteOrder.nativeOrder()) ? new byte[] {0} : new byte[] {1};
 
   public byte[] encode(Geometry<?> geometry) throws IOException {
     final ByteArrayOutputStream stream = new ByteArrayOutputStream(1024);
@@ -41,6 +39,7 @@ public class GeometryEncoderWkb {
     return stream.toByteArray();
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void writeGeometry(ByteArrayOutputStream stream, Geometry<?> geometry, boolean withHeader)
       throws IOException {
     if (withHeader) {
@@ -65,6 +64,8 @@ public class GeometryEncoderWkb {
       case MULTI_SURFACE -> writeGeometryCollection(stream, (MultiSurface) geometry);
       case GEOMETRY_COLLECTION -> writeGeometryCollection(stream, (GeometryCollection) geometry);
       case POLYHEDRAL_SURFACE -> writePolyhedralSurface(stream, (PolyhedralSurface) geometry);
+      default -> throw new IllegalStateException(
+          "Unsupported geometry type: " + geometry.getType());
     }
   }
 
@@ -73,7 +74,7 @@ public class GeometryEncoderWkb {
       throw new IllegalArgumentException("Unsigned Integer must be positive: " + uint32);
     }
     int value = uint32;
-    if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
+    if (ByteOrder.LITTLE_ENDIAN.equals(ByteOrder.nativeOrder())) {
       value = Integer.reverseBytes(value);
     }
     stream.write(value >> 24 & 0xFF);
@@ -82,7 +83,7 @@ public class GeometryEncoderWkb {
     stream.write(value & 0xFF);
   }
 
-  public void writeCoordinatesWkb(ByteArrayOutputStream stream, double[] coordinates)
+  public void writeCoordinatesWkb(ByteArrayOutputStream stream, double... coordinates)
       throws IOException {
     for (double coordinate : coordinates) {
       writeDouble(stream, coordinate);
@@ -91,7 +92,7 @@ public class GeometryEncoderWkb {
 
   private void writeDouble(ByteArrayOutputStream stream, double value) throws IOException {
     long longBits = Double.doubleToRawLongBits(value);
-    if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
+    if (ByteOrder.LITTLE_ENDIAN.equals(ByteOrder.nativeOrder())) {
       longBits = Long.reverseBytes(longBits);
     }
     for (int i = 7; i >= 0; i--) {

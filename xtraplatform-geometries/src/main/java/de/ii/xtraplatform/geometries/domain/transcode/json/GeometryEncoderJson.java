@@ -29,17 +29,21 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Optional;
 
 public class GeometryEncoderJson implements GeometryVisitor<Void> {
 
+  private static final String FIELD_TYPE = "type";
+  private static final String FIELD_COORDINATES = "coordinates";
+
   private final JsonGenerator json;
   private final boolean onlyGeoJsonGeometries;
-  private final int[] precision;
+  private final Optional<int[]> precision;
 
   public GeometryEncoderJson(JsonGenerator json) {
     this.json = json;
     this.onlyGeoJsonGeometries = false;
-    this.precision = null;
+    this.precision = Optional.empty();
   }
 
   public GeometryEncoderJson(
@@ -48,8 +52,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     this.onlyGeoJsonGeometries = onlyGeoJsonGeometries;
     this.precision =
         precision.stream().anyMatch(v -> v > 0)
-            ? precision.stream().mapToInt(v -> v).toArray()
-            : null;
+            ? Optional.of(precision.stream().mapToInt(v -> v).toArray())
+            : Optional.empty();
   }
 
   @Override
@@ -57,8 +61,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "Point");
-          json.writeFieldName("coordinates");
+          json.writeStringField(FIELD_TYPE, "Point");
+          json.writeFieldName(FIELD_COORDINATES);
           writePosition(geometry.getValue().getCoordinates());
           json.writeEndObject();
         });
@@ -70,8 +74,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "MultiPoint");
-          json.writeFieldName("coordinates");
+          json.writeStringField(FIELD_TYPE, "MultiPoint");
+          json.writeFieldName(FIELD_COORDINATES);
           json.writeStartArray();
           for (Point point : geometry.getValue()) {
             writePosition(point.getValue().getCoordinates());
@@ -88,14 +92,14 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
         json -> {
           json.writeStartObject();
           json.writeStringField(
-              "type",
+              FIELD_TYPE,
               switch (geometry.getType()) {
                 case LINE_STRING -> "LineString";
                 case CIRCULAR_STRING -> "CircularString";
                 default -> throw new IllegalArgumentException(
                     "Unsupported geometry type: " + geometry.getType());
               });
-          json.writeFieldName("coordinates");
+          json.writeFieldName(FIELD_COORDINATES);
           writePositionList(geometry.getAxes().size(), geometry.getValue().getCoordinates());
           json.writeEndObject();
         });
@@ -107,8 +111,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "MultiLineString");
-          json.writeFieldName("coordinates");
+          json.writeStringField(FIELD_TYPE, "MultiLineString");
+          json.writeFieldName(FIELD_COORDINATES);
           json.writeStartArray();
           for (LineString lineString : geometry.getValue()) {
             writePositionList(geometry.getAxes().size(), lineString.getValue().getCoordinates());
@@ -124,8 +128,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "Polygon");
-          json.writeFieldName("coordinates");
+          json.writeStringField(FIELD_TYPE, "Polygon");
+          json.writeFieldName(FIELD_COORDINATES);
           json.writeStartArray();
           for (LineString ring : geometry.getValue()) {
             writePositionList(geometry.getAxes().size(), ring.getValue().getCoordinates());
@@ -141,8 +145,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "MultiPolygon");
-          json.writeFieldName("coordinates");
+          json.writeStringField(FIELD_TYPE, "MultiPolygon");
+          json.writeFieldName(FIELD_COORDINATES);
           json.writeStartArray();
           for (Polygon polygon : geometry.getValue()) {
             json.writeStartArray();
@@ -171,7 +175,7 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "CompoundCurve");
+          json.writeStringField(FIELD_TYPE, "CompoundCurve");
           json.writeFieldName("geometries");
           json.writeStartArray();
           for (SingleCurve curve : geometry.getValue()) {
@@ -191,7 +195,7 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     writeJson(
         json -> {
           json.writeStartObject();
-          json.writeStringField("type", "CurvePolygon");
+          json.writeStringField(FIELD_TYPE, "CurvePolygon");
           json.writeFieldName("geometries");
           json.writeStartArray();
           for (Curve<?> curve : geometry.getValue()) {
@@ -216,13 +220,14 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Void visit(PolyhedralSurface geometry) {
     writeJson(
         json -> {
           if (geometry.isClosed() && !onlyGeoJsonGeometries) {
             json.writeStartObject();
-            json.writeStringField("type", "Polyhedron");
-            json.writeFieldName("coordinates");
+            json.writeStringField(FIELD_TYPE, "Polyhedron");
+            json.writeFieldName(FIELD_COORDINATES);
             json.writeStartArray();
             json.writeStartArray();
             for (Polygon polygon : geometry.getValue()) {
@@ -237,8 +242,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
             json.writeEndObject();
           } else {
             json.writeStartObject();
-            json.writeStringField("type", "MultiPolygon");
-            json.writeFieldName("coordinates");
+            json.writeStringField(FIELD_TYPE, "MultiPolygon");
+            json.writeFieldName(FIELD_COORDINATES);
             json.writeStartArray();
             for (Polygon polygon : geometry.getValue()) {
               json.writeStartArray();
@@ -254,19 +259,19 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
     return null;
   }
 
-  private void writePosition(double[] coordinates) {
+  private void writePosition(double... coordinates) {
     writeJson(
         json -> {
           if (Double.isNaN(coordinates[0])) {
             json.writeStartArray();
             json.writeEndArray();
-          } else if (precision != null) {
+          } else if (precision.isPresent()) {
+            int[] scale = precision.get();
             json.writeStartArray();
             for (int i = 0; i < coordinates.length; i++) {
-              if (i < precision.length && precision[i] > 0) {
+              if (i < scale.length && scale[i] > 0) {
                 json.writeNumber(
-                    BigDecimal.valueOf(coordinates[i])
-                        .setScale(precision[i], RoundingMode.HALF_UP));
+                    BigDecimal.valueOf(coordinates[i]).setScale(scale[i], RoundingMode.HALF_UP));
               } else {
                 json.writeNumber(coordinates[i]);
               }
@@ -278,7 +283,8 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
         });
   }
 
-  private void writePositionList(int dimension, double[] coordinates) {
+  @SuppressWarnings("PMD.CognitiveComplexity")
+  private void writePositionList(int dimension, double... coordinates) {
     writeJson(
         json -> {
           json.writeStartArray();
@@ -286,13 +292,14 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
             if (Double.isNaN(coordinates[i * dimension])) {
               continue;
             }
-            if (precision != null) {
+            if (precision.isPresent()) {
+              int[] scale = precision.get();
               json.writeStartArray();
               for (int j = 0; j < dimension; j++) {
-                if (j < precision.length && precision[j] > 0) {
+                if (j < scale.length && scale[j] > 0) {
                   json.writeNumber(
                       BigDecimal.valueOf(coordinates[i * dimension + j])
-                          .setScale(precision[j], RoundingMode.HALF_UP));
+                          .setScale(scale[j], RoundingMode.HALF_UP));
                 } else {
                   json.writeNumber(coordinates[i * dimension + j]);
                 }
@@ -311,7 +318,7 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
         json -> {
           json.writeStartObject();
           json.writeStringField(
-              "type",
+              FIELD_TYPE,
               switch (geometry.getType()) {
                 case GEOMETRY_COLLECTION -> "GeometryCollection";
                 case MULTI_CURVE -> "MultiCurve";

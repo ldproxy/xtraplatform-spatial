@@ -19,6 +19,16 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaInteger.Builder.class)
 public abstract class JsonSchemaInteger extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaInteger> FUNNEL =
+      (from, into) -> {
+        into.putString(from.getType(), StandardCharsets.UTF_8);
+        from.getMinimum().ifPresent(into::putLong);
+        from.getMaximum().ifPresent(into::putLong);
+        from.getEnums().ifPresent(enums -> enums.stream().sorted().forEachOrdered(into::putInt));
+        from.getUnit().ifPresent(val -> into.putString(val, StandardCharsets.UTF_8));
+      };
+
   @Value.Derived
   public String getType() {
     return "integer";
@@ -35,14 +45,4 @@ public abstract class JsonSchemaInteger extends JsonSchema {
   public abstract Optional<String> getUnit();
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaInteger> FUNNEL =
-      (from, into) -> {
-        into.putString(from.getType(), StandardCharsets.UTF_8);
-        from.getMinimum().ifPresent(into::putLong);
-        from.getMaximum().ifPresent(into::putLong);
-        from.getEnums().ifPresent(enums -> enums.stream().sorted().forEachOrdered(into::putInt));
-        from.getUnit().ifPresent(val -> into.putString(val, StandardCharsets.UTF_8));
-      };
 }
