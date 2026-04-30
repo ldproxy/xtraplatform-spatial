@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * @title GeoParquet
  * @sortPriority 80
  * @langEn The features are stored using one or multiple (Geo)Parquet files.
- * @langDe Die Features sind in einem oder mehreren (Geo)Parquet Dateien gespeichert.
+ * @langDe Die Features sind in einem oder mehreren (Geo)Parquet-Dateien gespeichert.
  * @limitationsEn
  *     <p>The following limitations are known:
  *     <p><code>
@@ -68,9 +68,9 @@ import org.slf4j.LoggerFactory;
  *   - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
  *   - CRUD-Operationen werden nicht unterstützt.
  *   - Spalten mit JSON-Inhalt werden *noch* nicht unterstützt.
- *   - Bei großen Dateien sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
+ *   - Bei großen Dateien sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann es zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
  *   - Das Befüllen einer Tabelle mit dem Inhalt mehrerer spezifischer (Geo)Parquet-Dateien wird *noch* nicht unterstützt. Es ist jedoch möglich, mehrere Dateien mit den Wildcard-Operatoren `*` und `?` auszuwählen.
- *   - Die S3-Url und die S3-Zugangsdaten werden nicht auf korrektheit überprüft.
+ *   - Die S3-URL und die S3-Zugangsdaten werden nicht auf Korrektheit überprüft.
  *   - Der S3-Zugriff kann fehlschlagen, wenn S3-Zugangsdaten angegeben werden, obwohl der Bucket öffentlich ist.
  * </code>
  * @cfgPropertiesAdditionalEn ### Connection Info
@@ -91,6 +91,16 @@ import org.slf4j.LoggerFactory;
  *     </code> Finally the table names can be referenced in `sourcePath`: <code>
  *     sourcePath: /FOOBAR
  *     </code>
+ *     <p>### Configuration of S3
+ *     <p>The possible parameters can be found in the [S3 documentation of
+ *     DuckDB](https://duckdb.org/docs/current/core_extensions/httpfs/s3api#overview-of-s3-secret-parameters).
+ *     The following must be noted: <code>
+ *       - Every value must be a String. This also applies to boolean parameters (in these cases use the Strings "true" and "false").
+ *       - The provided keys must be in lower-case, e.g. "endpoint" for the parameter `ENDPOINT`.
+ *       - The parameters `KEY_ID` and `SECRET` must be provided using `user` and `password` instead of `driverOptions`.
+ *       - The platform-specific secret type can be provided using the internal parameter "type". Valid options are "s3", "r2" and "gcs". For other providers use "s3" and set a custom endpoint instead.
+ *       - Instead of using the parameter `SCOPE` (which is not supported), set your sub-path as part of the bucket-URL in `host`.
+ *     </code>
  * @cfgPropertiesAdditionalDe ### Connection Info
  *     <p>Das Connection-Info-Objekt für GeoParquet hat die folgenden Eigenschaften:
  *     <p>{@docTable:connectionInfo}
@@ -108,6 +118,16 @@ import org.slf4j.LoggerFactory;
  *      table.FOOBAR: "**\/*.parquet" # Alle Parquet-Dateien in beliebiger Tiefe
  *     </code> Die Tabellennamen können anschließend in `sourcePath` referenziert werden: <code>
  *     sourcePath: /FOOBAR
+ *     </code>
+ *     <p>### Konfiguration von S3
+ *     <p>Die möglichen Parameter sind in der [S3-Dokumentation von
+ *     DuckDB](https://duckdb.org/docs/current/core_extensions/httpfs/s3api#overview-of-s3-secret-parameters)
+ *     zu finden. Folgendes ist zu beachten: <code>
+ *       - Jeder Wert muss ein String sein. Dies gilt auch für boolesche Parameter (in diesem Fall "true" und "false" verwenden).
+ *       - Die Schlüssel müssen in Kleinbuchstaben angegeben werden, z.B. "endpoint" für den Parameter `ENDPOINT`.
+ *       - Die Parameter `KEY_ID` und `SECRET` müssen über `user` und `password` statt über `driverOptions` angegeben werden.
+ *       - Der plattformspezifische Secret-Typ kann über den internen Parameter "type" angegeben werden. Gültige Optionen sind "s3", "r2" und "gcs". Für andere Provider "s3" verwenden und den `ENDPOINT`-Parameter entsprechend setzen.
+ *       - Anstelle des Parameters `SCOPE` (der nicht unterstützt wird), den Unterordner als Teil der Bucket-URL in `host` angeben.
  *     </code>
  * @ref:connectionInfo {@link
  *     de.ii.xtraplatform.features.geoparquet.domain.ImmutableConnectionInfoGeoParquet}
