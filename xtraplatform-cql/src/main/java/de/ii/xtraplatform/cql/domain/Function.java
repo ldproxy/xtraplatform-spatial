@@ -20,7 +20,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableFunction.Builder.class)
 @JsonSerialize(using = Function.Serializer.class)
-public interface Function extends CqlNode, Scalar, Temporal, Operand, Cql2Expression {
+public interface Function extends Temporal, Cql2Expression {
 
   String getName();
 
@@ -40,6 +40,8 @@ public interface Function extends CqlNode, Scalar, Temporal, Operand, Cql2Expres
   }
 
   class Serializer extends StdSerializer<Function> {
+
+    private static final long serialVersionUID = 1L;
 
     protected Serializer() {
       this(null);

@@ -30,19 +30,22 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
   private final CrsInfo crsInfo;
 
   public CqlVisitorMapEnvelopes(CrsInfo crsInfo) {
+    super();
     this.crsInfo = crsInfo;
   }
 
   @Override
   public CqlNode visit(SpatialLiteral spatialLiteral, List<CqlNode> children) {
-    if (spatialLiteral.getType() == Bbox.class && spatialLiteral.getValue() instanceof Bbox)
+    if (spatialLiteral.getType() == Bbox.class && spatialLiteral.getValue() instanceof Bbox) {
       return SpatialLiteral.of(
           ((GeometryNode) visit((Bbox) spatialLiteral.getValue(), children)).getGeometry());
+    }
 
     return super.visit(spatialLiteral, children);
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public CqlNode visit(Bbox bbox, List<CqlNode> children) {
     List<Double> c = bbox.getCoordinates();
     EpsgCrs crs = bbox.getCrs().orElse(OgcCrs.CRS84);
