@@ -19,6 +19,7 @@ import javax.ws.rs.core.MediaType;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.UseObjectForClearerAPI")
 public class DecoderFactoryJson implements DecoderFactory {
 
   @Inject

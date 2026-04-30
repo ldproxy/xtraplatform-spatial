@@ -81,6 +81,7 @@ public class GraphQlConnectorHttpFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface FactoryAssisted {
     GraphQlConnectorHttp create(String providerId, ConnectionInfoGraphQlHttp connectionInfo);
   }

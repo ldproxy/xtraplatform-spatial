@@ -16,13 +16,13 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaNot.Builder.class)
 public abstract class JsonSchemaNot extends JsonSchema {
 
-  public abstract Optional<JsonSchema> getNot();
-
-  public abstract static class Builder extends JsonSchema.Builder {}
-
   @SuppressWarnings("UnstableApiUsage")
   public static final Funnel<JsonSchemaNot> FUNNEL =
       (from, into) -> {
         from.getNot().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
       };
+
+  public abstract Optional<JsonSchema> getNot();
+
+  public abstract static class Builder extends JsonSchema.Builder {}
 }

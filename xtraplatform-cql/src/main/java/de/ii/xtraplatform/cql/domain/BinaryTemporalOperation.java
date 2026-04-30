@@ -11,17 +11,32 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import java.util.Locale;
 import org.immutables.value.Value;
 import org.threeten.extra.Interval;
 
-public interface BinaryTemporalOperation extends BinaryOperation2<Temporal>, CqlNode {
+public interface BinaryTemporalOperation extends BinaryOperation2<Temporal> {
+
+  List<TemporalFunction> INTERVAL_ONLY =
+      ImmutableList.of(
+          TemporalFunction.T_CONTAINS,
+          TemporalFunction.T_DURING,
+          TemporalFunction.T_FINISHEDBY,
+          TemporalFunction.T_FINISHES,
+          TemporalFunction.T_MEETS,
+          TemporalFunction.T_METBY,
+          TemporalFunction.T_OVERLAPPEDBY,
+          TemporalFunction.T_OVERLAPS,
+          TemporalFunction.T_STARTEDBY,
+          TemporalFunction.T_STARTS);
 
   @JsonIgnore
   @Value.Derived
   default TemporalFunction getTemporalOperator() {
-    return TemporalFunction.valueOf(getOp().toUpperCase());
+    return TemporalFunction.valueOf(getOp().toUpperCase(Locale.ROOT));
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static BinaryTemporalOperation of(
       TemporalFunction operator, Temporal temporal1, Temporal temporal2) {
     switch (operator) {
@@ -60,19 +75,6 @@ public interface BinaryTemporalOperation extends BinaryOperation2<Temporal>, Cql
     throw new IllegalStateException();
   }
 
-  List<TemporalFunction> INTERVAL_ONLY =
-      ImmutableList.of(
-          TemporalFunction.T_CONTAINS,
-          TemporalFunction.T_DURING,
-          TemporalFunction.T_FINISHEDBY,
-          TemporalFunction.T_FINISHES,
-          TemporalFunction.T_MEETS,
-          TemporalFunction.T_METBY,
-          TemporalFunction.T_OVERLAPPEDBY,
-          TemporalFunction.T_OVERLAPS,
-          TemporalFunction.T_STARTEDBY,
-          TemporalFunction.T_STARTS);
-
   @Value.Check
   @Override
   default void check() {
@@ -83,21 +85,23 @@ public interface BinaryTemporalOperation extends BinaryOperation2<Temporal>, Cql
               Preconditions.checkState(
                   operand != null, "a temporal operation must have temporal operands, found null");
               if (INTERVAL_ONLY.contains(getTemporalOperator())) {
-                if (operand instanceof Property)
+                if (operand instanceof Property) {
                   Preconditions.checkState(
                       true,
                       "The arguments of %s must be an INTERVAL(). Found: a property ('%s').",
                       getTemporalOperator().toString(),
                       ((Property) operand).getName());
-                if (operand instanceof TemporalLiteral)
+                }
+                if (operand instanceof TemporalLiteral) {
                   Preconditions.checkState(
                       ((TemporalLiteral) operand).getType() == Interval.class
-                          || (((TemporalLiteral) operand).getType()
-                              == de.ii.xtraplatform.cql.domain.Interval.class),
+                          || ((TemporalLiteral) operand).getType()
+                              == de.ii.xtraplatform.cql.domain.Interval.class,
                       "The arguments of %s must be an INTERVAL(). Found: a temporal literal '%s' of type '%s'.",
                       getTemporalOperator().toString(),
                       ((TemporalLiteral) operand).getValue(),
                       ((TemporalLiteral) operand).getType());
+                }
               }
             });
   }

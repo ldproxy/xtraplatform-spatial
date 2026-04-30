@@ -13,7 +13,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableScalarLiteral.Builder.class)
-public interface ScalarLiteral extends Scalar, Literal, CqlNode {
+public interface ScalarLiteral extends Scalar, Literal {
 
   static ScalarLiteral of(Double literal) {
     return new Builder(literal).build();
@@ -27,7 +27,7 @@ public interface ScalarLiteral extends Scalar, Literal, CqlNode {
     return new Builder(literal).build();
   }
 
-  static ScalarLiteral of(java.lang.Boolean literal) {
+  static ScalarLiteral of(Boolean literal) {
     return new Builder(literal).build();
   }
 
@@ -66,10 +66,10 @@ public interface ScalarLiteral extends Scalar, Literal, CqlNode {
     }
 
     @JsonCreator
-    public Builder(java.lang.Boolean literal) {
+    public Builder(Boolean literal) {
       super();
       value(literal);
-      type(java.lang.Boolean.class);
+      type(Boolean.class);
     }
 
     @JsonCreator
@@ -99,8 +99,8 @@ public interface ScalarLiteral extends Scalar, Literal, CqlNode {
           try {
             return Double.valueOf(literal);
           } catch (NumberFormatException e3) {
-            if (literal.equalsIgnoreCase("true") || literal.equalsIgnoreCase("false")) {
-              return java.lang.Boolean.valueOf(literal);
+            if ("true".equalsIgnoreCase(literal) || "false".equalsIgnoreCase(literal)) {
+              return Boolean.valueOf(literal);
             }
           }
         }

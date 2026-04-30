@@ -14,8 +14,9 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableArrayLiteral.Builder.class)
-public interface ArrayLiteral extends Vector, Literal, Scalar, CqlNode {
+public interface ArrayLiteral extends Vector, Literal, Scalar {
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   static ArrayLiteral of(String elements) throws CqlParseException {
     return new ArrayLiteral.Builder(elements).build();
   }
@@ -37,6 +38,7 @@ public interface ArrayLiteral extends Vector, Literal, Scalar, CqlNode {
     }
 
     @JsonCreator
+    @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
     public Builder(String literal) throws CqlParseException {
       super();
       value(literal);

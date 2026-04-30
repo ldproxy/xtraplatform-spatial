@@ -36,17 +36,19 @@ public class CqlTextParser {
     return parser.cqlFilter();
   }
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   public Cql2Expression parse(String cql, EpsgCrs defaultCrs) throws CqlParseException {
     return parse(cql, new CqlTextVisitor(defaultCrs));
   }
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   public Cql2Expression parse(String cql, CqlTextVisitor visitor) throws CqlParseException {
     try {
       CqlParser.CqlFilterContext cqlFilterContext = parseToTree(cql);
 
       return (Cql2Expression) visitor.visit(cqlFilterContext);
     } catch (ParseCancellationException e) {
-      throw new CqlParseException(e.getMessage());
+      throw new CqlParseException(e.getMessage(), e);
     }
   }
 
@@ -55,6 +57,7 @@ public class CqlTextParser {
     public static final ThrowingErrorListener INSTANCE = new ThrowingErrorListener();
 
     @Override
+    @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
     public void syntaxError(
         Recognizer<?, ?> recognizer,
         Object offendingSymbol,
@@ -74,11 +77,12 @@ public class CqlTextParser {
     }
 
     protected final Boolean isNotInsideNestedFilter(ParserRuleContext ctx) {
+      ParserRuleContext current = ctx;
 
-      while (ctx.parent != null) {
-        ctx = (ParserRuleContext) ctx.parent;
+      while (current.parent != null) {
+        current = (ParserRuleContext) current.parent;
 
-        if (ctx instanceof CqlParser.NestedCqlFilterContext) {
+        if (current instanceof CqlParser.NestedCqlFilterContext) {
           return false;
         }
       }

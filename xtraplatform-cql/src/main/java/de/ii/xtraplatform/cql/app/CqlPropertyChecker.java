@@ -24,13 +24,14 @@ public class CqlPropertyChecker extends CqlVisitorBase<List<String>> {
   private final List<String> invalidProperties = new ArrayList<>();
 
   public CqlPropertyChecker(Collection<String> allowedProperties) {
+    super();
     this.allowedProperties =
         ImmutableList.<String>builder().addAll(allowedProperties).add(ID_PLACEHOLDER).build();
   }
 
   @Override
   public List<String> postProcess(CqlNode node, List<String> strings) {
-    ImmutableList<String> result = ImmutableList.copyOf(invalidProperties);
+    List<String> result = ImmutableList.copyOf(invalidProperties);
     invalidProperties.clear();
     return result;
   }

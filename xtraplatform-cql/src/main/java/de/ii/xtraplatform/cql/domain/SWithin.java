@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSWithin.Builder.class)
-public interface SWithin extends BinarySpatialOperation, CqlNode {
+public interface SWithin extends BinarySpatialOperation {
 
   String TYPE = "s_within";
 
