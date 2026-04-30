@@ -20,11 +20,15 @@ public interface LineString extends SingleCurve {
     return ImmutableLineString.builder().value(PositionList.empty(axes)).build();
   }
 
-  static LineString of(double[] xyCoordinates) {
+  static LineString of(double... xyCoordinates) {
     return ImmutableLineString.builder().value(PositionList.of(Axes.XY, xyCoordinates)).build();
   }
 
   static LineString of(double[] xyCoordinates, EpsgCrs crs) {
+    return of(crs, xyCoordinates);
+  }
+
+  static LineString of(EpsgCrs crs, double... xyCoordinates) {
     return ImmutableLineString.builder()
         .crs(crs)
         .value(PositionList.of(Axes.XY, xyCoordinates))
@@ -57,6 +61,7 @@ public interface LineString extends SingleCurve {
     return ImmutableLineString.builder().value(PositionList.of(axes, coordinates)).build();
   }
 
+  @Override
   @Value.Derived
   @Value.Auxiliary
   default Axes getAxes() {

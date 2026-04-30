@@ -30,6 +30,7 @@ public class CqlVisitorMapNots extends CqlVisitorCopy {
     return map(not.getArgs().get(0));
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private Cql2Expression map(Cql2Expression arg) {
     if (arg instanceof Or) {
       return And.of(

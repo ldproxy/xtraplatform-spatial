@@ -7,4 +7,4 @@
  */
 package de.ii.xtraplatform.cql.domain;
 
-public interface Vector extends Operand, CqlNode {}
+public interface Vector extends Operand {}

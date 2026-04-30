@@ -27,6 +27,7 @@ public interface CircularString extends SingleCurve {
     return ImmutableCircularString.builder().crs(crs).value(positionList).build();
   }
 
+  @Override
   @Value.Default
   default Axes getAxes() {
     return getValue().getAxes();
@@ -42,7 +43,7 @@ public interface CircularString extends SingleCurve {
   @Value.Check
   default void check() {
     Preconditions.checkState(
-        isEmpty() || (getValue().getNumPositions() > 2 && getValue().getNumPositions() % 2 == 1),
+        isEmpty() || getValue().getNumPositions() > 2 && getValue().getNumPositions() % 2 == 1,
         "A non-empty circular string must have an odd number of positions and at least three positions, found %d positions.",
         getValue().getNumPositions());
   }

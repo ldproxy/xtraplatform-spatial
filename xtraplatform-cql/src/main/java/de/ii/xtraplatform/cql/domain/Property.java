@@ -18,7 +18,8 @@ import org.immutables.value.Value;
 @Value.Immutable
 @Value.Style(of = "new")
 @JsonDeserialize(builder = ImmutableProperty.Builder.class)
-public interface Property extends Scalar, Spatial, Temporal, Operand, Vector, CqlNode {
+@SuppressWarnings("PMD.FieldDeclarationsShouldBeAtStartOfClass")
+public interface Property extends Temporal, Spatial, Vector {
 
   static Property of(String name) {
     return ImmutableProperty.builder().name(name).build();
