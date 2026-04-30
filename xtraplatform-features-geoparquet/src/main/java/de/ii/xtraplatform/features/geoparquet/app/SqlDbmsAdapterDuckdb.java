@@ -39,11 +39,19 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
   // ToDo: Log errors
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterDuckdb.class);
 
-  // Constants for ConnectionInfo
+  // Constants to extract parameter from driverOptions
   private static final String TABLE_PREFIX = "table.";
+  private static final String DRIVER_OPT_TYPE = "type";
   private static final String DRIVER_OPT_ENDPOINT = "endpoint";
-  private static final String DRIVER_OPT_USE_SSL = "use_ssl";
+  private static final String DRIVER_OPT_REGION = "region";
+  private static final String DRIVER_OPT_SESSION_TOKEN = "session_token";
+  private static final String DRIVER_OPT_URL_COMPATIBILITY_MODE = "url_compatibility_mode";
   private static final String DRIVER_OPT_URL_STYLE = "url_style";
+  private static final String DRIVER_OPT_USE_SSL = "use_ssl";
+  private static final String DRIVER_OPT_VERIFY_SSL = "verify_ssl";
+  private static final String DRIVER_OPT_ACCOUNT_ID = "account_id";
+  private static final String DRIVER_OPT_KMS_KEY_ID = "kms_key_id";
+  private static final String DRIVER_OPT_REQUESTER_PAYS = "requester_pays";
 
   private final ResourceStore featuresStore;
   private final String applicationName;
@@ -125,43 +133,96 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     queryBuilder.append("INSTALL httpfs;");
     queryBuilder.append("LOAD httpfs;");
 
-    // Extract all parameter necessary to connect to the S3 service
-    ArrayList<String> connectingParameter = new ArrayList<>();
+    // Extract all parameter necessary driver parameter, see
+    // https://duckdb.org/docs/current/core_extensions/httpfs/s3api#overview-of-s3-secret-parameters
+    // ToDo: Check if the input is valid
+    ArrayList<String> driverParameter = new ArrayList<>();
     Map<String, String> driverOptions = connectionInfo.getDriverOptions();
 
-    // Extract key
-    connectionInfo
-        .getUser()
-        .ifPresent(key -> connectingParameter.add(String.format("KEY_ID '%s'", key)));
-
-    // Extract secret key
-    connectionInfo
-        .getPassword()
-        .ifPresent(secret -> connectingParameter.add(String.format("SECRET '%s'", secret)));
-
-    // Extract custom endpoint
+    // Extract ENDPOINT
     if (driverOptions.containsKey(DRIVER_OPT_ENDPOINT)) {
-      connectingParameter.add(
-          String.format("ENDPOINT '%s'", driverOptions.get(DRIVER_OPT_ENDPOINT)));
+      driverParameter.add(String.format("ENDPOINT '%s'", driverOptions.get(DRIVER_OPT_ENDPOINT)));
     }
 
-    // Extract USE_SLL
-    if (driverOptions.containsKey(DRIVER_OPT_USE_SSL)) {
-      connectingParameter.add(String.format("USE_SSL %s", driverOptions.get(DRIVER_OPT_USE_SSL)));
+    // Extract KEY_ID
+    connectionInfo
+        .getUser()
+        .ifPresent(key -> driverParameter.add(String.format("KEY_ID '%s'", key)));
+
+    // Extract REGION
+    if (driverOptions.containsKey(DRIVER_OPT_REGION)) {
+      driverParameter.add(String.format("REGION '%s'", driverOptions.get(DRIVER_OPT_REGION)));
+    }
+
+    // Extract SECRET
+    connectionInfo
+        .getPassword()
+        .ifPresent(secret -> driverParameter.add(String.format("SECRET '%s'", secret)));
+
+    // Extract SESSION_TOKEN
+    if (driverOptions.containsKey(DRIVER_OPT_SESSION_TOKEN)) {
+      driverParameter.add(
+          String.format("SESSION_TOKEN '%s'", driverOptions.get(DRIVER_OPT_SESSION_TOKEN)));
+    }
+
+    // Extract URL_COMPATIBILITY_MODE
+    if (driverOptions.containsKey(DRIVER_OPT_URL_COMPATIBILITY_MODE)) {
+      driverParameter.add(
+          String.format(
+              "URL_COMPATIBILITY_MODE %s", driverOptions.get(DRIVER_OPT_URL_COMPATIBILITY_MODE)));
     }
 
     // Extract URL_STYLE
     if (driverOptions.containsKey(DRIVER_OPT_URL_STYLE)) {
-      connectingParameter.add(
-          String.format("URL_STYLE '%s'", driverOptions.get(DRIVER_OPT_URL_STYLE)));
+      driverParameter.add(String.format("URL_STYLE '%s'", driverOptions.get(DRIVER_OPT_URL_STYLE)));
+    }
+
+    // Extract USE_SSL
+    if (driverOptions.containsKey(DRIVER_OPT_USE_SSL)) {
+      driverParameter.add(String.format("USE_SSL %s", driverOptions.get(DRIVER_OPT_USE_SSL)));
+    }
+
+    // Extract VERIFY_SSL
+    if (driverOptions.containsKey(DRIVER_OPT_VERIFY_SSL)) {
+      driverParameter.add(String.format("VERIFY_SSL %s", driverOptions.get(DRIVER_OPT_VERIFY_SSL)));
+    }
+
+    // Extract ACCOUNT_ID
+    if (driverOptions.containsKey(DRIVER_OPT_ACCOUNT_ID)) {
+      driverParameter.add(
+          String.format("ACCOUNT_ID '%s'", driverOptions.get(DRIVER_OPT_ACCOUNT_ID)));
+    }
+
+    // Extract KMS_KEY_ID
+    if (driverOptions.containsKey(DRIVER_OPT_KMS_KEY_ID)) {
+      driverParameter.add(
+          String.format("KMS_KEY_ID '%s'", driverOptions.get(DRIVER_OPT_KMS_KEY_ID)));
+    }
+
+    // Extract REQUESTER_PAYS
+    if (driverOptions.containsKey(DRIVER_OPT_REQUESTER_PAYS)) {
+      driverParameter.add(
+          String.format("REQUESTER_PAYS %s", driverOptions.get(DRIVER_OPT_REQUESTER_PAYS)));
     }
 
     // Create DuckDB Secret containing all the connection parameter
-    if (!connectingParameter.isEmpty()) {
-      queryBuilder.append("CREATE SECRET (TYPE s3,");
-      queryBuilder.append(String.join(",", connectingParameter));
-      queryBuilder.append(");");
+    if (driverOptions.containsKey(DRIVER_OPT_TYPE)) {
+      switch (driverOptions.get(DRIVER_OPT_TYPE).toLowerCase()) {
+        case "s3" -> queryBuilder.append("CREATE SECRET (TYPE s3");
+        case "r2" -> queryBuilder.append("CREATE SECRET (TYPE r2");
+        case "gcs" -> queryBuilder.append("CREATE SECRET (TYPE gcs");
+        default ->
+            throw new IllegalArgumentException(
+                "Unknown provider type. Use S3 with a custom endpoint instead.");
+      }
+    } else {
+      queryBuilder.append("CREATE SECRET (TYPE s3");
     }
+    if (!driverParameter.isEmpty()) {
+      queryBuilder.append(",");
+      queryBuilder.append(String.join(",", driverParameter));
+    }
+    queryBuilder.append(");");
 
     // Host (bucket) is present because it was checked in getInitSql)
     addViews(queryBuilder, connectionInfo.getHost().get(), driverOptions);
@@ -178,8 +239,8 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     queryBuilder.append("LOAD spatial;");
 
     // Data is retrieved from S3
-    if (connectionInfo.getHost().isPresent() && connectionInfo.getHost().get().startsWith("s3"))
-      return handleS3(queryBuilder, connectionInfo);
+    // ToDo: Check if host is valid
+    if (connectionInfo.getHost().isPresent()) return handleS3(queryBuilder, connectionInfo);
 
     // Data is available as local GeoParquet files
     return handleLocalFiles(queryBuilder, connectionInfo);
