@@ -73,6 +73,8 @@ public interface FeatureSchema
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
 
+  Optional<Boolean> getAudit();
+
   @JsonIgnore
   @Override
   String getName();
@@ -1146,8 +1148,7 @@ public interface FeatureSchema
                               .map(
                                   entry ->
                                       new SimpleEntry<>(
-                                          entry.getKey(),
-                                          (FeatureSchema) visit.apply(entry.getValue())))
+                                          entry.getKey(), visit.apply(entry.getValue())))
                               .collect(
                                   ImmutableMap.toImmutableMap(
                                       Map.Entry::getKey, Map.Entry::getValue)))
