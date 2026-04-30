@@ -57,6 +57,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass", "PMD.TooManyMethods"})
 public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private static final Set<Type> NUMBER = ImmutableSet.of(Type.Integer, Type.Long, Type.Double);
@@ -149,6 +150,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   private final Cql cql;
 
   public CqlTypeAndFunctionChecker(Map<String, String> propertyTypes, Cql cql) {
+    super();
     this.propertyTypes = propertyTypes;
     this.cql = cql;
   }
@@ -237,9 +239,10 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public Type visit(Property property, List<Type> children) {
     String schemaType = propertyTypes.get(property.getName());
-    if (Objects.nonNull(schemaType))
+    if (Objects.nonNull(schemaType)) {
       switch (schemaType) {
         case "STRING":
           return Type.String;
@@ -258,7 +261,10 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
         case "VALUE_ARRAY":
         case "OBJECT_ARRAY":
           return Type.List;
+        default:
+          return Type.UNKNOWN;
       }
+    }
     return Type.UNKNOWN;
   }
 
@@ -269,8 +275,9 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   @Override
   public Type visit(TemporalLiteral temporalLiteral, List<Type> children) {
-    if (temporalLiteral.getType() == Interval.class)
+    if (temporalLiteral.getType() == Interval.class) {
       return ((Interval) temporalLiteral.getValue()).accept(this);
+    }
     return Type.valueOf(temporalLiteral.getType().getSimpleName());
   }
 
@@ -286,17 +293,20 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private void checkOperation(CqlNode node, List<Type> types) {
     final Type firstType = types.get(0);
-    if (firstType == Type.UNKNOWN) return;
-    final List<Type> otherTypes = types.subList(1, types.size());
+    if (firstType == Type.UNKNOWN) {
+      return;
+    }
 
     List<Set<Type>> compatibilityLists = getCompatibilityLists(node.getClass());
-    if (compatibilityLists.isEmpty())
+    if (compatibilityLists.isEmpty()) {
       throw new CqlIncompatibleTypes(getText(node), firstType.schemaType(), ImmutableList.of());
-    if (compatibilityLists.stream().noneMatch(list -> list.contains(firstType)))
+    }
+    if (compatibilityLists.stream().noneMatch(list -> list.contains(firstType))) {
       throw new CqlIncompatibleTypes(
           getText(node),
           firstType.schemaType(),
           asSchemaTypes(compatibilityLists.stream().flatMap(Collection::stream).toList()));
+    }
 
     final List<Type> compatibleTypes =
         getCompatibilityLists(node.getClass()).stream()
@@ -306,8 +316,9 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
             .toList();
     final List<Type> expectedTypes =
         ImmutableList.<Type>builder().add(firstType).addAll(compatibleTypes).build();
+    final List<Type> otherTypes = types.subList(1, types.size());
     otherTypes.stream()
-        .filter(type -> !expectedTypes.contains(type) && !type.equals(Type.UNKNOWN))
+        .filter(type -> !expectedTypes.contains(type) && type != Type.UNKNOWN)
         .findFirst()
         .ifPresent(
             type -> {
@@ -355,7 +366,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
             i -> {
               Type type = types.get(i);
               Set<Type> expected = expectedTypes.get(i);
-              if (expected.stream().noneMatch(expectedType -> expectedType.equals(type))) {
+              if (expected.stream().noneMatch(expectedType -> expectedType == type)) {
                 throw new CqlIncompatibleTypes(
                     getText(function), i + 1, type.schemaType(), asSchemaTypesFunction(expected));
               }
@@ -371,8 +382,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     if (expectedTypes.stream()
         .noneMatch(
             typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
+                types.stream().allMatch(type -> typeList.contains(type) || type == Type.UNKNOWN))) {
       throw new CqlIncompatibleTypes(
           getText(node), asSchemaTypes(types), asSchemaTypes(expectedTypes));
     }
@@ -387,8 +397,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     if (expectedTypes.stream()
         .noneMatch(
             typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
+                types.stream().allMatch(type -> typeList.contains(type) || type == Type.UNKNOWN))) {
       throw new CqlIncompatibleTypes(
           getText(node), asSchemaTypes(types), asSchemaTypes(expectedTypes));
     }
@@ -432,7 +441,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
       String tmp =
           cql.write(
               TEquals.of(TemporalLiteral.of(Instant.EPOCH), (Interval) node), Cql.Format.TEXT);
-      return tmp.substring(0, tmp.indexOf(",") + 1).replace(")", "");
+      return tmp.substring(0, tmp.indexOf(',') + 1).replace(")", "");
     }
     return cql.write((Cql2Expression) node, Cql.Format.TEXT);
   }

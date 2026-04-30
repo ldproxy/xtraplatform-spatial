@@ -41,9 +41,10 @@ public abstract class BoundingBoxTransformer implements CrsTransformer {
     return BoundingBox.of(xmin, ymin, xmax, ymax, getTargetCrs());
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private BoundingBox transformBoundingBox3D(BoundingBox boundingBox)
       throws CrsTransformationException {
-    assert (boundingBox.is3d());
+    assert boundingBox.is3d();
 
     double[] llb =
         this.transform(

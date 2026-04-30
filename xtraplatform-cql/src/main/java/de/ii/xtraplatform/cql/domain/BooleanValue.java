@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.domain;
 
 import java.util.Optional;
 
+@FunctionalInterface
 public interface BooleanValue {
 
   Optional<ScalarLiteral> getBooleanValue();

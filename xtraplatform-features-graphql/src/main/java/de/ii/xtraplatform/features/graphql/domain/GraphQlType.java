@@ -24,7 +24,7 @@ public enum GraphQlType {
   URI("anyURI"),
   NONE("");
 
-  private String stringRepresentation;
+  private final String stringRepresentation;
 
   GraphQlType(String stringRepresentation) {
     this.stringRepresentation = stringRepresentation;
@@ -36,7 +36,7 @@ public enum GraphQlType {
   }
 
   public static GraphQlType fromString(String type) {
-    for (GraphQlType v : GraphQlType.values()) {
+    for (GraphQlType v : values()) {
       if (v.toString().equals(type)) {
         return v;
       }
@@ -46,7 +46,7 @@ public enum GraphQlType {
   }
 
   public static boolean contains(String type) {
-    for (GraphQlType v : GraphQlType.values()) {
+    for (GraphQlType v : values()) {
       if (v.toString().equals(type)) {
         return true;
       }

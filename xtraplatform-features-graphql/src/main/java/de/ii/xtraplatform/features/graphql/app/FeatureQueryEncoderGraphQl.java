@@ -26,6 +26,7 @@ import de.ii.xtraplatform.strings.domain.StringTemplateFilters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,7 +40,6 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
   private final Map<String, FeatureSchema> featureSchemas;
   private final Map<String, List<FeatureSchema>> sourceSchemas;
   private final GraphQlQueries queryGeneration;
-  private final EpsgCrs nativeCrs;
   private final FilterEncoderGraphQl filterEncoder;
 
   public FeatureQueryEncoderGraphQl(
@@ -52,8 +52,8 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
       Cql cql) {
     this.featureSchemas = featureSchemas;
     this.sourceSchemas = sourceSchemas;
+    Objects.requireNonNull(connectionInfo);
     this.queryGeneration = queryGeneration;
-    this.nativeCrs = nativeCrs;
     this.filterEncoder =
         new FilterEncoderGraphQl(nativeCrs, crsTransformerFactory, cql, queryGeneration);
   }
@@ -74,7 +74,6 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
 
   @Override
   public FeatureProviderCapabilities getCapabilities() {
-    // TODO: derive from queryGeneration
     return ImmutableFeatureProviderCapabilities.builder().level(Level.BASIC).build();
   }
 
@@ -84,10 +83,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
 
   public String getTypeName(final FeatureQuery query) {
     FeatureSchema featureSchema = featureSchemas.get(query.getType());
-    String name =
-        featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);
-
-    return name;
+    return featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);
   }
 
   private String getNestedFields(String sourcePath) {
@@ -95,22 +91,16 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
       return sourcePath;
     }
 
-    String fields = "";
-
     String[] split = sourcePath.split("/");
-    for (int i = split.length - 1; i >= 0; i--) {
-      String elem = split[i];
-      if (!fields.isBlank()) {
-        elem = elem + " " + fields;
-      }
-      if (i > 0) {
-        fields = "{ " + elem + " }";
-      } else {
-        fields = elem;
-      }
+    StringBuilder fields = new StringBuilder(split[split.length - 1]);
+
+    for (int i = split.length - 2; i >= 0; i--) {
+      fields.insert(0, " { ");
+      fields.insert(0, split[i]);
+      fields.append(" }");
     }
 
-    return fields;
+    return fields.toString();
   }
 
   public String getFields(FeatureSchema featureSchema, String indentation) {
@@ -119,7 +109,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
         .map(
             prop -> {
               if (prop.isValue()) {
-                return prop.getSourcePath().map(obj -> getNestedFields(obj));
+                return prop.getSourcePath().map(this::getNestedFields);
               } else if (prop.isObject()) {
                 return prop.getSourcePath()
                     .map(obj -> obj + " " + getFields(prop, indentation + "  "));
@@ -146,7 +136,9 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
 
     String q = String.format(queryTemplate, name + arguments, fields);
 
-    LOGGER.debug("GraphQL Request\n{}", q.replaceAll("\\\\n", "\n"));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("GraphQL Request\n{}", q.replaceAll("\\\\n", "\n"));
+    }
 
     return q;
   }
@@ -174,7 +166,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
         .map(
             template ->
                 StringTemplateFilters.applyTemplate(
-                    template, (Map.of("value", String.valueOf(limit)))::get))
+                    template, Map.of("value", String.valueOf(limit))::get))
         .ifPresent(arguments::add);
 
     queryGeneration
@@ -184,7 +176,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
         .map(
             template ->
                 StringTemplateFilters.applyTemplate(
-                    template, (Map.of("value", String.valueOf(offset)))::get))
+                    template, Map.of("value", String.valueOf(offset))::get))
         .ifPresent(arguments::add);
 
     return arguments;
@@ -212,7 +204,7 @@ public class FeatureQueryEncoderGraphQl implements FeatureQueryEncoder<String, Q
     String argument =
         StringTemplateFilters.applyTemplate(
             queryGeneration.getCollection().getArguments().getFilter().orElse("{{value}}"),
-            (Map.of("value", filterString))::get);
+            Map.of("value", filterString)::get);
 
     return List.of(argument);
   }

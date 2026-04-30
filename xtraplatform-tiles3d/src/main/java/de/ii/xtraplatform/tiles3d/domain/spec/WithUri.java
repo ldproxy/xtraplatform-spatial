@@ -14,6 +14,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableWithUri.Builder.class)
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface WithUri {
 
   @SuppressWarnings("UnstableApiUsage")

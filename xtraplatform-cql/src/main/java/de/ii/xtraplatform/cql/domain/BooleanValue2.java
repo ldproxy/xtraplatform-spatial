@@ -12,15 +12,16 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableBooleanValue2.Builder.class)
-public interface BooleanValue2 extends Cql2Expression, Literal, CqlNode {
+@FunctionalInterface
+public interface BooleanValue2 extends Cql2Expression, Literal {
 
   @Value.Derived
   @Override
   default Class<?> getType() {
-    return java.lang.Boolean.class;
+    return Boolean.class;
   }
 
-  static BooleanValue2 of(java.lang.Boolean literal) {
+  static BooleanValue2 of(Boolean literal) {
     return new ImmutableBooleanValue2.Builder().value(literal).build();
   }
 }

@@ -42,6 +42,7 @@ public interface Point extends Primitive<Position> {
     return ImmutablePoint.builder().crs(crs).value(pos).build();
   }
 
+  @Override
   @Value.Derived
   @Value.Auxiliary
   default Axes getAxes() {
