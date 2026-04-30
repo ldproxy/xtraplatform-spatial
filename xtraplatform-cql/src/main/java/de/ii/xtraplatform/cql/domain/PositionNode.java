@@ -11,6 +11,7 @@ import de.ii.xtraplatform.geometries.domain.Position;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 public interface PositionNode extends CqlNode {
 
   @Value.Parameter

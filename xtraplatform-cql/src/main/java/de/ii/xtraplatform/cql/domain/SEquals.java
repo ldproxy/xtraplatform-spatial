@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSEquals.Builder.class)
-public interface SEquals extends BinarySpatialOperation, CqlNode {
+public interface SEquals extends BinarySpatialOperation {
 
   String TYPE = "s_equals";
 

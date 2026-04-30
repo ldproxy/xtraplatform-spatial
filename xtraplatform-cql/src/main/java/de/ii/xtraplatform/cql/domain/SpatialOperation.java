@@ -15,7 +15,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(as = SpatialOperation.class)
-public interface SpatialOperation extends BinaryOperation<SpatialLiteral>, CqlNode {
+public interface SpatialOperation extends BinaryOperation<SpatialLiteral> {
 
   @JsonValue
   SpatialFunction getOperator();
