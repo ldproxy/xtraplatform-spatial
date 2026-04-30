@@ -14,15 +14,17 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.FeatureChange;
 import de.ii.xtraplatform.features.domain.FeatureChange.Action;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureChange;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import org.immutables.value.Value;
 import org.threeten.extra.Interval;
 
 @Value.Immutable
 public interface Notification {
+
+  Splitter SPLITTER = Splitter.on(",").trimResults();
 
   static Notification from(String featureType, String payload) {
     return ImmutableNotification.builder().featureType(featureType).payload(payload).build();
@@ -55,43 +57,34 @@ public interface Notification {
         .build();
   }
 
-  Splitter SPLITTER = Splitter.on(",").trimResults();
-
   private static List<String> parseFeatureId(String featureId) {
-    if (featureId.isEmpty() || featureId.equalsIgnoreCase("NULL")) return ImmutableList.of();
+    if (featureId.isEmpty() || "NULL".equalsIgnoreCase(featureId)) {
+      return ImmutableList.of();
+    }
 
     return ImmutableList.of(featureId);
   }
 
   private static Optional<Interval> parseInterval(List<String> interval) {
-    if (interval.get(0).isEmpty()) {
-      // no instant or interval, ignore
-    } else if (interval.get(1).isEmpty()) {
+    if (interval.get(1).isEmpty()) {
       // an instant
-      try {
-        Instant instant = parseTimestamp(interval.get(0));
-        if (Objects.nonNull(instant)) return Optional.of(Interval.of(instant, instant));
-      } catch (Exception e) {
-        // ignore
-      }
+      return parseTimestamp(interval.get(0)).map(instant -> Interval.of(instant, instant));
     } else {
       // an interval
-      try {
-        Instant begin = parseTimestamp(interval.get(0));
-        Instant end = parseTimestamp(interval.get(1));
-        return Optional.of(Interval.of(begin, end));
-      } catch (Exception e) {
-        // ignore
+      Optional<Instant> begin = parseTimestamp(interval.get(0));
+      Optional<Instant> end = parseTimestamp(interval.get(1));
+      if (begin.isPresent() && end.isPresent()) {
+        return Optional.of(Interval.of(begin.get(), end.get()));
       }
     }
     return Optional.empty();
   }
 
-  private static Instant parseTimestamp(String timestamp) {
+  private static Optional<Instant> parseTimestamp(String timestamp) {
     try {
-      return Instant.parse(timestamp);
-    } catch (Exception e) {
-      return null;
+      return Optional.of(Instant.parse(timestamp));
+    } catch (DateTimeException e) {
+      return Optional.empty();
     }
   }
 
@@ -104,7 +97,7 @@ public interface Notification {
               Double.parseDouble(bbox.get(2)),
               Double.parseDouble(bbox.get(3)),
               OgcCrs.CRS84));
-    } catch (Exception e) {
+    } catch (NumberFormatException | IndexOutOfBoundsException e) {
       return Optional.empty();
     }
   }
