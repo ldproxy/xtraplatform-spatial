@@ -14,7 +14,6 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
-import java.io.IOException;
 import java.lang.module.Configuration;
 import java.lang.module.ModuleFinder;
 import java.text.Collator;
@@ -31,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.AvoidCatchingGenericException")
 public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterOras.class);
@@ -102,7 +102,7 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
       oracleDataSource.getDeclaredMethod("setServiceName", String.class).invoke(ds, database);
 
       return ds;
-    } catch (ReflectiveOperationException | IllegalArgumentException | SecurityException e) {
+    } catch (Throwable e) {
       throw new IllegalStateException("Could not create Oracle data source", e);
     }
   }
@@ -118,10 +118,7 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
       ModuleLayer layer = parent.defineModulesWithOneLoader(cf, ClassLoader.getSystemClassLoader());
 
       return layer.findLoader(JDBC_MODULE).loadClass(JDBC_DS_CLASS);
-    } catch (IllegalArgumentException
-        | SecurityException
-        | IOException
-        | ClassNotFoundException e) {
+    } catch (Throwable e) {
       throw new IllegalStateException("Could not load Oracle driver", e);
     }
   }

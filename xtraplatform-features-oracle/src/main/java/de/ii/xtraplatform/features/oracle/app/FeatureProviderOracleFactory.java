@@ -147,6 +147,7 @@ public class FeatureProviderOracleFactory
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public EntityData hydrateData(EntityData entityData) {
     if (skipHydration) {
       return entityData;
@@ -173,7 +174,7 @@ public class FeatureProviderOracleFactory
 
       return data;
 
-    } catch (IllegalArgumentException | IllegalStateException e) {
+    } catch (Throwable e) {
       LogContext.error(
           LOGGER, e, "Feature provider with id '{}' could not be started", data.getId());
     }
