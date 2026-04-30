@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableNot.Builder.class)
-public interface Not extends UnaryOperation<Cql2Expression>, CqlNode {
+@FunctionalInterface
+public interface Not extends UnaryOperation<Cql2Expression> {
 
   String TYPE = "not";
 

@@ -14,7 +14,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(as = TemporalOperation.class)
-public interface TemporalOperation extends BinaryOperation<TemporalLiteral>, CqlNode {
+public interface TemporalOperation extends BinaryOperation<TemporalLiteral> {
 
   @JsonValue
   TemporalFunction getOperator();

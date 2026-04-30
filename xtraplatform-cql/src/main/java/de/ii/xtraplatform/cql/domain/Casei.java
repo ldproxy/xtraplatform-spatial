@@ -15,7 +15,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableCasei.Builder.class)
-public interface Casei extends CqlNode, Operand, Scalar {
+@FunctionalInterface
+public interface Casei extends Scalar {
 
   String TYPE = "casei";
 
