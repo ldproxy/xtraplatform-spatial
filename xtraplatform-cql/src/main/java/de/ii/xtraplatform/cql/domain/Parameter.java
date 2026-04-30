@@ -59,7 +59,7 @@ public interface Parameter extends Temporal, Spatial, Vector {
       JsonNode node = parser.getCodec().readTree(parser);
 
       // Using '$ref' directly inside '$parameter' is deprecated.
-      // Support is kept for backward compatibility.
+      // NOTE: Support is kept for backward compatibility.
       if (node.has("$ref")) {
         JsonNode value = node.get("$ref");
         if (!value.isTextual()) {

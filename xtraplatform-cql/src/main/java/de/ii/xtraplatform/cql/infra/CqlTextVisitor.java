@@ -232,7 +232,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
             .map(v -> (Scalar) v.accept(this))
             .collect(Collectors.toList());
 
-    // IN currently requires a property on the left side and literals on the right side
+    // NOTE: IN currently requires a property on the left side and literals on the right side
     in =
         new ImmutableIn.Builder()
             .addArgs((Scalar) ctx.scalarExpression(0).accept(this))
