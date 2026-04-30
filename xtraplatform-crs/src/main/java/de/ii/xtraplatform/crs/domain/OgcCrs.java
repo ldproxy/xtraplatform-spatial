@@ -11,6 +11,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs.Force;
 import java.util.Objects;
 import java.util.Optional;
 
+@SuppressWarnings("PMD.FieldNamingConventions")
 public interface OgcCrs {
 
   EpsgCrs CRS84 = EpsgCrs.of(4326, Force.LON_LAT);
