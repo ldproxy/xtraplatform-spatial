@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.jsonschema.domain;
 
+@FunctionalInterface
 public interface JsonSchemaVisitor<T> {
 
   T visit(JsonSchema schema);

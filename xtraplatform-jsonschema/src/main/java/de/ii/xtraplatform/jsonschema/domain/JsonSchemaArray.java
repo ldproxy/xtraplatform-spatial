@@ -22,6 +22,16 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaArray.Builder.class)
 public abstract class JsonSchemaArray extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaArray> FUNNEL =
+      (from, into) -> {
+        into.putString(from.getType(), StandardCharsets.UTF_8);
+        from.getItems().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
+        from.getPrefixItems().forEach(item -> JsonSchema.FUNNEL.funnel(item, into));
+        from.getMinItems().ifPresent(into::putInt);
+        from.getMaxItems().ifPresent(into::putInt);
+      };
+
   @Value.Derived
   public String getType() {
     return "array";
@@ -39,22 +49,16 @@ public abstract class JsonSchemaArray extends JsonSchema {
   @JsonIgnore
   @Value.Derived
   public JsonSchema getItemSchema() {
-    return getItems()
-        .orElse(
-            !getPrefixItems().isEmpty() ? getPrefixItems().get(0) : JsonSchemaBuildingBlocks.NULL);
+    if (getItems().isPresent()) {
+      return getItems().get();
+    }
+    if (!getPrefixItems().isEmpty()) {
+      return getPrefixItems().get(0);
+    }
+    return JsonSchemaBuildingBlocks.NULL;
   }
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaArray> FUNNEL =
-      (from, into) -> {
-        into.putString(from.getType(), StandardCharsets.UTF_8);
-        from.getItems().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
-        from.getPrefixItems().forEach(item -> JsonSchema.FUNNEL.funnel(item, into));
-        from.getMinItems().ifPresent(into::putInt);
-        from.getMaxItems().ifPresent(into::putInt);
-      };
 
   @Value.Check
   protected void check() {
