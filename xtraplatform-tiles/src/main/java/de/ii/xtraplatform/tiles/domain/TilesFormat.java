@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MediaType;
 
 public enum TilesFormat {
   MVT("pbf", "mvt", MediaType.valueOf("application/vnd.mapbox-vector-tile")),

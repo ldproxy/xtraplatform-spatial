@@ -9,7 +9,7 @@ package de.ii.xtraplatform.geometries.domain;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable

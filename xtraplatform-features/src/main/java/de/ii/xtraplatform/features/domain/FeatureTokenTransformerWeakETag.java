@@ -12,7 +12,7 @@ import de.ii.xtraplatform.base.domain.ETag.Type;
 import de.ii.xtraplatform.features.domain.ImmutableResult.Builder;
 import java.util.Objects;
 import java.util.function.Consumer;
-import javax.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.EntityTag;
 
 public class FeatureTokenTransformerWeakETag extends FeatureTokenTransformer {
 

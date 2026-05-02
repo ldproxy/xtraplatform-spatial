@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MediaType;
 import no.ecc.vectortile.VectorTileEncoder;
 import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.Geometry;

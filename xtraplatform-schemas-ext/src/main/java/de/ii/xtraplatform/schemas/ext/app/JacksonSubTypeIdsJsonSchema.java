@@ -14,8 +14,8 @@ import de.ii.xtraplatform.base.domain.JacksonSubTypeIds;
 import de.ii.xtraplatform.features.domain.ExtensionConfiguration;
 import de.ii.xtraplatform.schemas.ext.domain.JsonSchemaConfiguration;
 import java.util.List;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 @AutoBind

@@ -18,8 +18,8 @@ import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dProviderFilesData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFilesData;
 import java.util.Optional;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 @AutoBind

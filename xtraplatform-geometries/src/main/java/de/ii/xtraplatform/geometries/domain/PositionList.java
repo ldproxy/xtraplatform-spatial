@@ -10,7 +10,7 @@ package de.ii.xtraplatform.geometries.domain;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable

@@ -17,7 +17,7 @@ import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import java.io.IOException;
 import java.util.Map;
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MediaType;
 
 public class TileEncoders implements ChainedTileProvider {
   private static final Map<MediaType, TileEncoder> ENCODERS =

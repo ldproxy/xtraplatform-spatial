@@ -50,7 +50,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import javax.measure.Unit;
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MediaType;
 import org.kortforsyningen.proj.Units;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

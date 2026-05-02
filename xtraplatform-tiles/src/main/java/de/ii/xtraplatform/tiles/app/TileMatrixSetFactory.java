@@ -10,8 +10,8 @@ package de.ii.xtraplatform.tiles.app;
 import com.github.azahnen.dagger.annotations.AutoBind;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetData;
 import de.ii.xtraplatform.values.domain.ValueFactoryAuto;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 @AutoBind

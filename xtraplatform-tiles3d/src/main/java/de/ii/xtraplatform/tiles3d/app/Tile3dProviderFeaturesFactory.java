@@ -19,8 +19,8 @@ import de.ii.xtraplatform.tiles3d.domain.ImmutableTileset3dFeaturesDefaults;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFeaturesData;
 import java.util.Optional;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
