@@ -26,28 +26,37 @@ import de.ii.xtraplatform.geometries.domain.Position
 import de.ii.xtraplatform.geometries.domain.PositionList
 import spock.lang.Specification
 
+import javax.xml.stream.XMLOutputFactory
+
 class GeometrySpec extends Specification {
 
-    StringBuilder sb = new StringBuilder()
-    GeometryEncoderGml gmlEncoderWith = new GeometryEncoderGml(sb, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.WITH_GML_ID, GeometryEncoderGml.Options.WITH_SRS_NAME), Optional.of("gml"), Optional.of("g_"), List.of(1,1))
-    GeometryEncoderGml gmlEncoderWithout = new GeometryEncoderGml(sb, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
-    GeometryEncoderGml gmlEncoderGml21 = new GeometryEncoderGml(sb, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
+    // ...
 
     def 'POINT XY'() {
-
         given:
         Geometry<?> geometry = Point.of(10.81, 10.37)
 
         when:
-        sb.setLength(0)
+        def sw1 = new StringWriter()
+        def xmlWriter1 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw1)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter1, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut1 = sb.toString()
-        sb.setLength(0)
+        xmlWriter1.flush()
+        String gmlOut1 = sw1.toString()
+
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderWith = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.WITH_GML_ID, GeometryEncoderGml.Options.WITH_SRS_NAME), Optional.of("gml"), Optional.of("g_"), List.of(1,1))
         geometry.accept(gmlEncoderWith)
-        String gmlOut2 = sb.toString()
-        sb.setLength(0)
+        xmlWriter2.flush()
+        String gmlOut2 = sw2.toString()
+
+        def sw3 = new StringWriter()
+        def xmlWriter3 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw3)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter3, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter3.flush()
+        String gmlOut21 = sw3.toString()
 
         then:
         gmlOut1 == "<gml:Point><gml:pos>10.81 10.37</gml:pos></gml:Point>"
@@ -60,12 +69,19 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = Point.of(Position.ofXYZ(10.81, 10.37, 5.00))
 
         when:
-        sb.setLength(0)
+        def sw1 = new StringWriter()
+        def xmlWriter1 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw1)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter1, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter1.flush()
+        String gmlOut = sw1.toString()
+
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:Point><gml:pos>10.81 10.37 5.0</gml:pos></gml:Point>"
@@ -77,9 +93,12 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = Point.of(Position.ofXYM(10.81, 10.37, 5.00))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Point><gml:pos>10.81 10.37</gml:pos></gml:Point>"
@@ -90,9 +109,12 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = Point.of(Position.ofXYZM(10.81, 10.37, 5.00, 7.50))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Point><gml:pos>10.81 10.37 5.0</gml:pos></gml:Point>"
@@ -100,12 +122,15 @@ class GeometrySpec extends Specification {
 
     def 'POINT XY EMPTY'() {
         given:
-        Geometry<?> geometry = Point.empty(Axes.XY);
+        Geometry<?> geometry = Point.empty(Axes.XY)
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Point><gml:pos>NaN NaN</gml:pos></gml:Point>"
@@ -113,12 +138,15 @@ class GeometrySpec extends Specification {
 
     def 'POINT XYZ EMPTY'() {
         given:
-        Geometry<?> geometry = Point.empty(Axes.XYZ);
+        Geometry<?> geometry = Point.empty(Axes.XYZ)
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Point><gml:pos>NaN NaN NaN</gml:pos></gml:Point>"
@@ -126,15 +154,22 @@ class GeometrySpec extends Specification {
 
     def 'LINESTRING XY'() {
         given:
-        Geometry<?> geometry = LineString.of(new double[]{10.0,10.0,20.0,20.0,30.0,40.0});
+        Geometry<?> geometry = LineString.of(new double[]{10.0,10.0,20.0,20.0,30.0,40.0})
 
         when:
-        sb.setLength(0)
+        def sw1 = new StringWriter()
+        def xmlWriter1 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw1)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter1, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter1.flush()
+        String gmlOut = sw1.toString()
+
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:LineString><gml:posList>10.0 10.0 20.0 20.0 30.0 40.0</gml:posList></gml:LineString>"
@@ -143,15 +178,22 @@ class GeometrySpec extends Specification {
 
     def 'LINESTRING XYZ'() {
         given:
-        Geometry<?> geometry = LineString.of(PositionList.of(Axes.XYZ, new double[]{10.0,10.0,1.0,20.0,20.0,2.0,30.0,40.0,3.0}));
+        Geometry<?> geometry = LineString.of(PositionList.of(Axes.XYZ, new double[]{10.0,10.0,1.0,20.0,20.0,2.0,30.0,40.0,3.0}))
 
         when:
-        sb.setLength(0)
+        def sw1 = new StringWriter()
+        def xmlWriter1 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw1)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter1, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter1.flush()
+        String gmlOut = sw1.toString()
+
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:LineString><gml:posList>10.0 10.0 1.0 20.0 20.0 2.0 30.0 40.0 3.0</gml:posList></gml:LineString>"
@@ -163,12 +205,18 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = MultiPoint.of(List.of(Point.of(10,10),Point.of(20,20)))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:MultiPoint><gml:pointMember><gml:Point><gml:pos>10.0 10.0</gml:pos></gml:Point></gml:pointMember><gml:pointMember><gml:Point><gml:pos>20.0 20.0</gml:pos></gml:Point></gml:pointMember></gml:MultiPoint>"
@@ -180,12 +228,18 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = Polygon.of(List.of(PositionList.of(Axes.XY,new double[]{10.0,10.0,20.0,20.0,30.0,40.0,10.0,10.0})))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>10.0 10.0 20.0 20.0 30.0 40.0 10.0 10.0</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon>"
@@ -200,12 +254,18 @@ class GeometrySpec extends Specification {
         ))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:MultiCurve><gml:curveMember><gml:LineString><gml:posList>10.0 10.0 20.0 20.0</gml:posList></gml:LineString></gml:curveMember><gml:curveMember><gml:LineString><gml:posList>30.0 40.0 50.0 60.0</gml:posList></gml:LineString></gml:curveMember></gml:MultiCurve>"
@@ -217,12 +277,18 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = MultiPolygon.of(List.of(Polygon.of(List.of(PositionList.of(Axes.XY,new double[]{10.0,10.0,20.0,20.0,30.0,40.0,10.0,10.0}))), Polygon.of(List.of(PositionList.of(Axes.XY,new double[]{50.0,50.0,60.0,60.0,70.0,80.0,50.0,50.0})))))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:MultiSurface><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>10.0 10.0 20.0 20.0 30.0 40.0 10.0 10.0</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>50.0 50.0 60.0 60.0 70.0 80.0 50.0 50.0</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember></gml:MultiSurface>"
@@ -234,12 +300,18 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = GeometryCollection.of(List.of(Point.of(10,10),LineString.of(new double[]{20.0,20.0,30.0,30.0})))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:MultiGeometry><gml:geometryMember><gml:Point><gml:pos>10.0 10.0</gml:pos></gml:Point></gml:geometryMember><gml:geometryMember><gml:LineString><gml:posList>20.0 20.0 30.0 30.0</gml:posList></gml:LineString></gml:geometryMember></gml:MultiGeometry>"
@@ -253,12 +325,18 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = GeometryCollection.of(List.of(geometryCollection, multiPoint))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
-        sb.setLength(0)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+        def sw2 = new StringWriter()
+        def xmlWriter2 = XMLOutputFactory.newInstance().createXMLStreamWriter(sw2)
+        def gmlEncoderGml21 = new GeometryEncoderGml(xmlWriter2, GmlVersion.GML21, Set.of(), Optional.of("gml"), Optional.empty(), List.of(1,1))
         geometry.accept(gmlEncoderGml21)
-        String gmlOut21 = sb.toString()
+        xmlWriter2.flush()
+        String gmlOut21 = sw2.toString()
 
         then:
         gmlOut == "<gml:MultiGeometry><gml:geometryMember><gml:MultiGeometry><gml:geometryMember><gml:Point><gml:pos>10.0 10.0</gml:pos></gml:Point></gml:geometryMember><gml:geometryMember><gml:LineString><gml:posList>20.0 20.0 30.0 30.0</gml:posList></gml:LineString></gml:geometryMember></gml:MultiGeometry></gml:geometryMember><gml:geometryMember><gml:MultiPoint><gml:pointMember><gml:Point><gml:pos>10.0 10.0</gml:pos></gml:Point></gml:pointMember><gml:pointMember><gml:Point><gml:pos>20.0 20.0</gml:pos></gml:Point></gml:pointMember></gml:MultiPoint></gml:geometryMember></gml:MultiGeometry>"
@@ -272,9 +350,12 @@ class GeometrySpec extends Specification {
         ))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:PolyhedralSurface><gml:patches><gml:PolygonPatch><gml:exterior><gml:LinearRing><gml:posList>0.0 0.0 0.0 1.0 1.0 1.0 0.0 0.0</gml:posList></gml:LinearRing></gml:exterior></gml:PolygonPatch><gml:PolygonPatch><gml:exterior><gml:LinearRing><gml:posList>0.0 0.0 1.0 1.0 1.0 0.0 0.0 0.0</gml:posList></gml:LinearRing></gml:exterior></gml:PolygonPatch></gml:patches></gml:PolyhedralSurface>"
@@ -285,9 +366,12 @@ class GeometrySpec extends Specification {
         Geometry<?> geometry = CircularString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 1.0, 1.0, 2.0, 0.0}))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Curve><gml:segments><gml:Arc><gml:posList>0.0 0.0 1.0 1.0 2.0 0.0</gml:posList></gml:Arc></gml:segments></gml:Curve>"
@@ -301,9 +385,12 @@ class GeometrySpec extends Specification {
         ))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Curve><gml:segments><gml:LineStringSegment><gml:posList>0.0 0.0 1.0 1.0</gml:posList></gml:LineStringSegment><gml:LineStringSegment><gml:posList>1.0 1.0 2.0 0.0</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve>"
@@ -316,9 +403,12 @@ class GeometrySpec extends Specification {
         ))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Polygon><gml:exterior><gml:Ring><gml:curveMember><gml:Curve><gml:segments><gml:ArcString><gml:posList>0.0 0.0 1.0 1.0 0.0 2.0 -1.0 -1.0 0.0 0.0</gml:posList></gml:ArcString></gml:segments></gml:Curve></gml:curveMember></gml:Ring></gml:exterior></gml:Polygon>"
@@ -332,9 +422,12 @@ class GeometrySpec extends Specification {
         ))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:MultiCurve><gml:curveMember><gml:LineString><gml:posList>0.0 0.0 1.0 1.0</gml:posList></gml:LineString></gml:curveMember><gml:curveMember><gml:Curve><gml:segments><gml:Arc><gml:posList>1.0 1.0 2.0 0.0 3.0 1.0</gml:posList></gml:Arc></gml:segments></gml:Curve></gml:curveMember></gml:MultiCurve>"
@@ -348,9 +441,12 @@ class GeometrySpec extends Specification {
         ))
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:MultiSurface><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>0.0 0.0 0.0 1.0 1.0 1.0 0.0 0.0</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:Ring><gml:curveMember><gml:Curve><gml:segments><gml:ArcString><gml:posList>1.0 1.0 2.0 2.0 3.0 2.0 2.0 1.0 1.0 1.0</gml:posList></gml:ArcString></gml:segments></gml:Curve></gml:curveMember></gml:Ring></gml:exterior></gml:Polygon></gml:surfaceMember></gml:MultiSurface>"
@@ -371,9 +467,12 @@ class GeometrySpec extends Specification {
         ), true)
 
         when:
-        sb.setLength(0)
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoderWithout = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(), Optional.of("gml"), Optional.empty(), List.of())
         geometry.accept(gmlEncoderWithout)
-        String gmlOut = sb.toString()
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
 
         then:
         gmlOut == "<gml:Solid><gml:exterior><gml:Shell><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280414.631 5660090.756 40.255 280414.631 5660088.454 40.255 280414.631 5660088.454 32.967 280414.631 5660090.756 32.967 280414.631 5660090.756 40.255</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280414.631 5660088.454 40.255 280405.623 5660088.454 33.256 280405.623 5660088.454 32.967 280414.631 5660088.454 32.967 280414.631 5660088.454 40.255</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280405.623 5660088.454 33.256 280405.623 5660090.756 33.256 280405.623 5660090.756 32.967 280405.623 5660088.454 32.967 280405.623 5660088.454 33.256</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280405.623 5660090.756 33.256 280414.631 5660090.756 40.255 280414.631 5660090.756 32.967 280405.623 5660090.756 32.967 280405.623 5660090.756 33.256</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280405.623 5660088.454 33.256 280414.631 5660088.454 40.255 280411.722 5660088.454 41.63 280405.623 5660088.454 33.256</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280414.631 5660090.756 40.255 280405.623 5660090.756 33.256 280411.722 5660090.756 41.63 280414.631 5660090.756 40.255</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280414.631 5660088.454 40.255 280414.631 5660090.756 40.255 280411.722 5660090.756 41.63 280411.722 5660088.454 41.63 280414.631 5660088.454 40.255</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280405.623 5660090.756 33.256 280405.623 5660088.454 33.256 280411.722 5660088.454 41.63 280411.722 5660090.756 41.63 280405.623 5660090.756 33.256</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>280414.631 5660090.756 32.967 280414.631 5660088.454 32.967 280405.623 5660088.454 32.967 280405.623 5660090.756 32.967 280414.631 5660090.756 32.967</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember></gml:Shell></gml:exterior></gml:Solid>"
