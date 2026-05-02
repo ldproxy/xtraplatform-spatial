@@ -23,6 +23,8 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.proj.domain.ProjLoader;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -39,8 +41,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import javax.measure.Unit;
 import org.kortforsyningen.proj.CoordinateOperationContext;
 import org.kortforsyningen.proj.GridAvailabilityUse;
@@ -386,11 +386,11 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     getAxisUnits(crs)
         .forEach(
             unit -> {
-              if (unit.equals(Units.METRE)) {
+              if (Units.METRE.equals(unit)) {
                 precisionListBuilder.add(
                     coordinatePrecision.getOrDefault(
                         "meter", coordinatePrecision.getOrDefault("metre", 0)));
-              } else if (unit.equals(Units.DEGREE)) {
+              } else if (Units.DEGREE.equals(unit)) {
                 precisionListBuilder.add(coordinatePrecision.getOrDefault("degree", 0));
               } else {
                 if (LOGGER.isWarnEnabled()) {

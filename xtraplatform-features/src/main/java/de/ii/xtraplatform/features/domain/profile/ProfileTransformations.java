@@ -16,9 +16,9 @@ import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
+import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Objects;
-import jakarta.ws.rs.core.MediaType;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -71,7 +71,7 @@ public interface ProfileTransformations extends PropertyTransformations {
                     reduceToUri(property, builder);
                     break;
                   case REL_AS_LINK:
-                    if (mediaType.equals(MediaType.TEXT_HTML)) {
+                    if (MediaType.TEXT_HTML.equals(mediaType)) {
                       reduceToLink(property, builder);
                     } else {
                       mapToLink(property, builder);

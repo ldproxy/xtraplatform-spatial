@@ -328,7 +328,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     config.setInitializationFailTimeout(asyncStartup ? -1 : getInitFailTimeout(connectionInfo));
     config.setIdleTimeout(parseMs(connectionInfo.getPool().getIdleTimeout()));
     config.setPoolName(poolName);
-    config.setKeepaliveTime(300000);
+    config.setKeepaliveTime(300_000);
 
     SqlDbmsAdapter dbmsAdapter = dbmsAdapters.get(connectionInfo.getDialect());
 

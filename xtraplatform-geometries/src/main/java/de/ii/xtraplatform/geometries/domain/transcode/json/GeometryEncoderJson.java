@@ -96,8 +96,9 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
               switch (geometry.getType()) {
                 case LINE_STRING -> "LineString";
                 case CIRCULAR_STRING -> "CircularString";
-                default -> throw new IllegalArgumentException(
-                    "Unsupported geometry type: " + geometry.getType());
+                default ->
+                    throw new IllegalArgumentException(
+                        "Unsupported geometry type: " + geometry.getType());
               });
           json.writeFieldName(FIELD_COORDINATES);
           writePositionList(geometry.getAxes().size(), geometry.getValue().getCoordinates());
@@ -323,8 +324,9 @@ public class GeometryEncoderJson implements GeometryVisitor<Void> {
                 case GEOMETRY_COLLECTION -> "GeometryCollection";
                 case MULTI_CURVE -> "MultiCurve";
                 case MULTI_SURFACE -> "MultiSurface";
-                default -> throw new IllegalArgumentException(
-                    "Unsupported geometry type: " + geometry.getType());
+                default ->
+                    throw new IllegalArgumentException(
+                        "Unsupported geometry type: " + geometry.getType());
               });
           json.writeFieldName("geometries");
           json.writeStartArray();

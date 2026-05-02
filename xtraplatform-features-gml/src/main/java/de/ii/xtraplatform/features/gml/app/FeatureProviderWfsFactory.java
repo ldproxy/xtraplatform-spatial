@@ -25,11 +25,11 @@ import de.ii.xtraplatform.features.gml.domain.ImmutableFeatureProviderWfsData;
 import de.ii.xtraplatform.features.gml.infra.WfsClientBasicFactoryDefault;
 import de.ii.xtraplatform.features.gml.infra.WfsClientBasicFactorySimple;
 import de.ii.xtraplatform.web.domain.Http;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

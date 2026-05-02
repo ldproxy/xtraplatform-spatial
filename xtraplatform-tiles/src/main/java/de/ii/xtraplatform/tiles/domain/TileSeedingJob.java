@@ -13,11 +13,11 @@ import de.ii.xtraplatform.jobs.domain.Job;
 import de.ii.xtraplatform.jobs.domain.Job.JobDetails;
 import de.ii.xtraplatform.tiles.app.FeatureEncoderMVT;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSeedingJob.Builder;
+import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import jakarta.ws.rs.core.MediaType;
 import org.immutables.value.Value;
 
 @Value.Immutable

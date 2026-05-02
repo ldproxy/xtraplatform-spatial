@@ -325,7 +325,7 @@ public class MappingOperationResolver implements TypesResolver {
 
   public static String cleanConcatPath(String propertyPath) {
     if (isConcatPath(propertyPath)) {
-      return propertyPath.substring(propertyPath.indexOf("_") + 1);
+      return propertyPath.substring(propertyPath.indexOf('_') + 1);
     }
 
     return propertyPath;

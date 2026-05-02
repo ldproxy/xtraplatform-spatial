@@ -12,10 +12,10 @@ import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.Decoder;
 import de.ii.xtraplatform.features.domain.DecoderFactory;
 import de.ii.xtraplatform.features.json.domain.DecoderJson;
-import java.util.Optional;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.core.MediaType;
+import java.util.Optional;
 
 @Singleton
 @AutoBind

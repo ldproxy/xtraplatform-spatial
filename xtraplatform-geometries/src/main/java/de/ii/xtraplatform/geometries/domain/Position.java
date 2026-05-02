@@ -8,8 +8,8 @@
 package de.ii.xtraplatform.geometries.domain;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import jakarta.validation.constraints.NotNull;
+import java.util.Arrays;
 import org.immutables.value.Value;
 
 @Value.Immutable

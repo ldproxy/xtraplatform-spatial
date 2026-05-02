@@ -151,7 +151,7 @@ public class OGCEntityResolver implements EntityResolver {
         // workaround for A4I 10.1 SP1 (Patch1) blank encoding bug in GET parameters
         if (url.contains("OUTPUT_FORMAT=")) {
           int start = url.indexOf("OUTPUT_FORMAT=") + 13;
-          int end = url.indexOf("&", start);
+          int end = url.indexOf('&', start);
           String out = url.substring(start, end).replaceAll("%20", "");
           url = url.substring(0, start) + out + url.substring(end);
         }

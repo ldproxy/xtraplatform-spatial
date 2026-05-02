@@ -7,8 +7,8 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
-import java.util.Optional;
 import jakarta.ws.rs.core.MediaType;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable

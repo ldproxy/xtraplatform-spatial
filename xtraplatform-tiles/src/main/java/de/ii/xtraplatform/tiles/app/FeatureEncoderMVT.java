@@ -16,13 +16,13 @@ import de.ii.xtraplatform.tiles.domain.TileBuilder;
 import de.ii.xtraplatform.tiles.domain.TileCoordinates;
 import de.ii.xtraplatform.tiles.domain.TileGenerationContext;
 import de.ii.xtraplatform.tiles.domain.TileGenerationOptions;
+import jakarta.ws.rs.core.MediaType;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import jakarta.ws.rs.core.MediaType;
 import no.ecc.vectortile.VectorTileEncoder;
 import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.Geometry;
@@ -250,7 +250,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
                 written++;
               });
     }
-    long mergerDuration = (System.nanoTime() - mergerStart) / 1000000;
+    long mergerDuration = (System.nanoTime() - mergerStart) / 1_000_000;
 
     long encoderStart = System.nanoTime();
 
@@ -282,9 +282,9 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
     }
 
     if (LOGGER.isDebugEnabled()) {
-      long encoderDuration = (System.nanoTime() - encoderStart) / 1000000;
-      long transformerDuration = (System.nanoTime() - transformerStart) / 1000000;
-      long processingDuration = (System.nanoTime() - processingStart) / 1000000;
+      long encoderDuration = (System.nanoTime() - encoderStart) / 1_000_000;
+      long transformerDuration = (System.nanoTime() - transformerStart) / 1_000_000;
+      long processingDuration = (System.nanoTime() - processingStart) / 1_000_000;
       int kiloBytes = mvt.length / 1024;
       String text =
           String.format(
@@ -298,7 +298,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
               written,
               transformerDuration,
               processingDuration,
-              featureDuration / 1000000,
+              featureDuration / 1_000_000,
               mergerDuration,
               encoderDuration,
               kiloBytes);

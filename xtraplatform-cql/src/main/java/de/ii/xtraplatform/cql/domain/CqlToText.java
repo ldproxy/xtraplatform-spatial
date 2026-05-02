@@ -320,17 +320,17 @@ public class CqlToText implements CqlVisitor<String> {
       String end;
       Interval interval = (Interval) temporalLiteral.getValue();
       start =
-          interval.getStart().equals(Instant.MIN)
+          Instant.MIN.equals(interval.getStart())
               ? ".."
               : DateTimeFormatter.ISO_INSTANT.format(interval.getStart());
       end =
-          interval.getEnd().equals(Instant.MAX)
+          Instant.MAX.equals(interval.getEnd())
               ? ".."
               : DateTimeFormatter.ISO_INSTANT.format(interval.getEnd());
       return String.format("INTERVAL('%s','%s')", start, end);
     } else if (temporalLiteral.getType() == Instant.class) {
       Instant instant = (Instant) temporalLiteral.getValue();
-      if (instant.equals(Instant.MIN) || instant.equals(Instant.MAX)) {
+      if (Instant.MIN.equals(instant) || Instant.MAX.equals(instant)) {
         return "'..'";
       }
       return String.format("TIMESTAMP('%s')", DateTimeFormatter.ISO_INSTANT.format(instant));

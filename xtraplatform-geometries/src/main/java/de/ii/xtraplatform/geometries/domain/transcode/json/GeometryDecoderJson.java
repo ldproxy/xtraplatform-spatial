@@ -152,14 +152,15 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
       case POINT -> point(toPosition(axes, coordinatesRaw), coordRefSys);
       case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), coordRefSys);
       case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), coordRefSys);
-      case MULTI_LINE_STRING -> multiLineString(
-          toListOfPositionList(axes, coordinatesRaw), coordRefSys);
+      case MULTI_LINE_STRING ->
+          multiLineString(toListOfPositionList(axes, coordinatesRaw), coordRefSys);
       case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), coordRefSys);
-      case MULTI_POLYGON -> multiPolygon(
-          toListOfListOfPositionList(axes, coordinatesRaw), coordRefSys);
+      case MULTI_POLYGON ->
+          multiPolygon(toListOfListOfPositionList(axes, coordinatesRaw), coordRefSys);
       case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), coordRefSys);
-      case POLYHEDRAL_SURFACE -> polyhedralSurface(
-          toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, coordRefSys);
+      case POLYHEDRAL_SURFACE ->
+          polyhedralSurface(
+              toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, coordRefSys);
       case COMPOUND_CURVE -> compoundCurve(geometries, coordRefSys);
       case CURVE_POLYGON -> curvePolygon(geometries, coordRefSys);
       case MULTI_CURVE -> multiCurve(geometries, coordRefSys);
@@ -206,14 +207,15 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
           case POINT -> point(toPosition(axes, coordinatesRaw), coordRefSys);
           case MULTI_POINT -> multiPoint(toListOfPositions(axes, coordinatesRaw), coordRefSys);
           case LINE_STRING -> lineString(toPositionList(axes, coordinatesRaw), coordRefSys);
-          case MULTI_LINE_STRING -> multiLineString(
-              toListOfPositionList(axes, coordinatesRaw), coordRefSys);
+          case MULTI_LINE_STRING ->
+              multiLineString(toListOfPositionList(axes, coordinatesRaw), coordRefSys);
           case POLYGON -> polygon(toListOfPositionList(axes, coordinatesRaw), coordRefSys);
-          case MULTI_POLYGON -> multiPolygon(
-              toListOfListOfPositionList(axes, coordinatesRaw), coordRefSys);
+          case MULTI_POLYGON ->
+              multiPolygon(toListOfListOfPositionList(axes, coordinatesRaw), coordRefSys);
           case CIRCULAR_STRING -> circularString(toPositionList(axes, coordinatesRaw), coordRefSys);
-          case POLYHEDRAL_SURFACE -> polyhedralSurface(
-              toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, coordRefSys);
+          case POLYHEDRAL_SURFACE ->
+              polyhedralSurface(
+                  toListOfListOfListOfPositionList(axes, coordinatesRaw).get(0), true, coordRefSys);
           default -> throw new IllegalStateException(UNSUPPORTED_GEOMETRY_TYPE + type);
         };
       }

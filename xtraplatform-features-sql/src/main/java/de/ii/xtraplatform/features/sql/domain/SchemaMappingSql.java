@@ -35,11 +35,11 @@ public interface SchemaMappingSql extends SchemaMappingBase<SchemaSql> {
   @Override
   default String cleanPath(String path) {
     if (path.contains("{")) {
-      int i = path.indexOf("{");
+      int i = path.indexOf('{');
       if (path.startsWith("filter", i + 1)) {
         return path.substring(0, i + 2) + cleanPath(path.substring(i + 2));
       }
-      return path.substring(0, path.indexOf("{"));
+      return path.substring(0, path.indexOf('{'));
     }
     return path;
   }

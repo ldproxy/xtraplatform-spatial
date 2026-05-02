@@ -7,9 +7,9 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import jakarta.ws.rs.core.MediaType;
 import java.util.Map;
 import java.util.Optional;
-import jakarta.ws.rs.core.MediaType;
 
 public interface DecoderFactories {
 

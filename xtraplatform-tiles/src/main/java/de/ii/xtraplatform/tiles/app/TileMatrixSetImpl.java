@@ -149,13 +149,13 @@ public class TileMatrixSetImpl implements TileMatrixSet {
                 .epsgCrs(getCrs())
                 .xmin(
                     data.getTileMatrices().stream()
-                        .filter(tm -> tm.getCornerOfOrigin().equals("topLeft"))
+                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
                         .mapToDouble(tm -> tm.getPointOfOrigin()[0].doubleValue())
                         .min()
                         .orElse(Double.NaN))
                 .ymin(
                     data.getTileMatrices().stream()
-                        .filter(tm -> tm.getCornerOfOrigin().equals("topLeft"))
+                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
                         .mapToDouble(
                             tm ->
                                 tm.getPointOfOrigin()[1].doubleValue()
@@ -166,7 +166,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
                         .orElse(Double.NaN))
                 .xmax(
                     data.getTileMatrices().stream()
-                        .filter(tm -> tm.getCornerOfOrigin().equals("topLeft"))
+                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
                         .mapToDouble(
                             tm ->
                                 tm.getPointOfOrigin()[0].doubleValue()
@@ -177,7 +177,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
                         .orElse(Double.NaN))
                 .ymax(
                     data.getTileMatrices().stream()
-                        .filter(tm -> tm.getCornerOfOrigin().equals("topLeft"))
+                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
                         .mapToDouble(tm -> tm.getPointOfOrigin()[1].doubleValue())
                         .max()
                         .orElse(Double.NaN))
@@ -187,7 +187,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
   @Override
   public BoundingBox getBoundingBoxCrs84(CrsTransformerFactory crsTransformerFactory)
       throws CrsTransformationException {
-    if (getCrs().equals(OgcCrs.CRS84)) return getBoundingBox();
+    if (OgcCrs.CRS84.equals(getCrs())) return getBoundingBox();
     CrsTransformer crsTransformer =
         crsTransformerFactory
             .getTransformer(getCrs(), OgcCrs.CRS84, true)

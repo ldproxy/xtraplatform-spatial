@@ -15,11 +15,11 @@ import de.ii.xtraplatform.features.domain.ImmutablePartialObjectSchema;
 import de.ii.xtraplatform.features.domain.PartialObjectSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

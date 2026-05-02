@@ -148,7 +148,7 @@ class FeatureMerger {
                   int i = 0;
                   boolean match = true;
                   for (String att : groupBy) {
-                    if (values.get(i).equals(NULL)) {
+                    if (NULL.equals(values.get(i))) {
                       if (feature.getProperties().containsKey(att)) {
                         match = false;
                         break;
@@ -286,7 +286,7 @@ class FeatureMerger {
                   int i = 0;
                   boolean match = true;
                   for (String att : groupBy) {
-                    if (values.get(i).equals(NULL)) {
+                    if (NULL.equals(values.get(i))) {
                       if (feature.getProperties().containsKey(att)) {
                         match = false;
                         break;

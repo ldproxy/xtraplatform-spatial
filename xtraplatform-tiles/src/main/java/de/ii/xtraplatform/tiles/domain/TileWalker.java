@@ -11,12 +11,12 @@ import com.google.common.collect.Range;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.services.domain.TaskContext;
+import jakarta.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import jakarta.ws.rs.core.MediaType;
 
 public interface TileWalker extends Volatile2 {
 

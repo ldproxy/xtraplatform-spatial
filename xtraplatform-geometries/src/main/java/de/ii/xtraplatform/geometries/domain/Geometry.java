@@ -9,8 +9,8 @@ package de.ii.xtraplatform.geometries.domain;
 
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.geometries.domain.transform.GeometryVisitor;
-import java.util.Optional;
 import jakarta.validation.constraints.NotNull;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 public interface Geometry<T> {

@@ -150,7 +150,7 @@ public class MappingRulesDeriver
     List<Integer> cursors = new ArrayList<>();
 
     for (String tableIdentifier : rulesByTable.keySet()) {
-      String source = tableIdentifier.substring(0, tableIdentifier.lastIndexOf("-"));
+      String source = tableIdentifier.substring(0, tableIdentifier.lastIndexOf('-'));
       boolean hasParent = MappingRule.maskPathAttributes(source).indexOf("/", 1) > 1;
 
       if (hasParent) {

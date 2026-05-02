@@ -323,7 +323,7 @@ public class FeatureRefResolver implements TypesResolver {
       if (property.isFeatureRef()
           && (isStatic(property.getRefType())
               || property.getProperties().stream()
-                  .anyMatch(p -> p.getName().equals("type") && p.getSourcePath().isPresent()))) {
+                  .anyMatch(p -> "type".equals(p.getName()) && p.getSourcePath().isPresent()))) {
         Optional<FeatureSchema> idProperty =
             property.getProperties().stream()
                 .filter(Objects::nonNull)

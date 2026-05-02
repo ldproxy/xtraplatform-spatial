@@ -34,6 +34,8 @@ import de.ii.xtraplatform.tiles.domain.ImmutableTilesetFeaturesDefaults;
 import de.ii.xtraplatform.tiles.domain.TileProviderData;
 import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
@@ -43,8 +45,6 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +100,7 @@ public class TileProviderFeaturesFactory
         .tilesetDefaultsBuilder(
             new ImmutableTilesetFeaturesDefaults.Builder()
                 .putLevels("WebMercatorQuad", new ImmutableMinMax.Builder().min(0).max(23).build())
-                .featureLimit(100000)
+                .featureLimit(100_000)
                 .minimumSizeInPixel(0.5)
                 .ignoreInvalidGeometries(false)
                 .sparse(false));

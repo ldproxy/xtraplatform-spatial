@@ -11,8 +11,8 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileComposed;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
-import java.util.Optional;
 import jakarta.ws.rs.core.MediaType;
+import java.util.Optional;
 
 public interface TileGenerator extends ChainedTileProvider, VolatileComposed {
 

@@ -10,9 +10,9 @@ package de.ii.xtraplatform.features.domain;
 import de.ii.xtraplatform.base.domain.ETag;
 import de.ii.xtraplatform.base.domain.ETag.Type;
 import de.ii.xtraplatform.features.domain.ImmutableResult.Builder;
+import jakarta.ws.rs.core.EntityTag;
 import java.util.Objects;
 import java.util.function.Consumer;
-import jakarta.ws.rs.core.EntityTag;
 
 public class FeatureTokenTransformerWeakETag extends FeatureTokenTransformer {
 

@@ -328,7 +328,7 @@ public class FeatureEncoderSql
 
   private boolean checkJson(Tuple<SqlQuerySchema, SqlQueryColumn> column) {
     if (column.second().hasOperation(Operation.CONNECTOR)) {
-      if (column.second().getOperationParameter(Operation.CONNECTOR, "").equals("JSON")) {
+      if ("JSON".equals(column.second().getOperationParameter(Operation.CONNECTOR, ""))) {
         if (currentJsonColumn == null) {
           this.currentJsonColumn = column;
           this.jsonColumns.put(currentJsonColumn.second().getPathSegment(), new JsonBuilder());

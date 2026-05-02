@@ -14,10 +14,10 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dJobProcessor;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
-import java.io.IOException;
-import java.util.function.Consumer;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.io.IOException;
+import java.util.function.Consumer;
 
 @Singleton
 @AutoBind

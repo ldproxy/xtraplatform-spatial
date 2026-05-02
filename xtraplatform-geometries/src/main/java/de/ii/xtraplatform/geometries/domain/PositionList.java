@@ -7,10 +7,10 @@
  */
 package de.ii.xtraplatform.geometries.domain;
 
+import jakarta.validation.constraints.NotNull;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
-import jakarta.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -123,7 +123,7 @@ public abstract class PositionList {
     int dimension = getAxes().size();
     int length = getCoordinates().length;
     double[] coordinates = Arrays.copyOf(getCoordinates(), length);
-    for (int i = 0; i < length / 2; i = i + dimension) {
+    for (int i = 0; i < length / 2; i += dimension) {
       double x = coordinates[i];
       double y = coordinates[i + 1];
 

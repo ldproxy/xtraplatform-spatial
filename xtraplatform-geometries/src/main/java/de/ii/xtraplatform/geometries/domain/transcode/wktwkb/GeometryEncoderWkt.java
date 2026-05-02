@@ -95,8 +95,8 @@ public class GeometryEncoderWkt {
         case MULTI_SURFACE -> writeMultiSurface(builder, (MultiSurface) geometry);
         case GEOMETRY_COLLECTION -> writeGeometryCollection(builder, (GeometryCollection) geometry);
         case POLYHEDRAL_SURFACE -> writePolyhedralSurface(builder, (PolyhedralSurface) geometry);
-        default -> throw new IllegalStateException(
-            "Unsupported geometry type: " + geometry.getType());
+        default ->
+            throw new IllegalStateException("Unsupported geometry type: " + geometry.getType());
       }
       builder.append(')');
     }

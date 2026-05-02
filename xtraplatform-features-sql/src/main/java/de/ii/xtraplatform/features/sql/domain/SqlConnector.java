@@ -96,7 +96,7 @@ public interface SqlConnector
 
     void register(String currentTable, SqlRowMeta metaResult) {
       featureCountdown -= metaResult.getNumberReturned();
-      numberSkipped = numberSkipped + metaResult.getNumberSkipped().orElse(0);
+      numberSkipped += metaResult.getNumberSkipped().orElse(0);
       lastTable = currentTable;
       lastNumberReturned = metaResult.getNumberReturned();
       lastNumberSkipped = metaResult.getNumberSkipped().orElse(0);
@@ -356,7 +356,7 @@ public interface SqlConnector
             (Long) values.get(size - 2),
             (Long) values.get(size - 1));
 
-    for (int i = 0; i < size - 5; i = i + 2) {
+    for (int i = 0; i < size - 5; i += 2) {
       builder.addCustomMinKeys(values.get(i)).addCustomMaxKeys(values.get(i + 1));
     }
 
@@ -408,7 +408,7 @@ public interface SqlConnector
                           totalMessage.append("\n  ").append("Hint: ").append(msg);
                         }
                         msg = String.valueOf(serverErrorMessage.getPosition());
-                        if (!msg.equals("0")) {
+                        if (!"0".equals(msg)) {
                           totalMessage.append("\n  ").append("Position: ").append(msg);
                         }
                         msg = serverErrorMessage.getWhere();

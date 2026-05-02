@@ -25,11 +25,11 @@ public interface FeatureChange {
     UNKNOWN;
 
     public static Action fromString(String action) {
-      return action.equalsIgnoreCase("create") || action.equalsIgnoreCase("insert")
+      return "create".equalsIgnoreCase(action) || "insert".equalsIgnoreCase(action)
           ? CREATE
-          : action.equalsIgnoreCase("update")
+          : "update".equalsIgnoreCase(action)
               ? UPDATE
-              : action.equalsIgnoreCase("delete") ? DELETE : UNKNOWN;
+              : "delete".equalsIgnoreCase(action) ? DELETE : UNKNOWN;
     }
   }
 

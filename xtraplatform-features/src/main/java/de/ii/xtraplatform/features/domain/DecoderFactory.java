@@ -9,9 +9,9 @@ package de.ii.xtraplatform.features.domain;
 
 import com.github.azahnen.dagger.annotations.AutoMultiBind;
 import de.ii.xtraplatform.base.domain.util.Tuple;
+import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Optional;
-import jakarta.ws.rs.core.MediaType;
 
 // TODO: only for byte decoders?
 @AutoMultiBind

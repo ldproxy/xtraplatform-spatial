@@ -78,80 +78,91 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
 
     return switch (type) {
       case POINT -> point(readPosition(dis, isLittleEndian, axes), crs);
-      case MULTI_POINT -> multiPoint2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POINT), false),
-          crs);
+      case MULTI_POINT ->
+          multiPoint2(
+              readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POINT), false),
+              crs);
       case LINE_STRING -> lineString(readPositionList(dis, isLittleEndian, axes), crs);
-      case MULTI_LINE_STRING -> multiLineString2(
-          readListOfGeometry(
-              dis, crs, axes, isLittleEndian, Set.of(GeometryType.LINE_STRING), false),
-          crs);
+      case MULTI_LINE_STRING ->
+          multiLineString2(
+              readListOfGeometry(
+                  dis, crs, axes, isLittleEndian, Set.of(GeometryType.LINE_STRING), false),
+              crs);
       case POLYGON -> polygon(readListOfPositionList(dis, isLittleEndian, axes), crs);
-      case MULTI_POLYGON -> multiPolygon2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
-          crs);
+      case MULTI_POLYGON ->
+          multiPolygon2(
+              readListOfGeometry(
+                  dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
+              crs);
       case CIRCULAR_STRING -> circularString(readPositionList(dis, isLittleEndian, axes), crs);
-      case POLYHEDRAL_SURFACE -> polyhedralSurface2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
-          crs);
-      case COMPOUND_CURVE -> compoundCurve(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING),
-              true),
-          crs);
-      case CURVE_POLYGON -> curvePolygon(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(
-                  GeometryType.LINE_STRING,
-                  GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE),
-              true),
-          crs);
-      case MULTI_CURVE -> multiCurve(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(
-                  GeometryType.LINE_STRING,
-                  GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE),
-              false),
-          crs);
-      case MULTI_SURFACE -> multiSurface(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON),
-              false),
-          crs);
-      case GEOMETRY_COLLECTION -> geometryCollection(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(
-                  GeometryType.POINT,
-                  GeometryType.LINE_STRING,
-                  GeometryType.POLYGON,
-                  GeometryType.MULTI_POINT,
-                  GeometryType.MULTI_LINE_STRING,
-                  GeometryType.MULTI_POLYGON,
-                  GeometryType.GEOMETRY_COLLECTION),
-              false),
-          crs);
+      case POLYHEDRAL_SURFACE ->
+          polyhedralSurface2(
+              readListOfGeometry(
+                  dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
+              crs);
+      case COMPOUND_CURVE ->
+          compoundCurve(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING),
+                  true),
+              crs);
+      case CURVE_POLYGON ->
+          curvePolygon(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(
+                      GeometryType.LINE_STRING,
+                      GeometryType.CIRCULAR_STRING,
+                      GeometryType.COMPOUND_CURVE),
+                  true),
+              crs);
+      case MULTI_CURVE ->
+          multiCurve(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(
+                      GeometryType.LINE_STRING,
+                      GeometryType.CIRCULAR_STRING,
+                      GeometryType.COMPOUND_CURVE),
+                  false),
+              crs);
+      case MULTI_SURFACE ->
+          multiSurface(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON),
+                  false),
+              crs);
+      case GEOMETRY_COLLECTION ->
+          geometryCollection(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(
+                      GeometryType.POINT,
+                      GeometryType.LINE_STRING,
+                      GeometryType.POLYGON,
+                      GeometryType.MULTI_POINT,
+                      GeometryType.MULTI_LINE_STRING,
+                      GeometryType.MULTI_POLYGON,
+                      GeometryType.GEOMETRY_COLLECTION),
+                  false),
+              crs);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
   }

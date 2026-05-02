@@ -49,6 +49,10 @@ import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
 import de.ii.xtraplatform.web.domain.DropwizardPlugin;
 import io.dropwizard.core.setup.Environment;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -60,11 +64,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import javax.measure.Unit;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.MediaType;
 import org.kortforsyningen.proj.Units;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -318,10 +318,10 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
     Unit<?> nativeCrsUnit = crsInfo.getUnit(nativeCrs);
     if (tmsCrsUnit.equals(nativeCrsUnit)) {
       return maxAllowableOffsetTileMatrixSet;
-    } else if (tmsCrsUnit.equals(Units.DEGREE) && nativeCrsUnit.equals(Units.METRE)) {
-      return maxAllowableOffsetTileMatrixSet * 111333.0;
-    } else if (tmsCrsUnit.equals(Units.METRE) && nativeCrsUnit.equals(Units.DEGREE)) {
-      return maxAllowableOffsetTileMatrixSet / 111333.0;
+    } else if (Units.DEGREE.equals(tmsCrsUnit) && Units.METRE.equals(nativeCrsUnit)) {
+      return maxAllowableOffsetTileMatrixSet * 111_333.0;
+    } else if (Units.METRE.equals(tmsCrsUnit) && Units.DEGREE.equals(nativeCrsUnit)) {
+      return maxAllowableOffsetTileMatrixSet / 111_333.0;
     }
 
     LOGGER.warn(

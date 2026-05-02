@@ -16,12 +16,12 @@ import de.ii.xtraplatform.features.domain.DecoderFactory;
 import de.ii.xtraplatform.features.domain.DecoderFactory.FeatureDecoderFactory;
 import de.ii.xtraplatform.features.domain.DecoderFactory.GeometryDecoderFactory;
 import de.ii.xtraplatform.features.domain.FeatureDecoder;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.core.MediaType;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Singleton
 @AutoBind

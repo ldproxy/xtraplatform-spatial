@@ -24,7 +24,7 @@ public abstract class SwapXY implements CoordinatesTransformation {
       Optional<Interpolation> interpolation,
       OptionalInt minNumberOfPositions)
       throws IOException {
-    for (int i = 0; i < length; i = i + dimension) {
+    for (int i = 0; i < length; i += dimension) {
       double x = coordinates[i];
       coordinates[i] = coordinates[i + 1];
       coordinates[i + 1] = x;

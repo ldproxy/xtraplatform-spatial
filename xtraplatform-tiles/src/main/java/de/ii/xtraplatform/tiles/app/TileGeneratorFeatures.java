@@ -41,6 +41,7 @@ import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TilesetFeatures;
+import jakarta.ws.rs.core.MediaType;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,7 +51,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import javax.measure.Unit;
-import jakarta.ws.rs.core.MediaType;
 import org.kortforsyningen.proj.Units;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +71,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
                   PropertyTransformations.WILDCARD,
                   ImmutableList.of(
                       new ImmutablePropertyTransformation.Builder().flatten(".").build())));
-  private static final double BUFFER_DEGREE = 0.00001;
+  private static final double BUFFER_DEGREE = 0.000_01;
   private static final double BUFFER_METRE = 10.0;
 
   private final CrsInfo crsInfo;

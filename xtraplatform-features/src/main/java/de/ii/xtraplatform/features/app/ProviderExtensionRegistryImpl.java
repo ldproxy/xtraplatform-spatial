@@ -11,10 +11,10 @@ import com.github.azahnen.dagger.annotations.AutoBind;
 import dagger.Lazy;
 import de.ii.xtraplatform.features.domain.FeatureQueriesExtension;
 import de.ii.xtraplatform.features.domain.ProviderExtensionRegistry;
-import java.util.Optional;
-import java.util.Set;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.util.Optional;
+import java.util.Set;
 
 @Singleton
 @AutoBind

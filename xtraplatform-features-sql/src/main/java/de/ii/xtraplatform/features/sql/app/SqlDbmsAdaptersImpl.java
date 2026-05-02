@@ -12,10 +12,10 @@ import dagger.Lazy;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapters;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
-import java.util.Objects;
-import java.util.Set;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.util.Objects;
+import java.util.Set;
 
 @Singleton
 @AutoBind
