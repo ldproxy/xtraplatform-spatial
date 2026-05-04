@@ -63,7 +63,6 @@ import java.util.stream.IntStream;
 public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private static final Set<Type> NUMBER = ImmutableSet.of(Type.Integer, Type.Long, Type.Double);
-  private static final Set<Type> INTEGER = ImmutableSet.of(Type.Integer, Type.Long);
   private static final Set<Type> TEXT = ImmutableSet.of(Type.String);
   private static final Set<Type> BOOLEAN = ImmutableSet.of(Type.Boolean);
   private static final Set<Type> TEMPORAL =
@@ -338,7 +337,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
                       .collect(Collectors.toList());
               Type actual = types.get(i);
 
-              if (!(expected.contains(actual) || actual.equals(Type.UNKNOWN))) {
+              if (!(expected.stream().anyMatch(e -> e == actual) || actual == Type.UNKNOWN)) {
                 throw new CqlIncompatibleTypes(
                     getText(function),
                     i + 1,
@@ -352,6 +351,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     return Optional.ofNullable(customFunctions.get(function.getName().toUpperCase(Locale.ROOT)));
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private Type fromSchemaType(String schemaType) {
     return switch (schemaType.toUpperCase(Locale.ROOT)) {
       case "STRING" -> Type.String;
@@ -398,10 +398,6 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   }
 
   private List<String> asSchemaTypes(List<Type> types) {
-    return types.stream().map(Type::schemaType).distinct().toList();
-  }
-
-  private List<String> asSchemaTypesFunction(Set<Type> types) {
     return types.stream().map(Type::schemaType).distinct().toList();
   }
 
