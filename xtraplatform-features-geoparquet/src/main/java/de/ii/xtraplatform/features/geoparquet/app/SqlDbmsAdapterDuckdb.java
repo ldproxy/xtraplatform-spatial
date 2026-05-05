@@ -13,6 +13,8 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,8 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.slf4j.Logger;
@@ -211,8 +211,9 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
         case "s3" -> queryBuilder.append("CREATE SECRET (TYPE s3");
         case "r2" -> queryBuilder.append("CREATE SECRET (TYPE r2");
         case "gcs" -> queryBuilder.append("CREATE SECRET (TYPE gcs");
-        default -> throw new IllegalArgumentException(
-            "Unknown provider type. Use S3 with a custom endpoint instead.");
+        default ->
+            throw new IllegalArgumentException(
+                "Unknown provider type. Use S3 with a custom endpoint instead.");
       }
     } else {
       queryBuilder.append("CREATE SECRET (TYPE s3");
