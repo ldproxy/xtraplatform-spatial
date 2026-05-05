@@ -110,7 +110,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
         namespaceNormalizer.getNamespacePrefix(nsUri), "@" + localName, depth + 1, false);
 
     if (depth == 0
-        && ((localName.equals("id") && nsUri.startsWith(GML_NS_URI)) || localName.equals("fid"))) {
+        && (("id".equals(localName) && nsUri.startsWith(GML_NS_URI)) || "fid".equals(localName))) {
       String path = currentPath.toString();
       // if (!isPathMapped(path)) {
       mappingBuilder.addValue(
@@ -162,7 +162,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     if (propertyType.isPresent()) {
       String fieldNameGml = currentPath.toFieldNameGml();
 
-      if (fieldNameGml.equals("id")) {
+      if ("id".equals(fieldNameGml)) {
         fieldNameGml = "_id_";
       }
 
@@ -276,7 +276,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
       return false;
     }
 
-    String parent = path.substring(0, path.lastIndexOf("/"));
+    String parent = path.substring(0, path.lastIndexOf('/'));
     for (String mappedPath : mappedPaths) {
       if (parent.equals(mappedPath)) {
         return true;

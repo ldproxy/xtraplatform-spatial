@@ -83,17 +83,14 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
             return withQuotes ? "'" + property.getValue() + "'" : property.getValue();
 
           case GEOMETRY:
-            // geometries are handled separately, ignore them in this map
+          // geometries are handled separately, ignore them in this map
           default:
             return null;
         }
 
       case OBJECT:
-        return property
-                .getSchema()
-                .map(FeatureSchema::getType)
-                .orElse(Type.UNKNOWN)
-                .equals(Type.GEOMETRY)
+        return Type.GEOMETRY.equals(
+                property.getSchema().map(FeatureSchema::getType).orElse(Type.UNKNOWN))
             ? null
             : getObjectAsString(property);
 
