@@ -71,7 +71,8 @@ class FilterEncoderSqlSpec extends Specification {
                 new ImmutableCql2FunctionArgument.Builder().addType("string").build()
         ]
         customFunction.getReturns() >> ["string"]
-        customFunction.getExpression() >> ["SQL": "concat(\$arg1, '-', \$arg2)"]
+        customFunction.getExpression() >> "concat(\$arg1, '-', \$arg2)"
+        customFunction.getExpressions() >> [:]
         filterEncoderCustom = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),
@@ -88,7 +89,8 @@ class FilterEncoderSqlSpec extends Specification {
                 new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
         ]
         booleanFunction.getReturns() >> ["BOOLEAN"]
-        booleanFunction.getExpression() >> ["SQL": "UPPER(\$arg1) LIKE UPPER(\$arg2)"]
+        booleanFunction.getExpression() >> "UPPER(\$arg1) LIKE UPPER(\$arg2)"
+        booleanFunction.getExpressions() >> [:]
         filterEncoderCustomBoolean = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),
@@ -105,7 +107,8 @@ class FilterEncoderSqlSpec extends Specification {
                 new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
         ]
         geometryFunction.getReturns() >> ["BOOLEAN"]
-        geometryFunction.getExpression() >> ["SQL": "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"]
+        geometryFunction.getExpression() >> "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"
+        geometryFunction.getExpressions() >> [:]
         filterEncoderCustomGeometry = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),
@@ -122,7 +125,8 @@ class FilterEncoderSqlSpec extends Specification {
                 new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
         ]
         concatDialectFunction.getReturns() >> ["STRING"]
-        concatDialectFunction.getExpression() >> ["SQL/GPKG": "concat(\$arg1, ' (', \$arg2, ')')", "SQL/PGIS": "\$arg1 || ' (' || \$arg2 || ')'"]
+        concatDialectFunction.getExpression() >> null
+        concatDialectFunction.getExpressions() >> ["SQL/GPKG": "concat(\$arg1, ' (', \$arg2, ')')", "SQL/PGIS": "\$arg1 || ' (' || \$arg2 || ')'"]
         filterEncoderCustomConcatPgis = new FilterEncoderSql(
                 OgcCrs.CRS84,
                 new SqlDialectPgis(),

@@ -192,10 +192,10 @@ class CqlFunctionCheckerSpec extends Specification {
     def 'Custom function: valid expression'() {
         given:
         def customFunctions = ImmutableList.of(
-                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of(
+                CustomFunction.of("IST_IN_BEREICH", null, ImmutableList.of(
                         new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
                         new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
-                ), ImmutableList.of("BOOLEAN"))
+                ), ImmutableList.of("BOOLEAN"), 'ST_Intersects($arg1, ST_GeomFromText($arg2))')
         )
         def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
                 "geometry", "GEOMETRY",
@@ -212,10 +212,10 @@ class CqlFunctionCheckerSpec extends Specification {
     def 'Custom function: incompatible argument type'() {
         given:
         def customFunctions = ImmutableList.of(
-                CustomFunction.of("IST_IN_BEREICH", ImmutableList.of(
+                CustomFunction.of("IST_IN_BEREICH", null, ImmutableList.of(
                         new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
                         new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
-                ), ImmutableList.of("BOOLEAN"))
+                ), ImmutableList.of("BOOLEAN"), 'ST_Intersects($arg1, ST_GeomFromText($arg2))')
         )
         def customVisitor = new CqlTypeAndFunctionChecker(ImmutableMap.of(
                 "geometry", "GEOMETRY",

@@ -202,14 +202,23 @@ public class FilterEncoderSql {
   }
 
   private Optional<String> resolveExpression(CustomFunction customFunction) {
+    if (Objects.nonNull(customFunction.getExpression())
+        && !customFunction.getExpression().isBlank()) {
+      return Optional.of(customFunction.getExpression());
+    }
+
     String dialectKey = "SQL/" + sqlDialect.getId();
-    if (customFunction.getExpression().containsKey(dialectKey)) {
-      return Optional.of(customFunction.getExpression().get(dialectKey));
+    if (customFunction.getExpressions().containsKey(dialectKey)) {
+      return Optional.of(customFunction.getExpressions().get(dialectKey));
     }
-    if (customFunction.getExpression().containsKey("SQL")) {
-      return Optional.of(customFunction.getExpression().get("SQL"));
+    if (customFunction.getExpressions().containsKey("SQL")) {
+      return Optional.of(customFunction.getExpressions().get("SQL"));
     }
-    return Optional.empty();
+
+    throw new IllegalArgumentException(
+        String.format(
+            "Custom function '%s' has no expression for dialect '%s'",
+            customFunction.getName(), dialectKey));
   }
 
   private boolean operandHasSelectForTemplate(String expression) {

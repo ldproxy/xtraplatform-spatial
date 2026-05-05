@@ -1857,10 +1857,10 @@ class CqlTextSpec extends Specification {
         )
 
         def customFunctions = List.of(
-                CustomFunction.of("IST_IN_BEREICH", List.of(
+                CustomFunction.of("IST_IN_BEREICH", null, List.of(
                         new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
                         new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
-                ), List.of("BOOLEAN"))
+                ), List.of("BOOLEAN"), 'ST_Intersects($geometry, ST_GeomFromText($bereich))')
         )
 
         String cqlText = "IST_IN_BEREICH(geometry, bereich) = true"
