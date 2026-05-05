@@ -115,6 +115,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -469,6 +470,7 @@ public class FeatureProviderSql
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SqlQueryMapping>> queryMappings;
+  private List<CustomFunction> cql2Functions;
   private String cronJob;
 
   @AssistedInject
@@ -535,6 +537,7 @@ public class FeatureProviderSql
     this.subdecoders = subdecoders;
     this.cronJob = null;
     this.tableSchemas = null;
+    this.cql2Functions = List.of();
   }
 
   private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
@@ -575,6 +578,7 @@ public class FeatureProviderSql
     }
 
     SqlDialect sqlDialect = dbmsAdapters.getDialect(getData().getConnectionInfo().getDialect());
+    this.cql2Functions = getDialectAwareCustomFunctions(sqlDialect);
     String accentiCollation =
         Objects.nonNull(getData().getQueryGeneration())
             ? getData().getQueryGeneration().getAccentiCollation().orElse(null)
@@ -1487,7 +1491,37 @@ public class FeatureProviderSql
 
   @Override
   public List<CustomFunction> getCql2Functions() {
-    return CqlBuiltInFunctions.prependBuiltInFunctions(getData().getCql2Functions());
+    return CqlBuiltInFunctions.prependBuiltInFunctions(cql2Functions);
+  }
+
+  private List<CustomFunction> getDialectAwareCustomFunctions(SqlDialect sqlDialect) {
+    final String dialectKey = "SQL/" + sqlDialect.getId().toUpperCase(Locale.ROOT);
+
+    return getData().getCql2Functions().stream()
+        .filter(
+            function -> {
+              if (Objects.nonNull(function.getExpression())
+                  && !function.getExpression().isBlank()) {
+                return true;
+              }
+
+              Map<String, String> expressions = function.getExpressions();
+              boolean hasDialectExpression = expressions.containsKey(dialectKey);
+              boolean hasGenericExpression = expressions.containsKey("SQL");
+
+              if (hasDialectExpression || hasGenericExpression) {
+                return true;
+              }
+
+              LOGGER.error(
+                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no expression is defined for dialect '{}' (available keys: {}).",
+                  getId(),
+                  function.getName(),
+                  dialectKey,
+                  expressions.keySet());
+              return false;
+            })
+        .toList();
   }
 
   @Override

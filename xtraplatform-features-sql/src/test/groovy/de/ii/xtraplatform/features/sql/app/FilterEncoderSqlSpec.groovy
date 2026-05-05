@@ -55,6 +55,9 @@ class FilterEncoderSqlSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoderCustomConcatGpkg
 
+    @Shared
+    FilterEncoderSql filterEncoderCustomPgisOnlyOnGpkg
+
     def setupSpec() {
 
         filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
@@ -143,6 +146,23 @@ class FilterEncoderSqlSpec extends Specification {
                 new CqlImpl(),
                 [concatDialectFunction],
                 null)
+
+        def pgisOnlyFunction = Stub(CustomFunction)
+        pgisOnlyFunction.getName() >> "my_pgis_only"
+        pgisOnlyFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        pgisOnlyFunction.getReturns() >> ["STRING"]
+        pgisOnlyFunction.getExpression() >> null
+        pgisOnlyFunction.getExpressions() >> ["SQL/PGIS": "UPPER(\$arg1)"]
+        filterEncoderCustomPgisOnlyOnGpkg = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectGpkg(),
+                null,
+                null,
+                new CqlImpl(),
+                [pgisOnlyFunction],
+                null)
     }
 
     def 'custom function dialect-specific expression: SQL/PGIS'() {
@@ -182,6 +202,25 @@ class FilterEncoderSqlSpec extends Specification {
 
         then:
         actual == expected
+
+    }
+
+    def 'custom function without expression for current dialect throws clear error'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_pgis_only", [Property.of("name")]),
+                        ScalarLiteral.of("KUPP")
+                ])
+
+        when:
+        filterEncoderCustomPgisOnlyOnGpkg.encode(filter, instanceContainer)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "Custom function 'my_pgis_only' has no expression for dialect 'SQL/GPKG'"
 
     }
 
