@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -27,10 +28,11 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
 
   /**
    * @langEn Only relevant for local (Geo)Parquet files: The relative path starting from
-   *     `/resources/features` to the directory containing the (Geo)Parquet files (including
-   *     subdirectories).
+   *     `/resources/features` to the directory containing the (Geo)Parquet files / subdirectories
+   *     with (Geo)Parquet files.
    * @langDe Nur relevant für lokale (Geo)Parquet-Dateien: Der relative Pfad ausgehend von
-   *     `/resources/features` zum Verzeichnis mit den (Geo)Parquet-Dateien (inklusive Unterordner).
+   *     `/resources/features` zum Verzeichnis mit den (Geo)Parquet-Dateien bzw. Unterordnern mit
+   *     (Geo)Parquet-Dateien.
    */
   @Override
   String getDatabase();
@@ -63,11 +65,11 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
 
   /**
    * @langEn This mapping is used to assign table names to (Geo)Parquet files, see
-   *     [below](#mapping-of-tables-to-(geo)parquet-files) for details, and to configure S3, see
-   *     [further below](#configuration-of-s3).
+   *     [below](#tablemapping) for details, and to configure S3, see [further
+   *     below](#configuration-of-s3).
    * @langDe Dieses Mapping dient sowohl der Zuordnung von Tabellennamen zu (Geo)Parquet-Dateien,
-   *     siehe [unten](#zuordnung-von-tabellen-zu-(geo)parquet-dateien) für Details, als auch dem
-   *     Konfigurieren von S3, siehe [weiter unten](#konfiguration-von-s3).
+   *     siehe [unten](#tabellenzuordnung) für Details, als auch dem Konfigurieren von S3, siehe
+   *     [weiter unten](#konfiguration-von-s3).
    */
   @Override
   Map<String, String> getDriverOptions();
@@ -85,4 +87,32 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
   default String getDialect() {
     return ConnectionInfoSql.super.getDialect();
   }
+
+  // Die folgenden zwei Parameter müssten für GeoParquet irrelevant sein
+  @DocIgnore
+  @JsonIgnore
+  @Nullable
+  @Override
+  List<String> getSchemas();
+
+  @DocIgnore
+  @JsonIgnore
+  @Nullable
+  @Override
+  default Optional<String> getDefaultCollation() {
+    return ConnectionInfoSql.super.getDefaultCollation();
+  }
+
+  /*
+  Es wurde nicht getestet, ob und wie Datensatzänderungen behandelt werden.
+  Allerdings ist es nicht möglich eine deperecated-Methode zu überschreiben,
+  daher bleibt die Option in den Docs...
+  @DocIgnore
+  @JsonIgnore
+  @Override
+  @Deprecated
+  default boolean getAssumeExternalChanges() {
+    return ConnectionInfoSql.super.getAssumeExternalChanges();
+  }
+   */
 }
