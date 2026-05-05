@@ -51,7 +51,7 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
    * @langEn Only relevant for S3: The `access key` required to access the bucket. Must not be set
    *     for public buckets.
    * @langDe Nur relevant für S3: Der `access key` für den Zugriff auf den Bucket. Darf für den
-   *     Zugriff auf öffentlichen Buckets nicht gesetzt werden.
+   *     Zugriff auf öffentliche Buckets nicht gesetzt werden.
    */
   Optional<String> getUser();
 
@@ -59,13 +59,13 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
    * @langEn Only relevant for S3: The `secret access key` required to access the bucket. Must not
    *     be set for public buckets.
    * @langDe Nur relevant für S3: Der `secret access key` für den Zugriff auf den Bucket. Darf für
-   *     den Zugriff auf öffentlichen Buckets nicht gesetzt werden.
+   *     den Zugriff auf öffentliche Buckets nicht gesetzt werden.
    */
   Optional<String> getPassword();
 
   /**
    * @langEn This mapping is used to assign table names to (Geo)Parquet files and to configure S3.
-   *     See [Tablemapping](#tablemapping) and [Configuration of S3](#configuration-of-s3) for
+   *     See [Table Mapping](#table-mapping) and [Configuration of S3](#configuration-of-s3) for
    *     details.
    * @langDe Dieses Mapping dient sowohl der Zuordnung von Tabellennamen zu (Geo)Parquet-Dateien,
    *     als auch dem Konfigurieren von S3. Siehe [Tabellenzuordnung](#tabellenzuordnung) und

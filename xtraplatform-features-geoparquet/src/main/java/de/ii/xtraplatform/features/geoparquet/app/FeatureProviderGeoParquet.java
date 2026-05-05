@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * - When working with large files, the data might not be available immediately after application start, especially if no cache has been built beforehand. Requesting the data before it is ready may return `HTTP Error 503`. After some minutes the data should become available, the exact time depends on the size of the files.
  * - Populating a table with the content of multiple specific (Geo)Parquet files is not *yet* supported. However, it is possible to select multiple files using the `*` and `?` wildcard operators.
  * - The configuration is not checked for errors. This is especially the case for any S3-related configurations.
- * - The S3-access may fail, if S3-credentials are provided although the bucket is public.
+ * - The S3-access may fail if S3-credentials are provided although the bucket is public.
  * - The behavior on dataset changes has not been tested.
  * </code>
  * @limitationsDe
@@ -91,9 +91,8 @@ import org.slf4j.LoggerFactory;
  * ```yaml
  * connectionInfo:
  *   driverOptions:
- *     table.FOO: "Unterordner/foo.parquet" # Match one specific file
- *     table.BAR: "Unterordner/Unterordner_2/*.parquet" # All parquet files inside Unterordner/Unterordner_2/
- *     table.FOOBAR: "*&#42;/*.parquet" # Match all parquet files at any depth
+ *     table.FOO: "subdirectory/foo.parquet" # Match one specific file
+ *     table.BAR: "subdirectory/subdirectory_2/*.parquet" # All parquet files inside subdirectory/subdirectory_2/
  * ```
  * </code> Finally the table names can be referenced in `sourcePath`: <code>
  * ```yaml
@@ -141,7 +140,6 @@ import org.slf4j.LoggerFactory;
  *   driverOptions:
  *     table.FOO: "Unterordner/foo.parquet" # Wähle eine bestimmte Datei aus
  *     table.BAR: "Unterordner/Unterordner_2/*.parquet" # Alle Parquet-Dateien in Unterordner/Unterordner_2/
- *     table.FOOBAR: "*&#42;/*.parquet" # Alle Parquet-Dateien in beliebiger Tiefe
  * ```
  * </code>Die Tabellennamen können anschließend in `sourcePath` referenziert werden: <code>
  * ```yaml
