@@ -86,7 +86,7 @@ public class MbtilesTileset {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MbtilesTileset.class);
   private static final int EMPTY_TILE_ID = 1;
-  private static final int IDS_CHUCK_SIZE = 10000;
+  private static final int IDS_CHUCK_SIZE = 10_000;
   private final Path tilesetPath;
   private final Mutex mutex;
   private final MbtilesMetadata metadata;
@@ -259,7 +259,7 @@ public class MbtilesTileset {
       }
 
       // create empty MVT tile with rowid=1
-      if (metadata.getFormat().equals(TilesFormat.MVT)) {
+      if (TilesFormat.MVT.equals(metadata.getFormat())) {
         try (PreparedStatement statement =
             connection.prepareStatement("INSERT INTO tile_blobs (tile_id,tile_data) VALUES(?,?)")) {
           statement.setInt(1, EMPTY_TILE_ID);

@@ -86,7 +86,7 @@ public abstract class ReverseLine implements CoordinatesTransformation {
       Optional<Interpolation> interpolation,
       OptionalInt minNumberOfPositions)
       throws IOException {
-    for (int i = 0; i < length / 2; i = i + dimension) {
+    for (int i = 0; i < length / 2; i += dimension) {
       double x = coordinates[i];
       double y = coordinates[i + 1];
 

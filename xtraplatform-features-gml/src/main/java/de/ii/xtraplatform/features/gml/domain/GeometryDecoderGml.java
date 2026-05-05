@@ -106,28 +106,21 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
                     : Axes.XYZ;
             Geometry<?> geom =
                 switch (localName) {
-                  case "Point" -> ImmutablePoint.builder()
-                      .crs(crs)
-                      .value(Position.empty(axes))
-                      .build();
-                  case "LineString" -> ImmutableLineString.builder()
-                      .crs(crs)
-                      .value(PositionList.empty(axes))
-                      .build();
+                  case "Point" ->
+                      ImmutablePoint.builder().crs(crs).value(Position.empty(axes)).build();
+                  case "LineString" ->
+                      ImmutableLineString.builder()
+                          .crs(crs)
+                          .value(PositionList.empty(axes))
+                          .build();
                   case "Polygon" -> ImmutablePolygon.builder().crs(crs).axes(axes).build();
                   case "MultiPoint" -> ImmutableMultiPoint.builder().crs(crs).axes(axes).build();
-                  case "MultiCurve", "MultiLineString" -> ImmutableMultiLineString.builder()
-                      .crs(crs)
-                      .axes(axes)
-                      .build();
-                  case "MultiSurface", "MultiPolygon" -> ImmutableMultiPolygon.builder()
-                      .crs(crs)
-                      .axes(axes)
-                      .build();
-                  case "MultiGeometry" -> ImmutableGeometryCollection.builder()
-                      .crs(crs)
-                      .axes(axes)
-                      .build();
+                  case "MultiCurve", "MultiLineString" ->
+                      ImmutableMultiLineString.builder().crs(crs).axes(axes).build();
+                  case "MultiSurface", "MultiPolygon" ->
+                      ImmutableMultiPolygon.builder().crs(crs).axes(axes).build();
+                  case "MultiGeometry" ->
+                      ImmutableGeometryCollection.builder().crs(crs).axes(axes).build();
                   default -> throw new IOException("Unsupported GML geometry type: " + localName);
                 };
             if (currentGeometry == null) {
@@ -350,25 +343,25 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     String srsName = parser.getAttributeValue(null, "srsName");
     if (srsName != null) {
       if (srsName.startsWith("urn:ogc:def:crs:EPSG::")) {
-        String code = srsName.substring(srsName.lastIndexOf(":") + 1);
+        String code = srsName.substring(srsName.lastIndexOf(':') + 1);
         try {
           return Optional.of(EpsgCrs.of(Integer.parseInt(code)));
         } catch (Exception e) {
           // ignore, fallback to default
         }
       } else if (srsName.startsWith("http://www.opengis.net/def/crs/EPSG/0/")) {
-        String code = srsName.substring(srsName.lastIndexOf("/") + 1);
+        String code = srsName.substring(srsName.lastIndexOf('/') + 1);
         try {
           return Optional.of(EpsgCrs.of(Integer.parseInt(code)));
         } catch (Exception e) {
           // ignore, fallback to default
         }
-      } else if (srsName.equals("http://www.opengis.net/def/crs/OGC/0/CRS84")
-          || srsName.equals("http://www.opengis.net/def/crs/OGC/1.3/CRS84")
-          || srsName.equals("urn:ogc:def:crs:OGC:1.3:CRS84")) {
+      } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84".equals(srsName)
+          || "http://www.opengis.net/def/crs/OGC/1.3/CRS84".equals(srsName)
+          || "urn:ogc:def:crs:OGC:1.3:CRS84".equals(srsName)) {
         return Optional.of(OgcCrs.CRS84);
-      } else if (srsName.equals("http://www.opengis.net/def/crs/OGC/0/CRS84h")
-          || srsName.equals("urn:ogc:def:crs:OGC::CRS84h")) {
+      } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84h".equals(srsName)
+          || "urn:ogc:def:crs:OGC::CRS84h".equals(srsName)) {
         return Optional.of(OgcCrs.CRS84h);
       }
     }
