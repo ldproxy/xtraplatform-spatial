@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  *     <p>The following limitations are known:
  *     <p><code>
  * - Only 2D geometries are supported.
- * - The option `linearizeCurves` is not supported. All geometries must be encoded with WKB or according to the geometry types "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" from the GeoArrow specification.
+ * - The option `linearizeCurves` is not supported. As described in the [GeoParquet specification](https://geoparquet.org/releases/v1.1.0/) all geometries must be encoded with WKB or according to the geometry types "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" from the GeoArrow specification.
  * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
  * - CRUD operations are not supported.
  * - Columns with JSON content are not *yet* supported.
@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
  *     <p>Die folgenden Einschränkungen sind bekannt:
  *     <p><code>
  * - Es werden nur 2D-Geometrien unterstützt.
- * - Die Option `linearizeCurves` wird nicht unterstützt. Alle Geometrien müssen mit WKB oder gemäß den Geometrietypen "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" aus der GeoArrow-Spezifikation kodiert werden.
+ * - Die Option `linearizeCurves` wird nicht unterstützt. Wie in der [GeoParquet Spezifikation](https://geoparquet.org/releases/v1.1.0/) beschrieben müssen alle Geometrien mit WKB oder gemäß den Geometrietypen "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" aus der GeoArrow-Spezifikation kodiert werden.
  * - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
  * - CRUD-Operationen werden nicht unterstützt.
  * - Spalten mit JSON-Inhalt werden *noch* nicht unterstützt.
@@ -86,12 +86,14 @@ import org.slf4j.LoggerFactory;
  * - The table names must be in the `table` namespace by preceding them with `table.`, e.g. `table.FOO`.
  * - For S3, the path must be relative to the URL in `host`. For local files, it must be relative to the path set in `database`.
  * - Currently it is not possible to populate a table with the content of multiple specific files. However, the wildcard operators `*` and `?` can be used to select all files matching a specific pattern.
- * </code> Examples: <code>
+ * </code>
+ *     <p>Examples: <code>
  * ```yaml
- * driverOptions:
- *   table.FOO: "Unterordner/foo.parquet" # Match one specific file
- *   table.BAR: "Unterordner/Unterordner_2/*.parquet" # All parquet files inside Unterordner/Unterordner_2/
- *   table.FOOBAR: "**\/*.parquet" # Match all parquet files at any depth
+ * connectionInfo:
+ *   driverOptions:
+ *     table.FOO: "Unterordner/foo.parquet" # Match one specific file
+ *     table.BAR: "Unterordner/Unterordner_2/*.parquet" # All parquet files inside Unterordner/Unterordner_2/
+ *     table.FOOBAR: "*&#42;/*.parquet" # Match all parquet files at any depth
  * ```
  * </code> Finally the table names can be referenced in `sourcePath`: <code>
  * ```yaml
@@ -101,7 +103,7 @@ import org.slf4j.LoggerFactory;
  * ```
  * </code>
  *     <p>### Configuration of S3
- *     <p>The possible parameters can be found in the [S3 documentation of
+ *     <p>The possible parameters and their default values can be found in the [S3 documentation of
  *     DuckDB](https://duckdb.org/docs/current/core_extensions/httpfs/s3api#overview-of-s3-secret-parameters).
  *     The following must be noted: <code>
  * - Every value must be a String. This also applies to boolean parameters (in these cases use the Strings "true" and "false").
@@ -116,7 +118,7 @@ import org.slf4j.LoggerFactory;
  *   user: "KEY-ID"
  *   password: "SECRET KEY-ID"
  *   driverOptions:
- *     endpoint: "s3.miniio-provider.net"
+ *     endpoint: "s3.minio-provider.net"
  *     use_ssl: "true"
  *     url_style: "path"
  *     table.TEST: "file.parquet"
@@ -135,10 +137,11 @@ import org.slf4j.LoggerFactory;
  * - Derzeit ist es nicht möglich, eine Tabelle mit dem Inhalt mehrerer spezifischer Dateien zu befüllen. Die Wildcard-Operatoren `*` und `?` können jedoch verwendet werden, um Dateien nach einem bestimmten Muster auszuwählen.
  * </code> Beispiele: <code>
  * ```yaml
- * driverOptions:
- *   table.FOO: "Unterordner/foo.parquet" # Wähle eine bestimmte Datei aus
- *   table.BAR: "Unterordner/Unterordner_2/*.parquet" # Alle Parquet-Dateien in Unterordner/Unterordner_2/
- *   table.FOOBAR: "**\/*.parquet" # Alle Parquet-Dateien in beliebiger Tiefe
+ * connectionInfo:
+ *   driverOptions:
+ *     table.FOO: "Unterordner/foo.parquet" # Wähle eine bestimmte Datei aus
+ *     table.BAR: "Unterordner/Unterordner_2/*.parquet" # Alle Parquet-Dateien in Unterordner/Unterordner_2/
+ *     table.FOOBAR: "*&#42;/*.parquet" # Alle Parquet-Dateien in beliebiger Tiefe
  * ```
  * </code>Die Tabellennamen können anschließend in `sourcePath` referenziert werden: <code>
  * ```yaml
@@ -148,7 +151,7 @@ import org.slf4j.LoggerFactory;
  * ```
  * </code>
  *     <p>### Konfiguration von S3
- *     <p>Die möglichen Parameter sind in der [S3-Dokumentation von
+ *     <p>Die möglichen Parameter sowie Standardwerte sind in der [S3-Dokumentation von
  *     DuckDB](https://duckdb.org/docs/current/core_extensions/httpfs/s3api#overview-of-s3-secret-parameters)
  *     zu finden. Folgendes ist zu beachten: <code>
  * - Jeder Wert muss ein String sein. Dies gilt auch für boolesche Parameter (in diesem Fall "true" und "false" verwenden).
@@ -163,12 +166,14 @@ import org.slf4j.LoggerFactory;
  *   user: "KEY-ID"
  *   password: "SECRET KEY-ID"
  *   driverOptions:
- *     endpoint: "s3.miniio-provider.net"
+ *     endpoint: "s3.minio-provider.net"
  *     use_ssl: "true"
  *     url_style: "path"
  *     table.TEST: "file.parquet"
  * ```
  * </code>
+ * @ref:cfgProperties {@link
+ *     de.ii.xtraplatform.features.geoparquet.domain.FeatureProviderGeoParquetDataDummy}
  * @ref:connectionInfo {@link
  *     de.ii.xtraplatform.features.geoparquet.domain.ImmutableConnectionInfoGeoParquet}
  */

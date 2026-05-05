@@ -64,12 +64,12 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
   Optional<String> getPassword();
 
   /**
-   * @langEn This mapping is used to assign table names to (Geo)Parquet files, see
-   *     [below](#tablemapping) for details, and to configure S3, see [further
-   *     below](#configuration-of-s3).
+   * @langEn This mapping is used to assign table names to (Geo)Parquet files and to configure S3.
+   *     See [Tablemapping](#tablemapping) and [Configuration of S3](#configuration-of-s3) for
+   *     details.
    * @langDe Dieses Mapping dient sowohl der Zuordnung von Tabellennamen zu (Geo)Parquet-Dateien,
-   *     siehe [unten](#tabellenzuordnung) für Details, als auch dem Konfigurieren von S3, siehe
-   *     [weiter unten](#konfiguration-von-s3).
+   *     als auch dem Konfigurieren von S3. Siehe [Tabellenzuordnung](#tabellenzuordnung) und
+   *     [Konfiguration von S3](#konfiguration-von-s3) für Details.
    */
   @Override
   Map<String, String> getDriverOptions();
