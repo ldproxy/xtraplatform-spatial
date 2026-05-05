@@ -137,10 +137,10 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
         FeatureSchema schema = schemaStack.get(i);
         context.pathTracker().track(schema.getFullPath());
 
-        if (nestingStack.get(i).equals("A")) {
+        if ("A".equals(nestingStack.get(i))) {
           getDownstream().onArrayStart(context);
           context.setInArray(true);
-        } else if (nestingStack.get(i).equals("O")) {
+        } else if ("O".equals(nestingStack.get(i))) {
           getDownstream().onObjectStart(context);
           context.setInObject(true);
         }

@@ -106,7 +106,7 @@ public abstract class SimplifyLine implements CoordinatesTransformation {
     if (minNumberOfPositions > 2) {
       int split = Math.max(minNumberOfPositions - 1, numberOfPositions / minNumberOfPositions);
 
-      for (int i = 0; i < numberOfPositions; i = i + split) {
+      for (int i = 0; i < numberOfPositions; i += split) {
         simplifySection(
             coordinates, dimension, i, Math.min(i + split - 1, numberOfPositions - 1), keepPoints);
       }

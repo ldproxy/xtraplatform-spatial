@@ -14,9 +14,9 @@ import de.ii.xtraplatform.base.domain.JacksonSubTypeIds;
 import de.ii.xtraplatform.features.domain.ConnectionInfo;
 import de.ii.xtraplatform.features.graphql.domain.ConnectionInfoGraphQlHttp;
 import de.ii.xtraplatform.features.graphql.infra.GraphQlConnectorHttp;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.List;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 
 /**
  * @author zahnen

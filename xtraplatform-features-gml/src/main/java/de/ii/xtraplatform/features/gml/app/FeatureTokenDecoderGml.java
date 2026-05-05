@@ -360,9 +360,9 @@ public class FeatureTokenDecoderGml
           }
           break;
 
-          // Do not support DTD, SPACE, NAMESPACE, NOTATION_DECLARATION, ENTITY_DECLARATION,
-          // PROCESSING_INSTRUCTION, COMMENT, CDATA
-          // ATTRIBUTE is handled in START_ELEMENT implicitly
+        // Do not support DTD, SPACE, NAMESPACE, NOTATION_DECLARATION, ENTITY_DECLARATION,
+        // PROCESSING_INSTRUCTION, COMMENT, CDATA
+        // ATTRIBUTE is handled in START_ELEMENT implicitly
 
         default:
           // advanceParser(in);

@@ -246,7 +246,7 @@ public class SqlMappingDeriver {
       SqlQueryColumn column1,
       SqlQuerySchema querySchema,
       boolean isWritable) {
-    if (column.getTarget().equals("$")) {
+    if ("$".equals(column.getTarget())) {
       if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
         List<FeatureSchema> connectedSchemas =
             includeSchema
@@ -327,12 +327,12 @@ public class SqlMappingDeriver {
   }
 
   private static String applyRename(String target, String rename) {
-    String prefix = target.contains(".") ? target.substring(0, target.lastIndexOf(".") + 1) : "";
-    String prop = target.contains(".") ? target.substring(target.lastIndexOf(".") + 1) : "";
+    String prefix = target.contains(".") ? target.substring(0, target.lastIndexOf('.') + 1) : "";
+    String prop = target.contains(".") ? target.substring(target.lastIndexOf('.') + 1) : "";
     String renamed = rename;
 
     if (MappingOperationResolver.isConcatPath(prop)) {
-      renamed = prop.substring(0, prop.indexOf("_") + 1) + renamed;
+      renamed = prop.substring(0, prop.indexOf('_') + 1) + renamed;
     }
 
     return prefix + renamed;
