@@ -50,6 +50,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
+  private final boolean stepAudit;
 
   public FeatureStreamImpl(
       Query query,
@@ -86,6 +87,9 @@ public class FeatureStreamImpl implements FeatureStream {
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepAudit =
+        !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
@@ -126,6 +130,10 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
+          if (stepAudit) {
+            source = source.via(new FeatureTokenTransformerAudit(resultBuilder));
+          }
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
@@ -142,7 +150,7 @@ public class FeatureStreamImpl implements FeatureStream {
                     if (strongETag && x instanceof byte[]) {
                       eTag.put((byte[]) x);
                     }
-                    return builder.isEmpty(x instanceof byte[] ? ((byte[]) x).length <= 0 : false);
+                    return builder.isEmpty(x instanceof byte[] && ((byte[]) x).length <= 0);
                   })
               .handleEnd(
                   (ImmutableResult.Builder builder1) -> {
@@ -171,7 +179,7 @@ public class FeatureStreamImpl implements FeatureStream {
               doTransform
                   ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
                   : tokenSource;
-          ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
+          ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.builder();
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -190,6 +198,9 @@ public class FeatureStreamImpl implements FeatureStream {
           }
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+          }
+          if (stepAudit) {
+            source = source.via(new FeatureTokenTransformerAudit(resultBuilder));
           }
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));

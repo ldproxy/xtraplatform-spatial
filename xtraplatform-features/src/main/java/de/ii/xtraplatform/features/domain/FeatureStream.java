@@ -37,6 +37,7 @@ public interface FeatureStream {
     CLEAN,
     ETAG,
     METADATA,
+    AUDIT,
     ALL
   }
 
