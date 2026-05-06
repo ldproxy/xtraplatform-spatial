@@ -55,11 +55,11 @@ import org.slf4j.LoggerFactory;
  * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
  * - CRUD operations are not supported.
  * - Columns with `struct` content are not *yet* supported.
- * - When working with large files, the data might not be available immediately after application start, especially if no cache has been built beforehand. Requesting the data before it is ready may return `HTTP Error 503`. After some minutes the data should become available, the exact time depends on the size of the files.
  * - Populating a table with the content of multiple specific (Geo)Parquet files is not *yet* supported. However, it is possible to select multiple files using the `*` and `?` wildcard operators.
- * - The configuration is not checked for errors. This is especially the case for any S3-related configurations.
- * - The S3-access may fail if S3-credentials are provided although the bucket is public.
  * - The behavior on dataset changes has not been tested.
+ * - The configuration is not checked for errors. This is especially the case for any S3-related configurations.
+ * - When working with large S3 datasets, the data might not be available immediately after application start, especially if no cache has been built beforehand. Requesting the data before it is ready may return `HTTP Error 503`. After some minutes the data should become available, the exact time depends on the size of the files.
+ * - The S3 access may fail if S3-credentials are provided although the bucket is public.
  * </code>
  * @limitationsDe
  *     <p>Die folgenden Einschränkungen sind bekannt:
@@ -69,11 +69,11 @@ import org.slf4j.LoggerFactory;
  * - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
  * - CRUD-Operationen werden nicht unterstützt.
  * - Spalten mit `struct`-Inhalt werden *noch* nicht unterstützt.
- * - Bei großen Dateien sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann dies zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
  * - Das Befüllen einer Tabelle mit dem Inhalt mehrerer spezifischer (Geo)Parquet-Dateien wird *noch* nicht unterstützt. Es ist jedoch möglich, mehrere Dateien mit den Wildcard-Operatoren `*` und `?` auszuwählen.
- * - Die Konfiguration wird nicht auf Korrektheit überprüft. Dies gilt insbesondere für die S3-Konfiguration.
- * - Der S3-Zugriff kann fehlschlagen, wenn S3-Zugangsdaten angegeben werden, obwohl der Bucket öffentlich ist.
  * - Das Verhalten bei Datensatzänderungen ist nicht getestet worden.
+ * - Die Konfiguration wird nicht auf Korrektheit überprüft. Dies gilt insbesondere für die S3-Konfiguration.
+ * - Bei großen S3-Datensätzen sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann dies zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
+ * - Der S3-Zugriff kann fehlschlagen, wenn S3-Zugangsdaten angegeben werden, obwohl der Bucket öffentlich ist.
  * </code>
  * @cfgPropertiesAdditionalEn ### Connection Info
  *     <p>The connection info object for GeoParquet has the following properties:
