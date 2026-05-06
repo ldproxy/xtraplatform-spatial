@@ -110,7 +110,7 @@ public class SqlDialectDuckdb implements SqlDialect {
               .withZone(timeZone);
     }
 
-    // Necessary because DUCKDB supports INFINITY
+    // Necessary because DuckDB supports INFINITY
     // Note: Strictly, INFINITY/-INFINITY and INSTANT.MAX/INSTANT.MIN are not the same! May result
     // in undesired behavior.
     Instant parsedStart;

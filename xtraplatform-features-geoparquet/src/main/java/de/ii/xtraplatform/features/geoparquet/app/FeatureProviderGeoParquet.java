@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * - The option `linearizeCurves` is not supported. As described in the [GeoParquet specification](https://geoparquet.org/releases/v1.1.0/) all geometries must be encoded with WKB or according to the geometry types "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" from the GeoArrow specification.
  * - The CQL2 functions `DIAMETER2D()` and `DIAMETER3D()` are not supported.
  * - CRUD operations are not supported.
- * - Columns with JSON content are not *yet* supported.
+ * - Columns with `struct` content are not *yet* supported.
  * - When working with large files, the data might not be available immediately after application start, especially if no cache has been built beforehand. Requesting the data before it is ready may return `HTTP Error 503`. After some minutes the data should become available, the exact time depends on the size of the files.
  * - Populating a table with the content of multiple specific (Geo)Parquet files is not *yet* supported. However, it is possible to select multiple files using the `*` and `?` wildcard operators.
  * - The configuration is not checked for errors. This is especially the case for any S3-related configurations.
@@ -68,7 +68,7 @@ import org.slf4j.LoggerFactory;
  * - Die Option `linearizeCurves` wird nicht unterstützt. Wie in der [GeoParquet Spezifikation](https://geoparquet.org/releases/v1.1.0/) beschrieben müssen alle Geometrien mit WKB oder gemäß den Geometrietypen "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon" aus der GeoArrow-Spezifikation kodiert werden.
  * - Die CQL2-Funktionen `DIAMETER2D()` und `DIAMETER3D()` werden nicht unterstützt.
  * - CRUD-Operationen werden nicht unterstützt.
- * - Spalten mit JSON-Inhalt werden *noch* nicht unterstützt.
+ * - Spalten mit `struct`-Inhalt werden *noch* nicht unterstützt.
  * - Bei großen Dateien sind die Daten möglicherweise nicht sofort nach dem Anwendungsstart verfügbar, insbesondere wenn zuvor kein Cache aufgebaut wurde. Werden die Daten abgefragt, bevor sie bereitstehen, kann dies zum Fehler `HTTP Error 503` führen. Nach einigen Minuten sollten die Daten verfügbar sein, die genaue Dauer hängt aber von der Größe der Dateien ab.
  * - Das Befüllen einer Tabelle mit dem Inhalt mehrerer spezifischer (Geo)Parquet-Dateien wird *noch* nicht unterstützt. Es ist jedoch möglich, mehrere Dateien mit den Wildcard-Operatoren `*` und `?` auszuwählen.
  * - Die Konfiguration wird nicht auf Korrektheit überprüft. Dies gilt insbesondere für die S3-Konfiguration.
@@ -110,7 +110,8 @@ import org.slf4j.LoggerFactory;
  * - The parameters `KEY_ID` and `SECRET` must be provided using `user` and `password` instead of `driverOptions`.
  * - The platform-specific secret type can be provided using the internal parameter "type". Valid options are "s3", "r2" and "gcs". For other providers use "s3" and set a custom endpoint instead.
  * - Instead of using the parameter `SCOPE` (which is not supported), set your sub-path as part of the bucket-URL in `host`.
- * </code>Example for `MinIO`: <code>
+ * </code>
+ *     <p>Example for `MinIO`: <code>
  * ```yaml
  * connectionInfo:
  *   host: "s3://geoparquet/subdirectory/"
@@ -157,7 +158,8 @@ import org.slf4j.LoggerFactory;
  * - Die Parameter `KEY_ID` und `SECRET` müssen über `user` und `password` statt über `driverOptions` angegeben werden.
  * - Der plattformspezifische Secret-Typ kann über den internen Parameter "type" angegeben werden. Gültige Optionen sind "s3", "r2" und "gcs". Für andere Provider "s3" verwenden und den `ENDPOINT`-Parameter entsprechend setzen.
  * - Anstelle des Parameters `SCOPE` (der nicht unterstützt wird), den Unterordner als Teil der Bucket-URL in `host` angeben.
- * </code> Beispiel für `MinIO`: <code>
+ * </code>
+ *     <p>Beispiel für `MinIO`: <code>
  * ```yaml
  * connectionInfo:
  *   host: "s3://geoparquet/Unterordner/"
@@ -171,7 +173,7 @@ import org.slf4j.LoggerFactory;
  * ```
  * </code>
  * @ref:cfgProperties {@link
- *     de.ii.xtraplatform.features.geoparquet.domain.FeatureProviderGeoParquetDataDummy}
+ *     de.ii.xtraplatform.features.geoparquet.domain.ImmutableFeatureProviderGeoParquetDataDummy}
  * @ref:connectionInfo {@link
  *     de.ii.xtraplatform.features.geoparquet.domain.ImmutableConnectionInfoGeoParquet}
  */
