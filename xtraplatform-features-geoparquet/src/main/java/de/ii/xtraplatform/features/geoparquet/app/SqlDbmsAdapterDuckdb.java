@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 @AutoBind
 public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
-  static final String ID = "DUCKDB";
+  static final String ID = "GEOPARQUET";
 
   // ToDo: Log errors
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlDbmsAdapterDuckdb.class);
