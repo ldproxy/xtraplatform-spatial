@@ -182,9 +182,7 @@ public class SqlDialectDuckdb implements SqlDialect {
   @Override
   public String applyToJsonValue(
       String alias, String column, String path, PropertyTypeInfo typeInfo) {
-    // ToDo: Implement
-    throw new IllegalArgumentException(
-        "JSON is not supported for GeoParquet feature providers yet.");
+    throw new IllegalArgumentException("JSON is not supported for GeoParquet feature providers.");
   }
 
   @Override
