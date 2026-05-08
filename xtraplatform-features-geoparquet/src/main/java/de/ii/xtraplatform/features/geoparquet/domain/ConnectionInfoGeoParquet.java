@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.geoparquet.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.features.domain.ConnectionInfo;
@@ -68,4 +69,24 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfo {
    *     [Konfiguration von S3](#konfiguration-von-s3) für Details.
    */
   Map<String, String> getDriverOptions();
+
+  @JsonIgnore
+  @DocIgnore
+  @Override
+  Optional<String> getConnectionUri();
+
+  @JsonIgnore
+  @DocIgnore
+  @Override
+  String getConnectorType();
+
+  @JsonIgnore
+  @DocIgnore
+  @Override
+  boolean isShared();
+
+  @JsonIgnore
+  @DocIgnore
+  @Override
+  String getDatasetIdentifier();
 }
