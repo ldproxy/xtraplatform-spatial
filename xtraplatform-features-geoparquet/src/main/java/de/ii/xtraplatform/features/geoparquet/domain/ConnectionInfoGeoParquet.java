@@ -7,14 +7,11 @@
  */
 package de.ii.xtraplatform.features.geoparquet.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
-import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
-import java.util.List;
+import de.ii.xtraplatform.features.domain.ConnectionInfo;
 import java.util.Map;
 import java.util.Optional;
-import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -24,7 +21,7 @@ import org.immutables.value.Value;
     attributeBuilderDetection = true,
     passAnnotations = DocIgnore.class)
 @JsonDeserialize(builder = ImmutableConnectionInfoGeoParquet.Builder.class)
-public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
+public interface ConnectionInfoGeoParquet extends ConnectionInfo {
 
   /**
    * @langEn Only relevant for local (Geo)Parquet files: The relative path starting from
@@ -34,7 +31,6 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
    *     `/resources/features` zum Verzeichnis mit den (Geo)Parquet-Dateien bzw. Unterordnern mit
    *     (Geo)Parquet-Dateien.
    */
-  @Override
   String getDatabase();
 
   /**
@@ -71,48 +67,5 @@ public interface ConnectionInfoGeoParquet extends ConnectionInfoSql {
    *     als auch dem Konfigurieren von S3. Siehe [Tabellenzuordnung](#tabellenzuordnung) und
    *     [Konfiguration von S3](#konfiguration-von-s3) für Details.
    */
-  @Override
   Map<String, String> getDriverOptions();
-
-  @DocIgnore
-  @JsonIgnore
-  @Nullable
-  @Override
-  PoolSettings getPool();
-
-  @DocIgnore
-  @JsonIgnore
-  @Override
-  @Value.Default
-  default String getDialect() {
-    return ConnectionInfoSql.super.getDialect();
-  }
-
-  // Die folgenden zwei Parameter müssten für GeoParquet irrelevant sein
-  @DocIgnore
-  @JsonIgnore
-  @Nullable
-  @Override
-  List<String> getSchemas();
-
-  @DocIgnore
-  @JsonIgnore
-  @Nullable
-  @Override
-  default Optional<String> getDefaultCollation() {
-    return ConnectionInfoSql.super.getDefaultCollation();
-  }
-
-  /*
-  Es wurde nicht getestet, ob und wie Datensatzänderungen behandelt werden.
-  Allerdings ist es nicht möglich eine deperecated-Methode zu überschreiben,
-  daher bleibt die Option in den Docs...
-  @DocIgnore
-  @JsonIgnore
-  @Override
-  @Deprecated
-  default boolean getAssumeExternalChanges() {
-    return ConnectionInfoSql.super.getAssumeExternalChanges();
-  }
-   */
 }
