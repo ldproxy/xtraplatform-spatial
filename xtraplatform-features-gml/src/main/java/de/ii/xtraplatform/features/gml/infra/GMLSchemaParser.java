@@ -336,7 +336,7 @@ public class GMLSchemaParser {
         }
       }
 
-    } else if (!decl.getType().getBaseType().getName().equals("anyType")) {
+    } else if (!"anyType".equals(decl.getType().getBaseType().getName())) {
       propertyType = decl.getType().getBaseType();
     }
 

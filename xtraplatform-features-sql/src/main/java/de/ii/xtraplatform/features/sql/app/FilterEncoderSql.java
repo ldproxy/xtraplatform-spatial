@@ -293,11 +293,11 @@ public class FilterEncoderSql {
         SchemaSql table, String propertyName, String alias, boolean allowColumnFallback) {
       // TODO: support nested mapping filters
       if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
-          && propertyName.equals("node")) {
+          && "node".equals(propertyName)) {
         return Tuple.of("_route_" + propertyName, Optional.<String>empty());
       }
       if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
-          && propertyName.equals("source")) {
+          && "source".equals(propertyName)) {
         return Tuple.of(String.format("%s.%s", alias, propertyName), Optional.<String>empty());
       }
       return table.getProperties().stream()
@@ -334,7 +334,7 @@ public class FilterEncoderSql {
                           Tuple.of(
                               String.format(
                                   "%s.%s",
-                                  alias, propertyName.substring(propertyName.lastIndexOf(".") + 1)),
+                                  alias, propertyName.substring(propertyName.lastIndexOf('.') + 1)),
                               Optional.<String>empty()))
                       : Optional.empty())
           .orElseThrow(
@@ -409,7 +409,7 @@ public class FilterEncoderSql {
               ignoreInstanceFilter,
               true,
               FilterEncoderSql.this);
-      if (!join.isEmpty()) join = join + " ";
+      if (!join.isEmpty()) join += " ";
 
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
@@ -450,9 +450,9 @@ public class FilterEncoderSql {
       String end = children.get(1);
 
       // process special values for a half-bounded interval
-      if (start.equals("'..'"))
+      if ("'..'".equals(start))
         start = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      if (end.equals("'..'"))
+      if ("'..'".equals(end))
         end = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
 
       Operand arg1 = interval.getArgs().get(0);
@@ -1179,7 +1179,7 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BooleanValue2 booleanValue, List<String> children) {
-      return booleanValue.getValue().equals(Boolean.TRUE) ? "1=1" : "1=0";
+      return Boolean.TRUE.equals(booleanValue.getValue()) ? "1=1" : "1=0";
     }
   }
 
@@ -1210,7 +1210,7 @@ public class FilterEncoderSql {
       // strip double quotes from the property name
       String propertyName = property.getName().replaceAll("^\"|\"$", "");
       boolean hasPrefix = propertyName.contains(".");
-      String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf(".") + 1) : "";
+      String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf('.') + 1) : "";
       boolean hasAllowedPrefix = hasPrefix && allowedColumnPrefixes.contains(prefix);
       boolean allowColumnFallback = !hasPrefix || hasAllowedPrefix;
       List<String> aliases = AliasGenerator.getAliases(schema, isUserFilter ? 1 : 0);
@@ -1299,11 +1299,11 @@ public class FilterEncoderSql {
       // TODO: why is this needed? what would a clean solution look like? (original: support nested
       // mapping filters)
       if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
-          && propertyName.equals("node")) {
+          && "node".equals(propertyName)) {
         return Tuple.of("_route_" + propertyName, Optional.<String>empty());
       }
       if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
-          && propertyName.equals("source")) {
+          && "source".equals(propertyName)) {
         return Tuple.of(String.format("%s.%s", alias, propertyName), Optional.<String>empty());
       }
       return Optional.ofNullable(column)
@@ -1336,7 +1336,7 @@ public class FilterEncoderSql {
                           Tuple.of(
                               String.format(
                                   "%s.%s",
-                                  alias, propertyName.substring(propertyName.lastIndexOf(".") + 1)),
+                                  alias, propertyName.substring(propertyName.lastIndexOf('.') + 1)),
                               Optional.<String>empty()))
                       : Optional.empty())
           .orElseThrow(
@@ -1427,7 +1427,7 @@ public class FilterEncoderSql {
               ignoreInstanceFilter,
               false,
               FilterEncoderSql.this);
-      if (!join.isEmpty()) join = join + " ";
+      if (!join.isEmpty()) join += " ";
 
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
@@ -1468,9 +1468,9 @@ public class FilterEncoderSql {
       String end = children.get(1);
 
       // process special values for a half-bounded interval
-      if (start.equals("'..'"))
+      if ("'..'".equals(start))
         start = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      if (end.equals("'..'"))
+      if ("'..'".equals(end))
         end = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
 
       Operand arg1 = interval.getArgs().get(0);
@@ -2195,7 +2195,7 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BooleanValue2 booleanValue, List<String> children) {
-      return booleanValue.getValue().equals(Boolean.TRUE) ? "1=1" : "1=0";
+      return Boolean.TRUE.equals(booleanValue.getValue()) ? "1=1" : "1=0";
     }
   }
 
@@ -2278,9 +2278,9 @@ public class FilterEncoderSql {
 
     private String getQualifiedColumn(String propertyName) {
       boolean hasPrefix = propertyName.contains(".");
-      String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf(".") + 1) : "";
+      String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf('.') + 1) : "";
       String column =
-          hasPrefix ? propertyName.substring(propertyName.lastIndexOf(".") + 1) : propertyName;
+          hasPrefix ? propertyName.substring(propertyName.lastIndexOf('.') + 1) : propertyName;
 
       if (hasPrefix && !allowedColumnPrefixes.contains(prefix)) {
         throw new IllegalStateException(

@@ -296,7 +296,7 @@ public class FeatureTokenDecoderGeoJson
                 if (!"Feature".equals(parser.getValueAsString())) {
                   break;
                 }
-                // fall through
+              // fall through
               case "id":
                 startIfNecessary(false);
                 if (!"id".equals(currentName)) {

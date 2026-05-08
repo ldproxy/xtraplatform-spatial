@@ -162,7 +162,7 @@ public interface FeatureProviderSqlData
     @DocIgnore
     @Value.Default
     default int getChunkSize() {
-      return 10000;
+      return 10_000;
     }
 
     /**

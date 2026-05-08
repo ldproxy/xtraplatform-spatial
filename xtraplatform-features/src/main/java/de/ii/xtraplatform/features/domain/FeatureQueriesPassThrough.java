@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MediaType;
 
 public interface FeatureQueriesPassThrough {
 

@@ -166,7 +166,7 @@ public class XMLNamespaceNormalizer {
   }
   */
   public String getLocalName(String qn) {
-    return qn.substring(qn.lastIndexOf(":") + 1);
+    return qn.substring(qn.lastIndexOf(':') + 1);
   }
 
   public String getQualifiedName(String lqn) {
@@ -196,7 +196,7 @@ public class XMLNamespaceNormalizer {
 
   public String extractURI(String qn) {
     if (qn.contains(":")) {
-      return qn.substring(0, qn.lastIndexOf(":"));
+      return qn.substring(0, qn.lastIndexOf(':'));
     } else {
       return "";
     }

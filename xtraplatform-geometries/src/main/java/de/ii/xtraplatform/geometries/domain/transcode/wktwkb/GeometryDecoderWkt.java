@@ -128,61 +128,66 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
       case MULTI_LINE_STRING -> multiLineString(readListOfPositionList(tokenizer, axes), crs);
       case POLYGON -> polygon(readListOfPositionList(tokenizer, axes), crs);
       case MULTI_POLYGON -> multiPolygon(readListOfListOfPositionList(tokenizer, axes), crs);
-      case POLYHEDRAL_SURFACE -> polyhedralSurface(
-          readListOfListOfPositionList(tokenizer, axes), crs);
-      case COMPOUND_CURVE -> compoundCurve(
-          readListOf(
-              tokenizer,
-              crs,
-              axes,
-              GeometryType.LINE_STRING,
-              Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING)),
-          crs);
-      case CURVE_POLYGON -> curvePolygon(
-          readListOf(
-              tokenizer,
-              crs,
-              axes,
-              GeometryType.LINE_STRING,
-              Set.of(
+      case POLYHEDRAL_SURFACE ->
+          polyhedralSurface(readListOfListOfPositionList(tokenizer, axes), crs);
+      case COMPOUND_CURVE ->
+          compoundCurve(
+              readListOf(
+                  tokenizer,
+                  crs,
+                  axes,
                   GeometryType.LINE_STRING,
-                  GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE)),
-          crs);
-      case MULTI_CURVE -> multiCurve(
-          readListOf(
-              tokenizer,
-              crs,
-              axes,
-              GeometryType.LINE_STRING,
-              Set.of(
+                  Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING)),
+              crs);
+      case CURVE_POLYGON ->
+          curvePolygon(
+              readListOf(
+                  tokenizer,
+                  crs,
+                  axes,
                   GeometryType.LINE_STRING,
-                  GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE)),
-          crs);
-      case MULTI_SURFACE -> multiSurface(
-          readListOf(
-              tokenizer,
-              crs,
-              axes,
-              GeometryType.POLYGON,
-              Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON)),
-          crs);
-      case GEOMETRY_COLLECTION -> geometryCollection(
-          readListOf(
-              tokenizer,
-              crs,
-              axes,
-              null,
-              Set.of(
-                  GeometryType.POINT,
+                  Set.of(
+                      GeometryType.LINE_STRING,
+                      GeometryType.CIRCULAR_STRING,
+                      GeometryType.COMPOUND_CURVE)),
+              crs);
+      case MULTI_CURVE ->
+          multiCurve(
+              readListOf(
+                  tokenizer,
+                  crs,
+                  axes,
                   GeometryType.LINE_STRING,
+                  Set.of(
+                      GeometryType.LINE_STRING,
+                      GeometryType.CIRCULAR_STRING,
+                      GeometryType.COMPOUND_CURVE)),
+              crs);
+      case MULTI_SURFACE ->
+          multiSurface(
+              readListOf(
+                  tokenizer,
+                  crs,
+                  axes,
                   GeometryType.POLYGON,
-                  GeometryType.MULTI_POINT,
-                  GeometryType.MULTI_LINE_STRING,
-                  GeometryType.MULTI_POLYGON,
-                  GeometryType.GEOMETRY_COLLECTION)),
-          crs);
+                  Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON)),
+              crs);
+      case GEOMETRY_COLLECTION ->
+          geometryCollection(
+              readListOf(
+                  tokenizer,
+                  crs,
+                  axes,
+                  null,
+                  Set.of(
+                      GeometryType.POINT,
+                      GeometryType.LINE_STRING,
+                      GeometryType.POLYGON,
+                      GeometryType.MULTI_POINT,
+                      GeometryType.MULTI_LINE_STRING,
+                      GeometryType.MULTI_POLYGON,
+                      GeometryType.GEOMETRY_COLLECTION)),
+              crs);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
   }

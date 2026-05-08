@@ -142,7 +142,7 @@ public abstract class FeaturePropertyTransformerFlatten
         .map(
             elem -> {
               if (elem.endsWith("]")) {
-                return elem.substring(0, elem.indexOf("["));
+                return elem.substring(0, elem.indexOf('['));
               }
               return elem;
             })
