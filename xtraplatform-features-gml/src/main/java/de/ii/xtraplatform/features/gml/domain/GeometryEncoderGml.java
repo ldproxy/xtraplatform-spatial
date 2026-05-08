@@ -51,6 +51,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private static final String MULTI_CURVE = "MultiCurve";
   private static final String MULTI_LINE_STRING = "MultiLineString";
   private static final String POLYGON = "Polygon";
+  private static final String SURFACE = "Surface";
   private static final String POLYGON_PATCH = "PolygonPatch";
   private static final String POLYHEDRAL_SURFACE = "PolyhedralSurface";
   private static final String MULTI_SURFACE = "MultiSurface";
@@ -118,7 +119,8 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     WITH_SRS_NAME,
     WITH_SRS_DIMENSION,
     LINE_STRING_AS_SEGMENT,
-    POLYGON_AS_PATCH
+    POLYGON_AS_PATCH,
+    USE_SURFACE_RING_CURVE
   }
 
   private final XMLStreamWriter xmlWriter;
@@ -389,16 +391,24 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   private void writeLineString(LineString geometry, boolean asSegment) {
-    String tagName;
+    boolean useRing = options.contains(Options.USE_SURFACE_RING_CURVE);
     if (asSegment) {
-      tagName = LINE_STRING_SEGMENT;
-      writeStartTagDataType(tagName);
+      writeStartTagDataType(LINE_STRING_SEGMENT);
+      writePositionList(geometry.getValue().getCoordinates(), geometry.getAxes());
+      writeEndTag();
+    } else if (useRing) {
+      writeStartTagObject(CURVE, false);
+      writeStartTagProperty(SEGMENTS);
+      writeStartTagDataType(LINE_STRING_SEGMENT);
+      writePositionList(geometry.getValue().getCoordinates(), geometry.getAxes());
+      writeEndTag();
+      writeEndTag();
+      writeEndTag();
     } else {
-      tagName = LINE_STRING;
-      writeStartTagObject(tagName, false);
+      writeStartTagObject(LINE_STRING, false);
+      writePositionList(geometry.getValue().getCoordinates(), geometry.getAxes());
+      writeEndTag();
     }
-    writePositionList(geometry.getValue().getCoordinates(), geometry.getAxes());
-    writeEndTag();
   }
 
   private void writeCircularString(CircularString geometry, boolean asSegment) {
@@ -432,7 +442,12 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   @Override
   public Void visit(Polygon geometry) {
     boolean asPatch = options.contains(Options.POLYGON_AS_PATCH);
-    if (asPatch) {
+    boolean useRing = options.contains(Options.USE_SURFACE_RING_CURVE);
+    if (useRing) {
+      writeStartTagObject(SURFACE, false);
+      writeStartTagProperty(PATCHES);
+      writeStartTagDataType(POLYGON_PATCH);
+    } else if (asPatch) {
       writeStartTagDataType(POLYGON_PATCH);
     } else {
       writeStartTagObject(POLYGON, false);
@@ -444,8 +459,21 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       } else {
         writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
       }
-      writeStartTagObject(LINEAR_RING, true);
-      writePositionList(ring.getValue().getCoordinates(), geometry.getAxes());
+      if (useRing) {
+        writeStartTagObject(RING, true);
+        writeStartTagProperty(CURVE_MEMBER);
+        writeStartTagDataType(LINE_STRING_SEGMENT);
+        writePositionList(ring.getValue().getCoordinates(), geometry.getAxes());
+        writeEndTag();
+        writeEndTag();
+      } else {
+        writeStartTagObject(LINEAR_RING, true);
+        writePositionList(ring.getValue().getCoordinates(), geometry.getAxes());
+      }
+      writeEndTag();
+      writeEndTag();
+    }
+    if (useRing) {
       writeEndTag();
       writeEndTag();
     }
