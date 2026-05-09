@@ -414,6 +414,99 @@ class GeometrySpec extends Specification {
         gmlOut == "<gml:Polygon><gml:exterior><gml:Ring><gml:curveMember><gml:Curve><gml:segments><gml:ArcString><gml:posList>0.0 0.0 1.0 1.0 0.0 2.0 -1.0 -1.0 0.0 0.0</gml:posList></gml:ArcString></gml:segments></gml:Curve></gml:curveMember></gml:Ring></gml:exterior></gml:Polygon>"
     }
 
+    def 'LINESTRING XY with USE_SURFACE_RING_CURVE'() {
+        given:
+        Geometry<?> geometry = LineString.of(new double[]{0.0, 0.0, 1.0, 1.0, 2.0, 0.0})
+
+        when:
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoder = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE), Optional.of("gml"), Optional.empty(), List.of())
+        geometry.accept(gmlEncoder)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+
+        then:
+        gmlOut == "<gml:Curve><gml:segments><gml:LineStringSegment><gml:posList>0.0 0.0 1.0 1.0 2.0 0.0</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve>"
+    }
+
+    def 'POLYGON XY with USE_SURFACE_RING_CURVE'() {
+        given:
+        Geometry<?> geometry = Polygon.of(List.of(
+                PositionList.of(Axes.XY, new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0})
+        ))
+
+        when:
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoder = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE), Optional.of("gml"), Optional.empty(), List.of())
+        geometry.accept(gmlEncoder)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+
+        then:
+        gmlOut == "<gml:Surface><gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring><gml:curveMember><gml:LineStringSegment><gml:posList>0.0 0.0 0.0 1.0 1.0 1.0 0.0 0.0</gml:posList></gml:LineStringSegment></gml:curveMember></gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface>"
+    }
+
+    def 'CURVEPOLYGON XY with USE_SURFACE_RING_CURVE'() {
+        given:
+        Geometry<?> geometry = CurvePolygon.of(List.of(
+                CircularString.of(PositionList.of(Axes.XY, new double[]{0.0, 0.0, 1.0, 1.0, 0.0, 2.0, -1.0, -1.0, 0.0, 0.0}))
+        ))
+
+        when:
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoder = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE), Optional.of("gml"), Optional.empty(), List.of())
+        geometry.accept(gmlEncoder)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+
+        then:
+        gmlOut == "<gml:Surface><gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring><gml:curveMember><gml:Curve><gml:segments><gml:ArcString><gml:posList>0.0 0.0 1.0 1.0 0.0 2.0 -1.0 -1.0 0.0 0.0</gml:posList></gml:ArcString></gml:segments></gml:Curve></gml:curveMember></gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface>"
+    }
+
+    def 'CURVEPOLYGON with CompoundCurve ring XY with USE_SURFACE_RING_CURVE'() {
+        given:
+        Geometry<?> geometry = CurvePolygon.of(List.of(
+                CompoundCurve.of(List.of(
+                        LineString.of(new double[]{0.0, 0.0, 1.0, 1.0}),
+                        CircularString.of(PositionList.of(Axes.XY, new double[]{1.0, 1.0, 2.0, 0.0, 3.0, 1.0})),
+                        LineString.of(new double[]{3.0, 1.0, 0.0, 0.0})
+                ))
+        ))
+
+        when:
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoder = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE), Optional.of("gml"), Optional.empty(), List.of())
+        geometry.accept(gmlEncoder)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+
+        then:
+        gmlOut == "<gml:Surface><gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring><gml:curveMember><gml:Curve><gml:segments><gml:LineStringSegment><gml:posList>0.0 0.0 1.0 1.0</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve></gml:curveMember><gml:curveMember><gml:Curve><gml:segments><gml:Arc><gml:posList>1.0 1.0 2.0 0.0 3.0 1.0</gml:posList></gml:Arc></gml:segments></gml:Curve></gml:curveMember><gml:curveMember><gml:Curve><gml:segments><gml:LineStringSegment><gml:posList>3.0 1.0 0.0 0.0</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve></gml:curveMember></gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface>"
+    }
+
+    def 'COMPOUNDCURVE XY with USE_SURFACE_RING_CURVE'() {
+        given:
+        Geometry<?> geometry = CompoundCurve.of(List.of(
+                LineString.of(new double[]{0.0, 0.0, 1.0, 1.0}),
+                CircularString.of(PositionList.of(Axes.XY, new double[]{1.0, 1.0, 2.0, 0.0, 3.0, 1.0}))
+        ))
+
+        when:
+        def sw = new StringWriter()
+        def xmlWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(sw)
+        def gmlEncoder = new GeometryEncoderGml(xmlWriter, GmlVersion.GML32, Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE), Optional.of("gml"), Optional.empty(), List.of())
+        geometry.accept(gmlEncoder)
+        xmlWriter.flush()
+        String gmlOut = sw.toString()
+
+        then:
+        gmlOut == "<gml:CompositeCurve><gml:curveMember><gml:Curve><gml:segments><gml:LineStringSegment><gml:posList>0.0 0.0 1.0 1.0</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve></gml:curveMember><gml:curveMember><gml:Curve><gml:segments><gml:Arc><gml:posList>1.0 1.0 2.0 0.0 3.0 1.0</gml:posList></gml:Arc></gml:segments></gml:Curve></gml:curveMember></gml:CompositeCurve>"
+    }
+
     def 'MULTICURVE XY'() {
         given:
         Geometry<?> geometry = MultiCurve.of(List.of(

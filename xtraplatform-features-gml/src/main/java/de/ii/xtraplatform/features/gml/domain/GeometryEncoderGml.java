@@ -391,12 +391,12 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   private void writeLineString(LineString geometry, boolean asSegment) {
-    boolean useRing = options.contains(Options.USE_SURFACE_RING_CURVE);
+    boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);
     if (asSegment) {
       writeStartTagDataType(LINE_STRING_SEGMENT);
       writePositionList(geometry.getValue().getCoordinates(), geometry.getAxes());
       writeEndTag();
-    } else if (useRing) {
+    } else if (useSurfaceAndCurve) {
       writeStartTagObject(CURVE, false);
       writeStartTagProperty(SEGMENTS);
       writeStartTagDataType(LINE_STRING_SEGMENT);
@@ -442,8 +442,8 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   @Override
   public Void visit(Polygon geometry) {
     boolean asPatch = options.contains(Options.POLYGON_AS_PATCH);
-    boolean useRing = options.contains(Options.USE_SURFACE_RING_CURVE);
-    if (useRing) {
+    boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);
+    if (useSurfaceAndCurve) {
       writeStartTagObject(SURFACE, false);
       writeStartTagProperty(PATCHES);
       writeStartTagDataType(POLYGON_PATCH);
@@ -459,7 +459,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       } else {
         writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
       }
-      if (useRing) {
+      if (useSurfaceAndCurve) {
         writeStartTagObject(RING, true);
         writeStartTagProperty(CURVE_MEMBER);
         writeStartTagDataType(LINE_STRING_SEGMENT);
@@ -473,7 +473,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       writeEndTag();
       writeEndTag();
     }
-    if (useRing) {
+    if (useSurfaceAndCurve) {
       writeEndTag();
       writeEndTag();
     }
@@ -535,31 +535,63 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(CompoundCurve geometry) {
-    writeStartTagObject(CURVE, false);
-    writeStartTagProperty(SEGMENTS);
-    for (int i = 0; i < geometry.getNumGeometries(); i++) {
-      SingleCurve curve = geometry.getValue().get(i);
-      curve.accept(encodeAsSegmentOrPatch.orElse(this));
+    boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);
+    if (useSurfaceAndCurve) {
+      writeStartTagObject(COMPOSITE_CURVE, false);
+      for (int i = 0; i < geometry.getNumGeometries(); i++) {
+        SingleCurve curve = geometry.getValue().get(i);
+        writeStartTagProperty(CURVE_MEMBER);
+        curve.accept(encodeAsEmbeddedGeometry.orElse(this));
+        writeEndTag();
+      }
+      writeEndTag();
+    } else {
+      writeStartTagObject(CURVE, false);
+      writeStartTagProperty(SEGMENTS);
+      for (int i = 0; i < geometry.getNumGeometries(); i++) {
+        SingleCurve curve = geometry.getValue().get(i);
+        curve.accept(encodeAsSegmentOrPatch.orElse(this));
+      }
+      writeEndTag();
+      writeEndTag();
     }
-    writeEndTag();
-    writeEndTag();
     return null;
   }
 
   @Override
   public Void visit(CurvePolygon geometry) {
-    writeStartTagObject(POLYGON, false);
+    boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);
+    if (useSurfaceAndCurve) {
+      writeStartTagObject(SURFACE, false);
+      writeStartTagProperty(PATCHES);
+      writeStartTagDataType(POLYGON_PATCH);
+    } else {
+      writeStartTagObject(POLYGON, false);
+    }
     for (int i = 0; i < geometry.getNumRings(); i++) {
       Curve<?> ring = geometry.getValue().get(i);
       if (i == 0) {
-        writeStartTagProperty(EXTERIOR);
+        writeStartTagProperty(version != GmlVersion.GML21 ? EXTERIOR : OUTER_BOUNDARY_IS);
       } else {
-        writeStartTagProperty(INTERIOR);
+        writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
       }
       writeStartTagObject(RING, true);
-      writeStartTagProperty(CURVE_MEMBER);
-      ring.accept(encodeAsEmbeddedGeometry.orElse(this));
+      if (useSurfaceAndCurve && ring instanceof CompoundCurve compoundCurve) {
+        for (int j = 0; j < compoundCurve.getNumGeometries(); j++) {
+          SingleCurve segment = compoundCurve.getValue().get(j);
+          writeStartTagProperty(CURVE_MEMBER);
+          segment.accept(encodeAsEmbeddedGeometry.orElse(this));
+          writeEndTag();
+        }
+      } else {
+        writeStartTagProperty(CURVE_MEMBER);
+        ring.accept(encodeAsEmbeddedGeometry.orElse(this));
+        writeEndTag();
+      }
       writeEndTag();
+      writeEndTag();
+    }
+    if (useSurfaceAndCurve) {
       writeEndTag();
       writeEndTag();
     }
