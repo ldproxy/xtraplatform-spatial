@@ -98,7 +98,7 @@ import org.slf4j.LoggerFactory;
  * ```yaml
  * types:
  *   example:
- *     sourcePath: /FOOBAR
+ *     sourcePath: /FOO
  * ```
  * </code>
  *     <p>### Configuration of S3
@@ -146,7 +146,7 @@ import org.slf4j.LoggerFactory;
  * ```yaml
  * types:
  *   beispiel:
- *     sourcePath: /FOOBAR
+ *     sourcePath: /FOO
  * ```
  * </code>
  *     <p>### Konfiguration von S3
