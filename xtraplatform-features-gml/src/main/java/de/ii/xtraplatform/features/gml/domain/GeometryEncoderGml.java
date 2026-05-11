@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.gml.domain;
 
 import com.google.common.collect.ImmutableSet;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.geometries.domain.Axes;
 import de.ii.xtraplatform.geometries.domain.CircularString;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
@@ -131,6 +133,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private final Optional<GeometryEncoderGml> encodeAsSegmentOrPatch;
   private final Optional<GeometryEncoderGml> encodeAsEmbeddedGeometry;
   private final GmlVersion version;
+  private final Function<EpsgCrs, String> srsNameMapper;
   private int nextGmlId = 0;
   private String srsName;
 
@@ -140,6 +143,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     this.gmlIdPrefix = "geom_";
     this.options = Set.of();
     this.precision = null;
+    this.srsNameMapper = EpsgCrs::toUriString;
     this.encodeAsSegmentOrPatch =
         Optional.of(
             new GeometryEncoderGml(
@@ -148,7 +152,8 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                 Set.of(Options.LINE_STRING_AS_SEGMENT, Options.POLYGON_AS_PATCH),
                 this.gmlPrefix,
                 Optional.empty(),
-                List.of()));
+                List.of(),
+                this.srsNameMapper));
     this.encodeAsEmbeddedGeometry =
         Optional.of(
             new GeometryEncoderGml(
@@ -157,7 +162,8 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                 Set.of(),
                 this.gmlPrefix,
                 Optional.empty(),
-                List.of()));
+                List.of(),
+                this.srsNameMapper));
     this.srsName = null;
     this.version = GmlVersion.GML32;
   }
@@ -169,10 +175,22 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       Optional<String> gmlPrefix,
       Optional<String> gmlIdPrefix,
       List<Integer> precision) {
+    this(xmlWriter, version, options, gmlPrefix, gmlIdPrefix, precision, EpsgCrs::toUriString);
+  }
+
+  public GeometryEncoderGml(
+      XMLStreamWriter xmlWriter,
+      GmlVersion version,
+      Set<GeometryEncoderGml.Options> options,
+      Optional<String> gmlPrefix,
+      Optional<String> gmlIdPrefix,
+      List<Integer> precision,
+      Function<EpsgCrs, String> srsNameMapper) {
     this.xmlWriter = xmlWriter;
     this.gmlPrefix = gmlPrefix;
     this.gmlIdPrefix = gmlIdPrefix.orElse("geom_");
     this.options = options;
+    this.srsNameMapper = srsNameMapper;
     this.encodeAsSegmentOrPatch =
         options.contains(Options.LINE_STRING_AS_SEGMENT)
                 && options.contains(Options.POLYGON_AS_PATCH)
@@ -187,7 +205,8 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                         .build(),
                     gmlPrefix,
                     Optional.of(this.gmlIdPrefix + "seg_"),
-                    precision));
+                    precision,
+                    srsNameMapper));
     this.encodeAsEmbeddedGeometry =
         options.contains(Options.WITH_SRS_NAME)
             ? Optional.of(
@@ -202,7 +221,8 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                         .build(),
                     gmlPrefix,
                     Optional.of(this.gmlIdPrefix + "embed_"),
-                    precision))
+                    precision,
+                    srsNameMapper))
             : Optional.empty();
     this.precision =
         precision.stream().anyMatch(v -> v > 0)
@@ -216,13 +236,13 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   public Optional<Void> initAndCheckGeometry(Geometry<?> geometry) {
     if (srsName == null) {
       srsName =
-          geometry
-              .getCrs()
-              .orElse(
-                  geometry.getAxes() == Axes.XY || geometry.getAxes() == Axes.XYM
-                      ? OgcCrs.CRS84
-                      : OgcCrs.CRS84h)
-              .toUriString();
+          srsNameMapper.apply(
+              geometry
+                  .getCrs()
+                  .orElse(
+                      geometry.getAxes() == Axes.XY || geometry.getAxes() == Axes.XYM
+                          ? OgcCrs.CRS84
+                          : OgcCrs.CRS84h));
     }
 
     return Optional.empty();
