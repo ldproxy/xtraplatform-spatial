@@ -28,11 +28,21 @@ public class SchemaTransformerChain
 
   private final List<String> currentParentProperties;
   private final Map<String, List<FeaturePropertySchemaTransformer>> transformers;
+  private final boolean useAlias;
 
   public SchemaTransformerChain(
       Map<String, List<PropertyTransformation>> allTransformations,
       SchemaMapping schemaMapping,
       boolean inCollection) {
+    this(allTransformations, schemaMapping, inCollection, false);
+  }
+
+  public SchemaTransformerChain(
+      Map<String, List<PropertyTransformation>> allTransformations,
+      SchemaMapping schemaMapping,
+      boolean inCollection,
+      boolean useAlias) {
+    this.useAlias = useAlias;
     this.currentParentProperties = new ArrayList<>();
     this.transformers =
         allTransformations.entrySet().stream()
@@ -103,7 +113,33 @@ public class SchemaTransformerChain
 
     transformed = run(transformers, path, path, schema);
 
+    if (useAlias
+        && transformed != null
+        && schema.getAlias().isPresent()
+        && !hasExplicitRename(path)) {
+      transformed =
+          ImmutableFeaturePropertyTransformerRename.builder()
+              .propertyPath(path)
+              .parameter(schema.getAlias().get())
+              .build()
+              .transform(path, transformed);
+    }
+
     return transformed;
+  }
+
+  private boolean hasExplicitRename(String path) {
+    List<FeaturePropertySchemaTransformer> atPath = transformers.get(path);
+    if (atPath == null) {
+      return false;
+    }
+    for (FeaturePropertySchemaTransformer t : atPath) {
+      if (t instanceof FeaturePropertyTransformerRename
+          && !((FeaturePropertyTransformerRename) t).pathOnly()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

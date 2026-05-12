@@ -141,7 +141,12 @@ public interface PropertyTransformations {
 
   default SchemaTransformerChain getSchemaTransformations(
       SchemaMapping schemaMapping, boolean inCollection) {
-    return new SchemaTransformerChain(getTransformations(), schemaMapping, inCollection);
+    return getSchemaTransformations(schemaMapping, inCollection, false);
+  }
+
+  default SchemaTransformerChain getSchemaTransformations(
+      SchemaMapping schemaMapping, boolean inCollection, boolean useAlias) {
+    return new SchemaTransformerChain(getTransformations(), schemaMapping, inCollection, useAlias);
   }
 
   default TokenSliceTransformerChain getTokenSliceTransformations(
