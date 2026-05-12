@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax.Builder;
@@ -35,5 +36,25 @@ public interface TilesetMbTilesDefaults extends TilesetCommonDefaults {
   @Value.Default
   default String getTileMatrixSet() {
     return "WebMercatorQuad";
+  }
+
+  /**
+   * @langEn Optional fixed spatial extent for this tileset. If set, this value is used as the clip
+   *     bounding box instead of falling back to MBTiles metadata.
+   * @langDe Optionaler fester räumlicher Extent für dieses Tileset. Wenn gesetzt, wird dieser Wert
+   *     als Clip-BoundingBox verwendet, statt auf MBTiles-Metadaten zurückzufallen.
+   */
+  Optional<BoundingBox> getExtent();
+
+  /**
+   * @langEn If true, the spatial extent will always be computed from data, even if a fixed value is
+   *     set globally. If false, a fixed value is always used. If not set, the global or provider
+   *     logic applies.
+   * @langDe Wenn true, wird der räumliche Extent immer aus den Daten berechnet, auch wenn global
+   *     ein fester Wert gesetzt ist. Wenn false, wird immer ein fixer Wert verwendet. Wenn nicht
+   *     gesetzt, gilt die globale oder Provider-Logik.
+   */
+  default Optional<Boolean> getSpatialExtentComputed() {
+    return Optional.empty();
   }
 }
