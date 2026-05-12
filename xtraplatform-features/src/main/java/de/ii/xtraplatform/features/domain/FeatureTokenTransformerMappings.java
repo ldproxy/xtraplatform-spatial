@@ -74,7 +74,8 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
                             .getSchemaTransformations(
                                 entry.getValue(),
                                 (!(context.query() instanceof FeatureQuery)
-                                    || !((FeatureQuery) context.query()).returnsSingleFeature()))))
+                                    || !((FeatureQuery) context.query()).returnsSingleFeature()),
+                                propertyTransformations.get(entry.getKey()).useAlias())))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.sliceTransformerChains =
