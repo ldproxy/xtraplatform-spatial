@@ -11,6 +11,7 @@ import com.google.common.collect.Range;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.ProviderData;
@@ -117,6 +118,12 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
   }
 
   private TilesetMetadata loadMetadata(TilesetHttp tileset) {
+    boolean forceCompute = getData().getTilesetDefaults().getSpatialExtentComputed().orElse(false);
+    Optional<BoundingBox> bounds =
+        forceCompute
+            ? Optional.empty()
+            : tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent());
+
     return ImmutableTilesetMetadata.builder()
         .encodings(
             tileset.getEncodings().isEmpty()
@@ -127,6 +134,7 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
                 ? getData().getTilesetDefaults().getLevels()
                 : tileset.getLevels())
         .center(tileset.getCenter().or(() -> getData().getTilesetDefaults().getCenter()))
+        .bounds(bounds)
         .build();
   }
 }

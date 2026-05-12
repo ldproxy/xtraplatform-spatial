@@ -177,12 +177,26 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
         (key, path) -> {
           Tuple<String, String> tilesetKey = toTuple(key);
 
-          metadata.put(tilesetKey.first(), loadMetadata(tilesetKey.second(), path));
+          TilesetMbTiles tileset =
+              getData()
+                  .getTilesets()
+                  .get(tilesetKey.first())
+                  .mergeDefaults(getData().getTilesetDefaults());
+          boolean forceCompute =
+              getData().getTilesetDefaults().getSpatialExtentComputed().orElse(false);
+          Optional<BoundingBox> configuredExtent =
+              forceCompute
+                  ? Optional.empty()
+                  : tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent());
+
+          metadata.put(
+              tilesetKey.first(), loadMetadata(tilesetKey.second(), path, configuredExtent));
           tmsRanges.put(tilesetKey.first(), metadata.get(tilesetKey.first()).getTmsRanges());
         });
   }
 
-  private TilesetMetadata loadMetadata(String tms, Path path) {
+  private TilesetMetadata loadMetadata(
+      String tms, Path path, Optional<BoundingBox> configuredExtent) {
     try {
       MbtilesMetadata metadata = new MbtilesTileset(path, false).getMetadata();
       TileMatrixSet tileMatrixSet =
@@ -210,11 +224,14 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
               tms,
               new ImmutableMinMax.Builder().min(minzoom).max(maxzoom).getDefault(defzoom).build());
       List<Double> bbox = metadata.getBounds();
-      Optional<BoundingBox> bounds =
+      Optional<BoundingBox> boundsFromMetadata =
           bbox.size() == 4
               ? Optional.of(
                   BoundingBox.of(bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3), OgcCrs.CRS84))
               : Optional.empty();
+      // Configured extent takes priority; fall back to bounds from MBTiles metadata
+      Optional<BoundingBox> bounds =
+          configuredExtent.isPresent() ? configuredExtent : boundsFromMetadata;
       TilesFormat format = metadata.getFormat();
       List<FeatureSchema> vectorSchemas =
           metadata.getVectorLayers().stream()
