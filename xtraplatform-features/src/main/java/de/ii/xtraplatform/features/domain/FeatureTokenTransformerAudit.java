@@ -7,34 +7,20 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.crs.domain.BoundingBox;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
-  private final Consumer<Instant> lastModifiedSetter;
-  private final Consumer<BoundingBox> spatialExtentSetter;
-  private final Consumer<Tuple<Instant, Instant>> temporalExtentSetter;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenTransformerAudit.class);
 
-  public FeatureTokenTransformerAudit(ImmutableResult.Builder resultBuilder) {
-    this.lastModifiedSetter = resultBuilder::lastModified;
-    this.spatialExtentSetter = resultBuilder::spatialExtent;
-    this.temporalExtentSetter = resultBuilder::temporalExtent;
-  }
+  public FeatureTokenTransformerAudit(ImmutableResult.Builder resultBuilder) {}
 
-  public <X> FeatureTokenTransformerAudit(ImmutableResultReduced.Builder<X> resultBuilder) {
-    this.lastModifiedSetter = resultBuilder::lastModified;
-    this.spatialExtentSetter = resultBuilder::spatialExtent;
-    this.temporalExtentSetter = resultBuilder::temporalExtent;
-  }
+  public <X> FeatureTokenTransformerAudit(ImmutableResultReduced.Builder<X> resultBuilder) {}
 
   private final Map<String, Map<String, Set<String>>> toAudit = new LinkedHashMap<>();
 
@@ -54,8 +40,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
     super.onStart(context);
   }
 
-  @Override
-  public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+  private void audit(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     String type = context.type();
     String property = context.pathTracker().toString();
     Map<String, Set<String>> props = toAudit.get(type);
@@ -65,6 +50,11 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
         valueSet.add(context.value());
       }
     }
+  }
+
+  @Override
+  public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    audit(context);
     super.onValue(context);
   }
 
