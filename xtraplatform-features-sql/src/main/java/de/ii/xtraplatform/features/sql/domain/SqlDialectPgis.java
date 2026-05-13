@@ -37,7 +37,7 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public String getId() {
-    return "PGIS";
+    return SqlDbmsPgis.ID;
   }
 
   private static final Splitter BBOX_SPLITTER =

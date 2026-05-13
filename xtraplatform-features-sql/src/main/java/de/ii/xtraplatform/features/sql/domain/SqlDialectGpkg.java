@@ -13,6 +13,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
+import de.ii.xtraplatform.features.sql.infra.db.SqlDbmsAdapterGpkg;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -27,7 +28,7 @@ public class SqlDialectGpkg implements SqlDialect {
 
   @Override
   public String getId() {
-    return "GPKG";
+    return SqlDbmsAdapterGpkg.ID;
   }
 
   private QueryGeneratorSettings settings;

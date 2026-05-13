@@ -28,6 +28,11 @@ public class SqlDialectDuckdb implements SqlDialect {
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
+  @Override
+  public String getId() {
+    return SqlDbmsAdapterDuckdb.ID;
+  }
+
   /**
    * As of v.1.1.0, the GeoParquet standard curve geometries are not supported and all exterior
    * polygon rings must already be ordered in CCW directorion, see "geometry_types" under <a
