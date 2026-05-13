@@ -32,6 +32,11 @@ import org.threeten.extra.Interval;
 // - identifiers must be unquoted, that is, in uppercase in Oracle
 public class SqlDialectOras implements SqlDialect {
 
+  @Override
+  public String getId() {
+    return "ORAS";
+  }
+
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 

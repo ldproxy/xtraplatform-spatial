@@ -66,8 +66,6 @@ import de.ii.xtraplatform.geometries.domain.Point;
 import de.ii.xtraplatform.geometries.domain.Polygon;
 import de.ii.xtraplatform.geometries.domain.Position;
 import de.ii.xtraplatform.geometries.domain.PositionList;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -395,7 +393,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
   @Override
   public CqlNode visitIntervalParameter(CqlParser.IntervalParameterContext ctx) {
     if (Objects.nonNull(ctx.NOW())) {
-      return TemporalLiteral.of(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+      return TemporalLiteral.of(TemporalLiteral.now());
     } else if (Objects.nonNull(ctx.DateString())) {
       String s = ctx.DateString().getText();
       return TemporalLiteral.of(s.substring(1, s.length() - 1));
@@ -413,7 +411,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
   @Override
   public CqlNode visitInstantInstance(CqlParser.InstantInstanceContext ctx) {
     if (Objects.nonNull(ctx.NOW())) {
-      return TemporalLiteral.of(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+      return TemporalLiteral.of(TemporalLiteral.now());
     }
 
     String s =

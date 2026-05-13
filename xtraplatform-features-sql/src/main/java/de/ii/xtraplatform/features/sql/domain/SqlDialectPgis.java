@@ -35,6 +35,11 @@ import org.threeten.extra.Interval;
 
 public class SqlDialectPgis implements SqlDialect {
 
+  @Override
+  public String getId() {
+    return "PGIS";
+  }
+
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
   private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
