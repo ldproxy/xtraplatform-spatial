@@ -328,34 +328,7 @@ public class FeatureStreamImpl implements FeatureStream {
             .map(p -> p.mergeInto(providerTransformations))
             .orElse(providerTransformations);
 
-    if (merged.useAlias()) {
-      merged = injectAliasRenames(merged, featureSchemas.get(typeQuery.getType()));
-    }
-
     return applyRename(merged);
-  }
-
-  private static PropertyTransformations injectAliasRenames(
-      PropertyTransformations propertyTransformations, FeatureSchema schema) {
-    Map<String, List<PropertyTransformation>> aliasRenames = new LinkedHashMap<>();
-    collectAliasRenames(schema, aliasRenames);
-    if (aliasRenames.isEmpty()) {
-      return propertyTransformations;
-    }
-    return propertyTransformations.mergeInto(() -> aliasRenames);
-  }
-
-  private static void collectAliasRenames(
-      FeatureSchema schema, Map<String, List<PropertyTransformation>> aliasRenames) {
-    schema
-        .getAlias()
-        .filter(alias -> !schema.getFullPath().isEmpty())
-        .ifPresent(
-            alias ->
-                aliasRenames.put(
-                    schema.getFullPathAsString(),
-                    List.of(new ImmutablePropertyTransformation.Builder().rename(alias).build())));
-    schema.getProperties().forEach(child -> collectAliasRenames(child, aliasRenames));
   }
 
   private static PropertyTransformations applyRename(

@@ -79,17 +79,11 @@ public interface PropertyTransformations {
 
   default PropertyTransformations withSubstitutions(Map<String, String> substitutions) {
     Map<String, List<PropertyTransformation>> transformations = this.getTransformations();
-    boolean useAlias = this.useAlias();
 
     return new PropertyTransformations() {
       @Override
       public Map<String, List<PropertyTransformation>> getTransformations() {
         return transformations;
-      }
-
-      @Override
-      public boolean useAlias() {
-        return useAlias;
       }
 
       @Override
@@ -145,24 +139,9 @@ public interface PropertyTransformations {
     };
   }
 
-  /**
-   * Whether the encoding pipeline should substitute the alias declared on each feature-schema
-   * property in place of its schema name. Overridden by ldproxy's {@code AliasConfiguration} when a
-   * format configuration opts in. Only the feature-encoding pipeline reads this flag; schema
-   * derivation paths for queryables, sortables, JSON Schema, etc. always use schema names.
-   */
-  default boolean useAlias() {
-    return false;
-  }
-
   default SchemaTransformerChain getSchemaTransformations(
       SchemaMapping schemaMapping, boolean inCollection) {
-    return getSchemaTransformations(schemaMapping, inCollection, false);
-  }
-
-  default SchemaTransformerChain getSchemaTransformations(
-      SchemaMapping schemaMapping, boolean inCollection, boolean useAlias) {
-    return new SchemaTransformerChain(getTransformations(), schemaMapping, inCollection, useAlias);
+    return new SchemaTransformerChain(getTransformations(), schemaMapping, inCollection);
   }
 
   default TokenSliceTransformerChain getTokenSliceTransformations(
@@ -212,17 +191,6 @@ public interface PropertyTransformations {
               }
             });
 
-    boolean mergedUseAlias = useAlias() || source.useAlias();
-    return new PropertyTransformations() {
-      @Override
-      public Map<String, List<PropertyTransformation>> getTransformations() {
-        return mergedTransformations;
-      }
-
-      @Override
-      public boolean useAlias() {
-        return mergedUseAlias;
-      }
-    };
+    return () -> mergedTransformations;
   }
 }
