@@ -34,7 +34,7 @@ public class SqlDialectOras implements SqlDialect {
 
   @Override
   public String getId() {
-    return "ORAS";
+    return SqlDbmsAdapterOras.ID;
   }
 
   private static final Splitter BBOX_SPLITTER =
