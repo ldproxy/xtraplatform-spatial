@@ -11,7 +11,9 @@ import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransf
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
 import com.google.common.collect.ImmutableMap;
+import de.ii.xtraplatform.base.domain.AuditLogger;
 import de.ii.xtraplatform.base.domain.ETag;
+import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -52,6 +54,8 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepMetadata;
   private final boolean stepAudit;
 
+  private final AuditLogger auditLogger;
+
   public FeatureStreamImpl(
       Query query,
       FeatureProviderDataV2 data,
@@ -59,7 +63,8 @@ public class FeatureStreamImpl implements FeatureStream {
       boolean nativeCrsIs3d,
       Map<String, Codelist> codelists,
       QueryRunner runner,
-      boolean doTransform) {
+      boolean doTransform,
+      AuditLogger auditLogger) {
     this.query = query;
     this.data = data;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -67,6 +72,7 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
+    this.auditLogger = auditLogger;
 
     this.stepMappingSchema =
         !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
@@ -131,7 +137,14 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           if (stepAudit) {
-            source = source.via(new FeatureTokenTransformerAudit(resultBuilder));
+            if (!LogContext.has(LogContext.CONTEXT.AUDIT)) {
+              throw new IllegalStateException(
+                  "Audit logging not possible, no request-uuid provided!");
+            }
+            String requestUuid = LogContext.get(LogContext.CONTEXT.AUDIT);
+            source =
+                source.via(
+                    new FeatureTokenTransformerAudit(resultBuilder, requestUuid, auditLogger));
           }
 
           source =
@@ -200,7 +213,14 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
           if (stepAudit) {
-            source = source.via(new FeatureTokenTransformerAudit(resultBuilder));
+            if (!LogContext.has(LogContext.CONTEXT.AUDIT)) {
+              throw new IllegalStateException(
+                  "Audit logging not possible, no request-uuid provided!");
+            }
+            String requestUuid = LogContext.get(LogContext.CONTEXT.AUDIT);
+            source =
+                source.via(
+                    new FeatureTokenTransformerAudit(resultBuilder, requestUuid, auditLogger));
           }
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));

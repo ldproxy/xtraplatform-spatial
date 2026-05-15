@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.app;
 import com.google.common.collect.ImmutableList;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.AuditLogger;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -142,6 +143,7 @@ public class FeatureProviderWfs
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      AuditLogger auditLogger,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
     super(
@@ -151,6 +153,7 @@ public class FeatureProviderWfs
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLogger,
         data,
         volatileRegistry);
 
@@ -376,6 +379,7 @@ public class FeatureProviderWfs
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        false);
+        false,
+        auditLogger);
   }
 }

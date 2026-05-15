@@ -7,68 +7,49 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import de.ii.xtraplatform.base.domain.AuditLogger;
 
 public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenTransformerAudit.class);
+  private final String requestUuid;
+  private final AuditLogger auditLogger;
 
-  public FeatureTokenTransformerAudit(ImmutableResult.Builder resultBuilder) {}
+  public FeatureTokenTransformerAudit(
+      ImmutableResult.Builder resultBuilder, String requestUuid, AuditLogger auditLogger) {
+    this.requestUuid = requestUuid;
+    this.auditLogger = auditLogger;
+  }
 
-  public <X> FeatureTokenTransformerAudit(ImmutableResultReduced.Builder<X> resultBuilder) {}
-
-  private final Map<String, Map<String, Set<String>>> toAudit = new LinkedHashMap<>();
+  public <X> FeatureTokenTransformerAudit(
+      ImmutableResultReduced.Builder<X> resultBuilder,
+      String requestUuid,
+      AuditLogger auditLogger) {
+    this.requestUuid = requestUuid;
+    this.auditLogger = auditLogger;
+  }
 
   @Override
   public void onStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    for (String type : context.mappings().keySet()) {
-      Map<String, Set<String>> auditProps =
-          toAudit.computeIfAbsent(type, t -> new LinkedHashMap<>());
+    // Annahme: Types -> Properties mapping hat immer size==1
+    if (context.mappings().size() != 1)
+      throw new IllegalStateException("Types zu Properties Mapping ist ungleich 1.");
 
-      for (FeatureSchema prop : context.mappings().get(type).getTargetSchema().getProperties()) {
-        if (prop.getAudit().isPresent()) {
-          auditProps.computeIfAbsent(prop.getName(), p -> new LinkedHashSet<>());
-        }
+    String type = context.mappings().keySet().stream().findFirst().get();
+    auditLogger.initType(requestUuid, type);
+
+    for (FeatureSchema prop : context.mappings().get(type).getTargetSchema().getProperties()) {
+      if (prop.getAudit().isPresent()) {
+        auditLogger.initPropertyToValueTrack(requestUuid, prop.getName());
       }
     }
 
     super.onStart(context);
   }
 
-  private void audit(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    String type = context.type();
-    String property = context.pathTracker().toString();
-    Map<String, Set<String>> props = toAudit.get(type);
-    if (props != null) {
-      Set<String> valueSet = props.get(property);
-      if (valueSet != null) {
-        valueSet.add(context.value());
-      }
-    }
-  }
-
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    audit(context);
+    String property = context.pathTracker().toString();
+    auditLogger.appendPropertyValue(requestUuid, property, context.value());
     super.onValue(context);
-  }
-
-  @Override
-  public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    toAudit.forEach(
-        (type, properties) ->
-            properties.forEach(
-                (property, values) -> {
-                  if (!values.isEmpty()) {
-                    LOGGER.info(
-                        "Type '{}', property '{}', accessed values {}", type, property, values);
-                  }
-                }));
-    super.onEnd(context);
   }
 }

@@ -5,6 +5,7 @@ description = 'Feature providers and transformations.'
 descriptionDe = 'Feature-Provider und Transformationen.'
 
 dependencies {
+    provided 'de.interactive_instruments:xtraplatform-base'
     provided 'de.interactive_instruments:xtraplatform-entities'
     provided 'de.interactive_instruments:xtraplatform-streams'
     provided 'de.interactive_instruments:xtraplatform-values'

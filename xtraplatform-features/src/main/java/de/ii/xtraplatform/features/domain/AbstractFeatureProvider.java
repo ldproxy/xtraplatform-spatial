@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import de.ii.xtraplatform.base.domain.AuditLogger;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
@@ -85,6 +86,8 @@ public abstract class AbstractFeatureProvider<
   private boolean datasetChangedForced;
   private String previousDataset;
 
+  protected AuditLogger auditLogger;
+
   protected AbstractFeatureProvider(
       ConnectorFactory connectorFactory,
       Reactive reactive,
@@ -92,6 +95,7 @@ public abstract class AbstractFeatureProvider<
       CrsInfo crsInfo,
       ProviderExtensionRegistry extensionRegistry,
       Values<Codelist> codelistStore,
+      AuditLogger auditLogger,
       FeatureProviderDataV2 data,
       VolatileRegistry volatileRegistry) {
     super(data, volatileRegistry);
@@ -101,6 +105,7 @@ public abstract class AbstractFeatureProvider<
     this.crsInfo = crsInfo;
     this.extensionRegistry = extensionRegistry;
     this.codelistStore = codelistStore;
+    this.auditLogger = auditLogger;
     this.volatileRegistry = volatileRegistry;
     this.changeHandler = new FeatureChangeHandlerImpl();
     this.connector =
@@ -520,7 +525,8 @@ public abstract class AbstractFeatureProvider<
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        !query.hitsOnly());
+        !query.hitsOnly(),
+        auditLogger);
   }
 
   // TODO: more tests

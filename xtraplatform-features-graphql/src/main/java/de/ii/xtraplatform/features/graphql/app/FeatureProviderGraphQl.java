@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.graphql.app;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.AuditLogger;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -197,6 +198,7 @@ public class FeatureProviderGraphQl
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      AuditLogger auditLogger,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
     super(
@@ -206,6 +208,7 @@ public class FeatureProviderGraphQl
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLogger,
         data,
         volatileRegistry);
 
@@ -271,10 +274,9 @@ public class FeatureProviderGraphQl
   protected FeatureTokenDecoder<
           byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings) {
-    if (!(query instanceof FeatureQuery)) {
+    if (!(query instanceof FeatureQuery featureQuery)) {
       throw new IllegalArgumentException();
     }
-    FeatureQuery featureQuery = (FeatureQuery) query;
     FeatureSchema featureSchema = getSourceSchemas().get(featureQuery.getType()).get(0);
     String name =
         featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);

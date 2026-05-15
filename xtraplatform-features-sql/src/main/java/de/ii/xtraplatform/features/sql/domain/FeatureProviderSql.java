@@ -14,6 +14,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.AuditLogger;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
@@ -483,6 +484,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLogger auditLogger,
       @Assisted FeatureProviderDataV2 data) {
     this(
         crsTransformerFactory,
@@ -497,6 +499,7 @@ public class FeatureProviderSql
         volatileRegistry,
         cache,
         scheduler,
+        auditLogger,
         data,
         decoderFactories.getConnectorDecoders());
   }
@@ -514,6 +517,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLogger auditLogger,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
     super(
@@ -523,6 +527,7 @@ public class FeatureProviderSql
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLogger,
         data,
         volatileRegistry);
 
@@ -945,11 +950,7 @@ public class FeatureProviderSql
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
       return false;
     }
-    if (!getData().getDatasetChanges().isModeCrud()) {
-      return false;
-    }
-
-    return true;
+    return getData().getDatasetChanges().isModeCrud();
   }
 
   @Override
@@ -1335,7 +1336,7 @@ public class FeatureProviderSql
                     crsTransformerFactory,
                     getData().getNativeTimeZone(),
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            .via(Transformer.map(feature -> (FeatureDataSql) feature));
+            .via(Transformer.map(feature -> feature));
 
     if (partial) {
       featureSqlSource =
@@ -1449,7 +1450,8 @@ public class FeatureProviderSql
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        !query.hitsOnly());
+        !query.hitsOnly(),
+        auditLogger);
   }
 
   @Override
