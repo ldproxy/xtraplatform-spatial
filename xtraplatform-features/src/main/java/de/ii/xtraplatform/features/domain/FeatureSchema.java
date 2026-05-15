@@ -222,6 +222,14 @@ public interface FeatureSchema
   Optional<String> getDescription();
 
   /**
+   * @langEn Optional spatial and temporal extent for this feature type. If set, automatic
+   *     calculation for this type can be skipped by consuming applications.
+   * @langDe Optionaler räumlicher und zeitlicher Extent für diesen Feature-Type. Wenn gesetzt, kann
+   *     die automatische Berechnung für diesen Type in konsumierenden Anwendungen entfallen.
+   */
+  Optional<CollectionExtent> getExtent();
+
+  /**
    * @langEn The unit of measurement of the value, only relevant for numeric properties.
    * @langDe Die Maßeinheit des Wertes, nur relevant bei numerischen Eigenschaften.
    */
