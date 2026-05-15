@@ -7,15 +7,16 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.cql.domain.Interval;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import java.util.Optional;
 import org.immutables.value.Value;
 
 /** Extent object for spatial and temporal extents. */
 @Value.Immutable
+@JsonDeserialize(builder = ImmutableCollectionExtent.Builder.class)
 public interface CollectionExtent {
   Optional<BoundingBox> getSpatial();
 
-  Optional<Interval> getTemporal();
+  Optional<TemporalExtent> getTemporal();
 }
