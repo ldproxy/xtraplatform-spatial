@@ -73,7 +73,7 @@ public interface FeatureSchema
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
 
-  Optional<Boolean> getAudit();
+  Optional<String> getAudit();
 
   @JsonIgnore
   @Override
