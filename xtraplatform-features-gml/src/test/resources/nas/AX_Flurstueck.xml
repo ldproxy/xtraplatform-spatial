@@ -24,7 +24,7 @@
           </adv:zeigtAufExternes>
           <adv:istTeilVon xlink:href="urn:adv:oid:DENW36ALl800005x"/>
           <adv:position>
-            <gml:MultiSurface gml:id="o11001.id.27491453.position_complex.Geom_15">
+            <gml:MultiSurface gml:id="o11001.id.27491453.position_complex.Geom_15" srsName="urn:adv:crs:ETRS89_UTM32">
               <gml:surfaceMember>
                 <gml:Surface gml:id="o11001.id.27491453.position_complex.Geom_0">
                   <gml:patches>
@@ -229,6 +229,12 @@
           <adv:flurnummer>25</adv:flurnummer>
           <adv:abweichenderRechtszustand>false</adv:abweichenderRechtszustand>
           <adv:rechtsbehelfsverfahren>false</adv:rechtsbehelfsverfahren>
+          <!-- adv:objektkoordinaten added for testing -->
+          <adv:objektkoordinaten>
+            <gml:Point gml:id="o11001.test" srsName="urn:adv:crs:ETRS89_UTM32"> <!-- set a different CRS for mixed CRS tests -->
+              <gml:pos>361972.327 5614528.243</gml:pos>
+            </gml:Point> 
+          </adv:objektkoordinaten>
           <adv:zeitpunktDerEntstehung>1861-01-01</adv:zeitpunktDerEntstehung>
           <adv:gemeindezugehoerigkeit>
             <adv:AX_Gemeindekennzeichen>
