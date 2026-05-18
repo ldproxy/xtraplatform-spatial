@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -128,10 +129,23 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   }
 
   private final Deque<Frame> stack = new ArrayDeque<>();
+  private final Map<String, EpsgCrs> srsNameMappings;
   private boolean waitingForInput = false;
   private Geometry<?> result;
 
-  public GeometryDecoderGml() {}
+  public GeometryDecoderGml() {
+    this(Map.of());
+  }
+
+  /**
+   * @param srsNameMappings reverse-mapping from {@code srsName} URI/URN forms to {@link EpsgCrs};
+   *     consulted before the built-in EPSG / OGC URN parsers and intended to resolve
+   *     application-profile forms (e.g. ALKIS NAS uses {@code urn:adv:crs:DE_DHDN_3GK2_NW101}) that
+   *     the built-in parsers cannot handle.
+   */
+  public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings) {
+    this.srsNameMappings = srsNameMappings == null ? Map.of() : srsNameMappings;
+  }
 
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
@@ -273,7 +287,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     f.elementName = localName;
 
     if (isObject(kind)) {
-      Optional<EpsgCrs> explicitCrs = parseSrsName(parser);
+      Optional<EpsgCrs> explicitCrs = parseSrsName(parser, srsNameMappings);
       f.crs = explicitCrs.or(() -> defaultCrs).or(this::inheritedCrs);
       OptionalInt dim = parseSrsDimension(parser);
       if (dim.isEmpty()) {
@@ -455,10 +469,15 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     return OptionalInt.empty();
   }
 
-  private static Optional<EpsgCrs> parseSrsName(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser) {
+  private static Optional<EpsgCrs> parseSrsName(
+      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser, Map<String, EpsgCrs> srsNameMappings) {
     String srsName = parser.getAttributeValue(null, "srsName");
     if (srsName == null || srsName.isEmpty()) {
       return Optional.empty();
+    }
+    EpsgCrs mapped = srsNameMappings.get(srsName);
+    if (mapped != null) {
+      return Optional.of(mapped);
     }
     if (srsName.startsWith("urn:ogc:def:crs:EPSG::")) {
       try {

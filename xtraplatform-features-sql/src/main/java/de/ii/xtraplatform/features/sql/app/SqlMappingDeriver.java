@@ -169,7 +169,13 @@ public class SqlMappingDeriver {
 
     if (tableRule.isWritable()
         && !seenWritableProperties.contains(tableRule.getTarget())
-        && !Objects.equals(tableRule.getTarget(), ROOT_TARGET)) {
+        && !Objects.equals(tableRule.getTarget(), ROOT_TARGET)
+        && tableRule.getType() != Type.VALUE_ARRAY) {
+      // VALUE_ARRAY tables share the cleaned target with their single value column (e.g. both end
+      // up as "anl"). Adding the table target here would dedup the column out of the writable loop
+      // below, so this register-as-object-table step is reserved for OBJECT / OBJECT_ARRAY tables.
+      // The value column for a VALUE_ARRAY junction still reaches putWritableTables /
+      // putWritableColumns via the writable column loop, which is what writes need.
       mapping.putObjectTables(tableRule.getTarget(), querySchema);
       seenWritableProperties.add(tableRule.getTarget());
     }
