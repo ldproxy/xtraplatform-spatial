@@ -113,11 +113,14 @@ public abstract class Position {
   public void check() {
     Preconditions.checkState(
         getCoordinates().length == getAxes().size(),
-        "Position must have %d coordinates, but got %d.",
+        "Position must have %d coordinates for axes %s, but got %d: %s",
         getAxes().size(),
-        getCoordinates().length);
+        getAxes(),
+        getCoordinates().length,
+        Arrays.toString(getCoordinates()));
     Preconditions.checkState(
         isEmpty() || Arrays.stream(getCoordinates()).noneMatch(Double::isNaN),
-        "Position must not have NaN coordinates unless it is EMPTY.");
+        "Position must not have NaN coordinates unless it is EMPTY, got: %s",
+        Arrays.toString(getCoordinates()));
   }
 }
