@@ -24,6 +24,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -186,10 +187,13 @@ public class SchemaGeneratorSql implements SchemaGenerator {
               featureProperty.excludedScopes(ImmutableList.of(Scope.RECEIVABLE));
             }
             if (featurePropertyType == SchemaBase.Type.GEOMETRY) {
-              if (!geometryInfos.containsKey(table.getName())) {
+              String geometryInfoKey =
+                  String.format("%s.%s", schema.getName(), table.getName())
+                      .toLowerCase(Locale.ROOT);
+              if (!geometryInfos.containsKey(geometryInfoKey)) {
                 continue;
               }
-              GeoInfo geometryInfo = geometryInfos.get(table.getName());
+              GeoInfo geometryInfo = geometryInfos.get(geometryInfoKey);
 
               // if srid=0, do not set, will use default
               try {
@@ -258,10 +262,13 @@ public class SchemaGeneratorSql implements SchemaGenerator {
           }
         }
         if (featurePropertyType == SchemaBase.Type.GEOMETRY) {
-          if (!geometryInfos.containsKey(table.getName())) {
+          String geometryInfoKey =
+              String.format("%s.%s", table.getSchema().getName(), table.getName())
+                  .toLowerCase(Locale.ROOT);
+          if (!geometryInfos.containsKey(geometryInfoKey)) {
             continue;
           }
-          GeoInfo geometryInfo = geometryInfos.get(table.getName());
+          GeoInfo geometryInfo = geometryInfos.get(geometryInfoKey);
 
           // if srid=0, do not set, will use default
           try {
@@ -295,8 +302,9 @@ public class SchemaGeneratorSql implements SchemaGenerator {
   private SchemaBase.Type getFeaturePropertyType(ColumnDataType columnDataType) {
     // TODO: pass GeoInfo to determine geo columns
     try {
-      if ("GEOMETRY".equals(columnDataType.getName())
-          || WktWkbGeometryType.valueOf(columnDataType.getName()) != WktWkbGeometryType.NONE) {
+      if ("GEOMETRY".equalsIgnoreCase(columnDataType.getName())
+          || WktWkbGeometryType.valueOf(columnDataType.getName().toUpperCase(Locale.ROOT))
+              != WktWkbGeometryType.NONE) {
         return SchemaBase.Type.GEOMETRY;
       }
     } catch (Exception ignore) {
