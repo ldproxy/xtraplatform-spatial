@@ -32,6 +32,41 @@ class GeometryDecoderGmlSpec extends Specification {
         return new GeometryEncoderWkt().encode(g)
     }
 
+    def 'Surface geometry: extra unrelated xmlns declarations on the geometry root must not affect dimensionality'() {
+        // Same Surface geometry, wrapped in two different xmlns scopes. Extra namespace declarations
+        // on an enclosing element (xsi, fes) must not influence the geometry decoder's axes.
+        given:
+        String geom = '''<gml:Surface gml:id="s1">
+            <gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring>
+              <gml:curveMember><gml:Curve gml:id="c1"><gml:segments>
+                <gml:LineStringSegment><gml:posList>363351.009 5615009.083 363332.428 5615021.012</gml:posList></gml:LineStringSegment>
+              </gml:segments></gml:Curve></gml:curveMember>
+              <gml:curveMember><gml:Curve gml:id="c2"><gml:segments>
+                <gml:LineStringSegment><gml:posList>363332.428 5615021.012 363351.009 5615009.083</gml:posList></gml:LineStringSegment>
+              </gml:segments></gml:Curve></gml:curveMember>
+            </gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches>
+          </gml:Surface>'''
+        String body = '''
+            <gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring>
+              <gml:curveMember><gml:Curve gml:id="c1"><gml:segments>
+                <gml:LineStringSegment><gml:posList>363351.009 5615009.083 363332.428 5615021.012</gml:posList></gml:LineStringSegment>
+              </gml:segments></gml:Curve></gml:curveMember>
+              <gml:curveMember><gml:Curve gml:id="c2"><gml:segments>
+                <gml:LineStringSegment><gml:posList>363332.428 5615021.012 363351.009 5615009.083</gml:posList></gml:LineStringSegment>
+              </gml:segments></gml:Curve></gml:curveMember>
+            </gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface>'''
+        String onlyGml = '<gml:Surface gml:id="s1" xmlns:gml="http://www.opengis.net/gml/3.2">' + body
+        String gmlPlusXsiFes = '<gml:Surface gml:id="s1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:fes="http://www.opengis.net/fes/2.0">' + body
+
+        when:
+        def a = decode(onlyGml)
+        def b = decode(gmlPlusXsiFes)
+
+        then:
+        a.axes.toString() == 'XY'
+        b.axes.toString() == 'XY'
+    }
+
     def 'Point XY'() {
         when:
         def g = decode('<gml:Point xmlns:gml="http://www.opengis.net/gml/3.2"><gml:pos>10 20</gml:pos></gml:Point>')

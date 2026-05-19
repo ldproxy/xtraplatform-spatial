@@ -699,8 +699,20 @@ public class FeatureTokenDecoderGml
 
   private void onEndElement() throws XMLStreamException, java.io.IOException {
     if (geometryDecoder.isWaitingForInput()) {
+      // The geometry decoder paused on EVENT_INCOMPLETE while reading a coordinate element's text
+      // (pos/posList/coordinates). Any CHARACTERS that arrived after the pause landed in this
+      // decoder's `buffer` via the main loop. Hand them over so continueDecoding can append them
+      // to the geometry decoder's coord frame before finalising — otherwise the trailing chunk of
+      // the coordinate text is silently dropped (observed: a posList split mid-number produced a
+      // truncated odd coord count, which the dimension heuristic then promoted to XYZ).
+      String pending = isBuffering ? buffer.toString() : "";
+      if (isBuffering) {
+        isBuffering = false;
+        buffer.setLength(0);
+      }
       Optional<Geometry<?>> optGeometry =
-          geometryDecoder.continueDecoding(parser, crs, srsDimension, parser.getLocalName(), "");
+          geometryDecoder.continueDecoding(
+              parser, crs, srsDimension, parser.getLocalName(), pending);
       if (optGeometry.isPresent()) {
         emitGeometry(optGeometry.get());
       }
