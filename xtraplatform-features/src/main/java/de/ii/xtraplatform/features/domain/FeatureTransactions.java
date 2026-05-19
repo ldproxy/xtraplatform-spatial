@@ -57,4 +57,74 @@ public interface FeatureTransactions {
       String type, String id, FeatureTokenSource featureTokenSource, EpsgCrs crs, boolean partial);
 
   MutationResult deleteFeature(String featureType, String id);
+
+  /**
+   * Opens a session that executes a sequence of mutator calls against a single underlying SQL
+   * transaction. {@link Session#commit()} makes the changes durable; {@link Session#close()}
+   * without a prior {@code commit()} rolls back. The default implementation throws {@link
+   * UnsupportedOperationException} for providers that have not yet adopted the API.
+   */
+  default Session openSession() {
+    throw new UnsupportedOperationException(
+        "Multi-action transaction sessions are not supported by this feature provider");
+  }
+
+  /**
+   * Session-scoped transaction. The mutator methods have the same contract as their top-level
+   * counterparts on {@link FeatureTransactions}, but all calls execute against one underlying SQL
+   * transaction.
+   */
+  interface Session extends AutoCloseable {
+
+    MutationResult createFeatures(
+        String featureType,
+        FeatureTokenSource featureTokenSource,
+        EpsgCrs crs,
+        Optional<String> featureId);
+
+    /**
+     * Drains multiple feature token sources sequentially against the same underlying transaction,
+     * giving the implementation a chance to batch generated SQL across features. The default
+     * implementation iterates {@link #createFeatures(String, FeatureTokenSource, EpsgCrs,
+     * Optional)} once per source.
+     *
+     * <p>The returned result aggregates ids from every source in source order; on the first source
+     * that returns an error, iteration stops and the error is propagated with the ids collected so
+     * far.
+     */
+    default MutationResult createFeatures(
+        String featureType, Iterable<FeatureTokenSource> featureTokenSources, EpsgCrs crs) {
+      ImmutableMutationResult.Builder result =
+          ImmutableMutationResult.builder().type(MutationResult.Type.CREATE).hasFeatures(false);
+      for (FeatureTokenSource src : featureTokenSources) {
+        MutationResult one = createFeatures(featureType, src, crs, Optional.empty());
+        for (String id : one.getIds()) {
+          result.addIds(id);
+        }
+        if (one.getError().isPresent()) {
+          return result.error(one.getError().get()).build();
+        }
+      }
+      return result.build();
+    }
+
+    MutationResult updateFeature(
+        String type,
+        String id,
+        FeatureTokenSource featureTokenSource,
+        EpsgCrs crs,
+        boolean partial);
+
+    MutationResult deleteFeature(String featureType, String id);
+
+    /** Commits all mutations performed against this session. Throws if already finalised. */
+    void commit();
+
+    /** Rolls back all mutations performed against this session. Idempotent. */
+    void rollback();
+
+    /** Equivalent to {@link #rollback()} if {@link #commit()} has not been called. */
+    @Override
+    void close();
+  }
 }

@@ -17,6 +17,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
+import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import io.reactivex.rxjava3.core.Flowable;
@@ -314,6 +315,12 @@ public class SqlClientRx implements SqlClient {
   @Override
   public Connection getConnection() {
     return session.connection().blockingGet();
+  }
+
+  @Override
+  public SqlSession openSession() {
+    Connection connection = session.connection().blockingGet();
+    return new JdbcSqlSession(connection);
   }
 
   @Override
