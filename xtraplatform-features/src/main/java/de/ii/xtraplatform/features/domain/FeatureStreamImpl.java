@@ -13,7 +13,6 @@ import static de.ii.xtraplatform.features.domain.transform.PropertyTransformatio
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.base.domain.AuditLogger;
 import de.ii.xtraplatform.base.domain.ETag;
-import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -103,7 +102,8 @@ public class FeatureStreamImpl implements FeatureStream {
   public CompletionStage<Result> runWith(
       Sink<Object> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
@@ -137,14 +137,13 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           if (stepAudit) {
-            if (!LogContext.has(LogContext.CONTEXT.AUDIT)) {
+            if (requestId.isEmpty()) {
               throw new IllegalStateException(
                   "Audit logging not possible, no request-uuid provided!");
             }
-            String requestUuid = LogContext.get(LogContext.CONTEXT.AUDIT);
             source =
                 source.via(
-                    new FeatureTokenTransformerAudit(resultBuilder, requestUuid, auditLogger));
+                    new FeatureTokenTransformerAudit(resultBuilder, requestId.get(), auditLogger));
           }
 
           source =
@@ -181,7 +180,8 @@ public class FeatureStreamImpl implements FeatureStream {
   public <X> CompletionStage<ResultReduced<X>> runWith(
       SinkReduced<Object, X> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
@@ -212,15 +212,15 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
+          Optional<String> test = requestId;
           if (stepAudit) {
-            if (!LogContext.has(LogContext.CONTEXT.AUDIT)) {
+            if (requestId.isEmpty()) {
               throw new IllegalStateException(
                   "Audit logging not possible, no request-uuid provided!");
             }
-            String requestUuid = LogContext.get(LogContext.CONTEXT.AUDIT);
             source =
                 source.via(
-                    new FeatureTokenTransformerAudit(resultBuilder, requestUuid, auditLogger));
+                    new FeatureTokenTransformerAudit(resultBuilder, requestId.get(), auditLogger));
           }
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
