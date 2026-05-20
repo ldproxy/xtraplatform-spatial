@@ -184,11 +184,15 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
     Map<String, GeoInfo> result = new LinkedHashMap<>();
 
     while (rs.next()) {
+      String schema = rs.getString(GeoInfo.SCHEMA);
+      String table = rs.getString(GeoInfo.TABLE);
+      String key = String.format("%s.%s", schema, table).toLowerCase(Locale.ROOT);
+
       result.put(
-          rs.getString(GeoInfo.TABLE),
+          key,
           ImmutableGeoInfo.of(
-              rs.getString(GeoInfo.SCHEMA),
-              rs.getString(GeoInfo.TABLE),
+              schema,
+              table,
               rs.getString(GeoInfo.COLUMN),
               rs.getString(GeoInfo.DIMENSION),
               rs.getString(GeoInfo.SRID),
