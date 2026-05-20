@@ -139,7 +139,7 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepAudit) {
             if (requestId.isEmpty()) {
               throw new IllegalStateException(
-                  "Audit logging not possible, no request-uuid provided!");
+                  "Audit logging not possible, no request-id provided!");
             }
             source =
                 source.via(
@@ -212,11 +212,11 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
-          Optional<String> test = requestId;
+
           if (stepAudit) {
             if (requestId.isEmpty()) {
               throw new IllegalStateException(
-                  "Audit logging not possible, no request-uuid provided!");
+                  "Audit logging not possible, no request-id provided!");
             }
             source =
                 source.via(
