@@ -42,5 +42,5 @@ public interface FeatureTypeConfiguration {
    * @langDe Optionaler räumlicher und zeitlicher Extent für diesen Type. Wenn gesetzt, wird keine
    *     automatische Berechnung für diesen Type durchgeführt.
    */
-  Optional<CollectionExtent> getExtent();
+  Optional<FeatureTypeExtent> getExtent();
 }

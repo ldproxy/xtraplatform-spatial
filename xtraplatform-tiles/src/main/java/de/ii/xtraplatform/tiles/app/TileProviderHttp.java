@@ -12,9 +12,11 @@ import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.ProviderData;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
 import de.ii.xtraplatform.tiles.domain.TileAccess;
@@ -118,11 +120,8 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
   }
 
   private TilesetMetadata loadMetadata(TilesetHttp tileset) {
-    boolean forceCompute = getData().getTilesetDefaults().getSpatialExtentComputed().orElse(false);
     Optional<BoundingBox> bounds =
-        forceCompute
-            ? Optional.empty()
-            : tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent());
+        toBoundingBox(tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent()));
 
     return ImmutableTilesetMetadata.builder()
         .encodings(
@@ -136,5 +135,32 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
         .center(tileset.getCenter().or(() -> getData().getTilesetDefaults().getCenter()))
         .bounds(bounds)
         .build();
+  }
+
+  private Optional<BoundingBox> toBoundingBox(Optional<SpatialExtent> extent) {
+    return extent
+        .filter(e -> e.getComputed() == null)
+        .flatMap(
+            e -> {
+              if (e.getXmin() == null
+                  || e.getYmin() == null
+                  || e.getXmax() == null
+                  || e.getYmax() == null) {
+                return Optional.empty();
+              }
+              if (e.getZmin() != null && e.getZmax() != null) {
+                return Optional.of(
+                    BoundingBox.of(
+                        e.getXmin(),
+                        e.getYmin(),
+                        e.getZmin(),
+                        e.getXmax(),
+                        e.getYmax(),
+                        e.getZmax(),
+                        OgcCrs.CRS84));
+              }
+              return Optional.of(
+                  BoundingBox.of(e.getXmin(), e.getYmin(), e.getXmax(), e.getYmax(), OgcCrs.CRS84));
+            });
   }
 }
