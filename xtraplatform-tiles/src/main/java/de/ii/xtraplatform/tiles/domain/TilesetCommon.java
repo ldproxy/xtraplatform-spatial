@@ -7,8 +7,8 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
-import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax.Builder;
 import java.util.Optional;
 
@@ -27,10 +27,8 @@ public interface TilesetCommon extends TilesetCommonDefaults {
   Optional<LonLat> getCenter();
 
   /**
-   * @langEn Optional fixed spatial extent for this tileset. If set, this value is used as the clip
-   *     bounding box.
-   * @langDe Optionaler fester räumlicher Extent für dieses Tileset. Wenn gesetzt, wird dieser Wert
-   *     als Clip-BoundingBox verwendet.
+   * @langEn Optional fixed spatial extent for this tileset in native CRS.
+   * @langDe Optionaler fester räumlicher Extent für dieses Tileset im nativen CRS.
    */
-  Optional<BoundingBox> getExtent();
+  Optional<SpatialExtent> getExtent();
 }

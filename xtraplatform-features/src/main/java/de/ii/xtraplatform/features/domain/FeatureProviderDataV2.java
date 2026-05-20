@@ -204,7 +204,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    * @langDe Optionaler räumlicher und zeitlicher Extent für alle Types dieses Providers. Wenn
    *     gesetzt, wird keine automatische Berechnung durchgeführt.
    */
-  Optional<CollectionExtent> getExtent();
+  Optional<FeatureTypeExtent> getExtent();
 
   // custom builder to automatically use keys of types as name of FeatureTypeV2
   abstract class Builder<T extends Builder<T>> implements EntityDataBuilder<FeatureProviderDataV2> {
@@ -255,13 +255,5 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
 
     @JsonProperty("extensions")
     public abstract T addAllExtensions(Iterable<? extends ExtensionConfiguration> elements);
-
-    /**
-     * @langEn Optional spatial and temporal extent for all types in this provider. If set, disables
-     *     automatic calculation.
-     * @langDe Optionaler räumlicher und zeitlicher Extent für alle Types dieses Providers. Wenn
-     *     gesetzt, wird keine automatische Berechnung durchgeführt.
-     */
-    public abstract T extent(CollectionExtent extent);
   }
 }

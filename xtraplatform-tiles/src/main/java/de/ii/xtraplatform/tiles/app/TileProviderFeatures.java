@@ -26,6 +26,8 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
@@ -37,6 +39,7 @@ import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProvider.FeatureVolatileCapability;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import de.ii.xtraplatform.jobs.domain.JobQueue;
 import de.ii.xtraplatform.tiles.domain.Cache;
 import de.ii.xtraplatform.tiles.domain.Cache.Storage;
@@ -1000,11 +1003,9 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             .map(id -> tileGenerator.getVectorSchema(id, FeatureEncoderMVT.FORMAT))
             .collect(Collectors.toList());
 
-    boolean forceCompute = getData().getTilesetDefaults().getSpatialExtentComputed().orElse(false);
     Optional<BoundingBox> configuredExtent =
-        forceCompute
-            ? Optional.empty()
-            : tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent());
+        toBoundingBox(
+            tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent()), tileset);
 
     Optional<BoundingBox> bounds;
     if (configuredExtent.isPresent()) {
@@ -1135,5 +1136,41 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
 
   private String getFeatureProviderId(TilesetFeatures tileset) {
     return tileset.getFeatureProvider().orElse(TileProviderFeatures.clean(getData().getId()));
+  }
+
+  private Optional<BoundingBox> toBoundingBox(
+      Optional<SpatialExtent> extent, TilesetFeatures tileset) {
+    EpsgCrs nativeCrs = resolveNativeCrs(tileset);
+    return extent
+        .filter(e -> e.getComputed() == null)
+        .flatMap(
+            e -> {
+              if (e.getXmin() == null
+                  || e.getYmin() == null
+                  || e.getXmax() == null
+                  || e.getYmax() == null) {
+                return Optional.empty();
+              }
+              if (e.getZmin() != null && e.getZmax() != null) {
+                return Optional.of(
+                    BoundingBox.of(
+                        e.getXmin(),
+                        e.getYmin(),
+                        e.getZmin(),
+                        e.getXmax(),
+                        e.getYmax(),
+                        e.getZmax(),
+                        nativeCrs));
+              }
+              return Optional.of(
+                  BoundingBox.of(e.getXmin(), e.getYmin(), e.getXmax(), e.getYmax(), nativeCrs));
+            });
+  }
+
+  private EpsgCrs resolveNativeCrs(TilesetFeatures tileset) {
+    return tileGenerator
+        .getFeatureProvider(getFeatureProviderId(tileset))
+        .map(provider -> provider.crs().get().getNativeCrs())
+        .orElse(OgcCrs.CRS84);
   }
 }

@@ -78,6 +78,8 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
+import de.ii.xtraplatform.features.domain.TemporalExtent;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
@@ -110,6 +112,7 @@ import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
@@ -1026,6 +1029,11 @@ public class FeatureProviderSql
       return Optional.empty();
     }
 
+    Optional<BoundingBox> configured = getConfiguredSpatialExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
+    }
+
     String[] cacheKey = {typeName, "stats", "spatial"};
     String cacheValidator = getData().getStableHash();
 
@@ -1099,6 +1107,11 @@ public class FeatureProviderSql
   public Optional<Interval> getTemporalExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
+    }
+
+    Optional<Interval> configured = getConfiguredTemporalExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
     }
 
     String[] cacheKey = {typeName, "stats", "temporal"};
@@ -1178,6 +1191,79 @@ public class FeatureProviderSql
     }
 
     return Optional.empty();
+  }
+
+  private Optional<BoundingBox> getConfiguredSpatialExtent(String typeName) {
+    Optional<SpatialExtent> fromType =
+        Optional.ofNullable(getData().getTypes().get(typeName))
+            .flatMap(FeatureSchema::getExtent)
+            .flatMap(de.ii.xtraplatform.features.domain.FeatureTypeExtent::getSpatial);
+    Optional<SpatialExtent> fromProvider =
+        getData()
+            .getExtent()
+            .flatMap(de.ii.xtraplatform.features.domain.FeatureTypeExtent::getSpatial);
+
+    return fromType
+        .or(() -> fromProvider)
+        .filter(extent -> extent.getComputed() == null)
+        .flatMap(
+            extent -> {
+              if (extent.getXmin() == null
+                  || extent.getYmin() == null
+                  || extent.getXmax() == null
+                  || extent.getYmax() == null) {
+                return Optional.empty();
+              }
+              EpsgCrs nativeCrs = getData().getNativeCrs().orElse(OgcCrs.CRS84);
+              if (extent.getZmin() != null && extent.getZmax() != null) {
+                return Optional.of(
+                    BoundingBox.of(
+                        extent.getXmin(),
+                        extent.getYmin(),
+                        extent.getZmin(),
+                        extent.getXmax(),
+                        extent.getYmax(),
+                        extent.getZmax(),
+                        nativeCrs));
+              }
+              return Optional.of(
+                  BoundingBox.of(
+                      extent.getXmin(),
+                      extent.getYmin(),
+                      extent.getXmax(),
+                      extent.getYmax(),
+                      nativeCrs));
+            });
+  }
+
+  private Optional<Interval> getConfiguredTemporalExtent(String typeName) {
+    Optional<TemporalExtent> fromType =
+        Optional.ofNullable(getData().getTypes().get(typeName))
+            .flatMap(FeatureSchema::getExtent)
+            .flatMap(de.ii.xtraplatform.features.domain.FeatureTypeExtent::getTemporal);
+    Optional<TemporalExtent> fromProvider =
+        getData()
+            .getExtent()
+            .flatMap(de.ii.xtraplatform.features.domain.FeatureTypeExtent::getTemporal);
+
+    return fromType
+        .or(() -> fromProvider)
+        .filter(extent -> extent.getComputed() == null)
+        .flatMap(
+            extent -> {
+              if (extent.getStart() == null && extent.getEnd() == null) {
+                return Optional.empty();
+              }
+              OffsetDateTime start =
+                  extent.getStart() != null
+                      ? OffsetDateTime.parse(extent.getStart())
+                      : OffsetDateTime.parse("0001-01-01T00:00:00Z");
+              OffsetDateTime end =
+                  extent.getEnd() != null
+                      ? OffsetDateTime.parse(extent.getEnd())
+                      : OffsetDateTime.parse("9999-12-31T23:59:59Z");
+              return Optional.of(Interval.of(start.toInstant(), end.toInstant()));
+            });
   }
 
   // TODO: cache deser does not work, because the the feature schemas have no name

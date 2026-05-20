@@ -8,10 +8,10 @@
 package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -34,24 +34,10 @@ public interface TilesetHttpDefaults
   }
 
   /**
-   * @langEn Optional fixed spatial extent for this tileset. If set, this value is used as the clip
-   *     bounding box instead of falling back to TileMatrixSet bounds.
-   * @langDe Optionaler fester räumlicher Extent für dieses Tileset. Wenn gesetzt, wird dieser Wert
-   *     als Clip-BoundingBox verwendet, statt auf TileMatrixSet-Bounds zurückzufallen.
+   * @langEn Optional fixed spatial extent for this tileset in native CRS.
+   * @langDe Optionaler fester räumlicher Extent für dieses Tileset im nativen CRS.
    */
-  Optional<BoundingBox> getExtent();
-
-  /**
-   * @langEn If true, the spatial extent will always be computed from data, even if a fixed value is
-   *     set globally. If false, a fixed value is always used. If not set, the global or provider
-   *     logic applies.
-   * @langDe Wenn true, wird der räumliche Extent immer aus den Daten berechnet, auch wenn global
-   *     ein fester Wert gesetzt ist. Wenn false, wird immer ein fixer Wert verwendet. Wenn nicht
-   *     gesetzt, gilt die globale oder Provider-Logik.
-   */
-  default Optional<Boolean> getSpatialExtentComputed() {
-    return Optional.empty();
-  }
+  Optional<SpatialExtent> getExtent();
 
   abstract class Builder implements BuildableBuilder<TilesetHttpDefaults> {}
 }

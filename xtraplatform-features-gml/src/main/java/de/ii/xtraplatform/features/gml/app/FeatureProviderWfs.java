@@ -46,11 +46,14 @@ import de.ii.xtraplatform.features.domain.FeatureStorePathParser;
 import de.ii.xtraplatform.features.domain.FeatureStream;
 import de.ii.xtraplatform.features.domain.FeatureStreamImpl;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
+import de.ii.xtraplatform.features.domain.FeatureTypeExtent;
 import de.ii.xtraplatform.features.domain.Metadata;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.ProviderExtensionRegistry;
 import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
+import de.ii.xtraplatform.features.domain.TemporalExtent;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.gml.domain.ConnectionInfoWfsHttp;
@@ -61,6 +64,7 @@ import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import jakarta.ws.rs.core.MediaType;
+import java.time.OffsetDateTime;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.List;
 import java.util.Map;
@@ -311,8 +315,13 @@ public class FeatureProviderWfs
 
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
-    if (getData().getTypes().containsKey(typeName)) {
+    if (!getData().getTypes().containsKey(typeName)) {
       return Optional.empty();
+    }
+
+    Optional<BoundingBox> configured = getConfiguredSpatialExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
     }
 
     try {
@@ -353,7 +362,80 @@ public class FeatureProviderWfs
 
   @Override
   public Optional<Interval> getTemporalExtent(String typeName) {
-    return Optional.empty();
+    if (!getData().getTypes().containsKey(typeName)) {
+      return Optional.empty();
+    }
+
+    return getConfiguredTemporalExtent(typeName);
+  }
+
+  private Optional<BoundingBox> getConfiguredSpatialExtent(String typeName) {
+    Optional<SpatialExtent> fromType =
+        Optional.ofNullable(getData().getTypes().get(typeName))
+            .flatMap(FeatureSchema::getExtent)
+            .flatMap(FeatureTypeExtent::getSpatial);
+    Optional<SpatialExtent> fromProvider =
+        getData().getExtent().flatMap(FeatureTypeExtent::getSpatial);
+
+    return fromType
+        .or(() -> fromProvider)
+        .filter(extent -> extent.getComputed() == null)
+        .flatMap(
+            extent -> {
+              if (extent.getXmin() == null
+                  || extent.getYmin() == null
+                  || extent.getXmax() == null
+                  || extent.getYmax() == null) {
+                return Optional.empty();
+              }
+              EpsgCrs nativeCrs = getData().getNativeCrs().orElse(OgcCrs.CRS84);
+              if (extent.getZmin() != null && extent.getZmax() != null) {
+                return Optional.of(
+                    BoundingBox.of(
+                        extent.getXmin(),
+                        extent.getYmin(),
+                        extent.getZmin(),
+                        extent.getXmax(),
+                        extent.getYmax(),
+                        extent.getZmax(),
+                        nativeCrs));
+              }
+              return Optional.of(
+                  BoundingBox.of(
+                      extent.getXmin(),
+                      extent.getYmin(),
+                      extent.getXmax(),
+                      extent.getYmax(),
+                      nativeCrs));
+            });
+  }
+
+  private Optional<Interval> getConfiguredTemporalExtent(String typeName) {
+    Optional<TemporalExtent> fromType =
+        Optional.ofNullable(getData().getTypes().get(typeName))
+            .flatMap(FeatureSchema::getExtent)
+            .flatMap(FeatureTypeExtent::getTemporal);
+    Optional<TemporalExtent> fromProvider =
+        getData().getExtent().flatMap(FeatureTypeExtent::getTemporal);
+
+    return fromType
+        .or(() -> fromProvider)
+        .filter(extent -> extent.getComputed() == null)
+        .flatMap(
+            extent -> {
+              if (extent.getStart() == null && extent.getEnd() == null) {
+                return Optional.empty();
+              }
+              OffsetDateTime start =
+                  extent.getStart() != null
+                      ? OffsetDateTime.parse(extent.getStart())
+                      : OffsetDateTime.parse("0001-01-01T00:00:00Z");
+              OffsetDateTime end =
+                  extent.getEnd() != null
+                      ? OffsetDateTime.parse(extent.getEnd())
+                      : OffsetDateTime.parse("9999-12-31T23:59:59Z");
+              return Optional.of(Interval.of(start.toInstant(), end.toInstant()));
+            });
   }
 
   @Override
