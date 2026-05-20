@@ -370,7 +370,11 @@ public class CqlToText implements CqlVisitor<String> {
 
   @Override
   public String visit(SpatialLiteral spatialLiteral, List<String> children) {
-    return ((CqlNode) spatialLiteral.getValue()).accept(this);
+    Object value = spatialLiteral.getValue();
+    if (value instanceof CqlNode) {
+      return ((CqlNode) value).accept(this);
+    }
+    return value.toString();
   }
 
   @Override
