@@ -262,13 +262,18 @@ public class SchemaGeneratorSql implements SchemaGenerator {
           }
         }
         if (featurePropertyType == SchemaBase.Type.GEOMETRY) {
-          String geometryInfoKey =
+          String geometryInfoKeySchema =
               String.format("%s.%s", table.getSchema().getName(), table.getName())
                   .toLowerCase(Locale.ROOT);
-          if (!geometryInfos.containsKey(geometryInfoKey)) {
+          String geometryInfoKeyTable = table.getName().toLowerCase(Locale.ROOT);
+          GeoInfo geometryInfo = null;
+          if (geometryInfos.containsKey(geometryInfoKeySchema)) {
+            geometryInfo = geometryInfos.get(geometryInfoKeySchema);
+          } else if (geometryInfos.containsKey(geometryInfoKeyTable)) {
+            geometryInfo = geometryInfos.get(geometryInfoKeyTable);
+          } else {
             continue;
           }
-          GeoInfo geometryInfo = geometryInfos.get(geometryInfoKey);
 
           // if srid=0, do not set, will use default
           try {
