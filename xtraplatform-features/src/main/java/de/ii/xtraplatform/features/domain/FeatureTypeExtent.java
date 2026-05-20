@@ -8,15 +8,14 @@
 package de.ii.xtraplatform.features.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import de.ii.xtraplatform.crs.domain.BoundingBox;
 import java.util.Optional;
 import org.immutables.value.Value;
 
 /** Extent object for spatial and temporal extents. */
 @Value.Immutable
-@JsonDeserialize(builder = ImmutableCollectionExtent.Builder.class)
-public interface CollectionExtent {
-  Optional<BoundingBox> getSpatial();
+@JsonDeserialize(builder = ImmutableFeatureTypeExtent.Builder.class)
+public interface FeatureTypeExtent {
+  Optional<SpatialExtent> getSpatial();
 
   Optional<TemporalExtent> getTemporal();
 }
