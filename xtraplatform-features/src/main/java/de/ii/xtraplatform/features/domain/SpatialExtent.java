@@ -47,10 +47,10 @@ public interface SpatialExtent {
             || getXmax() != null
             || getYmax() != null
             || getZmax() != null;
-    boolean hasComputed = getComputed() != null;
+    boolean autoCompute = Boolean.TRUE.equals(getComputed());
 
     Preconditions.checkState(
-        !(hasCoordinates && hasComputed),
+        !(hasCoordinates && autoCompute),
         "SpatialExtent: 'computed' and explicit coordinates must not be set at the same time.");
 
     if (hasCoordinates) {
