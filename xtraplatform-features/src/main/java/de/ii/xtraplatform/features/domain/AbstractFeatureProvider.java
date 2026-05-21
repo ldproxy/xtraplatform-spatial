@@ -11,7 +11,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import de.ii.xtraplatform.base.domain.AuditLogger;
+import de.ii.xtraplatform.base.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
@@ -86,7 +86,7 @@ public abstract class AbstractFeatureProvider<
   private boolean datasetChangedForced;
   private String previousDataset;
 
-  protected AuditLogger auditLogger;
+  protected AuditLog auditLog;
 
   protected AbstractFeatureProvider(
       ConnectorFactory connectorFactory,
@@ -95,7 +95,7 @@ public abstract class AbstractFeatureProvider<
       CrsInfo crsInfo,
       ProviderExtensionRegistry extensionRegistry,
       Values<Codelist> codelistStore,
-      AuditLogger auditLogger,
+      AuditLog auditLog,
       FeatureProviderDataV2 data,
       VolatileRegistry volatileRegistry) {
     super(data, volatileRegistry);
@@ -105,7 +105,7 @@ public abstract class AbstractFeatureProvider<
     this.crsInfo = crsInfo;
     this.extensionRegistry = extensionRegistry;
     this.codelistStore = codelistStore;
-    this.auditLogger = auditLogger;
+    this.auditLog = auditLog;
     this.volatileRegistry = volatileRegistry;
     this.changeHandler = new FeatureChangeHandlerImpl();
     this.connector =
@@ -526,7 +526,7 @@ public abstract class AbstractFeatureProvider<
         getCodelists(),
         this::runQuery,
         !query.hitsOnly(),
-        auditLogger);
+        auditLog);
   }
 
   // TODO: more tests
@@ -593,8 +593,7 @@ public abstract class AbstractFeatureProvider<
 
   private Map<String, SchemaMapping> createMapping(
       Query query, Map<String, PropertyTransformations> propertyTransformations) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
+    if (query instanceof FeatureQuery featureQuery) {
 
       WithScope withScope =
           featureQuery.getSchemaScope() == SchemaBase.Scope.RETURNABLE

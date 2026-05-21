@@ -10,7 +10,7 @@ package de.ii.xtraplatform.features.gml.app;
 import com.google.common.collect.ImmutableList;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
-import de.ii.xtraplatform.base.domain.AuditLogger;
+import de.ii.xtraplatform.base.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -143,7 +143,7 @@ public class FeatureProviderWfs
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
-      AuditLogger auditLogger,
+      AuditLog auditLog,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
     super(
@@ -153,7 +153,7 @@ public class FeatureProviderWfs
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
-        auditLogger,
+        auditLog,
         data,
         volatileRegistry);
 
@@ -230,10 +230,9 @@ public class FeatureProviderWfs
   private FeatureTokenDecoder<
           byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings, boolean passThrough) {
-    if (!(query instanceof FeatureQuery)) {
+    if (!(query instanceof FeatureQuery featureQuery)) {
       throw new IllegalArgumentException();
     }
-    FeatureQuery featureQuery = (FeatureQuery) query;
     Map<String, String> namespaces = getData().getConnectionInfo().getNamespaces();
     XMLNamespaceNormalizer namespaceNormalizer = new XMLNamespaceNormalizer(namespaces);
     FeatureSchema featureSchema = getData().getTypes().get(featureQuery.getType());
@@ -380,6 +379,6 @@ public class FeatureProviderWfs
         getCodelists(),
         this::runQuery,
         false,
-        auditLogger);
+        auditLog);
   }
 }

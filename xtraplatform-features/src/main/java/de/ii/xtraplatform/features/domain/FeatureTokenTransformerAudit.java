@@ -7,7 +7,9 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.base.domain.AuditLogger;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import de.ii.xtraplatform.base.domain.AuditLog;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,20 +17,20 @@ import org.slf4j.LoggerFactory;
 public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
   private final String requestId;
-  private final AuditLogger auditLogger;
+  private final AuditLog auditLog;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenTransformerAudit.class);
 
   public FeatureTokenTransformerAudit(
-      ImmutableResult.Builder resultBuilder, String requestId, AuditLogger auditLogger) {
+      ImmutableResult.Builder resultBuilder, String requestId, AuditLog auditLog) {
     this.requestId = requestId;
-    this.auditLogger = auditLogger;
+    this.auditLog = auditLog;
   }
 
   public <X> FeatureTokenTransformerAudit(
-      ImmutableResultReduced.Builder<X> resultBuilder, String requestId, AuditLogger auditLogger) {
+      ImmutableResultReduced.Builder<X> resultBuilder, String requestId, AuditLog auditLog) {
     this.requestId = requestId;
-    this.auditLogger = auditLogger;
+    this.auditLog = auditLog;
   }
 
   @Override
@@ -39,10 +41,10 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
           String audit = prop.getAudit().get().toLowerCase();
           switch (audit) {
             case "access":
-              auditLogger.initPropertyToAccessTrack(requestId, type, prop.getName());
+              auditLog.initPropertyToAccessTrack(requestId, type, prop.getName());
               continue;
             case "value":
-              auditLogger.initPropertyToValueTrack(requestId, type, prop.getName());
+              auditLog.initPropertyToValueTrack(requestId, type, prop.getName());
               continue;
             case "none":
               continue;
@@ -64,15 +66,19 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
             .filter(p -> p.getFullPathAsString().equals(context.pathTracker().toString()))
             .findFirst();
 
+    List<FeatureSchema> test = context.mappings().get(type).getTargetSchema().getProperties();
+    List<FeatureSchema> testid = context.mappings().get(type).getTargetSchema().getIdProperties();
+    FeatureSchema testtarget = context.mappings().get(type).getTargetSchema();
+    String testname = context.mappings().get(type).getTargetSchema().getName();
     if (prop.isPresent()) {
       if (prop.get().getAudit().isPresent()) {
         String audit = prop.get().getAudit().get().toLowerCase();
         switch (audit) {
           case "access":
-            auditLogger.markPropertyAccessed(requestId, type, prop.get().getName());
+            auditLog.markPropertyAccessed(requestId, type, prop.get().getName());
             break;
           case "value":
-            auditLogger.appendPropertyValue(requestId, type, prop.get().getName(), context.value());
+            auditLog.appendPropertyValue(requestId, type, prop.get().getName(), context.value());
             break;
           case "none":
             break;
@@ -89,7 +95,11 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
   @Override
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    auditLogger.saveToFileAndRemove(requestId);
+    try {
+      auditLog.saveLogToFileAndRemove(requestId);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
     super.onEnd(context);
   }
 }

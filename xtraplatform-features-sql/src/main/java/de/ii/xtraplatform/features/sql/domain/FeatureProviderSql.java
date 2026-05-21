@@ -14,7 +14,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
-import de.ii.xtraplatform.base.domain.AuditLogger;
+import de.ii.xtraplatform.base.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
@@ -484,7 +484,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
-      AuditLogger auditLogger,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     this(
         crsTransformerFactory,
@@ -499,7 +499,7 @@ public class FeatureProviderSql
         volatileRegistry,
         cache,
         scheduler,
-        auditLogger,
+        auditLog,
         data,
         decoderFactories.getConnectorDecoders());
   }
@@ -517,7 +517,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
-      AuditLogger auditLogger,
+      AuditLog auditLog,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
     super(
@@ -527,7 +527,7 @@ public class FeatureProviderSql
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
-        auditLogger,
+        auditLog,
         data,
         volatileRegistry);
 
@@ -1451,7 +1451,7 @@ public class FeatureProviderSql
         getCodelists(),
         this::runQuery,
         !query.hitsOnly(),
-        auditLogger);
+        auditLog);
   }
 
   @Override

@@ -11,7 +11,7 @@ import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransf
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
 import com.google.common.collect.ImmutableMap;
-import de.ii.xtraplatform.base.domain.AuditLogger;
+import de.ii.xtraplatform.base.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.ETag;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
@@ -53,7 +53,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepMetadata;
   private final boolean stepAudit;
 
-  private final AuditLogger auditLogger;
+  private final AuditLog auditLog;
 
   public FeatureStreamImpl(
       Query query,
@@ -63,7 +63,7 @@ public class FeatureStreamImpl implements FeatureStream {
       Map<String, Codelist> codelists,
       QueryRunner runner,
       boolean doTransform,
-      AuditLogger auditLogger) {
+      AuditLog auditLog) {
     this.query = query;
     this.data = data;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -71,7 +71,7 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
-    this.auditLogger = auditLogger;
+    this.auditLog = auditLog;
 
     this.stepMappingSchema =
         !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
@@ -143,7 +143,7 @@ public class FeatureStreamImpl implements FeatureStream {
             }
             source =
                 source.via(
-                    new FeatureTokenTransformerAudit(resultBuilder, requestId.get(), auditLogger));
+                    new FeatureTokenTransformerAudit(resultBuilder, requestId.get(), auditLog));
           }
 
           source =
@@ -220,7 +220,7 @@ public class FeatureStreamImpl implements FeatureStream {
             }
             source =
                 source.via(
-                    new FeatureTokenTransformerAudit(resultBuilder, requestId.get(), auditLogger));
+                    new FeatureTokenTransformerAudit(resultBuilder, requestId.get(), auditLog));
           }
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));

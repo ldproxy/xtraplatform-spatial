@@ -9,7 +9,7 @@ package de.ii.xtraplatform.features.oracle.app;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
-import de.ii.xtraplatform.base.domain.AuditLogger;
+import de.ii.xtraplatform.base.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -127,7 +127,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
-      AuditLogger auditLogger,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     super(
         crsTransformerFactory,
@@ -142,7 +142,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
         volatileRegistry,
         cache,
         scheduler,
-        auditLogger,
+        auditLog,
         data,
         Map.of());
   }
