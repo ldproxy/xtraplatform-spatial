@@ -33,10 +33,10 @@ public interface TemporalExtent {
   @Value.Check
   default void checkExclusiveComputed() {
     boolean hasBounds = getStart() != null || getEnd() != null;
-    boolean hasComputed = getComputed() != null;
+    boolean autoCompute = Boolean.TRUE.equals(getComputed());
 
     Preconditions.checkState(
-        !(hasBounds && hasComputed),
+        !(hasBounds && autoCompute),
         "TemporalExtent: 'computed' and explicit start/end must not be set at the same time.");
 
     if (getStart() != null) {
