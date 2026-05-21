@@ -108,8 +108,10 @@ import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1229,7 +1231,7 @@ public class FeatureProviderSql
 
     return fromType
         .or(() -> fromProvider)
-        .filter(extent -> extent.getComputed() == null)
+        .filter(extent -> !Boolean.TRUE.equals(extent.getComputed()))
         .flatMap(
             extent -> {
               if (extent.getXmin() == null
@@ -1272,7 +1274,7 @@ public class FeatureProviderSql
 
     return fromType
         .or(() -> fromProvider)
-        .filter(extent -> extent.getComputed() == null)
+        .filter(extent -> !Boolean.TRUE.equals(extent.getComputed()))
         .flatMap(
             extent -> {
               if (extent.getStart() == null && extent.getEnd() == null) {
@@ -1280,14 +1282,24 @@ public class FeatureProviderSql
               }
               OffsetDateTime start =
                   extent.getStart() != null
-                      ? OffsetDateTime.parse(extent.getStart())
+                      ? parseConfiguredTemporalBound(extent.getStart(), false)
                       : OffsetDateTime.parse("0001-01-01T00:00:00Z");
               OffsetDateTime end =
                   extent.getEnd() != null
-                      ? OffsetDateTime.parse(extent.getEnd())
+                      ? parseConfiguredTemporalBound(extent.getEnd(), true)
                       : OffsetDateTime.parse("9999-12-31T23:59:59Z");
               return Optional.of(Interval.of(start.toInstant(), end.toInstant()));
             });
+  }
+
+  private static OffsetDateTime parseConfiguredTemporalBound(String value, boolean endOfDay) {
+    if (value.contains("T")) {
+      return OffsetDateTime.parse(value);
+    }
+
+    return endOfDay
+        ? LocalDate.parse(value).atTime(23, 59, 59).atOffset(ZoneOffset.UTC)
+        : LocalDate.parse(value).atStartOfDay().atOffset(ZoneOffset.UTC);
   }
 
   // TODO: cache deser does not work, because the the feature schemas have no name
