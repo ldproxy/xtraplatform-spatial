@@ -25,7 +25,6 @@ import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -334,43 +333,54 @@ public class FeatureStreamImpl implements FeatureStream {
 
   private static PropertyTransformations applyRename(
       PropertyTransformations propertyTransformations) {
-    if (propertyTransformations.getTransformations().values().stream()
-        .flatMap(Collection::stream)
-        .anyMatch(propertyTransformation -> propertyTransformation.getRename().isPresent())) {
-      Map<String, List<PropertyTransformation>> renamed = new LinkedHashMap<>();
+    // Collect every rename keyed by its original full path.
+    Map<String, String> renames = new LinkedHashMap<>();
+    propertyTransformations
+        .getTransformations()
+        .forEach(
+            (key, value) ->
+                value.stream()
+                    .filter(pt -> pt.getRename().isPresent())
+                    .map(pt -> pt.getRename().get())
+                    .findFirst()
+                    .ifPresent(rename -> renames.put(key, rename)));
 
-      propertyTransformations
-          .getTransformations()
-          .forEach(
-              (key, value) -> {
-                Optional<String> rename =
-                    value.stream()
-                        .filter(
-                            propertyTransformation ->
-                                propertyTransformation.getRename().isPresent())
-                        .map(propertyTransformation -> propertyTransformation.getRename().get())
-                        .findFirst();
-
-                if (rename.isPresent()) {
-                  renamed.put(rename.get(), value);
-
-                  String prefix = key + ".";
-
-                  propertyTransformations
-                      .getTransformations()
-                      .forEach(
-                          (key2, value2) -> {
-                            if (key2.startsWith(prefix)) {
-                              renamed.put(key2.replace(key, rename.get()), value2);
-                            }
-                          });
-                }
-              });
-
-      return propertyTransformations.mergeInto(() -> renamed);
+    if (renames.isEmpty()) {
+      return propertyTransformations;
     }
 
-    return propertyTransformations;
+    // Re-key every transformation by the cumulative renamed full path so that lookups
+    // by the renamed target path (e.g. "qualitaetsangaben.herkunft.gmd:processStep.gmd:dateTime")
+    // still find the right transformation (auto DATETIME formatter, value transformers,
+    // wrap transformers, ...).
+    Map<String, List<PropertyTransformation>> renamed = new LinkedHashMap<>();
+    propertyTransformations
+        .getTransformations()
+        .forEach(
+            (key, value) -> {
+              String newKey = renameFullPath(key, renames);
+              renamed.put(newKey, value);
+            });
+
+    return propertyTransformations.mergeInto(() -> renamed);
+  }
+
+  private static String renameFullPath(String path, Map<String, String> renames) {
+    String[] segments = path.split("\\.");
+    StringBuilder result = new StringBuilder();
+    StringBuilder running = new StringBuilder();
+    for (int i = 0; i < segments.length; i++) {
+      if (i > 0) {
+        running.append(".");
+      }
+      running.append(segments[i]);
+      String renamedSegment = renames.getOrDefault(running.toString(), segments[i]);
+      if (i > 0) {
+        result.append(".");
+      }
+      result.append(renamedSegment);
+    }
+    return result.toString();
   }
 
   private static Map<String, List<PropertyTransformation>> getProviderTransformations(
