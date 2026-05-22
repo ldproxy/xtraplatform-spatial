@@ -14,7 +14,6 @@ import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
-import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -40,14 +39,11 @@ import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureQueryEncoder;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
-import de.ii.xtraplatform.features.domain.FeatureTypeExtent;
 import de.ii.xtraplatform.features.domain.Metadata;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.ProviderExtensionRegistry;
 import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
-import de.ii.xtraplatform.features.domain.SpatialExtent;
-import de.ii.xtraplatform.features.domain.TemporalExtent;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.graphql.domain.FeatureProviderGraphQlData;
@@ -55,9 +51,6 @@ import de.ii.xtraplatform.features.graphql.domain.GraphQlConnector;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.List;
 import java.util.Map;
@@ -389,18 +382,7 @@ public class FeatureProviderGraphQl
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
-        .flatMap(
-            boundingBox ->
-                crsTransformerFactory
-                    .getTransformer(getNativeCrs(), crs, false)
-                    .flatMap(
-                        crsTransformer -> {
-                          try {
-                            return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
-                          } catch (CrsTransformationException e) {
-                            return Optional.empty();
-                          }
-                        }));
+        .flatMap(boundingBox -> transformSpatialExtent(boundingBox, crs));
   }
 
   @Override
@@ -409,85 +391,6 @@ public class FeatureProviderGraphQl
       return Optional.empty();
     }
     return getConfiguredTemporalExtent(typeName);
-  }
-
-  private Optional<BoundingBox> getConfiguredSpatialExtent(String typeName) {
-    Optional<SpatialExtent> fromType =
-        Optional.ofNullable(getData().getTypes().get(typeName))
-            .flatMap(FeatureSchema::getExtent)
-            .flatMap(FeatureTypeExtent::getSpatial);
-    Optional<SpatialExtent> fromProvider =
-        getData().getExtent().flatMap(FeatureTypeExtent::getSpatial);
-
-    return fromType
-        .or(() -> fromProvider)
-        .filter(extent -> !Boolean.TRUE.equals(extent.getComputed()))
-        .flatMap(
-            extent -> {
-              if (extent.getXmin() == null
-                  || extent.getYmin() == null
-                  || extent.getXmax() == null
-                  || extent.getYmax() == null) {
-                return Optional.empty();
-              }
-              EpsgCrs nativeCrs = getData().getNativeCrs().orElse(OgcCrs.CRS84);
-              if (extent.getZmin() != null && extent.getZmax() != null) {
-                return Optional.of(
-                    BoundingBox.of(
-                        extent.getXmin(),
-                        extent.getYmin(),
-                        extent.getZmin(),
-                        extent.getXmax(),
-                        extent.getYmax(),
-                        extent.getZmax(),
-                        nativeCrs));
-              }
-              return Optional.of(
-                  BoundingBox.of(
-                      extent.getXmin(),
-                      extent.getYmin(),
-                      extent.getXmax(),
-                      extent.getYmax(),
-                      nativeCrs));
-            });
-  }
-
-  private Optional<Interval> getConfiguredTemporalExtent(String typeName) {
-    Optional<TemporalExtent> fromType =
-        Optional.ofNullable(getData().getTypes().get(typeName))
-            .flatMap(FeatureSchema::getExtent)
-            .flatMap(FeatureTypeExtent::getTemporal);
-    Optional<TemporalExtent> fromProvider =
-        getData().getExtent().flatMap(FeatureTypeExtent::getTemporal);
-
-    return fromType
-        .or(() -> fromProvider)
-        .filter(extent -> !Boolean.TRUE.equals(extent.getComputed()))
-        .flatMap(
-            extent -> {
-              if (extent.getStart() == null && extent.getEnd() == null) {
-                return Optional.empty();
-              }
-              OffsetDateTime start =
-                  extent.getStart() != null
-                      ? parseConfiguredTemporalBound(extent.getStart(), false)
-                      : OffsetDateTime.parse("0001-01-01T00:00:00Z");
-              OffsetDateTime end =
-                  extent.getEnd() != null
-                      ? parseConfiguredTemporalBound(extent.getEnd(), true)
-                      : OffsetDateTime.parse("9999-12-31T23:59:59Z");
-              return Optional.of(Interval.of(start.toInstant(), end.toInstant()));
-            });
-  }
-
-  private static OffsetDateTime parseConfiguredTemporalBound(String value, boolean endOfDay) {
-    if (value.contains("T")) {
-      return OffsetDateTime.parse(value);
-    }
-
-    return endOfDay
-        ? LocalDate.parse(value).atTime(23, 59, 59).atOffset(ZoneOffset.UTC)
-        : LocalDate.parse(value).atStartOfDay().atOffset(ZoneOffset.UTC);
   }
 
   @Override
