@@ -7,28 +7,50 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
-import java.time.LocalDate;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
-/** Temporal extent with ISO-8601 dates (yyyy-MM-dd). */
+/** Temporal extent with UTC ISO-8601 instants (yyyy-MM-ddTHH:mm:ss.SSSZ). */
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTemporalExtent.Builder.class)
 public interface TemporalExtent {
 
-  /** Start of the temporal extent as ISO-8601 date (yyyy-MM-dd), or {@code null} for open start. */
+  /**
+   * Start of the temporal extent as UTC ISO-8601 instant (yyyy-MM-ddTHH:mm:ss[.SSS]Z), or {@code
+   * null} for open start.
+   */
   @Nullable
   String getStart();
 
-  /** End of the temporal extent as ISO-8601 date (yyyy-MM-dd), or {@code null} for open end. */
+  /**
+   * End of the temporal extent as UTC ISO-8601 instant (yyyy-MM-ddTHH:mm:ss[.SSS]Z), or {@code
+   * null} for open end.
+   */
   @Nullable
   String getEnd();
 
   @Nullable
   Boolean getComputed();
+
+  @Value.Derived
+  @JsonIgnore
+  default Instant getStartInstant() {
+    return getStart() == null
+        ? null
+        : Instant.from(DateTimeFormatter.ISO_INSTANT.parse(getStart()));
+  }
+
+  @Value.Derived
+  @JsonIgnore
+  default Instant getEndInstant() {
+    return getEnd() == null ? null : Instant.from(DateTimeFormatter.ISO_INSTANT.parse(getEnd()));
+  }
 
   @Value.Check
   default void checkExclusiveComputed() {
@@ -40,28 +62,24 @@ public interface TemporalExtent {
         "TemporalExtent: 'computed' and explicit start/end must not be set at the same time.");
 
     if (getStart() != null) {
-      validateIsoDate(getStart(), "start");
+      validateIsoInstant(getStart(), "start");
     }
     if (getEnd() != null) {
-      validateIsoDate(getEnd(), "end");
+      validateIsoInstant(getEnd(), "end");
     }
   }
 
-  private static void validateIsoDate(String value, String field) {
+  private static void validateIsoInstant(String value, String field) {
     Preconditions.checkState(
         !value.matches("^-?\\d+$"),
-        "TemporalExtent: '%s' must be an ISO date string (yyyy-MM-dd), not a numeric timestamp.",
-        field);
-    Preconditions.checkState(
-        !value.contains("T"),
-        "TemporalExtent: '%s' must be an ISO date string (yyyy-MM-dd), timestamps are not allowed.",
+        "TemporalExtent: '%s' must be a UTC ISO-8601 instant string, not a numeric timestamp.",
         field);
     try {
-      LocalDate.parse(value);
+      DateTimeFormatter.ISO_INSTANT.parse(value);
     } catch (DateTimeParseException e) {
       Preconditions.checkState(
           false,
-          "TemporalExtent: '%s' is not a valid ISO-8601 date (yyyy-MM-dd): %s",
+          "TemporalExtent: '%s' is not a valid UTC ISO-8601 instant (yyyy-MM-ddTHH:mm:ss.SSSZ): %s",
           field,
           value);
     }
