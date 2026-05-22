@@ -9,6 +9,9 @@ package de.ii.xtraplatform.features.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -62,5 +65,19 @@ public interface SpatialExtent {
           (getZmin() == null && getZmax() == null) || (getZmin() != null && getZmax() != null),
           "SpatialExtent: zmin and zmax must both be set or both be absent.");
     }
+  }
+
+  default Optional<BoundingBox> toBoundingBox(EpsgCrs nativeCrs) {
+    if (getXmin() == null || getYmin() == null || getXmax() == null || getYmax() == null) {
+      return Optional.empty();
+    }
+
+    if (getZmin() != null && getZmax() != null) {
+      return Optional.of(
+          BoundingBox.of(
+              getXmin(), getYmin(), getZmin(), getXmax(), getYmax(), getZmax(), nativeCrs));
+    }
+
+    return Optional.of(BoundingBox.of(getXmin(), getYmin(), getXmax(), getYmax(), nativeCrs));
   }
 }
