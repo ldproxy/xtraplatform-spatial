@@ -13,15 +13,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author zahnen
  */
 public class GmlMultiplicityTracker {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GmlMultiplicityTracker.class);
   private static final Joiner JOINER = Joiner.on('.');
 
   private final Map<String, Integer> currentMultiplicities;

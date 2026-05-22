@@ -51,7 +51,6 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
-import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
 import de.ii.xtraplatform.features.gml.infra.fes.FesAnd;
 import de.ii.xtraplatform.features.gml.infra.fes.FesBBox;
 import de.ii.xtraplatform.features.gml.infra.fes.FesDuring;
@@ -76,29 +75,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
 
 public class FilterEncoderWfs {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FilterEncoderWfs.class);
-
   private final Cql cql;
   private final EpsgCrs nativeCrs;
   private final CrsTransformerFactory crsTransformerFactory;
-  private final XMLNamespaceNormalizer namespaceNormalizer;
   BiFunction<List<Double>, Optional<EpsgCrs>, List<Double>> coordinatesTransformer;
 
-  public FilterEncoderWfs(
-      EpsgCrs nativeCrs,
-      CrsTransformerFactory crsTransformerFactory,
-      Cql cql,
-      XMLNamespaceNormalizer namespaceNormalizer) {
+  public FilterEncoderWfs(EpsgCrs nativeCrs, CrsTransformerFactory crsTransformerFactory, Cql cql) {
     this.nativeCrs = nativeCrs;
     this.crsTransformerFactory = crsTransformerFactory;
     this.cql = cql;
-    this.namespaceNormalizer = namespaceNormalizer;
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
   }
 
@@ -110,34 +99,31 @@ public class FilterEncoderWfs {
 
   private List<Double> transformCoordinatesIfNecessary(
       List<Double> coordinates, Optional<EpsgCrs> sourceCrs) {
-
-    if (sourceCrs.isPresent() && !Objects.equals(sourceCrs.get(), nativeCrs)) {
-      Optional<CrsTransformer> transformer =
-          crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
-      if (transformer.isPresent()) {
-        double[] transformed =
-            transformer.get().transform(Doubles.toArray(coordinates), coordinates.size() / 2, 2);
-        if (Objects.isNull(transformed)) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Filter is invalid. Coordinates cannot be transformed: %s", coordinates));
-        }
-
-        return Doubles.asList(transformed);
-      }
+    if (sourceCrs.isEmpty() || Objects.equals(sourceCrs.get(), nativeCrs)) {
+      return coordinates;
     }
-    return coordinates;
+    Optional<CrsTransformer> transformer =
+        crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
+    if (transformer.isEmpty()) {
+      return coordinates;
+    }
+    double[] transformed =
+        transformer.get().transform(Doubles.toArray(coordinates), coordinates.size() / 2, 2);
+    if (Objects.isNull(transformed)) {
+      throw new IllegalArgumentException(
+          String.format("Filter is invalid. Coordinates cannot be transformed: %s", coordinates));
+    }
+    return Doubles.asList(transformed);
   }
 
   // TODO: reverse FeatureSchema for nested mappings?
   private Optional<String> getPrefixedPropertyName(FeatureSchema schema, String property) {
+    String normalizedProperty = property.replace(ID_PLACEHOLDER, "id");
     return schema.getProperties().stream()
         .filter(
             featureProperty ->
                 Objects.nonNull(featureProperty.getName())
-                    && Objects.equals(
-                        featureProperty.getName().toLowerCase(),
-                        property.replaceAll(ID_PLACEHOLDER, "id").toLowerCase()))
+                    && featureProperty.getName().equalsIgnoreCase(normalizedProperty))
         .map(FeatureSchema::getSourcePath)
         .filter(Optional::isPresent)
         .map(Optional::get)
@@ -151,6 +137,7 @@ public class FilterEncoderWfs {
             });
   }
 
+  @SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
   class CqlToFes implements CqlVisitor<FesExpression> {
 
     private final FeatureSchema schema;
@@ -178,6 +165,7 @@ public class FilterEncoderWfs {
     }
 
     @Override
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     public FesExpression visit(
         BinaryScalarOperation scalarOperation, List<FesExpression> children) {
       if (scalarOperation instanceof Eq) {

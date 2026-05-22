@@ -42,7 +42,6 @@ import de.ii.xtraplatform.features.domain.FeatureQueriesPassThrough;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureQueryEncoder;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
-import de.ii.xtraplatform.features.domain.FeatureStorePathParser;
 import de.ii.xtraplatform.features.domain.FeatureStream;
 import de.ii.xtraplatform.features.domain.FeatureStreamImpl;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
@@ -53,7 +52,6 @@ import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
-import de.ii.xtraplatform.features.gml.domain.ConnectionInfoWfsHttp;
 import de.ii.xtraplatform.features.gml.domain.FeatureProviderWfsData;
 import de.ii.xtraplatform.features.gml.domain.WfsConnector;
 import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
@@ -131,7 +129,6 @@ public class FeatureProviderWfs
 
   private FeatureQueryEncoderWfs queryTransformer;
   private AggregateStatsReader<FeatureSchema> aggregateStatsReader;
-  private FeatureStorePathParser pathParser;
 
   @AssistedInject
   public FeatureProviderWfs(
@@ -159,8 +156,6 @@ public class FeatureProviderWfs
 
   @Override
   protected boolean onStartup() throws InterruptedException {
-    this.pathParser = createPathParser(getData().getConnectionInfo());
-
     boolean success = super.onStartup();
 
     if (!success) {
@@ -188,11 +183,6 @@ public class FeatureProviderWfs
             .map(entry -> new SimpleImmutableEntry<>(entry.getKey(), List.of(entry.getValue())))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     return types;
-  }
-
-  private static FeatureStorePathParser createPathParser(
-      ConnectionInfoWfsHttp connectionInfoWfsHttp) {
-    return new FeatureStorePathParserWfs(connectionInfoWfsHttp.getNamespaces());
   }
 
   @Override
@@ -328,7 +318,6 @@ public class FeatureProviderWfs
           .join();
     } catch (Throwable e) {
       // continue
-      boolean br = true;
     }
 
     return Optional.empty();

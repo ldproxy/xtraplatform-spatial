@@ -42,7 +42,7 @@ public class FeatureProviderWfsAuto implements AutoEntityFactory {
 
   @Override
   public <T extends AutoEntity> Map<String, String> check(T entityData) {
-    return null;
+    return Map.of();
   }
 
   @Override

@@ -114,9 +114,11 @@ public class FeatureProviderWfsFactory
 
     try {
       if (data.isAuto()) {
-        LOGGER.info(
-            "Feature provider with id '{}' is in auto mode, generating configuration ...",
-            data.getId());
+        if (LOGGER.isInfoEnabled()) {
+          LOGGER.info(
+              "Feature provider with id '{}' is in auto mode, generating configuration ...",
+              data.getId());
+        }
 
         Map<String, List<String>> types = featureProviderWfsAuto.analyze(data);
 

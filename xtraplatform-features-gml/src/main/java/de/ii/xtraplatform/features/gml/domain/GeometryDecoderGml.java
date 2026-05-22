@@ -40,6 +40,7 @@ import java.util.OptionalInt;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   // In principle, we could support more GML geometry types, currently only the most common ones are
