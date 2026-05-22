@@ -22,8 +22,6 @@ import java.util.Optional;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 import org.apache.hc.core5.net.URIBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
 
 /**
@@ -32,11 +30,9 @@ import org.xml.sax.SAXException;
 // TODO: merge into FeatureQueryEncoderWfs
 public class WfsRequestEncoder {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(WfsRequestEncoder.class);
-
-  private Map<String, Map<WFS.METHOD, URI>> urls;
-  private Versions versions;
-  private XMLNamespaceNormalizer nsStore;
+  private final Map<String, Map<WFS.METHOD, URI>> urls;
+  private final Versions versions;
+  private final XMLNamespaceNormalizer nsStore;
 
   public WfsRequestEncoder(
       String version,

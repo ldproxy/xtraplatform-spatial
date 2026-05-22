@@ -46,6 +46,7 @@ import java.util.Set;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   private enum Kind {
