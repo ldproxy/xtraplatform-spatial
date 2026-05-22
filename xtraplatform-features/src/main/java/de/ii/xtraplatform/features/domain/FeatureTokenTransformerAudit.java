@@ -9,17 +9,22 @@ package de.ii.xtraplatform.features.domain;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import de.ii.xtraplatform.base.domain.AuditLog;
+import de.ii.xtraplatform.features.domain.SchemaBase.Role;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenTransformerAudit.class);
   private final String requestId;
   private final AuditLog auditLog;
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenTransformerAudit.class);
+  private final Map<String, Object> featureHolder = new HashMap<>();
+  private final List<Map<String, Object>> featureList = new ArrayList<>();
 
   public FeatureTokenTransformerAudit(
       ImmutableResult.Builder resultBuilder, String requestId, AuditLog auditLog) {
@@ -34,28 +39,9 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
   }
 
   @Override
-  public void onStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    for (String type : context.mappings().keySet()) {
-      for (FeatureSchema prop : context.mappings().get(type).getTargetSchema().getProperties()) {
-        if (prop.getAudit().isPresent()) {
-          String audit = prop.getAudit().get().toLowerCase();
-          switch (audit) {
-            case "access":
-              auditLog.initPropertyToAccessTrack(requestId, type, prop.getName());
-              continue;
-            case "value":
-              auditLog.initPropertyToValueTrack(requestId, type, prop.getName());
-              continue;
-            case "none":
-              continue;
-            default:
-              LOGGER.error("Wrong entry for audit: {}", audit);
-          }
-        }
-      }
-    }
-
-    super.onStart(context);
+  public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    featureHolder.clear();
+    super.onFeatureStart(context);
   }
 
   @Override
@@ -66,36 +52,30 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
             .filter(p -> p.getFullPathAsString().equals(context.pathTracker().toString()))
             .findFirst();
 
-    List<FeatureSchema> test = context.mappings().get(type).getTargetSchema().getProperties();
-    List<FeatureSchema> testid = context.mappings().get(type).getTargetSchema().getIdProperties();
-    FeatureSchema testtarget = context.mappings().get(type).getTargetSchema();
-    String testname = context.mappings().get(type).getTargetSchema().getName();
-    if (prop.isPresent()) {
-      if (prop.get().getAudit().isPresent()) {
-        String audit = prop.get().getAudit().get().toLowerCase();
-        switch (audit) {
-          case "access":
-            auditLog.markPropertyAccessed(requestId, type, prop.get().getName());
-            break;
-          case "value":
-            auditLog.appendPropertyValue(requestId, type, prop.get().getName(), context.value());
-            break;
-          case "none":
-            break;
-          default:
-            LOGGER.error("Wrong entry for audit: {}", audit);
-        }
-      }
-    } else {
+    if (prop.isEmpty()) {
       LOGGER.error("No property found with path: {}", context.pathTracker().toString());
+      super.onValue(context);
+      return;
     }
 
+    if (prop.get().getRole().filter(Role.ID::equals).isPresent()) {
+      featureHolder.put("id", context.value());
+    } else if (prop.get().getAudit().isPresent()) {
+      featureHolder.put(prop.get().getName(), context.value());
+    }
     super.onValue(context);
+  }
+
+  @Override
+  public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    featureList.add(new HashMap<>(featureHolder));
+    super.onFeatureEnd(context);
   }
 
   @Override
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     try {
+      auditLog.initTarget(requestId, Map.of("features", featureList));
       auditLog.saveLogToFileAndRemove(requestId);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
