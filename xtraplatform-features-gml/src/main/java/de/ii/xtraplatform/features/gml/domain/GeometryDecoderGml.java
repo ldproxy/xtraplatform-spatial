@@ -43,6 +43,12 @@ import javax.xml.stream.XMLStreamException;
 @SuppressWarnings("PMD.CyclomaticComplexity")
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
+  private static final String ELEMENT_SUFFIX = "> element.";
+
+  private boolean waitingForInput;
+  private boolean waitingForGeometry = true;
+  private PartialGeometry currentGeometry;
+
   // In principle, we could support more GML geometry types, currently only the most common ones are
   // supported. However, GML decoding is currently only relevant for un-maintained WFS feature
   // providers.
@@ -59,19 +65,13 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       new ImmutableList.Builder<String>().add("posList").add("pos").add("coordinates").build();
 
   static class PartialGeometry {
-    PartialGeometry parent = null;
+    PartialGeometry parent;
     Deque<PartialGeometry> children = new ArrayDeque<>();
-    boolean isComplete = false;
-    Geometry<?> geometry = null;
-    double[] coordinates = null;
-    StringBuilder textBuffer = new StringBuilder();
+    boolean isComplete;
+    Geometry<?> geometry;
+    double[] coordinates;
+    String textBuffer = "";
   }
-
-  private boolean waitingForInput = false;
-  private boolean waitingForGeometry = true;
-  private PartialGeometry currentGeometry = null;
-
-  public GeometryDecoderGml() {}
 
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
@@ -81,13 +81,19 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     return decode(parser, crs, srsDimension, false);
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.NullAssignment"
+  })
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
       Optional<EpsgCrs> defaultCrs,
       OptionalInt srsDimension,
       boolean useCurrentEvent)
       throws XMLStreamException, IOException {
-    String localName;
     waitingForInput = false;
     boolean doNotAdvance = useCurrentEvent;
     while (doNotAdvance || parser.hasNext()) {
@@ -98,7 +104,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
           waitingForInput = true;
           return Optional.empty();
         case XMLStreamConstants.START_ELEMENT:
-          localName = parser.getLocalName();
+          String startLocalName = parser.getLocalName();
           if (waitingForGeometry) {
             Optional<EpsgCrs> crs = getCrsFromSrsName(parser).or(() -> defaultCrs);
             Axes axes =
@@ -106,7 +112,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
                     ? Axes.XY
                     : Axes.XYZ;
             Geometry<?> geom =
-                switch (localName) {
+                switch (startLocalName) {
                   case "Point" -> ImmutablePoint.builder()
                       .crs(crs)
                       .value(Position.empty(axes))
@@ -129,7 +135,8 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
                       .crs(crs)
                       .axes(axes)
                       .build();
-                  default -> throw new IOException("Unsupported GML geometry type: " + localName);
+                  default -> throw new IOException(
+                      "Unsupported GML geometry type: " + startLocalName);
                 };
             if (currentGeometry == null) {
               currentGeometry = new PartialGeometry();
@@ -141,49 +148,58 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
             }
             currentGeometry.geometry = geom;
             waitingForGeometry = false;
-          } else if (GEOMETRY_COORDINATES.contains(localName)) {
+          } else if (GEOMETRY_COORDINATES.contains(startLocalName)) {
             if (currentGeometry == null) {
               throw new IllegalStateException(
-                  "No geometry started before <gml:" + localName + "> element.");
+                  "No geometry started before <gml:" + startLocalName + ELEMENT_SUFFIX);
             }
             if (currentGeometry.isComplete) {
               throw new IllegalStateException(
-                  "<gml:" + localName + "> element cannot be added to a completed geometry.");
+                  "<gml:"
+                      + startLocalName
+                      + ELEMENT_SUFFIX
+                      + " cannot be added to a completed geometry.");
             }
-            double[] coords = parseCoordinates(parser, localName);
             if (waitingForInput) {
               return Optional.empty();
             }
-            handleCoordinates(localName, coords);
-          } else if (GEOMETRY_PARTS.contains(localName)) {
+            double[] coordinates = parseCoordinates(parser, startLocalName);
+            if (waitingForInput || coordinates.length == 0) {
+              return Optional.empty();
+            }
+            handleCoordinates(startLocalName, coordinates);
+          } else if (GEOMETRY_PARTS.contains(startLocalName)) {
             if (currentGeometry == null) {
               throw new IllegalStateException(
-                  "No geometry started before <gml:" + localName + "> element.");
+                  "No geometry started before <gml:" + startLocalName + ELEMENT_SUFFIX);
             }
             if (currentGeometry.isComplete) {
               throw new IllegalStateException(
-                  "<gml:" + localName + "> element cannot be added to a completed geometry.");
+                  "<gml:"
+                      + startLocalName
+                      + ELEMENT_SUFFIX
+                      + " cannot be added to a completed geometry.");
             }
             waitingForGeometry = true;
           }
           break;
         case XMLStreamConstants.END_ELEMENT:
-          localName = parser.getLocalName();
+          String endLocalName = parser.getLocalName();
           if (currentGeometry == null) {
             throw new IllegalStateException(
-                "No geometry started before </gml:" + localName + "> element.");
+                "No geometry started before </gml:" + endLocalName + ELEMENT_SUFFIX);
           }
-          if ("Point".equals(localName)
-              || "LineString".equals(localName)
-              || "Polygon".equals(localName)
-              || "MultiPoint".equals(localName)
-              || "MultiCurve".equals(localName)
-              || "MultiSurface".equals(localName)) {
+          if ("Point".equals(endLocalName)
+              || "LineString".equals(endLocalName)
+              || "Polygon".equals(endLocalName)
+              || "MultiPoint".equals(endLocalName)
+              || "MultiCurve".equals(endLocalName)
+              || "MultiSurface".equals(endLocalName)) {
             if (currentGeometry.isComplete) {
               throw new IllegalStateException(
-                  "Geometry already completed for </gml:" + localName + "> element.");
+                  "Geometry already completed for </gml:" + endLocalName + ELEMENT_SUFFIX);
             }
-            switch (localName) {
+            switch (endLocalName) {
               case "MultiPoint" -> {
                 var builder =
                     ImmutableMultiPoint.builder().from((MultiPoint) currentGeometry.geometry);
@@ -209,11 +225,14 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
                 }
                 currentGeometry.geometry = builder.build();
               }
+              default -> {
+                // no-op
+              }
             }
             currentGeometry.isComplete = true;
             if (currentGeometry.geometry.isEmpty()) {
               throw new IllegalStateException(
-                  "Geometry is empty for </gml:" + localName + "> element.");
+                  "Geometry is empty for </gml:" + endLocalName + ELEMENT_SUFFIX);
             }
             if (currentGeometry.parent != null) {
               currentGeometry = currentGeometry.parent;
@@ -228,12 +247,15 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
           break;
         case XMLStreamConstants.CHARACTERS:
           break;
+        default:
+          break;
       }
     }
     throw new IOException("Unexpected end of XML stream, no complete geometry found.");
   }
 
-  private void handleCoordinates(String localName, double[] coords) {
+  @SuppressWarnings("PMD.NullAssignment")
+  private void handleCoordinates(String localName, double... coords) {
     Geometry<?> geom = currentGeometry.geometry;
     GeometryType geomType = geom.getType();
     Axes axes = geom.getAxes();
@@ -319,21 +341,21 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     if (GEOMETRY_COORDINATES.contains(localName)) {
       if (currentGeometry == null) {
         throw new IllegalStateException(
-            "No geometry started before <gml:" + localName + "> element.");
+            "No geometry started before <gml:" + localName + ELEMENT_SUFFIX);
       }
       if (currentGeometry.isComplete) {
         throw new IllegalStateException(
-            "<gml:" + localName + "> element cannot be added to a completed geometry.");
+            "<gml:" + localName + ELEMENT_SUFFIX + " cannot be added to a completed geometry.");
       }
-      double[] coords = parseDoubles(currentGeometry.textBuffer.append(bufferedText).toString());
-      currentGeometry.textBuffer.setLength(0);
+      double[] coords = parseDoubles(currentGeometry.textBuffer + bufferedText);
+      currentGeometry.textBuffer = "";
       handleCoordinates(localName, coords);
       return decode(parser, defaultCrs, srsDimension, false);
     }
     return decode(parser, defaultCrs, srsDimension, true);
   }
 
-  private void addCoordinates(double[] coords) {
+  private void addCoordinates(double... coords) {
     if (currentGeometry.coordinates == null) {
       currentGeometry.coordinates = coords;
     } else {
@@ -349,29 +371,30 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     return waitingForInput;
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private Optional<EpsgCrs> getCrsFromSrsName(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser) {
     String srsName = parser.getAttributeValue(null, "srsName");
     if (srsName != null) {
       if (srsName.startsWith("urn:ogc:def:crs:EPSG::")) {
-        String code = srsName.substring(srsName.lastIndexOf(":") + 1);
+        String code = srsName.substring(srsName.lastIndexOf(':') + 1);
         try {
           return Optional.of(EpsgCrs.of(Integer.parseInt(code)));
         } catch (Exception e) {
           // ignore, fallback to default
         }
       } else if (srsName.startsWith("http://www.opengis.net/def/crs/EPSG/0/")) {
-        String code = srsName.substring(srsName.lastIndexOf("/") + 1);
+        String code = srsName.substring(srsName.lastIndexOf('/') + 1);
         try {
           return Optional.of(EpsgCrs.of(Integer.parseInt(code)));
         } catch (Exception e) {
           // ignore, fallback to default
         }
-      } else if (srsName.equals("http://www.opengis.net/def/crs/OGC/0/CRS84")
-          || srsName.equals("http://www.opengis.net/def/crs/OGC/1.3/CRS84")
-          || srsName.equals("urn:ogc:def:crs:OGC:1.3:CRS84")) {
+      } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84".equals(srsName)
+          || "http://www.opengis.net/def/crs/OGC/1.3/CRS84".equals(srsName)
+          || "urn:ogc:def:crs:OGC:1.3:CRS84".equals(srsName)) {
         return Optional.of(OgcCrs.CRS84);
-      } else if (srsName.equals("http://www.opengis.net/def/crs/OGC/0/CRS84h")
-          || srsName.equals("urn:ogc:def:crs:OGC::CRS84h")) {
+      } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84h".equals(srsName)
+          || "urn:ogc:def:crs:OGC::CRS84h".equals(srsName)) {
         return Optional.of(OgcCrs.CRS84h);
       }
     }
@@ -416,9 +439,9 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       int event = parser.next();
       if (event == AsyncXMLStreamReader.EVENT_INCOMPLETE) {
         waitingForInput = true;
-        currentGeometry.textBuffer = new StringBuilder(text);
+        currentGeometry.textBuffer = text.toString();
         // keep current state and resume processing when more input is available
-        return null;
+        return new double[0];
       } else if (event == XMLStreamConstants.CHARACTERS) {
         text.append(parser.getText());
       } else if (event == XMLStreamConstants.END_ELEMENT && tagName.equals(parser.getLocalName())) {
