@@ -62,8 +62,6 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private static final String MULTI_POLYGON = "MultiPolygon";
   private static final String SOLID = "Solid";
   private static final String SHELL = "Shell";
-  // these will be needed for the AdV LoD2 CityGML profile
-  private static final String COMPOSITE_SURFACE = "CompositeSurface";
   private static final String COMPOSITE_CURVE = "CompositeCurve";
   private static final String POS = "pos";
   private static final String POS_LIST = "posList";
@@ -135,7 +133,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private final Optional<GeometryEncoderGml> encodeAsEmbeddedGeometry;
   private final GmlVersion version;
   private final Function<EpsgCrs, String> srsNameMapper;
-  private int nextGmlId = 0;
+  private int nextGmlId;
   private String srsName;
 
   public GeometryEncoderGml(XMLStreamWriter xmlWriter) {
@@ -143,7 +141,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     this.gmlPrefix = Optional.of("gml");
     this.gmlIdPrefix = "geom_";
     this.options = Set.of();
-    this.precision = null;
+    this.precision = new int[0];
     this.srsNameMapper = EpsgCrs::toUriString;
     this.encodeAsSegmentOrPatch =
         Optional.of(
@@ -165,7 +163,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                 Optional.empty(),
                 List.of(),
                 this.srsNameMapper));
-    this.srsName = null;
+    this.srsName = "";
     this.version = GmlVersion.GML32;
   }
 
@@ -228,14 +226,14 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     this.precision =
         precision.stream().anyMatch(v -> v > 0)
             ? precision.stream().mapToInt(v -> v).toArray()
-            : null;
-    this.srsName = null;
+            : new int[0];
+    this.srsName = "";
     this.version = version;
   }
 
   @Override
   public Optional<Void> initAndCheckGeometry(Geometry<?> geometry) {
-    if (srsName == null) {
+    if (srsName.isEmpty()) {
       srsName =
           srsNameMapper.apply(
               geometry
@@ -341,7 +339,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
             write(SPACE);
           }
         }
-        if (precision != null && j < precision.length && precision[j] > 0) {
+        if (j < precision.length && precision[j] > 0) {
           write(
               BigDecimal.valueOf(coordinates[i * dimensionWithoutM + j])
                   .setScale(precision[j], RoundingMode.HALF_UP));
