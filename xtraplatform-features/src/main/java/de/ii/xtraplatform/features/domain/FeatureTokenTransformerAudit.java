@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import de.ii.xtraplatform.base.domain.AuditLog;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.ArrayList;
@@ -26,14 +25,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
   private final Map<String, Object> featureHolder = new LinkedHashMap<>();
   private final List<Map<String, Object>> featureList = new ArrayList<>();
 
-  public FeatureTokenTransformerAudit(
-      ImmutableResult.Builder resultBuilder, String requestId, AuditLog auditLog) {
-    this.requestId = requestId;
-    this.auditLog = auditLog;
-  }
-
-  public <X> FeatureTokenTransformerAudit(
-      ImmutableResultReduced.Builder<X> resultBuilder, String requestId, AuditLog auditLog) {
+  public FeatureTokenTransformerAudit(String requestId, AuditLog auditLog) {
     this.requestId = requestId;
     this.auditLog = auditLog;
   }
@@ -74,12 +66,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
   @Override
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    try {
-      auditLog.initTarget(requestId, Map.of("features", featureList));
-      auditLog.saveLogToFileAndRemove(requestId);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
+    auditLog.initTarget(requestId, Map.of("features", featureList));
     super.onEnd(context);
   }
 }
