@@ -241,6 +241,16 @@ public class FeatureTokenDecoderGml
     String pendingXlinkHrefValue;
 
     /**
+     * Temporary fallback for a STRING-typed VALUE / VALUE_ARRAY property whose element carries an
+     * {@code xlink:href} attribute but no text content. Used only when the property does not route
+     * hrefs via {@link #pendingXlinkHrefValue} (i.e. it is not a feature-ref or codelist property),
+     * and the element body produced no buffered text. Supports the workaround where a concat'd
+     * {@code FEATURE_REF_ARRAY} is modelled as a plain STRING {@code VALUE_ARRAY}, with the target
+     * id still arriving on the wire as {@code xlink:href}.
+     */
+    String pendingXlinkHrefFallback;
+
+    /**
      * For VALUE_PROPERTY: set to {@code true} when the property's {@code fullPathAsString} is
      * listed in {@link FeatureTokenDecoderGmlInputProfile#getValueWrap()}. Children that appear
      * inside such a frame are pushed as {@link FrameKind#VALUE_WRAPPER}s so that wrapper
@@ -653,6 +663,14 @@ public class FeatureTokenDecoderGml
       Frame frame = Frame.valueProperty(prop, segment, segmentPathDepth);
       frame.nilOnCurrent = readXsiNil();
       frame.pendingXlinkHrefValue = readXlinkHrefAsValue(prop);
+      if (frame.pendingXlinkHrefValue == null
+          && prop.getValueType().orElse(prop.getType()) == Type.STRING) {
+        String raw = readRawXlinkHref();
+        frame.pendingXlinkHrefFallback =
+            raw == null
+                ? null
+                : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw, null);
+      }
       frame.valueWrapped = isValueWrapped(prop);
       validateUom(prop);
       frames.push(frame);
@@ -755,6 +773,10 @@ public class FeatureTokenDecoderGml
         downstream.onValue(context);
       } else if (!bufferedText.isEmpty()) {
         context.setValue(bufferedText);
+        context.setValueType(Type.STRING);
+        downstream.onValue(context);
+      } else if (frame.pendingXlinkHrefFallback != null) {
+        context.setValue(frame.pendingXlinkHrefFallback);
         context.setValueType(Type.STRING);
         downstream.onValue(context);
       }
@@ -1086,18 +1108,22 @@ public class FeatureTokenDecoderGml
     if (!shouldRouteXlinkHrefAsValue(prop)) {
       return null;
     }
-    String href = null;
-    for (int i = 0; i < parser.getAttributeCount(); i++) {
-      if (XLINK_NS.equals(parser.getAttributeNamespace(i))
-          && "href".equals(parser.getAttributeLocalName(i))) {
-        href = parser.getAttributeValue(i);
-        break;
-      }
-    }
+    String href = readRawXlinkHref();
     if (href == null) {
       return null;
     }
     return reverseXlinkHrefTemplate(href, prop);
+  }
+
+  /** Returns the raw {@code xlink:href} attribute on the current START_ELEMENT, or {@code null}. */
+  private String readRawXlinkHref() {
+    for (int i = 0; i < parser.getAttributeCount(); i++) {
+      if (XLINK_NS.equals(parser.getAttributeNamespace(i))
+          && "href".equals(parser.getAttributeLocalName(i))) {
+        return parser.getAttributeValue(i);
+      }
+    }
+    return null;
   }
 
   /**

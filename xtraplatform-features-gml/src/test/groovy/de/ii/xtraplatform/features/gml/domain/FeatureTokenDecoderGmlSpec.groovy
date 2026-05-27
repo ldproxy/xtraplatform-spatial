@@ -664,11 +664,32 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         !tokens.contains("urn:adv:oid:DENW36AL00000AAA")
     }
 
-    def 'xlink:href on a property that is neither codelist nor feature-ref is dropped'() {
+    def 'xlink:href on a STRING property with empty body is emitted as the value (fallback)'() {
         given:
         // qid (quellobjektID) is a plain STRING inherited from aa_objekt — no codelist, not a
-        // feature-ref. An xlink:href on it must not surface as the value, and xlink:* must not
-        // leak as additional attributes.
+        // feature-ref. When the element has no text content but carries an xlink:href, the
+        // decoder routes the href through the featureRefTemplate reverse substitution as a
+        // fallback so that the FEATURE_REF_ARRAY → VALUE_ARRAY workaround keeps working on the
+        // wire. The featureRefTemplate matches `urn:adv:oid:{{value}}` here, so an unrelated href
+        // like `urn:something:else:42` falls through unchanged.
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:quellobjektID xlink:href="urn:adv:oid:DENW36AL10000QID"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        tokens.contains("DENW36AL10000QID")
+        !tokens.contains("urn:adv:oid:DENW36AL10000QID")
+    }
+
+    def 'xlink:href on a STRING property whose href does not match featureRefTemplate is emitted unchanged'() {
+        given:
         def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES)
         def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
                 xmlns:gml="http://www.opengis.net/gml/3.2"
@@ -681,9 +702,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         def tokens = runDecoder(decoder, xml)
 
         then:
-        !tokens.contains("urn:something:else:42")
-        // only the gml:id is emitted as a value
-        tokens.count { it == FeatureTokenType.VALUE } == 1
+        tokens.contains("urn:something:else:42")
     }
 
     def 'xlink:href takes precedence over text content when both are present on a codelist property'() {
