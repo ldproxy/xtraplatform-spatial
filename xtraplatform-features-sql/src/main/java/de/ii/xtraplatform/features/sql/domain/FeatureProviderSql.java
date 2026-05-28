@@ -14,7 +14,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
-import de.ii.xtraplatform.base.domain.AuditLog;
+import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;

@@ -9,7 +9,7 @@ package de.ii.xtraplatform.features.graphql.app;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
-import de.ii.xtraplatform.base.domain.AuditLog;
+import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;

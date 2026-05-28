@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.base.domain.AuditLog;
+import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

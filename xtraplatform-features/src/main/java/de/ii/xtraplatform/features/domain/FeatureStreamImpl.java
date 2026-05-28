@@ -11,7 +11,7 @@ import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransf
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
 import com.google.common.collect.ImmutableMap;
-import de.ii.xtraplatform.base.domain.AuditLog;
+import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.ETag;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
