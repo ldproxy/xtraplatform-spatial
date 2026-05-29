@@ -7,8 +7,8 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,7 +66,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
   @Override
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    auditLog.initTarget(requestId, Map.of("features", featureList));
+    auditLog.setTarget(requestId, Map.of("features", featureList));
     super.onEnd(context);
   }
 }

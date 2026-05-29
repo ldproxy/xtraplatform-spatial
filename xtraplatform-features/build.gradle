@@ -1,4 +1,3 @@
-
 maturity = 'MATURE'
 maintenance = 'FULL'
 description = 'Feature providers and transformations.'
@@ -9,7 +8,7 @@ dependencies {
     provided 'de.interactive_instruments:xtraplatform-entities'
     provided 'de.interactive_instruments:xtraplatform-streams'
     provided 'de.interactive_instruments:xtraplatform-values'
-    provided 'de.interactive_instruments:xtraplatform-audit-log'
+    provided 'de.interactive_instruments:xtraplatform-services'
     provided project(':xtraplatform-codelists')
     provided project(':xtraplatform-cql')
     provided project(':xtraplatform-crs')

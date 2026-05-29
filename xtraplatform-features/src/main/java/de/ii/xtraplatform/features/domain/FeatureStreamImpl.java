@@ -11,7 +11,6 @@ import static de.ii.xtraplatform.features.domain.transform.FeaturePropertyTransf
 import static de.ii.xtraplatform.features.domain.transform.PropertyTransformations.WILDCARD;
 
 import com.google.common.collect.ImmutableMap;
-import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.ETag;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
@@ -20,6 +19,7 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;

@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.graphql.app;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
-import de.ii.xtraplatform.audit.log.domain.AuditLog;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -50,6 +49,7 @@ import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.graphql.domain.FeatureProviderGraphQlData;
 import de.ii.xtraplatform.features.graphql.domain.GraphQlConnector;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
