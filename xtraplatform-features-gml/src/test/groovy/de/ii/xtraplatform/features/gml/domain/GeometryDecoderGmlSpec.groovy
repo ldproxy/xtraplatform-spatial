@@ -170,7 +170,9 @@ class GeometryDecoderGmlSpec extends Specification {
         wkt(g) == 'CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0)'
     }
 
-    def 'Curve with Circle segment -> CircularString'() {
+    def 'Curve with Circle segment -> 5-position closed CircularString'() {
+        // A gml:Circle is geometrically closed; we expand the 3 control points to a 5-position
+        // closed CIRCULARSTRING so isClosed() holds and PostGIS accepts it as a full circle.
         when:
         def g = decode('''<gml:Curve xmlns:gml="http://www.opengis.net/gml/3.2">
             <gml:segments>
@@ -179,7 +181,7 @@ class GeometryDecoderGmlSpec extends Specification {
         </gml:Curve>''')
 
         then:
-        wkt(g) == 'CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0)'
+        wkt(g) == 'CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0,1.0 -1.0,0.0 0.0)'
     }
 
     def 'Curve with multiple LineStringSegments -> merged LineString'() {

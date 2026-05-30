@@ -138,6 +138,9 @@ class GeometryDecoderGmlRoundtripSpec extends Specification {
     }
 
     def 'Curve with one Circle (NAS shape)'() {
+        // gml:Circle decodes to a 5-position closed CIRCULARSTRING (P1, P2, P3, antipode(P2), P1).
+        // On re-encode the encoder collapses the same 5 points back to gml:Circle, so the
+        // re-decoded geometry has the same WKT.
         expect:
         roundtrip(
                 '''<gml:Curve>
@@ -145,7 +148,7 @@ class GeometryDecoderGmlRoundtripSpec extends Specification {
                         <gml:Circle><gml:posList>0 0 1 1 2 0</gml:posList></gml:Circle>
                     </gml:segments>
                 </gml:Curve>''',
-                'CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0)',
+                'CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0,1.0 -1.0,0.0 0.0)',
                 Set.of()
         )
     }
@@ -390,6 +393,47 @@ class GeometryDecoderGmlRoundtripSpec extends Specification {
                 </gml:Surface>''',
                 'CURVEPOLYGON(CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0,1.0 -1.0,0.0 0.0))',
                 Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE)
+        )
+    }
+
+    def 'Surface with PolygonPatch Ring containing a Circle (NAS shape)'() {
+        // The Bonn ALKIS data ships round road-intersection polygons whose outer Ring is a single
+        // gml:Circle (3 control points). Before circle-aware decoding these tripped the
+        // "All rings must be closed" check on Polygon/CurvePolygon construction.
+        expect:
+        roundtrip(
+                '''<gml:Surface>
+                    <gml:patches>
+                        <gml:PolygonPatch>
+                            <gml:exterior>
+                                <gml:Ring>
+                                    <gml:curveMember>
+                                        <gml:Curve><gml:segments>
+                                            <gml:Circle><gml:posList>0 0 1 1 2 0</gml:posList></gml:Circle>
+                                        </gml:segments></gml:Curve>
+                                    </gml:curveMember>
+                                </gml:Ring>
+                            </gml:exterior>
+                        </gml:PolygonPatch>
+                    </gml:patches>
+                </gml:Surface>''',
+                'CURVEPOLYGON(CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0,1.0 -1.0,0.0 0.0))',
+                Set.of(GeometryEncoderGml.Options.USE_SURFACE_RING_CURVE)
+        )
+    }
+
+    def 'Curve with one closed ArcString that is NOT a full circle stays an ArcString'() {
+        // 5-position closed CIRCULARSTRING whose four distinct control points are not on a
+        // common circle: the encoder must keep emitting gml:ArcString rather than gml:Circle.
+        expect:
+        roundtrip(
+                '''<gml:Curve>
+                    <gml:segments>
+                        <gml:Arc><gml:posList>0 0 1 1 2 0 1 -3 0 0</gml:posList></gml:Arc>
+                    </gml:segments>
+                </gml:Curve>''',
+                'CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0,1.0 -3.0,0.0 0.0)',
+                Set.of()
         )
     }
 
