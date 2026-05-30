@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain
 
-
+import de.ii.xtraplatform.features.domain.SchemaBase.Type
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -72,6 +72,41 @@ class MappingRulesDeriverSpec extends Specification {
         "root concat with value concat with constant" | "landcoverunit"                              || "landcoverunit"
         "strassen_unfaelle2"                          | "strassen_unfaelle2"                         || "strassen_unfaelle2"
         "simple expression"                           | "simple_expression"                          || "simple_expression"
+        "bare VALUE resolves to leaf type"            | "value_ref"                                  || "value_ref"
+    }
+
+    def 'bare Type.VALUE is resolved to its valueType (default STRING) in the emitted MappingRule'() {
+        // regression: a property declared as `type: VALUE, valueType: STRING` (used by xlink-reference
+        // properties in NAS/ALKIS provider configs) was previously emitting MappingRule.type=VALUE,
+        // which then propagated to SqlQueryColumn.type=VALUE — and FeatureEncoderSql.onValue only
+        // quotes STRING/DATETIME/DATE, so inserts produced unquoted SQL literals and Postgres parsed
+        // them as identifiers. MappingRule has no valueType field, so the resolution has to happen here.
+
+        given:
+        def schema = new ImmutableFeatureSchema.Builder()
+                .name('flurstueck')
+                .sourcePath('/flurstueck')
+                .type(Type.OBJECT)
+                .putProperties2('rel_buchung', new ImmutableFeatureSchema.Builder()
+                        .sourcePath('p_buchung')
+                        .type(Type.VALUE)
+                        .valueType(Type.STRING))
+                .putProperties2('rel_default', new ImmutableFeatureSchema.Builder()
+                        .sourcePath('p_default')
+                        .type(Type.VALUE))
+
+        when:
+        List<MappingRule> rules = schema.build().accept(deriver)
+        def byTarget = rules.collectEntries { [(it.target): it] }
+
+        then: 'explicit valueType wins'
+        byTarget['rel_buchung'].type == Type.STRING
+
+        and: 'missing valueType defaults to STRING (mirrors the existing VALUE_ARRAY handling)'
+        byTarget['rel_default'].type == Type.STRING
+
+        and: 'Type.VALUE never appears in emitted rules'
+        rules.every { it.type != Type.VALUE }
     }
 
 

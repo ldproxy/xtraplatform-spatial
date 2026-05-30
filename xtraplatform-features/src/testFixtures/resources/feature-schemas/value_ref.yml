@@ -1,0 +1,12 @@
+---
+sourcePath: /flurstueck
+type: OBJECT
+properties:
+  id:
+    sourcePath: objid
+    type: STRING
+    role: ID
+  rel_buchung:
+    sourcePath: p_buchung
+    type: VALUE
+    valueType: STRING

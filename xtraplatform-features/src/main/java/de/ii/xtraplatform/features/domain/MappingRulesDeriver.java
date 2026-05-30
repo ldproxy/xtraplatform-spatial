@@ -220,7 +220,7 @@ public class MappingRulesDeriver
     Type type =
         schema.isFeature()
             ? Type.OBJECT_ARRAY
-            : schema.getType() == Type.VALUE_ARRAY
+            : (schema.getType() == Type.VALUE_ARRAY || schema.getType() == Type.VALUE)
                 ? schema.getValueType().orElse(Type.STRING)
                 : schema.getType();
 
