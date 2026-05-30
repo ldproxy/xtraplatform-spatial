@@ -669,7 +669,7 @@ public class FeatureTokenDecoderGml
         frame.pendingXlinkHrefFallback =
             raw == null
                 ? null
-                : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw, null);
+                : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw).orElse(raw);
       }
       frame.valueWrapped = isValueWrapped(prop);
       validateUom(prop);
@@ -1129,18 +1129,33 @@ public class FeatureTokenDecoderGml
   /**
    * Reduces an {@code xlink:href} to its bare value segment via the appropriate reverse template
    * from the input profile. For codelist properties the schema's codelist id is substituted into
-   * {@code {{codelistId}}} first. If no template is configured, or the href does not match, the
-   * href is returned unchanged.
+   * {@code {{codelistId}}} first. If no template is configured, the href is returned unchanged
+   * silently. If a template is configured but the href does not match, the href is returned
+   * unchanged and a warning is logged — the raw URI will almost always overflow the storage column
+   * or be wrong as a value, so the operator needs visibility to fix the config mismatch.
    */
   private String reverseXlinkHrefTemplate(String href, FeatureSchema prop) {
+    String template;
     if (prop.isFeatureRef()) {
-      return applyReverseTemplate(inputProfile.getFeatureRefTemplate(), href, null);
+      template = inputProfile.getFeatureRefTemplate();
+    } else {
+      Optional<String> codelistId = prop.getConstraints().flatMap(SchemaConstraints::getCodelist);
+      if (codelistId.isEmpty()) {
+        return href;
+      }
+      String raw = inputProfile.getCodelistUriTemplate();
+      template = raw == null ? null : raw.replace("{{codelistId}}", codelistId.get());
     }
-    Optional<String> codelistId = prop.getConstraints().flatMap(SchemaConstraints::getCodelist);
-    if (codelistId.isPresent()) {
-      return applyReverseTemplate(inputProfile.getCodelistUriTemplate(), href, codelistId.get());
+    Optional<String> reduced = applyReverseTemplate(template, href);
+    if (reduced.isEmpty() && template != null && !template.isEmpty() && LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "xlink:href '{}' on property '{}' does not match the configured template '{}'; "
+              + "the unchanged href is passed through as the value",
+          href,
+          prop.getFullPathAsString(),
+          template);
     }
-    return href;
+    return reduced.orElse(href);
   }
 
   private static boolean shouldRouteXlinkHrefAsValue(FeatureSchema prop) {
@@ -1150,21 +1165,19 @@ public class FeatureTokenDecoderGml
     return prop.getConstraints().flatMap(SchemaConstraints::getCodelist).isPresent();
   }
 
-  private static String applyReverseTemplate(String template, String href, String codelistId) {
+  private static Optional<String> applyReverseTemplate(String template, String href) {
     if (template == null || template.isEmpty()) {
-      return href;
+      return Optional.empty();
     }
-    String substituted =
-        codelistId == null ? template : template.replace("{{codelistId}}", codelistId);
-    int idx = substituted.indexOf("{{value}}");
+    int idx = template.indexOf("{{value}}");
     if (idx < 0) {
-      return href;
+      return Optional.empty();
     }
-    String prefix = substituted.substring(0, idx);
-    String suffix = substituted.substring(idx + "{{value}}".length());
+    String prefix = template.substring(0, idx);
+    String suffix = template.substring(idx + "{{value}}".length());
     String regex = Pattern.quote(prefix) + "(.+?)" + Pattern.quote(suffix);
     Matcher m = Pattern.compile(regex).matcher(href);
-    return m.matches() ? m.group(1) : href;
+    return m.matches() ? Optional.of(m.group(1)) : Optional.empty();
   }
 
   /**

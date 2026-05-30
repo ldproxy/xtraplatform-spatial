@@ -536,7 +536,11 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         valueAtPath(tokens, ["11001-21008"]) == "urn:adv:oid:DENW36ALl800005x"
     }
 
-    def 'xlink:href is emitted unchanged when the configured template does not match'() {
+    def 'xlink:href is emitted unchanged when the configured template does not match, and a WARN is logged'() {
+        // The fall-through to the raw href is necessary (we have no better value to emit) but
+        // dangerous in practice — the URI is almost always wider than the storage column and longer
+        // than any expected value. A no-match is therefore a configuration mismatch the operator
+        // needs to see, not a silent best-effort.
         given:
         def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES)
         def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
@@ -547,10 +551,70 @@ class FeatureTokenDecoderGmlSpec extends Specification {
             </adv:AX_Flurstueck>"""
 
         when:
-        def tokens = runDecoder(decoder, xml)
+        List<Object> tokens = null
+        List<ILoggingEvent> warnings = captureWarnings { tokens = runDecoder(decoder, xml) }
 
         then:
         valueAtPath(tokens, ["11001-21008"]) == "https://example.org/items/some-other-id"
+        warnings.size() == 1
+        def msg = warnings[0].formattedMessage
+        msg.contains("https://example.org/items/some-other-id")
+        msg.contains("does not match the configured template")
+    }
+
+    def 'codelist xlink:href that does not match the configured template logs a WARN'() {
+        // Real-world manifestation: a service config whose codelistUriTemplate uses a namespace
+        // segment (e.g. 'de.adv.alkis') that differs from the namespace segment in the actual
+        // NAS data ('de.adv-online.gid'). Today the raw URI flowed silently into the SQL layer
+        // and surfaced as a varchar overflow at insert time; a WARN gives the operator a clear
+        // 'fix your template' signal at decode time instead.
+        given:
+        def mismatchedProfile = ImmutableFeatureTokenDecoderGmlInputProfile.builder()
+                .useAlias(true)
+                .codelistUriTemplate("https://registry.gdi-de.org/codelist/de.adv.alkis/{{codelistId}}/{{value}}")
+                .build()
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), mismatchedProfile)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704"
+                          xlink:title="Qualitätssicherung und Datenpflege"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        List<Object> tokens = null
+        List<ILoggingEvent> warnings = captureWarnings { tokens = runDecoder(decoder, xml) }
+
+        then: 'the unchanged href is emitted as the value (will fail downstream)'
+        tokens.contains("https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704")
+
+        and: 'a WARN identifies the mismatching href and the configured template with the codelistId substituted'
+        warnings.size() == 1
+        def msg = warnings[0].formattedMessage
+        msg.contains("https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704")
+        msg.contains("https://registry.gdi-de.org/codelist/de.adv.alkis/AA_Anlassart/{{value}}")
+    }
+
+    def 'matching xlink:href does not log a WARN'() {
+        given:
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+              <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        List<Object> tokens = null
+        List<ILoggingEvent> warnings = captureWarnings { tokens = runDecoder(decoder, xml) }
+
+        then:
+        warnings.empty
+        tokens.contains("DENW36ALl800005x")
+        tokens.contains("010704")
     }
 
     def 'wrap=OBJECT FEATURE_REF: xlink:href on the property element emits the reduced id at the .id child'() {
