@@ -182,6 +182,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
       boolean skipMetaQuery) {
     List<SortKey> sortKeys =
         transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
+    boolean useMinMaxKeys = queryTemplates.getMapping().getMainTable().isSortKeyUnique();
 
     BiFunction<Long, Long, Optional<String>> metaQuery =
         (maxLimit, skipped) ->
@@ -212,9 +213,10 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                             sortKeys,
                             typeQuery.getFilter(),
                             typeQuery.forceSimpleFeatureGeometry(),
-                            ((Objects.nonNull(metaResult.getMinKey())
-                                        && Objects.nonNull(metaResult.getMaxKey()))
-                                    || metaResult.getNumberReturned() == 0)
+                            (useMinMaxKeys
+                                    && ((Objects.nonNull(metaResult.getMinKey())
+                                            && Objects.nonNull(metaResult.getMaxKey()))
+                                        || metaResult.getNumberReturned() == 0))
                                 ? Optional.of(
                                     Tuple.of(metaResult.getMinKey(), metaResult.getMaxKey()))
                                 : Optional.empty(),
