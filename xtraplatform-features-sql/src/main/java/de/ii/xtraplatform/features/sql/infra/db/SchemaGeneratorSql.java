@@ -121,16 +121,6 @@ public class SchemaGeneratorSql implements SchemaGenerator {
                                   if (LOGGER.isDebugEnabled()) {
                                     LOGGER.debug("Stacktrace:", e);
                                   }
-                                  System.out.println(
-                                      "SCHEMA_ERROR "
-                                          + schema.getKey()
-                                          + "."
-                                          + tableName
-                                          + ": "
-                                          + e.getClass().getSimpleName()
-                                          + " | "
-                                          + Objects.requireNonNullElse(
-                                              e.getMessage(), "no message"));
                                   return null;
                                 }
                               }))
