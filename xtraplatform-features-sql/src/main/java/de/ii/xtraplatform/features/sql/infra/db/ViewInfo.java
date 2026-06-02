@@ -34,6 +34,9 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
 public class ViewInfo {
 
   public static List<String> getOriginalTables(String viewDefinition) {
+    if (Objects.isNull(viewDefinition)) {
+      return ImmutableList.of();
+    }
     try {
       PlainSelect select = parse(viewDefinition);
 
