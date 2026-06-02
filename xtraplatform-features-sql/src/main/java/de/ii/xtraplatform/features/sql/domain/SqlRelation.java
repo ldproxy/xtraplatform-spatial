@@ -37,11 +37,17 @@ public interface SqlRelation {
 
   Optional<String> getSourceSortKey();
 
+  Optional<Boolean> getSourceSortKeyUnique();
+
   Optional<String> getSourceFilter();
 
   String getTargetContainer();
 
   String getTargetField();
+
+  Optional<String> getTargetSortKey();
+
+  Optional<Boolean> getTargetSortKeyUnique();
 
   Optional<String> getTargetFilter();
 
@@ -96,19 +102,27 @@ public interface SqlRelation {
               getJunction().get(),
               getJunctionFilter().map(filter -> "{filter=" + filter + "}").orElse("")),
           String.format(
-              "[%s=%s]%s%s",
+              "[%s=%s]%s%s%s%s",
               getJunctionTarget().get(),
               getTargetField(),
               getTargetContainer(),
+              getTargetSortKey().map(sortKey -> "{sortKey=" + sortKey + "}").orElse(""),
+              getTargetSortKeyUnique()
+                  .map(sortKeyUnique -> "{sortKeyUnique=" + sortKeyUnique + "}")
+                  .orElse(""),
               getTargetFilter().map(filter -> "{filter=" + filter + "}").orElse("")));
     }
 
     return ImmutableList.of(
         String.format(
-            "[%s=%s]%s%s",
+            "[%s=%s]%s%s%s%s",
             getSourceField(),
             getTargetField(),
             getTargetContainer(),
+            getTargetSortKey().map(sortKey -> "{sortKey=" + sortKey + "}").orElse(""),
+            getTargetSortKeyUnique()
+                .map(sortKeyUnique -> "{sortKeyUnique=" + sortKeyUnique + "}")
+                .orElse(""),
             getTargetFilter().map(filter -> "{filter=" + filter + "}").orElse("")));
   }
 }
