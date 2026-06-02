@@ -193,7 +193,12 @@ public class GeometryEncoderWkt {
   }
 
   private void writePolygon(StringBuilder builder, Polygon geometry) {
+    boolean first = true;
     for (LineString ring : geometry.getValue()) {
+      if (!first) {
+        builder.append(',');
+      }
+      first = false;
       if (ring.isEmpty()) {
         builder.append("EMPTY");
       } else {

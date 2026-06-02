@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_BesondereFlurstuecksgrenze gml:id="DENW36AL10000MvI" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL10000MvI</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2024-10-15T07:55:13Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:sonstigesModell xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_WeitereModellart/NWABK" xlink:title="NWABK"/>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704" xlink:title="Qualitätssicherung und Datenpflege"/>
+          <adv:zeigtAufExternes>
+            <adv:AA_Fachdatenverbindung>
+              <adv:art>urn:adv:fdv:0901</adv:art>
+              <adv:fachdatenobjekt>
+                <adv:AA_Fachdatenobjekt>
+                  <adv:uri>urn:adv:oid:DENW36PS00000R5M</adv:uri>
+                </adv:AA_Fachdatenobjekt>
+              </adv:fachdatenobjekt>
+            </adv:AA_Fachdatenverbindung>
+          </adv:zeigtAufExternes>
+          <adv:position>
+            <gml:Curve gml:id="o11002.id.27493041.position_complex.Geom_0">
+              <gml:segments>
+                <gml:LineStringSegment>
+                  <gml:posList>360473.384 5614473.145 360525.943 5614447.161</gml:posList>
+                </gml:LineStringSegment>
+              </gml:segments>
+            </gml:Curve>
+          </adv:position>
+          <adv:artDerFlurstuecksgrenze>3000</adv:artDerFlurstuecksgrenze>
+          <adv:artDerFlurstuecksgrenze>7003</adv:artDerFlurstuecksgrenze>
+          <adv:artDerFlurstuecksgrenze>7104</adv:artDerFlurstuecksgrenze>
+          <adv:artDerFlurstuecksgrenze>7106</adv:artDerFlurstuecksgrenze>
+        </adv:AX_BesondereFlurstuecksgrenze>

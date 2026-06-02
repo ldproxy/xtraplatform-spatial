@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_Strassenverkehr gml:id="DENW36AL10000v8R" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL10000v8R</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2024-10-15T07:55:13Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:sonstigesModell xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_WeitereModellart/NWABK" xlink:title="NWABK"/>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704" xlink:title="Qualitätssicherung und Datenpflege"/>
+          <adv:zeigtAufExternes>
+            <adv:AA_Fachdatenverbindung>
+              <adv:art>urn:adv:fdv:0901</adv:art>
+              <adv:fachdatenobjekt>
+                <adv:AA_Fachdatenobjekt>
+                  <adv:uri>urn:adv:oid:DENW36PS00000GVL</adv:uri>
+                </adv:AA_Fachdatenobjekt>
+              </adv:fachdatenobjekt>
+            </adv:AA_Fachdatenverbindung>
+          </adv:zeigtAufExternes>
+          <adv:position>
+            <gml:Surface gml:id="o42001.id.27493764.position_complex.Geom_0">
+              <gml:patches>
+                <gml:PolygonPatch>
+                  <gml:exterior>
+                    <gml:Ring>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o42001.id.27493764.position_complex.Geom_1">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>362838.745 5610811.273 362826.644 5610812.957</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o42001.id.27493764.position_complex.Geom_2">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>362826.644 5610812.957 362829.771 5610802.300</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o42001.id.27493764.position_complex.Geom_3">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>362829.771 5610802.300 362839.836 5610801.333</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o42001.id.27493764.position_complex.Geom_4">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>362839.836 5610801.333 362838.745 5610811.273</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                    </gml:Ring>
+                  </gml:exterior>
+                </gml:PolygonPatch>
+              </gml:patches>
+            </gml:Surface>
+          </adv:position>
+          <adv:name>
+            <adv:AX_Lagebezeichnung>
+              <adv:unverschluesselt>Autobahn Bonn-Meckenheim</adv:unverschluesselt>
+            </adv:AX_Lagebezeichnung>
+          </adv:name>
+        </adv:AX_Strassenverkehr>

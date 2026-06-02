@@ -278,6 +278,20 @@ class GeometryWktWkbSpec extends Specification {
         new GeometryEncoderWkt().encode(new GeometryDecoderWkb().decode(new GeometryEncoderWkb().encode(geometry))) == wkt
     }
 
+    def 'POLYGON XY with inner ring'() {
+        given:
+        String wkt = "POLYGON((0.0 0.0,10.0 0.0,10.0 10.0,0.0 10.0,0.0 0.0),(2.0 2.0,4.0 2.0,4.0 4.0,2.0 4.0,2.0 2.0))"
+        when:
+        Geometry geometry = new GeometryDecoderWkt().decode(wkt)
+        then:
+        geometry.getType() == GeometryType.POLYGON
+        ((Polygon) geometry).getNumRings() == 2
+        ((Polygon) geometry).getValue().get(0).getValue().getCoordinates() == [0.0, 0.0, 10.0, 0.0, 10.0, 10.0, 0.0, 10.0, 0.0, 0.0] as double[]
+        ((Polygon) geometry).getValue().get(1).getValue().getCoordinates() == [2.0, 2.0, 4.0, 2.0, 4.0, 4.0, 2.0, 4.0, 2.0, 2.0] as double[]
+        new GeometryEncoderWkt().encode(geometry) == wkt
+        new GeometryEncoderWkt().encode(new GeometryDecoderWkb().decode(new GeometryEncoderWkb().encode(geometry))) == wkt
+    }
+
     def 'MULTILINESTRING XY'() {
         given:
         String wkt = "MULTILINESTRING((10.0 10.0,20.0 20.0),(30.0 40.0,50.0 60.0))"

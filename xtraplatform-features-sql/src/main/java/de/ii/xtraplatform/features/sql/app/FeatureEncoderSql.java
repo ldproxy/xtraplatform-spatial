@@ -65,6 +65,11 @@ public class FeatureEncoderSql
   private JsonBuilder currentJson;
   private Consumer<String> currentJsonSetter;
 
+  // Junction table targeted by the currently open VALUE_ARRAY, or null when no junction-backed
+  // VALUE_ARRAY is open. Set on onArrayStart when the array's value column lives on a non-current
+  // table; each onValue inside the array becomes its own junction row.
+  private SqlQuerySchema currentArrayJunctionTable;
+
   public FeatureEncoderSql(
       SqlQueryMapping mapping,
       EpsgCrs inputCrs,
@@ -79,7 +84,7 @@ public class FeatureEncoderSql
     this.nullValue = nullValue;
     this.jsonColumns = new LinkedHashMap<>();
     this.isPatch = nullValue.isPresent();
-    this.trace = false;
+    this.trace = LOGGER.isTraceEnabled();
   }
 
   @Modifiable
@@ -100,12 +105,13 @@ public class FeatureEncoderSql
       currentJsonColumn = null;
       jsonColumns.clear();
     }
-    if (trace) LOGGER.debug("onFeatureStart: {}", context.pathAsString());
+    currentArrayJunctionTable = null;
+    if (trace) LOGGER.trace("onFeatureStart: {}", context.pathAsString());
   }
 
   @Override
   public void onFeatureEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onFeatureEnd: {}", context.pathAsString());
+    if (trace) LOGGER.trace("onFeatureEnd: {}", context.pathAsString());
 
     if (currentJsonColumn != null) {
       try {
@@ -123,7 +129,7 @@ public class FeatureEncoderSql
         .forEach(
             row -> {
               if (trace)
-                LOGGER.debug("push: {} {}", row.first().getFullPathAsString(), row.second());
+                LOGGER.trace("push: {} {}", row.first().getFullPathAsString(), row.second());
             });
 
     push(currentFeature);
@@ -131,20 +137,20 @@ public class FeatureEncoderSql
 
   @Override
   public void onObjectStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onObjectStart: {}", context.pathAsString());
+    if (trace) LOGGER.trace("onObjectStart: {}", context.pathAsString());
 
     mapping.getMainSchema().getAllObjects().stream()
         .filter(schema -> Objects.equals(schema.getFullPath(), context.path()))
         .findFirst()
         .ifPresent(
             schema -> {
-              if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), schema);
+              if (trace) LOGGER.trace("onObjectStart: {} {}", context.pathAsString(), schema);
             });
 
     Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
     if (tableSchema.isPresent()) {
-      if (trace) LOGGER.debug("onObjectStart: table found for {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectStart: table found for {}", context.pathAsString());
 
       currentFeature.addRow(tableSchema.get());
       return;
@@ -156,7 +162,7 @@ public class FeatureEncoderSql
     if (column.isPresent() && checkJson(column.get())) {
       currentJson.openObject(context.path());
 
-      if (trace) LOGGER.debug("onObjectStart: JSON {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectStart: JSON {}", context.pathAsString());
       return;
     }
 
@@ -165,12 +171,12 @@ public class FeatureEncoderSql
 
   @Override
   public void onObjectEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onObjectEnd: {}", context.pathAsString());
+    if (trace) LOGGER.trace("onObjectEnd: {}", context.pathAsString());
 
     Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
     if (tableSchema.isPresent()) {
-      if (trace) LOGGER.debug("onObjectEnd: table found for {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectEnd: table found for {}", context.pathAsString());
 
       currentFeature.closeRow(tableSchema.get());
       return;
@@ -182,7 +188,7 @@ public class FeatureEncoderSql
     if (column.isPresent() && checkJson(column.get())) {
       currentJson.closeObject(context.path());
 
-      if (trace) LOGGER.debug("onObjectEnd: JSON {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectEnd: JSON {}", context.pathAsString());
       return;
     }
 
@@ -191,7 +197,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onArrayStart: {} {}", context.pathAsString());
+    if (trace) LOGGER.trace("onArrayStart: {} {}", context.pathAsString());
 
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -200,7 +206,20 @@ public class FeatureEncoderSql
               if (checkJson(column)) {
                 currentJson.openArray(context.path());
 
-                if (trace) LOGGER.debug("onArrayStart: JSON {}", context.pathAsString());
+                if (trace) LOGGER.trace("onArrayStart: JSON {}", context.pathAsString());
+                return;
+              }
+              // VALUE_ARRAY whose value column lives on a junction table other than the row at the
+              // top of the stack. Record the table here and defer the per-element addRow to
+              // onValue, so each array element becomes its own row — mirroring how OBJECT_ARRAY
+              // junctions get a row per member via onObjectStart.
+              if (!currentFeature.isCurrent(column.first())) {
+                currentArrayJunctionTable = column.first();
+                if (trace)
+                  LOGGER.trace(
+                      "onArrayStart: junction {} {}",
+                      context.pathAsString(),
+                      column.first().getFullPathAsString());
               }
             },
             () -> {
@@ -211,7 +230,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onArrayEnd: {} {}", context.pathAsString());
+    if (trace) LOGGER.trace("onArrayEnd: {} {}", context.pathAsString());
 
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -220,13 +239,15 @@ public class FeatureEncoderSql
               if (checkJson(column)) {
                 currentJson.closeArray(context.path());
 
-                if (trace) LOGGER.debug("onArrayEnd: JSON {}", context.pathAsString());
+                if (trace) LOGGER.trace("onArrayEnd: JSON {}", context.pathAsString());
               }
             },
             () -> {
               if (trace)
                 LOGGER.warn("onArrayEnd: JSON {} not found in mapping", context.pathAsString());
             });
+
+    currentArrayJunctionTable = null;
   }
 
   @Override
@@ -234,7 +255,7 @@ public class FeatureEncoderSql
     Geometry<?> geometry = context.geometry();
 
     if (trace) {
-      LOGGER.debug("geometry: {} {}", context.pathAsString(), geometry);
+      LOGGER.trace("geometry: {} {}", context.pathAsString(), geometry);
     }
 
     mapping
@@ -250,7 +271,7 @@ public class FeatureEncoderSql
                         currentFeature.addColumn(column.first(), column.second(), value);
 
                         if (trace) {
-                          LOGGER.debug("onGeometry: {} {}", context.pathAsString(), value);
+                          LOGGER.trace("onGeometry: {} {}", context.pathAsString(), value);
                         }
                       },
                       () -> {
@@ -288,7 +309,7 @@ public class FeatureEncoderSql
                 // TODO: does this use the sql name or json name?
                 currentJson.addValue(context.path(), value);
 
-                if (trace) LOGGER.debug("onValue: JSON {} {}", context.pathAsString(), value);
+                if (trace) LOGGER.trace("onValue: JSON {} {}", context.pathAsString(), value);
                 return;
               }
 
@@ -305,9 +326,18 @@ public class FeatureEncoderSql
                       ? String.format("'%s'", value.replaceAll("'", "''"))
                       : value;
 
+              boolean junctionElement =
+                  currentArrayJunctionTable != null
+                      && Objects.equals(column.first(), currentArrayJunctionTable);
+              if (junctionElement) {
+                currentFeature.addRow(column.first());
+              }
               currentFeature.addColumn(column.first(), column.second(), value);
+              if (junctionElement) {
+                currentFeature.closeRow(column.first());
+              }
 
-              if (trace) LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
+              if (trace) LOGGER.trace("onValue: {} {}", context.pathAsString(), value);
             },
             () -> {
               if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
@@ -356,7 +386,7 @@ public class FeatureEncoderSql
       String newValue = formatter.format(instant) + "Z";
 
       if (trace) {
-        LOGGER.debug(
+        LOGGER.trace(
             "onValue: {} transformed datetime value from '{}' to '{}'", path, value, newValue);
       }
 

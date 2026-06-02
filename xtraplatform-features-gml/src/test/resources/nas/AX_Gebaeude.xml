@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_Gebaeude gml:id="DENW36AL10000Egu" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL10000Egu</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2024-10-15T07:55:13Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:sonstigesModell xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_WeitereModellart/NWABK" xlink:title="NWABK"/>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704" xlink:title="Qualitätssicherung und Datenpflege"/>
+          <adv:position>
+            <gml:Surface gml:id="o31001.id.27495929.position_complex.Geom_0" srsName="urn:adv:crs:ETRS89_UTM32">
+              <gml:patches>
+                <gml:PolygonPatch>
+                  <gml:exterior>
+                    <gml:Ring>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o31001.id.27495929.position_complex.Geom_1">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>363609.477 5614790.107 363612.936 5614788.978</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o31001.id.27495929.position_complex.Geom_2">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>363612.936 5614788.978 363613.362 5614788.839</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o31001.id.27495929.position_complex.Geom_3">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>363613.362 5614788.839 363615.062 5614793.925</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o31001.id.27495929.position_complex.Geom_4">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>363615.062 5614793.925 363615.291 5614794.608</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o31001.id.27495929.position_complex.Geom_5">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>363615.291 5614794.608 363612.495 5614795.542</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o31001.id.27495929.position_complex.Geom_6">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>363612.495 5614795.542 363609.477 5614790.107</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                    </gml:Ring>
+                  </gml:exterior>
+                </gml:PolygonPatch>
+              </gml:patches>
+            </gml:Surface>
+          </adv:position>
+          <adv:gebaeudefunktion>2500</adv:gebaeudefunktion>
+          <adv:qualitaetsangaben>
+            <adv:AX_DQMitDatenerhebung>
+              <adv:herkunft>
+                <gmd:LI_Lineage xmlns:gmd="http://www.isotc211.org/2005/gmd">
+                  <gmd:processStep>
+                    <gmd:LI_ProcessStep>
+                      <gmd:description>
+                        <adv:AX_LI_ProcessStep_MitDatenerhebung_Description>Erhebung</adv:AX_LI_ProcessStep_MitDatenerhebung_Description>
+                      </gmd:description>
+                      <gmd:processor>
+                        <gmd:CI_ResponsibleParty>
+                          <gmd:organisationName>
+                            <gco:CharacterString xmlns:gco="http://www.isotc211.org/2005/gco">Amt für Bodenmanagement und Geoinformation Bonn</gco:CharacterString>
+                          </gmd:organisationName>
+                          <gmd:role>
+                            <gmd:CI_RoleCode codeList="http://www.isotc211.org/2005/gmd#CI_RoleCode" codeListValue="processor">processor</gmd:CI_RoleCode>
+                          </gmd:role>
+                        </gmd:CI_ResponsibleParty>
+                      </gmd:processor>
+                      <gmd:source>
+                        <gmd:LI_Source>
+                          <gmd:description>
+                            <adv:AX_Datenerhebung>1000</adv:AX_Datenerhebung>
+                          </gmd:description>
+                        </gmd:LI_Source>
+                      </gmd:source>
+                    </gmd:LI_ProcessStep>
+                  </gmd:processStep>
+                </gmd:LI_Lineage>
+              </adv:herkunft>
+            </adv:AX_DQMitDatenerhebung>
+          </adv:qualitaetsangaben>
+          <adv:zeigtAuf xlink:href="urn:adv:oid:DENW36AL10000AAA"/>  <!-- added -->
+          <adv:hat xlink:href="urn:adv:oid:DENW36AL10000K6p"/>
+          <adv:gehoertZu xlink:href="urn:adv:oid:DENW36AL10000BBB"/> <!-- added -->
+        </adv:AX_Gebaeude>

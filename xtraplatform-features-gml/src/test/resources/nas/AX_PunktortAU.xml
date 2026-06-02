@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_PunktortAU gml:id="DENW36AL1IC000L6" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL1IC000L6</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2024-10-15T07:55:13Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704" xlink:title="Qualitätssicherung und Datenpflege"/>
+          <adv:zeigtAufExternes>
+            <adv:AA_Fachdatenverbindung>
+              <adv:art>urn:adv:fdv:0901</adv:art>
+              <adv:fachdatenobjekt>
+                <adv:AA_Fachdatenobjekt>
+                  <adv:uri>urn:adv:oid:DENW36PS00000QKS</adv:uri>
+                </adv:AA_Fachdatenobjekt>
+              </adv:fachdatenobjekt>
+            </adv:AA_Fachdatenverbindung>
+          </adv:zeigtAufExternes>
+          <adv:istTeilVon xlink:href="urn:adv:oid:DENW36AL1IC000KO"/>
+          <adv:position>
+            <gml:Point gml:id="o14003.id.27553163.position.Geom_0">
+              <gml:pos>369818.203 5614520.625</gml:pos>
+            </gml:Point>
+          </adv:position>
+          <adv:kartendarstellung>true</adv:kartendarstellung>
+          <adv:koordinatenstatus>1000</adv:koordinatenstatus>
+          <adv:qualitaetsangaben>
+            <adv:AX_DQPunktort>
+              <adv:herkunft>
+                <gmd:LI_Lineage xmlns:gmd="http://www.isotc211.org/2005/gmd">
+                  <gmd:processStep>
+                    <gmd:LI_ProcessStep>
+                      <gmd:description>
+                        <adv:AX_LI_ProcessStep_Punktort_Description>Erhebung</adv:AX_LI_ProcessStep_Punktort_Description>
+                      </gmd:description>
+                      <gmd:dateTime>
+                        <gco:DateTime xmlns:gco="http://www.isotc211.org/2005/gco">2017-07-20T11:20:04Z</gco:DateTime>
+                      </gmd:dateTime>
+                      <gmd:processor>
+                        <gmd:CI_ResponsibleParty>
+                          <gmd:organisationName>
+                            <gco:CharacterString xmlns:gco="http://www.isotc211.org/2005/gco">Amt für Bodenmanagement und Geoinformation Bonn</gco:CharacterString>
+                          </gmd:organisationName>
+                          <gmd:role>
+                            <gmd:CI_RoleCode codeList="http://www.isotc211.org/2005/gmd#CI_RoleCode" codeListValue="processor">processor</gmd:CI_RoleCode>
+                          </gmd:role>
+                        </gmd:CI_ResponsibleParty>
+                      </gmd:processor>
+                      <gmd:source>
+                        <gmd:LI_Source>
+                          <gmd:description>
+                            <adv:AX_Datenerhebung_Punktort>1000</adv:AX_Datenerhebung_Punktort>
+                          </gmd:description>
+                        </gmd:LI_Source>
+                      </gmd:source>
+                    </gmd:LI_ProcessStep>
+                  </gmd:processStep>
+                </gmd:LI_Lineage>
+              </adv:herkunft>
+              <adv:genauigkeitsstufe>2100</adv:genauigkeitsstufe>
+            </adv:AX_DQPunktort>
+          </adv:qualitaetsangaben>
+        </adv:AX_PunktortAU>

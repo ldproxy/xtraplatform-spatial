@@ -13,64 +13,139 @@ import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.CircularString;
+import de.ii.xtraplatform.geometries.domain.CompoundCurve;
+import de.ii.xtraplatform.geometries.domain.Curve;
+import de.ii.xtraplatform.geometries.domain.CurvePolygon;
 import de.ii.xtraplatform.geometries.domain.Geometry;
-import de.ii.xtraplatform.geometries.domain.GeometryType;
-import de.ii.xtraplatform.geometries.domain.ImmutableGeometryCollection;
-import de.ii.xtraplatform.geometries.domain.ImmutableLineString;
-import de.ii.xtraplatform.geometries.domain.ImmutableMultiLineString;
-import de.ii.xtraplatform.geometries.domain.ImmutableMultiPoint;
-import de.ii.xtraplatform.geometries.domain.ImmutableMultiPolygon;
-import de.ii.xtraplatform.geometries.domain.ImmutablePoint;
-import de.ii.xtraplatform.geometries.domain.ImmutablePolygon;
+import de.ii.xtraplatform.geometries.domain.GeometryCollection;
 import de.ii.xtraplatform.geometries.domain.LineString;
+import de.ii.xtraplatform.geometries.domain.MultiCurve;
 import de.ii.xtraplatform.geometries.domain.MultiLineString;
 import de.ii.xtraplatform.geometries.domain.MultiPoint;
 import de.ii.xtraplatform.geometries.domain.MultiPolygon;
+import de.ii.xtraplatform.geometries.domain.MultiSurface;
 import de.ii.xtraplatform.geometries.domain.Point;
 import de.ii.xtraplatform.geometries.domain.Polygon;
+import de.ii.xtraplatform.geometries.domain.PolyhedralSurface;
 import de.ii.xtraplatform.geometries.domain.Position;
 import de.ii.xtraplatform.geometries.domain.PositionList;
+import de.ii.xtraplatform.geometries.domain.SingleCurve;
+import de.ii.xtraplatform.geometries.domain.Surface;
 import de.ii.xtraplatform.geometries.domain.transcode.AbstractGeometryDecoder;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
-  // In principle, we could support more GML geometry types, currently only the most common ones are
-  // supported. However, GML decoding is currently only relevant for un-maintained WFS feature
-  // providers.
-
-  static final List<String> GEOMETRY_PARTS =
-      new ImmutableList.Builder<String>()
-          .add("pointMember")
-          .add("curveMember")
-          .add("lineStringMember")
-          .add("surfaceMember")
-          .add("polygonMember")
-          .build();
-  static final List<String> GEOMETRY_COORDINATES =
-      new ImmutableList.Builder<String>().add("posList").add("pos").add("coordinates").build();
-
-  static class PartialGeometry {
-    PartialGeometry parent = null;
-    Deque<PartialGeometry> children = new ArrayDeque<>();
-    boolean isComplete = false;
-    Geometry<?> geometry = null;
-    double[] coordinates = null;
-    StringBuilder textBuffer = new StringBuilder();
+  private enum Kind {
+    POINT,
+    LINE_STRING,
+    POLYGON,
+    CURVE,
+    COMPOSITE_CURVE,
+    SURFACE,
+    COMPOSITE_SURFACE,
+    POLYHEDRAL_SURFACE,
+    SOLID,
+    MULTI_POINT,
+    MULTI_LINE_STRING,
+    MULTI_CURVE,
+    MULTI_POLYGON,
+    MULTI_SURFACE,
+    MULTI_GEOMETRY,
+    POINT_MEMBER,
+    CURVE_MEMBER,
+    LINE_STRING_MEMBER,
+    POLYGON_MEMBER,
+    SURFACE_MEMBER,
+    GEOMETRY_MEMBER,
+    POINT_MEMBERS,
+    CURVE_MEMBERS,
+    POLYGON_MEMBERS,
+    SURFACE_MEMBERS,
+    EXTERIOR,
+    INTERIOR,
+    OUTER_BOUNDARY_IS,
+    INNER_BOUNDARY_IS,
+    SHELL,
+    SEGMENTS,
+    PATCHES,
+    LINEAR_RING,
+    RING,
+    POLYGON_PATCH,
+    LINE_STRING_SEGMENT,
+    ARC,
+    ARC_STRING,
+    CIRCLE,
+    POS,
+    POS_LIST,
+    COORDINATES,
+    UNKNOWN
   }
 
-  private boolean waitingForInput = false;
-  private boolean waitingForGeometry = true;
-  private PartialGeometry currentGeometry = null;
+  private static final Set<String> COORDINATE_NAMES = Set.of("pos", "posList", "coordinates");
 
-  public GeometryDecoderGml() {}
+  private static final Set<String> UNSUPPORTED_TOP =
+      Set.of("CompositeSolid", "MultiSolid", "OrientableCurve", "OrientableSurface");
+
+  private static final Set<String> UNSUPPORTED_SEGMENT =
+      Set.of(
+          "GeodesicString",
+          "Geodesic",
+          "CubicSpline",
+          "BSpline",
+          "Bezier",
+          "ArcByCenterPoint",
+          "CircleByCenterPoint",
+          "ArcByBulge",
+          "ArcStringByBulge",
+          "OffsetCurve",
+          "Clothoid");
+
+  private static final Set<String> UNSUPPORTED_PATCH =
+      Set.of("Triangle", "Rectangle", "TriangulatedSurface", "Tin", "Cone", "Cylinder", "Sphere");
+
+  static class Frame {
+    Kind kind;
+    String elementName;
+    Optional<EpsgCrs> crs = Optional.empty();
+    OptionalInt srsDimension = OptionalInt.empty();
+
+    double[] coords;
+    StringBuilder textBuffer = new StringBuilder();
+    final List<Geometry<?>> children = new ArrayList<>();
+    boolean sawInterior; // for Solid: detect inner shell
+  }
+
+  private final Deque<Frame> stack = new ArrayDeque<>();
+  private final Map<String, EpsgCrs> srsNameMappings;
+  private boolean waitingForInput = false;
+  private Geometry<?> result;
+
+  public GeometryDecoderGml() {
+    this(Map.of());
+  }
+
+  /**
+   * @param srsNameMappings reverse-mapping from {@code srsName} URI/URN forms to {@link EpsgCrs};
+   *     consulted before the built-in EPSG / OGC URN parsers and intended to resolve
+   *     application-profile forms (e.g. ALKIS NAS uses {@code urn:adv:crs:DE_DHDN_3GK2_NW101}) that
+   *     the built-in parsers cannot handle.
+   */
+  public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings) {
+    this.srsNameMappings = srsNameMappings == null ? Map.of() : srsNameMappings;
+  }
 
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
@@ -83,220 +158,47 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
       Optional<EpsgCrs> defaultCrs,
-      OptionalInt srsDimension,
+      OptionalInt defaultSrsDimension,
       boolean useCurrentEvent)
       throws XMLStreamException, IOException {
-    String localName;
     waitingForInput = false;
     boolean doNotAdvance = useCurrentEvent;
+
     while (doNotAdvance || parser.hasNext()) {
       int event = doNotAdvance ? parser.getEventType() : parser.next();
       doNotAdvance = false;
+
       switch (event) {
         case AsyncXMLStreamReader.EVENT_INCOMPLETE:
           waitingForInput = true;
           return Optional.empty();
+
         case XMLStreamConstants.START_ELEMENT:
-          localName = parser.getLocalName();
-          if (waitingForGeometry) {
-            Optional<EpsgCrs> crs = getCrsFromSrsName(parser).or(() -> defaultCrs);
-            Axes axes =
-                getDimFromSrsDimension(parser).orElse(srsDimension.orElse(2)) == 2
-                    ? Axes.XY
-                    : Axes.XYZ;
-            Geometry<?> geom =
-                switch (localName) {
-                  case "Point" ->
-                      ImmutablePoint.builder().crs(crs).value(Position.empty(axes)).build();
-                  case "LineString" ->
-                      ImmutableLineString.builder()
-                          .crs(crs)
-                          .value(PositionList.empty(axes))
-                          .build();
-                  case "Polygon" -> ImmutablePolygon.builder().crs(crs).axes(axes).build();
-                  case "MultiPoint" -> ImmutableMultiPoint.builder().crs(crs).axes(axes).build();
-                  case "MultiCurve", "MultiLineString" ->
-                      ImmutableMultiLineString.builder().crs(crs).axes(axes).build();
-                  case "MultiSurface", "MultiPolygon" ->
-                      ImmutableMultiPolygon.builder().crs(crs).axes(axes).build();
-                  case "MultiGeometry" ->
-                      ImmutableGeometryCollection.builder().crs(crs).axes(axes).build();
-                  default -> throw new IOException("Unsupported GML geometry type: " + localName);
-                };
-            if (currentGeometry == null) {
-              currentGeometry = new PartialGeometry();
-            } else {
-              PartialGeometry parent = currentGeometry;
-              currentGeometry = new PartialGeometry();
-              currentGeometry.parent = parent;
-              parent.children.add(currentGeometry);
-            }
-            currentGeometry.geometry = geom;
-            waitingForGeometry = false;
-          } else if (GEOMETRY_COORDINATES.contains(localName)) {
-            if (currentGeometry == null) {
-              throw new IllegalStateException(
-                  "No geometry started before <gml:" + localName + "> element.");
-            }
-            if (currentGeometry.isComplete) {
-              throw new IllegalStateException(
-                  "<gml:" + localName + "> element cannot be added to a completed geometry.");
-            }
-            double[] coords = parseCoordinates(parser, localName);
-            if (waitingForInput) {
+          {
+            String localName = parser.getLocalName();
+            boolean isCoordElement =
+                handleStart(parser, localName, defaultCrs, defaultSrsDimension);
+            if (isCoordElement && !readCoordinateText(parser)) {
               return Optional.empty();
             }
-            handleCoordinates(localName, coords);
-          } else if (GEOMETRY_PARTS.contains(localName)) {
-            if (currentGeometry == null) {
-              throw new IllegalStateException(
-                  "No geometry started before <gml:" + localName + "> element.");
-            }
-            if (currentGeometry.isComplete) {
-              throw new IllegalStateException(
-                  "<gml:" + localName + "> element cannot be added to a completed geometry.");
-            }
-            waitingForGeometry = true;
+            break;
           }
-          break;
+
         case XMLStreamConstants.END_ELEMENT:
-          localName = parser.getLocalName();
-          if (currentGeometry == null) {
-            throw new IllegalStateException(
-                "No geometry started before </gml:" + localName + "> element.");
-          }
-          if ("Point".equals(localName)
-              || "LineString".equals(localName)
-              || "Polygon".equals(localName)
-              || "MultiPoint".equals(localName)
-              || "MultiCurve".equals(localName)
-              || "MultiSurface".equals(localName)) {
-            if (currentGeometry.isComplete) {
-              throw new IllegalStateException(
-                  "Geometry already completed for </gml:" + localName + "> element.");
-            }
-            switch (localName) {
-              case "MultiPoint" -> {
-                var builder =
-                    ImmutableMultiPoint.builder().from((MultiPoint) currentGeometry.geometry);
-                for (PartialGeometry child : currentGeometry.children) {
-                  builder.addValue((Point) child.geometry);
-                }
-                currentGeometry.geometry = builder.build();
-              }
-              case "MultiCurve" -> {
-                var builder =
-                    ImmutableMultiLineString.builder()
-                        .from((MultiLineString) currentGeometry.geometry);
-                for (PartialGeometry child : currentGeometry.children) {
-                  builder.addValue((LineString) child.geometry);
-                }
-                currentGeometry.geometry = builder.build();
-              }
-              case "MultiSurface" -> {
-                var builder =
-                    ImmutableMultiPolygon.builder().from((MultiPolygon) currentGeometry.geometry);
-                for (PartialGeometry child : currentGeometry.children) {
-                  builder.addValue((Polygon) child.geometry);
-                }
-                currentGeometry.geometry = builder.build();
-              }
-            }
-            currentGeometry.isComplete = true;
-            if (currentGeometry.geometry.isEmpty()) {
-              throw new IllegalStateException(
-                  "Geometry is empty for </gml:" + localName + "> element.");
-            }
-            if (currentGeometry.parent != null) {
-              currentGeometry = currentGeometry.parent;
-            } else {
-              Geometry<?> geom = currentGeometry.geometry;
-              currentGeometry = null;
-              waitingForGeometry = true;
-              waitingForInput = false;
-              return Optional.of(geom);
-            }
+          handleEnd(parser.getLocalName());
+          if (result != null && stack.isEmpty()) {
+            Geometry<?> r = result;
+            result = null;
+            waitingForInput = false;
+            return Optional.of(r);
           }
           break;
-        case XMLStreamConstants.CHARACTERS:
+
+        default:
           break;
       }
     }
     throw new IOException("Unexpected end of XML stream, no complete geometry found.");
-  }
-
-  private void handleCoordinates(String localName, double[] coords) {
-    Geometry<?> geom = currentGeometry.geometry;
-    GeometryType geomType = geom.getType();
-    Axes axes = geom.getAxes();
-    PartialGeometry child;
-    switch (geomType) {
-      case POINT:
-        if ("posList".equals(localName)) {
-          throw new IllegalStateException("<gml:posList> is not allowed for Point coordinates.");
-        }
-        addCoordinates(coords);
-        Position position =
-            Position.of(coords.length == 3 ? Axes.XYZ : Axes.XY, currentGeometry.coordinates);
-        currentGeometry.geometry = ImmutablePoint.copyOf((Point) geom).withValue(position);
-        break;
-      case LINE_STRING:
-        addCoordinates(coords);
-        if (!"pos".equals(localName)) {
-          LineString lineString = (LineString) geom;
-          PositionList positionList = PositionList.of(axes, currentGeometry.coordinates);
-          currentGeometry.geometry = ImmutableLineString.copyOf(lineString).withValue(positionList);
-          currentGeometry.coordinates = null;
-        }
-        break;
-      case POLYGON:
-        addCoordinates(coords);
-        if (!"pos".equals(localName)) {
-          Polygon polygon = (Polygon) geom;
-          PositionList positionList = PositionList.of(axes, currentGeometry.coordinates);
-          currentGeometry.geometry =
-              ImmutablePolygon.copyOf(polygon)
-                  .withValue(
-                      ImmutableList.<LineString>builder()
-                          .addAll(polygon.getValue())
-                          .add(LineString.of(positionList, polygon.getCrs()))
-                          .build());
-          currentGeometry.coordinates = null;
-        }
-        break;
-      case MULTI_POINT:
-        Position pos = Position.of(coords.length == 3 ? Axes.XYZ : Axes.XY, coords);
-        Point point = ImmutablePoint.builder().crs(geom.getCrs()).value(pos).build();
-        child = new PartialGeometry();
-        child.parent = currentGeometry;
-        child.geometry = point;
-        currentGeometry.children.add(child);
-        break;
-      case MULTI_LINE_STRING:
-        PositionList posList = PositionList.of(axes, coords);
-        LineString lineString =
-            ImmutableLineString.builder().crs(geom.getCrs()).value(posList).build();
-        child = new PartialGeometry();
-        child.parent = currentGeometry;
-        child.geometry = lineString;
-        currentGeometry.children.add(child);
-        break;
-      case MULTI_POLYGON:
-        PositionList ring = PositionList.of(axes, coords);
-        Polygon polygon =
-            ImmutablePolygon.builder()
-                .crs(geom.getCrs())
-                .axes(axes)
-                .addValue(LineString.of(ring, geom.getCrs()))
-                .build();
-        child = new PartialGeometry();
-        child.parent = currentGeometry;
-        child.geometry = polygon;
-        currentGeometry.children.add(child);
-        break;
-      default:
-        throw new IllegalStateException("Unsupported geometry type: " + geomType);
-    }
   }
 
   public Optional<Geometry<?>> continueDecoding(
@@ -306,116 +208,733 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       String localName,
       String bufferedText)
       throws XMLStreamException, IOException {
-    if (GEOMETRY_COORDINATES.contains(localName)) {
-      if (currentGeometry == null) {
-        throw new IllegalStateException(
-            "No geometry started before <gml:" + localName + "> element.");
+    if (COORDINATE_NAMES.contains(localName) && !stack.isEmpty()) {
+      Frame top = stack.peek();
+      if (top.kind == coordinateKind(localName)) {
+        if (bufferedText != null) {
+          top.textBuffer.append(bufferedText);
+        }
+        finalizeCoordinates(top);
+        stack.pop();
+        applyCoordinates(top);
+        return decode(parser, defaultCrs, srsDimension, false);
       }
-      if (currentGeometry.isComplete) {
-        throw new IllegalStateException(
-            "<gml:" + localName + "> element cannot be added to a completed geometry.");
-      }
-      double[] coords = parseDoubles(currentGeometry.textBuffer.append(bufferedText).toString());
-      currentGeometry.textBuffer.setLength(0);
-      handleCoordinates(localName, coords);
-      return decode(parser, defaultCrs, srsDimension, false);
     }
     return decode(parser, defaultCrs, srsDimension, true);
-  }
-
-  private void addCoordinates(double[] coords) {
-    if (currentGeometry.coordinates == null) {
-      currentGeometry.coordinates = coords;
-    } else {
-      double[] newCoords = new double[currentGeometry.coordinates.length + coords.length];
-      System.arraycopy(
-          currentGeometry.coordinates, 0, newCoords, 0, currentGeometry.coordinates.length);
-      System.arraycopy(coords, 0, newCoords, currentGeometry.coordinates.length, coords.length);
-      currentGeometry.coordinates = newCoords;
-    }
   }
 
   public boolean isWaitingForInput() {
     return waitingForInput;
   }
 
-  private Optional<EpsgCrs> getCrsFromSrsName(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser) {
-    String srsName = parser.getAttributeValue(null, "srsName");
-    if (srsName != null) {
-      if (srsName.startsWith("urn:ogc:def:crs:EPSG::")) {
-        String code = srsName.substring(srsName.lastIndexOf(':') + 1);
-        try {
-          return Optional.of(EpsgCrs.of(Integer.parseInt(code)));
-        } catch (Exception e) {
-          // ignore, fallback to default
-        }
-      } else if (srsName.startsWith("http://www.opengis.net/def/crs/EPSG/0/")) {
-        String code = srsName.substring(srsName.lastIndexOf('/') + 1);
-        try {
-          return Optional.of(EpsgCrs.of(Integer.parseInt(code)));
-        } catch (Exception e) {
-          // ignore, fallback to default
-        }
-      } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84".equals(srsName)
-          || "http://www.opengis.net/def/crs/OGC/1.3/CRS84".equals(srsName)
-          || "urn:ogc:def:crs:OGC:1.3:CRS84".equals(srsName)) {
-        return Optional.of(OgcCrs.CRS84);
-      } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84h".equals(srsName)
-          || "urn:ogc:def:crs:OGC::CRS84h".equals(srsName)) {
-        return Optional.of(OgcCrs.CRS84h);
+  private static Kind coordinateKind(String localName) {
+    return switch (localName) {
+      case "pos" -> Kind.POS;
+      case "posList" -> Kind.POS_LIST;
+      case "coordinates" -> Kind.COORDINATES;
+      default -> null;
+    };
+  }
+
+  /** Returns true when the started element is a coordinate text element. */
+  private boolean handleStart(
+      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
+      String localName,
+      Optional<EpsgCrs> defaultCrs,
+      OptionalInt defaultSrsDimension)
+      throws IOException {
+
+    if (UNSUPPORTED_TOP.contains(localName)) {
+      throw new IOException("Unsupported GML geometry type: " + localName);
+    }
+    if (UNSUPPORTED_PATCH.contains(localName)) {
+      throw new IOException("Unsupported GML surface patch: " + localName);
+    }
+    if (UNSUPPORTED_SEGMENT.contains(localName)) {
+      throw new IOException("Unsupported GML curve segment: " + localName);
+    }
+
+    if (COORDINATE_NAMES.contains(localName)) {
+      Frame f = new Frame();
+      f.kind = coordinateKind(localName);
+      f.elementName = localName;
+      stack.push(f);
+      return true;
+    }
+
+    Kind kind = classify(localName);
+    if (kind == null) {
+      if (stack.isEmpty()) {
+        throw new IOException("Unsupported GML geometry type: " + localName);
+      }
+      Frame f = new Frame();
+      f.kind = Kind.UNKNOWN;
+      f.elementName = localName;
+      stack.push(f);
+      return false;
+    }
+
+    // Reject Solid with inner shell as soon as we see <interior> directly under <Solid>
+    if (kind == Kind.INTERIOR || kind == Kind.INNER_BOUNDARY_IS) {
+      Frame parent = stack.peek();
+      if (parent != null && parent.kind == Kind.SOLID) {
+        throw new IOException("Solid with inner shells is not supported.");
       }
     }
 
-    // get CRS from parent scope
-    PartialGeometry g = currentGeometry;
-    while (g != null) {
-      if (g.geometry != null && g.geometry.getCrs().isPresent()) {
-        return g.geometry.getCrs();
+    Frame f = new Frame();
+    f.kind = kind;
+    f.elementName = localName;
+
+    if (isObject(kind)) {
+      Optional<EpsgCrs> explicitCrs = parseSrsName(parser, srsNameMappings);
+      f.crs = explicitCrs.or(() -> defaultCrs).or(this::inheritedCrs);
+      OptionalInt dim = parseSrsDimension(parser);
+      if (dim.isEmpty()) {
+        dim = defaultSrsDimension.isPresent() ? defaultSrsDimension : inheritedSrsDimension();
       }
-      g = g.parent;
+      f.srsDimension = dim;
+    }
+
+    stack.push(f);
+    return false;
+  }
+
+  private void handleEnd(String localName) throws IOException {
+    if (stack.isEmpty()) {
+      throw new IllegalStateException("Unbalanced end element: " + localName);
+    }
+    Frame top = stack.peek();
+
+    // tolerate stray closes that don't match our top frame (well-formed XML guarantees match)
+    if (!localName.equals(top.elementName)) {
+      return;
+    }
+
+    stack.pop();
+
+    if (top.kind == Kind.UNKNOWN) {
+      return;
+    }
+
+    Geometry<?> built = buildGeometry(top);
+    if (built == null) {
+      // transparent wrapper — nothing to contribute
+      return;
+    }
+
+    if (stack.isEmpty()) {
+      result = built;
+      return;
+    }
+
+    contributeToConsumer(built);
+  }
+
+  /** Adds {@code geom} to the nearest non-transparent ancestor in the stack. */
+  private void contributeToConsumer(Geometry<?> geom) {
+    Iterator<Frame> it = stack.iterator();
+    while (it.hasNext()) {
+      Frame anc = it.next();
+      if (isTransparent(anc.kind)) {
+        continue;
+      }
+      anc.children.add(geom);
+      return;
+    }
+    // no consumer found — geometry becomes the root result
+    result = geom;
+  }
+
+  private static boolean isTransparent(Kind kind) {
+    return switch (kind) {
+      case POINT_MEMBER,
+          CURVE_MEMBER,
+          LINE_STRING_MEMBER,
+          POLYGON_MEMBER,
+          SURFACE_MEMBER,
+          GEOMETRY_MEMBER,
+          POINT_MEMBERS,
+          CURVE_MEMBERS,
+          POLYGON_MEMBERS,
+          SURFACE_MEMBERS,
+          EXTERIOR,
+          INTERIOR,
+          OUTER_BOUNDARY_IS,
+          INNER_BOUNDARY_IS,
+          SHELL,
+          SEGMENTS,
+          PATCHES,
+          UNKNOWN ->
+          true;
+      default -> false;
+    };
+  }
+
+  /**
+   * Frames that produce a geometry value; they capture srsName/srsDimension at start and inherit
+   * from ancestors so that leaf primitives carry the same CRS as their enclosing object. Includes
+   * rings, surface patches, and curve segments — none of those typically carry a srsName attribute
+   * themselves, but they must still inherit one for the built primitive.
+   */
+  private static boolean isObject(Kind kind) {
+    return switch (kind) {
+      case POINT,
+          LINE_STRING,
+          POLYGON,
+          CURVE,
+          COMPOSITE_CURVE,
+          SURFACE,
+          COMPOSITE_SURFACE,
+          POLYHEDRAL_SURFACE,
+          SOLID,
+          MULTI_POINT,
+          MULTI_LINE_STRING,
+          MULTI_CURVE,
+          MULTI_POLYGON,
+          MULTI_SURFACE,
+          MULTI_GEOMETRY,
+          LINEAR_RING,
+          RING,
+          POLYGON_PATCH,
+          LINE_STRING_SEGMENT,
+          ARC,
+          ARC_STRING,
+          CIRCLE ->
+          true;
+      default -> false;
+    };
+  }
+
+  private static Kind classify(String localName) {
+    return switch (localName) {
+      case "Point" -> Kind.POINT;
+      case "LineString" -> Kind.LINE_STRING;
+      case "Polygon" -> Kind.POLYGON;
+      case "Curve" -> Kind.CURVE;
+      case "CompositeCurve" -> Kind.COMPOSITE_CURVE;
+      case "Surface" -> Kind.SURFACE;
+      case "CompositeSurface" -> Kind.COMPOSITE_SURFACE;
+      case "PolyhedralSurface" -> Kind.POLYHEDRAL_SURFACE;
+      case "Solid" -> Kind.SOLID;
+      case "MultiPoint" -> Kind.MULTI_POINT;
+      case "MultiLineString" -> Kind.MULTI_LINE_STRING;
+      case "MultiCurve" -> Kind.MULTI_CURVE;
+      case "MultiPolygon" -> Kind.MULTI_POLYGON;
+      case "MultiSurface" -> Kind.MULTI_SURFACE;
+      case "MultiGeometry" -> Kind.MULTI_GEOMETRY;
+      case "pointMember" -> Kind.POINT_MEMBER;
+      case "curveMember" -> Kind.CURVE_MEMBER;
+      case "lineStringMember" -> Kind.LINE_STRING_MEMBER;
+      case "polygonMember" -> Kind.POLYGON_MEMBER;
+      case "surfaceMember" -> Kind.SURFACE_MEMBER;
+      case "geometryMember" -> Kind.GEOMETRY_MEMBER;
+      case "pointMembers" -> Kind.POINT_MEMBERS;
+      case "curveMembers" -> Kind.CURVE_MEMBERS;
+      case "polygonMembers" -> Kind.POLYGON_MEMBERS;
+      case "surfaceMembers" -> Kind.SURFACE_MEMBERS;
+      case "exterior" -> Kind.EXTERIOR;
+      case "interior" -> Kind.INTERIOR;
+      case "outerBoundaryIs" -> Kind.OUTER_BOUNDARY_IS;
+      case "innerBoundaryIs" -> Kind.INNER_BOUNDARY_IS;
+      case "Shell" -> Kind.SHELL;
+      case "segments" -> Kind.SEGMENTS;
+      case "patches" -> Kind.PATCHES;
+      case "LinearRing" -> Kind.LINEAR_RING;
+      case "Ring" -> Kind.RING;
+      case "PolygonPatch" -> Kind.POLYGON_PATCH;
+      case "LineStringSegment" -> Kind.LINE_STRING_SEGMENT;
+      case "Arc" -> Kind.ARC;
+      case "ArcString" -> Kind.ARC_STRING;
+      case "Circle" -> Kind.CIRCLE;
+      default -> null;
+    };
+  }
+
+  private Optional<EpsgCrs> inheritedCrs() {
+    for (Frame f : stack) {
+      if (f.crs.isPresent()) {
+        return f.crs;
+      }
     }
     return Optional.empty();
   }
 
-  private OptionalInt getDimFromSrsDimension(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser) {
-    String srsDimension = parser.getAttributeValue(null, "srsDimension");
-    if (srsDimension != null) {
-      try {
-        return OptionalInt.of(Integer.parseInt(srsDimension));
-      } catch (Exception e) {
-        // ignore, fallback to default
+  private OptionalInt inheritedSrsDimension() {
+    for (Frame f : stack) {
+      if (f.srsDimension.isPresent()) {
+        return f.srsDimension;
       }
     }
-
-    // get dimension from parent scope
-    PartialGeometry g = currentGeometry;
-    while (g != null) {
-      if (g.geometry != null) {
-        return OptionalInt.of(g.geometry.getAxes().size());
-      }
-      g = g.parent;
-    }
-
     return OptionalInt.empty();
   }
 
-  private double[] parseCoordinates(
-      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser, String tagName) throws XMLStreamException {
-    StringBuilder text = new StringBuilder();
-    while (parser.hasNext()) {
-      int event = parser.next();
-      if (event == AsyncXMLStreamReader.EVENT_INCOMPLETE) {
-        waitingForInput = true;
-        currentGeometry.textBuffer = new StringBuilder(text);
-        // keep current state and resume processing when more input is available
-        return null;
-      } else if (event == XMLStreamConstants.CHARACTERS) {
-        text.append(parser.getText());
-      } else if (event == XMLStreamConstants.END_ELEMENT && tagName.equals(parser.getLocalName())) {
-        break;
+  private static Optional<EpsgCrs> parseSrsName(
+      AsyncXMLStreamReader<AsyncByteArrayFeeder> parser, Map<String, EpsgCrs> srsNameMappings) {
+    String srsName = parser.getAttributeValue(null, "srsName");
+    if (srsName == null || srsName.isEmpty()) {
+      return Optional.empty();
+    }
+    EpsgCrs mapped = srsNameMappings.get(srsName);
+    if (mapped != null) {
+      return Optional.of(mapped);
+    }
+    if (srsName.startsWith("urn:ogc:def:crs:EPSG::")) {
+      try {
+        return Optional.of(
+            EpsgCrs.of(Integer.parseInt(srsName.substring(srsName.lastIndexOf(':') + 1))));
+      } catch (Exception e) {
+        // fall through
+      }
+    } else if (srsName.startsWith("http://www.opengis.net/def/crs/EPSG/0/")) {
+      try {
+        return Optional.of(
+            EpsgCrs.of(Integer.parseInt(srsName.substring(srsName.lastIndexOf('/') + 1))));
+      } catch (Exception e) {
+        // fall through
+      }
+    } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84".equals(srsName)
+        || "http://www.opengis.net/def/crs/OGC/1.3/CRS84".equals(srsName)
+        || "urn:ogc:def:crs:OGC:1.3:CRS84".equals(srsName)) {
+      return Optional.of(OgcCrs.CRS84);
+    } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84h".equals(srsName)
+        || "urn:ogc:def:crs:OGC::CRS84h".equals(srsName)) {
+      return Optional.of(OgcCrs.CRS84h);
+    }
+    return Optional.empty();
+  }
+
+  private static OptionalInt parseSrsDimension(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser) {
+    String dim = parser.getAttributeValue(null, "srsDimension");
+    if (dim != null) {
+      try {
+        return OptionalInt.of(Integer.parseInt(dim));
+      } catch (NumberFormatException e) {
+        // fall through
       }
     }
-    return parseDoubles(text.toString());
+    return OptionalInt.empty();
+  }
+
+  private boolean readCoordinateText(AsyncXMLStreamReader<AsyncByteArrayFeeder> parser)
+      throws XMLStreamException {
+    Frame coordFrame = stack.peek();
+    while (parser.hasNext()) {
+      int event = parser.next();
+      switch (event) {
+        case AsyncXMLStreamReader.EVENT_INCOMPLETE:
+          waitingForInput = true;
+          return false;
+        case XMLStreamConstants.CHARACTERS:
+          coordFrame.textBuffer.append(parser.getText());
+          break;
+        case XMLStreamConstants.END_ELEMENT:
+          if (coordFrame.elementName.equals(parser.getLocalName())) {
+            finalizeCoordinates(coordFrame);
+            stack.pop();
+            applyCoordinates(coordFrame);
+            return true;
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    waitingForInput = true;
+    return false;
+  }
+
+  private static void finalizeCoordinates(Frame coordFrame) {
+    String text = coordFrame.textBuffer.toString().trim();
+    coordFrame.coords = text.isEmpty() ? new double[0] : parseDoubles(text);
+  }
+
+  private void applyCoordinates(Frame coordFrame) {
+    if (stack.isEmpty()) {
+      return;
+    }
+    Frame parent = stack.peek();
+    if (parent.coords == null) {
+      parent.coords = coordFrame.coords;
+    } else {
+      double[] a = parent.coords;
+      double[] b = coordFrame.coords;
+      double[] c = new double[a.length + b.length];
+      System.arraycopy(a, 0, c, 0, a.length);
+      System.arraycopy(b, 0, c, a.length, b.length);
+      parent.coords = c;
+    }
+  }
+
+  private static Axes axesOf(Frame f) {
+    if (f.srsDimension.isPresent()) {
+      return f.srsDimension.getAsInt() >= 3 ? Axes.XYZ : Axes.XY;
+    }
+    return Axes.XY;
+  }
+
+  // -- builders --------------------------------------------------------------
+
+  private Geometry<?> buildGeometry(Frame f) throws IOException {
+    return switch (f.kind) {
+      case POINT -> buildPoint(f);
+      case LINE_STRING -> buildSinglePosList(f, false);
+      case CURVE -> buildCurve(f);
+      case COMPOSITE_CURVE -> buildCompositeCurve(f);
+      case POLYGON -> buildPolygon(f);
+      case SURFACE -> buildSurface(f);
+      case COMPOSITE_SURFACE -> buildCompositeSurface(f);
+      case POLYHEDRAL_SURFACE -> buildPolyhedralSurface(f, false);
+      case SOLID -> buildSolid(f);
+      case MULTI_POINT -> buildMultiPoint(f);
+      case MULTI_LINE_STRING -> buildMultiLineString(f);
+      case MULTI_CURVE -> buildMultiCurve(f);
+      case MULTI_POLYGON -> buildMultiPolygon(f);
+      case MULTI_SURFACE -> buildMultiSurface(f);
+      case MULTI_GEOMETRY -> buildMultiGeometry(f);
+      case LINEAR_RING -> buildSinglePosList(f, false);
+      case RING -> buildRing(f);
+      case POLYGON_PATCH -> buildPolygon(f);
+      case LINE_STRING_SEGMENT -> buildSinglePosList(f, false);
+      case ARC, ARC_STRING -> buildSinglePosList(f, true);
+      case CIRCLE -> buildSinglePosList(f, true);
+      default -> null;
+    };
+  }
+
+  private Point buildPoint(Frame f) throws IOException {
+    double[] c = f.coords != null ? f.coords : new double[0];
+    if (c.length == 0) {
+      throw new IOException("Empty <gml:Point>.");
+    }
+    Axes axes = c.length >= 3 ? Axes.XYZ : Axes.XY;
+    return Point.of(Position.of(axes, c), f.crs);
+  }
+
+  private Geometry<?> buildSinglePosList(Frame f, boolean curved) throws IOException {
+    double[] c = f.coords != null ? f.coords : new double[0];
+    if (c.length == 0) {
+      throw new IOException("Empty <gml:" + f.elementName + ">.");
+    }
+    Axes axes = axesOf(f);
+    // If srsDimension wasn't declared explicitly anywhere in scope, heuristically pick 3D when
+    // total coordinate count is divisible by 3 but not by 2. Otherwise default 2D.
+    if (f.srsDimension.isEmpty()) {
+      if (c.length % 2 != 0 && c.length % 3 == 0) {
+        axes = Axes.XYZ;
+      }
+    }
+    PositionList pl = PositionList.of(axes, c);
+    return curved ? CircularString.of(pl, f.crs) : LineString.of(pl, f.crs);
+  }
+
+  /**
+   * Each curveMember of a Ring carries a primitive Curve. Primitives are preserved — a Ring with
+   * multiple curveMembers becomes a CompoundCurve even if every member is linear, since merging
+   * separate primitive Curves into one LineString would erase the input's primitive structure.
+   */
+  private Curve<?> buildRing(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:Ring>.");
+    }
+    if (f.children.size() == 1) {
+      Geometry<?> only = f.children.get(0);
+      if (only instanceof LineString ls) {
+        return ls;
+      }
+      if (only instanceof CircularString cs) {
+        return cs;
+      }
+      if (only instanceof CompoundCurve cc) {
+        return cc;
+      }
+    }
+    List<SingleCurve> segs = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof SingleCurve sc) {
+        segs.add(sc);
+      } else if (g instanceof CompoundCurve cc) {
+        // CompoundCurve cannot nest in our model; flatten — the curveMember had heterogeneous
+        // segments which already lost primitive identity at Curve build time.
+        segs.addAll(cc.getValue());
+      } else {
+        throw new IOException(
+            "Unsupported geometry inside <gml:Ring>: " + g.getClass().getSimpleName());
+      }
+    }
+    return CompoundCurve.of(segs, f.crs);
+  }
+
+  private static Axes axesFromMembers(List<Geometry<?>> members) {
+    for (Geometry<?> g : members) {
+      if (!g.isEmpty()) {
+        return g.getAxes();
+      }
+    }
+    return Axes.XY;
+  }
+
+  /** Concatenate connected SingleCurve segments, dropping each segment's duplicated start. */
+  private static double[] mergeConnectedSegments(List<Geometry<?>> segments, Axes axes) {
+    int dim = axes.size();
+    int total = 0;
+    for (int i = 0; i < segments.size(); i++) {
+      SingleCurve sc = (SingleCurve) segments.get(i);
+      int n = sc.getValue().getNumPositions();
+      total += i == 0 ? n : Math.max(0, n - 1);
+    }
+    double[] out = new double[total * dim];
+    int pos = 0;
+    for (int i = 0; i < segments.size(); i++) {
+      SingleCurve sc = (SingleCurve) segments.get(i);
+      double[] cc = sc.getValue().getCoordinates();
+      int start = i == 0 ? 0 : dim;
+      System.arraycopy(cc, start, out, pos, cc.length - start);
+      pos += cc.length - start;
+    }
+    return out;
+  }
+
+  /**
+   * Segments inside a single {@code <gml:Curve>} are parts of one primitive Curve, not separate
+   * primitives — consecutive segments of the same type are merged into one primitive (LineString or
+   * CircularString). Heterogeneous segments become a CompoundCurve.
+   */
+  private Geometry<?> buildCurve(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:Curve>.");
+    }
+    if (f.children.size() == 1) {
+      return f.children.get(0);
+    }
+    boolean allLinear = f.children.stream().allMatch(g -> g instanceof LineString);
+    if (allLinear) {
+      Axes axes = axesFromMembers(f.children);
+      return LineString.of(PositionList.of(axes, mergeConnectedSegments(f.children, axes)), f.crs);
+    }
+    boolean allCircular = f.children.stream().allMatch(g -> g instanceof CircularString);
+    if (allCircular) {
+      Axes axes = axesFromMembers(f.children);
+      return CircularString.of(
+          PositionList.of(axes, mergeConnectedSegments(f.children, axes)), f.crs);
+    }
+    List<SingleCurve> sc = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof SingleCurve s) {
+        sc.add(s);
+      } else {
+        throw new IOException(
+            "Unsupported geometry inside <gml:Curve>: " + g.getClass().getSimpleName());
+      }
+    }
+    return CompoundCurve.of(sc, f.crs);
+  }
+
+  private Geometry<?> buildCompositeCurve(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:CompositeCurve>.");
+    }
+    List<SingleCurve> sc = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof SingleCurve s) {
+        sc.add(s);
+      } else if (g instanceof CompoundCurve cc) {
+        sc.addAll(cc.getValue());
+      } else {
+        throw new IOException(
+            "Unsupported geometry inside <gml:CompositeCurve>: " + g.getClass().getSimpleName());
+      }
+    }
+    if (sc.size() == 1) {
+      return sc.get(0);
+    }
+    return CompoundCurve.of(sc, f.crs);
+  }
+
+  private Geometry<?> buildPolygon(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:" + f.elementName + ">.");
+    }
+    boolean allLinear = f.children.stream().allMatch(g -> g instanceof LineString);
+    if (allLinear) {
+      List<PositionList> rings = new ArrayList<>(f.children.size());
+      for (Geometry<?> g : f.children) {
+        rings.add(((LineString) g).getValue());
+      }
+      return Polygon.of(rings, f.crs);
+    }
+    List<Curve<?>> rings = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Curve<?> c) {
+        rings.add(c);
+      } else {
+        throw new IOException(
+            "Unsupported ring geometry inside <gml:"
+                + f.elementName
+                + ">: "
+                + g.getClass().getSimpleName());
+      }
+    }
+    return CurvePolygon.of(rings, f.crs);
+  }
+
+  private Geometry<?> buildSurface(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:Surface>.");
+    }
+    if (f.children.size() == 1) {
+      return f.children.get(0);
+    }
+    List<Polygon> polys = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Polygon p) {
+        polys.add(p);
+      } else {
+        throw new IOException(
+            "Multi-patch <gml:Surface> requires planar PolygonPatches; found "
+                + g.getClass().getSimpleName());
+      }
+    }
+    return PolyhedralSurface.of(polys, false, f.crs);
+  }
+
+  private Geometry<?> buildCompositeSurface(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:CompositeSurface>.");
+    }
+    boolean allPlanar = f.children.stream().allMatch(g -> g instanceof Polygon);
+    if (allPlanar) {
+      List<Polygon> polys = new ArrayList<>();
+      for (Geometry<?> g : f.children) {
+        polys.add((Polygon) g);
+      }
+      return PolyhedralSurface.of(polys, false, f.crs);
+    }
+    List<Surface<?>> surfaces = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Surface<?> s) {
+        surfaces.add(s);
+      } else {
+        throw new IOException(
+            "Unsupported geometry inside <gml:CompositeSurface>: " + g.getClass().getSimpleName());
+      }
+    }
+    return MultiSurface.of(surfaces, f.crs);
+  }
+
+  private Geometry<?> buildPolyhedralSurface(Frame f, boolean closed) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:PolyhedralSurface>.");
+    }
+    List<Polygon> polys = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Polygon p) {
+        polys.add(p);
+      } else {
+        throw new IOException(
+            "Non-planar patch in <gml:PolyhedralSurface>: " + g.getClass().getSimpleName());
+      }
+    }
+    return PolyhedralSurface.of(polys, closed, f.crs);
+  }
+
+  private Geometry<?> buildSolid(Frame f) throws IOException {
+    if (f.children.isEmpty()) {
+      throw new IOException("Empty <gml:Solid>.");
+    }
+    List<Polygon> polys = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Polygon p) {
+        polys.add(p);
+      } else {
+        throw new IOException("Non-planar surface in <gml:Solid>: " + g.getClass().getSimpleName());
+      }
+    }
+    return PolyhedralSurface.of(polys, true, f.crs);
+  }
+
+  private Geometry<?> buildMultiPoint(Frame f) throws IOException {
+    List<Point> pts = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Point p) {
+        pts.add(p);
+      } else {
+        throw new IOException(
+            "Unsupported member in <gml:MultiPoint>: " + g.getClass().getSimpleName());
+      }
+    }
+    return MultiPoint.of(pts, f.crs);
+  }
+
+  private Geometry<?> buildMultiLineString(Frame f) throws IOException {
+    List<LineString> ls = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof LineString l) {
+        ls.add(l);
+      } else {
+        throw new IOException(
+            "Unsupported member in <gml:MultiLineString>: " + g.getClass().getSimpleName());
+      }
+    }
+    return MultiLineString.of(ls, f.crs);
+  }
+
+  private Geometry<?> buildMultiCurve(Frame f) throws IOException {
+    boolean allLinear = f.children.stream().allMatch(g -> g instanceof LineString);
+    if (allLinear) {
+      List<LineString> ls = new ArrayList<>();
+      for (Geometry<?> g : f.children) {
+        ls.add((LineString) g);
+      }
+      return MultiLineString.of(ls, f.crs);
+    }
+    List<Curve<?>> cs = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Curve<?> c) {
+        cs.add(c);
+      } else {
+        throw new IOException(
+            "Unsupported member in <gml:MultiCurve>: " + g.getClass().getSimpleName());
+      }
+    }
+    return MultiCurve.of(cs, f.crs);
+  }
+
+  private Geometry<?> buildMultiPolygon(Frame f) throws IOException {
+    List<Polygon> ps = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Polygon p) {
+        ps.add(p);
+      } else {
+        throw new IOException(
+            "Unsupported member in <gml:MultiPolygon>: " + g.getClass().getSimpleName());
+      }
+    }
+    return MultiPolygon.of(ps, f.crs);
+  }
+
+  private Geometry<?> buildMultiSurface(Frame f) throws IOException {
+    if (f.children.stream().allMatch(g -> g instanceof Polygon)) {
+      List<Polygon> ps = new ArrayList<>();
+      for (Geometry<?> g : f.children) {
+        ps.add((Polygon) g);
+      }
+      return MultiPolygon.of(ps, f.crs);
+    }
+    List<Surface<?>> ss = new ArrayList<>();
+    for (Geometry<?> g : f.children) {
+      if (g instanceof Surface<?> s) {
+        ss.add(s);
+      } else {
+        throw new IOException(
+            "Unsupported member in <gml:MultiSurface>: " + g.getClass().getSimpleName());
+      }
+    }
+    return MultiSurface.of(ss, f.crs);
+  }
+
+  private Geometry<?> buildMultiGeometry(Frame f) {
+    return GeometryCollection.of(ImmutableList.copyOf(f.children), f.crs);
   }
 
   private static double[] parseDoubles(String text) {
