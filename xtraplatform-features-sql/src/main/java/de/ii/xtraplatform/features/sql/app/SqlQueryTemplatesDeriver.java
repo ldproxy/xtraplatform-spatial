@@ -359,13 +359,7 @@ public class SqlQueryTemplatesDeriver {
       return String.format("%s.%s", alias, table.getSortKey());
     }
 
-    if (Objects.equals(table.getSortKey(), table.getPrimaryKey())) {
-      return String.format("ROW_NUMBER() OVER (ORDER BY %s.%s)", alias, table.getSortKey());
-    }
-
-    return String.format(
-        "ROW_NUMBER() OVER (ORDER BY %s.%s, %s.%s)",
-        alias, table.getSortKey(), alias, table.getPrimaryKey());
+    return String.format("ROW_NUMBER() OVER (ORDER BY %s.%s)", alias, table.getSortKey());
   }
 
   private String getSkeyColumn(
