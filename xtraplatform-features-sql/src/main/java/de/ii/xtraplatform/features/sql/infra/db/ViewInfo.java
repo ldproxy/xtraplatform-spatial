@@ -68,6 +68,9 @@ public class ViewInfo {
 
   public static Optional<Tuple<String, String>> getOriginalTableAndColumn(
       String viewDefinition, String columnName) {
+    if (Objects.isNull(viewDefinition)) {
+      return Optional.empty();
+    }
     try {
       PlainSelect select = parse(viewDefinition);
 
@@ -143,9 +146,13 @@ public class ViewInfo {
   }
 
   private static PlainSelect parse(String select) throws JSQLParserException, ParseException {
-    Select statement =
-        (Select)
-            CCJSqlParserUtil.parse(select, ccjSqlParser -> ccjSqlParser.setErrorRecovery(true));
+    net.sf.jsqlparser.statement.Statement parsed =
+        CCJSqlParserUtil.parse(select, ccjSqlParser -> ccjSqlParser.setErrorRecovery(true));
+
+    if (!(parsed instanceof Select)) {
+      throw new JSQLParserException("View definition is not a SELECT statement");
+    }
+    Select statement = (Select) parsed;
 
     PlainSelect selectBody = (PlainSelect) statement.getSelectBody();
 
