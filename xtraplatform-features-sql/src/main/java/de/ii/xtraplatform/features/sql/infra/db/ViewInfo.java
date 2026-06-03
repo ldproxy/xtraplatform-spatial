@@ -23,6 +23,7 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.StatementVisitor;
+import net.sf.jsqlparser.statement.create.view.CreateView;
 import net.sf.jsqlparser.statement.select.FromItemVisitorAdapter;
 import net.sf.jsqlparser.statement.select.ParenthesedFromItem;
 import net.sf.jsqlparser.statement.select.PlainSelect;
@@ -34,6 +35,9 @@ import net.sf.jsqlparser.util.TablesNamesFinder;
 public class ViewInfo {
 
   public static List<String> getOriginalTables(String viewDefinition) {
+    if (Objects.isNull(viewDefinition)) {
+      return ImmutableList.of();
+    }
     try {
       PlainSelect select = parse(viewDefinition);
 
@@ -65,6 +69,9 @@ public class ViewInfo {
 
   public static Optional<Tuple<String, String>> getOriginalTableAndColumn(
       String viewDefinition, String columnName) {
+    if (Objects.isNull(viewDefinition)) {
+      return Optional.empty();
+    }
     try {
       PlainSelect select = parse(viewDefinition);
 
@@ -140,9 +147,17 @@ public class ViewInfo {
   }
 
   private static PlainSelect parse(String select) throws JSQLParserException, ParseException {
-    Select statement =
-        (Select)
-            CCJSqlParserUtil.parse(select, ccjSqlParser -> ccjSqlParser.setErrorRecovery(true));
+    net.sf.jsqlparser.statement.Statement parsed =
+        CCJSqlParserUtil.parse(select, ccjSqlParser -> ccjSqlParser.setErrorRecovery(true));
+
+    Select statement;
+    if (parsed instanceof Select) {
+      statement = (Select) parsed;
+    } else if (parsed instanceof CreateView) {
+      statement = ((CreateView) parsed).getSelect();
+    } else {
+      throw new JSQLParserException("View definition is not a SELECT statement");
+    }
 
     PlainSelect selectBody = (PlainSelect) statement.getSelectBody();
 
