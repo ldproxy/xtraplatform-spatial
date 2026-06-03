@@ -38,6 +38,12 @@ import java.util.function.Function;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods",
+  "PMD.AvoidStringBufferField"
+})
 public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   public static final String SPACE = " ";
@@ -326,6 +332,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     }
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void writeCoordinates(double[] coordinates, Axes axes) {
     int dimensionWithoutM = axes == Axes.XY || axes == Axes.XYM ? 2 : 3;
     for (int i = 0; i < coordinates.length / axes.size(); i++) {
@@ -351,28 +358,28 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   private void writePosition(double[] coordinates, Axes axes) {
-    if (version != GmlVersion.GML21) {
+    if (version == GmlVersion.GML21) {
+      writeStartTagProperty(COORDINATES);
+    } else {
       if (options.contains(Options.WITH_SRS_DIMENSION)) {
         writeStartTagProperty(POS, Map.of("srsDimension", String.valueOf(axes.size())));
       } else {
         writeStartTagProperty(POS);
       }
-    } else {
-      writeStartTagProperty(COORDINATES);
     }
     writeCoordinates(coordinates, axes);
     writeEndTag();
   }
 
   private void writePositionList(double[] coordinates, Axes axes) {
-    if (version != GmlVersion.GML21) {
+    if (version == GmlVersion.GML21) {
+      writeStartTagProperty(COORDINATES);
+    } else {
       if (options.contains(Options.WITH_SRS_DIMENSION)) {
         writeStartTagProperty(POS_LIST, Map.of("srsDimension", String.valueOf(axes.size())));
       } else {
         writeStartTagProperty(POS_LIST);
       }
-    } else {
-      writeStartTagProperty(COORDINATES);
     }
     writeCoordinates(coordinates, axes);
     writeEndTag();
@@ -459,10 +466,10 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(MultiLineString geometry) {
-    writeStartTagObject(version != GmlVersion.GML21 ? MULTI_CURVE : MULTI_LINE_STRING, false);
+    writeStartTagObject(version == GmlVersion.GML21 ? MULTI_LINE_STRING : MULTI_CURVE, false);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       LineString lineString = geometry.getValue().get(i);
-      writeStartTagProperty(version != GmlVersion.GML21 ? CURVE_MEMBER : LINE_STRING_MEMBER);
+      writeStartTagProperty(version == GmlVersion.GML21 ? LINE_STRING_MEMBER : CURVE_MEMBER);
       lineString.accept(encodeAsEmbeddedGeometry.orElse(this));
       writeEndTag();
     }
@@ -486,9 +493,9 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     for (int i = 0; i < geometry.getNumRings(); i++) {
       LineString ring = geometry.getValue().get(i);
       if (i == 0) {
-        writeStartTagProperty(version != GmlVersion.GML21 ? EXTERIOR : OUTER_BOUNDARY_IS);
+        writeStartTagProperty(version == GmlVersion.GML21 ? OUTER_BOUNDARY_IS : EXTERIOR);
       } else {
-        writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
+        writeStartTagProperty(version == GmlVersion.GML21 ? INNER_BOUNDARY_IS : INTERIOR);
       }
       if (useSurfaceAndCurve) {
         writeStartTagObject(RING, true);
@@ -512,10 +519,10 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(MultiPolygon geometry) {
-    writeStartTagObject(version != GmlVersion.GML21 ? MULTI_SURFACE : MULTI_POLYGON, false);
+    writeStartTagObject(version == GmlVersion.GML21 ? MULTI_POLYGON : MULTI_SURFACE, false);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       Polygon polygon = geometry.getValue().get(i);
-      writeStartTagProperty(version != GmlVersion.GML21 ? SURFACE_MEMBER : POLYGON_MEMBER);
+      writeStartTagProperty(version == GmlVersion.GML21 ? POLYGON_MEMBER : SURFACE_MEMBER);
       polygon.accept(encodeAsEmbeddedGeometry.orElse(this));
       writeEndTag();
     }

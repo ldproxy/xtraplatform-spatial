@@ -13,15 +13,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.namespace.QName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author fischer
  */
 public class XMLNamespaceNormalizer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(XMLNamespaceNormalizer.class);
   private Map<String, String> namespaces;
   private int nscount;
   private int shortcount;
