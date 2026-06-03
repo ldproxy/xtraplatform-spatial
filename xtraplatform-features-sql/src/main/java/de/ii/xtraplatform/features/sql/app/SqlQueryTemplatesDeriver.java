@@ -184,11 +184,7 @@ public class SqlQueryTemplatesDeriver {
       Optional<String> pagingClause =
           useRangePaging || (limit == 0 && offset == 0)
               ? Optional.empty()
-              : Optional.of(
-                  String.format(
-                      "%s%s",
-                      limit > 0 ? sqlDialect.applyToLimit(limit) : "",
-                      offset > 0 ? sqlDialect.applyToOffset(offset) : ""));
+              : Optional.of(sqlDialect.applyToLimitAndOffset(limit, offset));
 
       return getTableQuery(
           schema,
