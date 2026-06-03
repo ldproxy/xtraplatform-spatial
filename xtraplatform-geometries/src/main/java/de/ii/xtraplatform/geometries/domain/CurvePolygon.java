@@ -60,7 +60,9 @@ public interface CurvePolygon extends SingleSurface<Curve<?>> {
   default void check() {
     Preconditions.checkState(!getValue().isEmpty(), "A curve polygon must have at least one ring.");
     Preconditions.checkState(
-        getValue().stream().allMatch(Curve::isClosed), "All rings must be closed.");
+        getValue().stream().allMatch(Curve::isClosed),
+        "All rings must be closed. Not closed: %s",
+        getValue().stream().filter(c -> !c.isClosed()).toList());
     Preconditions.checkArgument(
         getValue().stream().allMatch(g -> g.getAxes() == getAxes()),
         "All geometries must have the same axes.");

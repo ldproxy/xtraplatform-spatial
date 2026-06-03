@@ -11,6 +11,9 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.util.TokenBuffer;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
@@ -34,6 +37,7 @@ public class FeatureTokenDecoderGeoJson
 
   private static final String PROPERTIES = "properties";
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final JsonParser parser;
   private final ByteArrayFeeder feeder;
@@ -48,6 +52,15 @@ public class FeatureTokenDecoderGeoJson
   private boolean inProperties;
   private boolean inGeometry;
   private int lastNameIsArrayDepth;
+
+  // Tokens of a GeoJSON "geometry"/"place" sub-object are buffered until the matching END_OBJECT
+  // so geometry decoding always operates on a complete in-memory subtree. This is what makes the
+  // decoder safe when an async chunk boundary lands inside a coordinates array, which would
+  // otherwise surface as "Unexpected Token: NOT_AVAILABLE" from the sync GeometryDecoderJson.
+  private boolean inGeometryBuffer;
+  private TokenBuffer geometryBuffer;
+  private int geometryDepth;
+  private String geometryFieldName;
 
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
   private FeatureTokenBufferSimple<
@@ -121,6 +134,30 @@ public class FeatureTokenDecoderGeoJson
         return true; // or completestage???
       }
 
+      if (inGeometryBuffer) {
+        if (nextToken == JsonToken.NOT_AVAILABLE) {
+          return true;
+        }
+        geometryBuffer.copyCurrentEvent(parser);
+        if (nextToken == JsonToken.START_OBJECT || nextToken == JsonToken.START_ARRAY) {
+          geometryDepth++;
+        } else if (nextToken == JsonToken.END_OBJECT || nextToken == JsonToken.END_ARRAY) {
+          geometryDepth--;
+          if (geometryDepth == 0) {
+            JsonNode geomNode = OBJECT_MAPPER.readTree(geometryBuffer.asParser());
+            Geometry<?> geometry =
+                new GeometryDecoderJson().decode(geomNode, Optional.of(crs), Optional.of(axes));
+            context.setGeometry(geometry);
+            context.pathTracker().track(geometryFieldName, 0);
+            downstream.onGeometry(context);
+            inGeometryBuffer = false;
+            geometryBuffer = null;
+            geometryFieldName = null;
+          }
+        }
+        return false;
+      }
+
       String currentName = parser.currentName();
 
       switch (nextToken) {
@@ -134,11 +171,11 @@ public class FeatureTokenDecoderGeoJson
         case START_OBJECT:
           if (Objects.nonNull(currentName)
               && ("geometry".equals(currentName) || "place".equals(currentName))) {
-            Geometry<?> geometry =
-                new GeometryDecoderJson().decode(parser, Optional.of(crs), Optional.of(axes));
-            context.setGeometry(geometry);
-            context.pathTracker().track(currentName, 0);
-            downstream.onGeometry(context);
+            geometryBuffer = new TokenBuffer(OBJECT_MAPPER, false);
+            geometryBuffer.copyCurrentEvent(parser);
+            geometryFieldName = currentName;
+            geometryDepth = 1;
+            inGeometryBuffer = true;
           } else {
             if (Objects.nonNull(currentName) && PROPERTIES.equals(currentName) && !started) {
               startIfNecessary(false);

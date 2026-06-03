@@ -79,8 +79,10 @@ public interface LineString extends SingleCurve {
   default void check() {
     Preconditions.checkState(
         getValue().getNumPositions() != 1,
-        "A non-empty line string must have at least two positions, found %s positions.",
-        getValue().getNumPositions());
+        "A non-empty line string must have at least two positions, found %s positions with axes %s: %s",
+        getValue().getNumPositions(),
+        getValue().getAxes(),
+        GeometryFormatting.formatPositions(getValue().getCoordinates(), getValue().getAxes(), 4));
   }
 
   @Override

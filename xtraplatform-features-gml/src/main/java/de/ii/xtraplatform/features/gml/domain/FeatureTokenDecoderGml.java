@@ -241,6 +241,16 @@ public class FeatureTokenDecoderGml
     String pendingXlinkHrefValue;
 
     /**
+     * Temporary fallback for a STRING-typed VALUE / VALUE_ARRAY property whose element carries an
+     * {@code xlink:href} attribute but no text content. Used only when the property does not route
+     * hrefs via {@link #pendingXlinkHrefValue} (i.e. it is not a feature-ref or codelist property),
+     * and the element body produced no buffered text. Supports the workaround where a concat'd
+     * {@code FEATURE_REF_ARRAY} is modelled as a plain STRING {@code VALUE_ARRAY}, with the target
+     * id still arriving on the wire as {@code xlink:href}.
+     */
+    String pendingXlinkHrefFallback;
+
+    /**
      * For VALUE_PROPERTY: set to {@code true} when the property's {@code fullPathAsString} is
      * listed in {@link FeatureTokenDecoderGmlInputProfile#getValueWrap()}. Children that appear
      * inside such a frame are pushed as {@link FrameKind#VALUE_WRAPPER}s so that wrapper
@@ -653,6 +663,14 @@ public class FeatureTokenDecoderGml
       Frame frame = Frame.valueProperty(prop, segment, segmentPathDepth);
       frame.nilOnCurrent = readXsiNil();
       frame.pendingXlinkHrefValue = readXlinkHrefAsValue(prop);
+      if (frame.pendingXlinkHrefValue == null
+          && prop.getValueType().orElse(prop.getType()) == Type.STRING) {
+        String raw = readRawXlinkHref();
+        frame.pendingXlinkHrefFallback =
+            raw == null
+                ? null
+                : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw).orElse(raw);
+      }
       frame.valueWrapped = isValueWrapped(prop);
       validateUom(prop);
       frames.push(frame);
@@ -699,8 +717,20 @@ public class FeatureTokenDecoderGml
 
   private void onEndElement() throws XMLStreamException, java.io.IOException {
     if (geometryDecoder.isWaitingForInput()) {
+      // The geometry decoder paused on EVENT_INCOMPLETE while reading a coordinate element's text
+      // (pos/posList/coordinates). Any CHARACTERS that arrived after the pause landed in this
+      // decoder's `buffer` via the main loop. Hand them over so continueDecoding can append them
+      // to the geometry decoder's coord frame before finalising — otherwise the trailing chunk of
+      // the coordinate text is silently dropped (observed: a posList split mid-number produced a
+      // truncated odd coord count, which the dimension heuristic then promoted to XYZ).
+      String pending = isBuffering ? buffer.toString() : "";
+      if (isBuffering) {
+        isBuffering = false;
+        buffer.setLength(0);
+      }
       Optional<Geometry<?>> optGeometry =
-          geometryDecoder.continueDecoding(parser, crs, srsDimension, parser.getLocalName(), "");
+          geometryDecoder.continueDecoding(
+              parser, crs, srsDimension, parser.getLocalName(), pending);
       if (optGeometry.isPresent()) {
         emitGeometry(optGeometry.get());
       }
@@ -743,6 +773,10 @@ public class FeatureTokenDecoderGml
         downstream.onValue(context);
       } else if (!bufferedText.isEmpty()) {
         context.setValue(bufferedText);
+        context.setValueType(Type.STRING);
+        downstream.onValue(context);
+      } else if (frame.pendingXlinkHrefFallback != null) {
+        context.setValue(frame.pendingXlinkHrefFallback);
         context.setValueType(Type.STRING);
         downstream.onValue(context);
       }
@@ -1074,35 +1108,54 @@ public class FeatureTokenDecoderGml
     if (!shouldRouteXlinkHrefAsValue(prop)) {
       return null;
     }
-    String href = null;
-    for (int i = 0; i < parser.getAttributeCount(); i++) {
-      if (XLINK_NS.equals(parser.getAttributeNamespace(i))
-          && "href".equals(parser.getAttributeLocalName(i))) {
-        href = parser.getAttributeValue(i);
-        break;
-      }
-    }
+    String href = readRawXlinkHref();
     if (href == null) {
       return null;
     }
     return reverseXlinkHrefTemplate(href, prop);
   }
 
+  /** Returns the raw {@code xlink:href} attribute on the current START_ELEMENT, or {@code null}. */
+  private String readRawXlinkHref() {
+    for (int i = 0; i < parser.getAttributeCount(); i++) {
+      if (XLINK_NS.equals(parser.getAttributeNamespace(i))
+          && "href".equals(parser.getAttributeLocalName(i))) {
+        return parser.getAttributeValue(i);
+      }
+    }
+    return null;
+  }
+
   /**
    * Reduces an {@code xlink:href} to its bare value segment via the appropriate reverse template
    * from the input profile. For codelist properties the schema's codelist id is substituted into
-   * {@code {{codelistId}}} first. If no template is configured, or the href does not match, the
-   * href is returned unchanged.
+   * {@code {{codelistId}}} first. If no template is configured, the href is returned unchanged
+   * silently. If a template is configured but the href does not match, the href is returned
+   * unchanged and a warning is logged — the raw URI will almost always overflow the storage column
+   * or be wrong as a value, so the operator needs visibility to fix the config mismatch.
    */
   private String reverseXlinkHrefTemplate(String href, FeatureSchema prop) {
+    String template;
     if (prop.isFeatureRef()) {
-      return applyReverseTemplate(inputProfile.getFeatureRefTemplate(), href, null);
+      template = inputProfile.getFeatureRefTemplate();
+    } else {
+      Optional<String> codelistId = prop.getConstraints().flatMap(SchemaConstraints::getCodelist);
+      if (codelistId.isEmpty()) {
+        return href;
+      }
+      String raw = inputProfile.getCodelistUriTemplate();
+      template = raw == null ? null : raw.replace("{{codelistId}}", codelistId.get());
     }
-    Optional<String> codelistId = prop.getConstraints().flatMap(SchemaConstraints::getCodelist);
-    if (codelistId.isPresent()) {
-      return applyReverseTemplate(inputProfile.getCodelistUriTemplate(), href, codelistId.get());
+    Optional<String> reduced = applyReverseTemplate(template, href);
+    if (reduced.isEmpty() && template != null && !template.isEmpty() && LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "xlink:href '{}' on property '{}' does not match the configured template '{}'; "
+              + "the unchanged href is passed through as the value",
+          href,
+          prop.getFullPathAsString(),
+          template);
     }
-    return href;
+    return reduced.orElse(href);
   }
 
   private static boolean shouldRouteXlinkHrefAsValue(FeatureSchema prop) {
@@ -1112,21 +1165,19 @@ public class FeatureTokenDecoderGml
     return prop.getConstraints().flatMap(SchemaConstraints::getCodelist).isPresent();
   }
 
-  private static String applyReverseTemplate(String template, String href, String codelistId) {
+  private static Optional<String> applyReverseTemplate(String template, String href) {
     if (template == null || template.isEmpty()) {
-      return href;
+      return Optional.empty();
     }
-    String substituted =
-        codelistId == null ? template : template.replace("{{codelistId}}", codelistId);
-    int idx = substituted.indexOf("{{value}}");
+    int idx = template.indexOf("{{value}}");
     if (idx < 0) {
-      return href;
+      return Optional.empty();
     }
-    String prefix = substituted.substring(0, idx);
-    String suffix = substituted.substring(idx + "{{value}}".length());
+    String prefix = template.substring(0, idx);
+    String suffix = template.substring(idx + "{{value}}".length());
     String regex = Pattern.quote(prefix) + "(.+?)" + Pattern.quote(suffix);
     Matcher m = Pattern.compile(regex).matcher(href);
-    return m.matches() ? m.group(1) : href;
+    return m.matches() ? Optional.of(m.group(1)) : Optional.empty();
   }
 
   /**

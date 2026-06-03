@@ -597,7 +597,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       case POLYGON_PATCH -> buildPolygon(f);
       case LINE_STRING_SEGMENT -> buildSinglePosList(f, false);
       case ARC, ARC_STRING -> buildSinglePosList(f, true);
-      case CIRCLE -> buildSinglePosList(f, true);
+      case CIRCLE -> buildCircle(f);
       default -> null;
     };
   }
@@ -609,6 +609,37 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     }
     Axes axes = c.length >= 3 ? Axes.XYZ : Axes.XY;
     return Point.of(Position.of(axes, c), f.crs);
+  }
+
+  /**
+   * A {@code <gml:Circle>} is 3 points defining a full circle. Internally we store it as a
+   * 5-position closed CIRCULARSTRING — {@code (P1, P2, P3, antipode(P2), P1)} — so it satisfies
+   * ring-closure validation and round-trips through WKT/WKB into PostGIS as a full circle. The
+   * original 3-point form is recovered by {@link GeometryEncoderGml} when emitting GML.
+   */
+  private Geometry<?> buildCircle(Frame f) throws IOException {
+    double[] c = f.coords != null ? f.coords : new double[0];
+    if (c.length == 0) {
+      throw new IOException("Empty <gml:Circle>.");
+    }
+    Axes axes = axesOf(f);
+    if (axes != Axes.XY) {
+      // 3D circles would need the plane of the circle resolved in 3-space; no current data
+      // requires this. Fall back to the linear 3-point form (which downstream ring-closure
+      // validation will reject loudly).
+      return buildSinglePosList(f, true);
+    }
+    if (c.length != 6) {
+      throw new IOException(
+          "<gml:Circle> requires exactly 3 XY positions, got " + (c.length / 2) + ".");
+    }
+    double[] expanded;
+    try {
+      expanded = Circles.expandCircleToClosed(c);
+    } catch (IllegalArgumentException colinear) {
+      throw new IOException("Invalid <gml:Circle>: " + colinear.getMessage());
+    }
+    return CircularString.of(PositionList.of(axes, expanded), f.crs);
   }
 
   private Geometry<?> buildSinglePosList(Frame f, boolean curved) throws IOException {

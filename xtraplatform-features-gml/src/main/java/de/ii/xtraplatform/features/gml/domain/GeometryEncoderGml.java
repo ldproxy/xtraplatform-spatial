@@ -50,6 +50,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private static final String LINE_STRING_SEGMENT = "LineStringSegment";
   private static final String ARC = "Arc";
   private static final String ARC_STRING = "ArcString";
+  private static final String CIRCLE = "Circle";
   private static final String MULTI_CURVE = "MultiCurve";
   private static final String MULTI_LINE_STRING = "MultiLineString";
   private static final String POLYGON = "Polygon";
@@ -436,10 +437,22 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       writeStartTagObject(CURVE, false);
       writeStartTagProperty(SEGMENTS);
     }
-    String tagName = geometry.getValue().getNumPositions() == 3 ? ARC : ARC_STRING;
-    writeStartTagDataType(tagName);
-    writePositionList(geometry.getValue().getCoordinates(), geometry.getAxes());
-    writeEndTag();
+    double[] coords = geometry.getValue().getCoordinates();
+    int numPositions = geometry.getValue().getNumPositions();
+    if (geometry.getAxes() == Axes.XY && numPositions == 5 && Circles.isFullCircleClosed(coords)) {
+      // Round-trip our 5-position closed-circle representation back to gml:Circle (3 control
+      // points). See GeometryDecoderGml#buildCircle for the inverse expansion.
+      writeStartTagDataType(CIRCLE);
+      double[] threePoints = new double[6];
+      System.arraycopy(coords, 0, threePoints, 0, 6);
+      writePositionList(threePoints, geometry.getAxes());
+      writeEndTag();
+    } else {
+      String tagName = numPositions == 3 ? ARC : ARC_STRING;
+      writeStartTagDataType(tagName);
+      writePositionList(coords, geometry.getAxes());
+      writeEndTag();
+    }
     if (!asSegment) {
       writeEndTag();
       writeEndTag();
