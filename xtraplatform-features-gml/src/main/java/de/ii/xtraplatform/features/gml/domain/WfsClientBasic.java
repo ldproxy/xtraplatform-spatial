@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.util.Optional;
 
 public interface WfsClientBasic {
-  InputStream runWfsOperation(final WfsOperation operation);
+  InputStream runWfsOperation(WfsOperation operation);
 
   Optional<Metadata> getMetadata();
 

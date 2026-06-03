@@ -45,8 +45,7 @@ public enum GmlGeometryType {
   public static GmlGeometryType fromString(String type) {
     for (GmlGeometryType v : GmlGeometryType.values()) {
       if (v.toString().equals(type)
-          || (v.elementStringRepresentation != null
-              && v.elementStringRepresentation.equals(type))) {
+          || v.elementStringRepresentation != null && v.elementStringRepresentation.equals(type)) {
         return v;
       }
     }
