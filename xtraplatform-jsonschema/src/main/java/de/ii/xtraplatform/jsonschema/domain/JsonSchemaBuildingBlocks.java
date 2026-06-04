@@ -26,8 +26,6 @@ public interface JsonSchemaBuildingBlocks {
       new ImmutableJsonSchemaGeometry.Builder().format("geometry-circularstring").build();
   JsonSchemaGeometry COMPOUND_CURVE =
       new ImmutableJsonSchemaGeometry.Builder().format("geometry-compoundcurve").build();
-  JsonSchemaGeometry CURVE =
-      new ImmutableJsonSchemaGeometry.Builder().format("geometry-curve").build();
   JsonSchemaGeometry MULTI_LINE_STRING =
       new ImmutableJsonSchemaGeometry.Builder().format("geometry-multilinestring").build();
   JsonSchemaGeometry LINE_STRING_OR_MULTI_LINE_STRING =
@@ -40,8 +38,6 @@ public interface JsonSchemaBuildingBlocks {
       new ImmutableJsonSchemaGeometry.Builder().format("geometry-polygon").build();
   JsonSchemaGeometry CURVE_POLYGON =
       new ImmutableJsonSchemaGeometry.Builder().format("geometry-curvepolygon").build();
-  JsonSchemaGeometry SURFACE =
-      new ImmutableJsonSchemaGeometry.Builder().format("geometry-surface").build();
   JsonSchemaGeometry POLYHEDRAL_SURFACE =
       new ImmutableJsonSchemaGeometry.Builder().format("geometry-polyhedralsurface").build();
   JsonSchemaGeometry MULTI_POLYGON =
