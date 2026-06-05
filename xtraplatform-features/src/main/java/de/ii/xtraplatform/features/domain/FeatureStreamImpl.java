@@ -270,11 +270,16 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           if (stepAudit) {
-            if (requestId.isEmpty()) {
-              throw new IllegalStateException(
-                  "Audit logging not possible, no request-id provided!");
+            if (auditLog.isEnabled()) {
+              if (requestId.isEmpty()) {
+                throw new IllegalStateException(
+                    "Audit logging not possible, no request-id provided!");
+              }
+
+              if (auditLog.logIsAvaible(requestId.get())) {
+                source = source.via(new FeatureTokenTransformerAudit(requestId.get(), auditLog));
+              }
             }
-            source = source.via(new FeatureTokenTransformerAudit(requestId.get(), auditLog));
           }
 
           source =
@@ -345,12 +350,18 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           if (stepAudit) {
-            if (requestId.isEmpty()) {
-              throw new IllegalStateException(
-                  "Audit logging not possible, no request-id provided!");
+            if (auditLog.isEnabled()) {
+              if (requestId.isEmpty()) {
+                throw new IllegalStateException(
+                    "Audit logging not possible, no request-id provided!");
+              }
+
+              if (auditLog.logIsAvaible(requestId.get())) {
+                source = source.via(new FeatureTokenTransformerAudit(requestId.get(), auditLog));
+              }
             }
-            source = source.via(new FeatureTokenTransformerAudit(requestId.get(), auditLog));
           }
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
