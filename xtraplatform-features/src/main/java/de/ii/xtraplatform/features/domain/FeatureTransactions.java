@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureStream.ResultBase;
@@ -57,6 +58,19 @@ public interface FeatureTransactions {
       String type, String id, FeatureTokenSource featureTokenSource, EpsgCrs crs, boolean partial);
 
   MutationResult deleteFeature(String featureType, String id);
+
+  /**
+   * Property-level partial update. {@code path} is a list of schema property identifiers naming the
+   * target property (one element for a top-level property, more for nested ones). An empty {@code
+   * value} clears the property (translates to SQL {@code NULL} or the {@link #PATCH_NULL_VALUE}
+   * sentinel for value-array entries).
+   */
+  @Value.Immutable
+  interface PropertyUpdate {
+    List<String> getPath();
+
+    Optional<JsonNode> getValue();
+  }
 
   /**
    * Opens a session that executes a sequence of mutator calls against a single underlying SQL
@@ -116,6 +130,18 @@ public interface FeatureTransactions {
         boolean partial);
 
     MutationResult deleteFeature(String featureType, String id);
+
+    /**
+     * Applies a property-level partial update to a single existing feature, in place, on this
+     * session's open transaction (so the update sees prior writes against the same session). The
+     * default implementation throws {@link UnsupportedOperationException}; the SQL provider's
+     * session implements it as a native {@code UPDATE} statement on the feature's main table.
+     */
+    default MutationResult patchFeature(
+        String featureType, String featureId, List<PropertyUpdate> updates, EpsgCrs crs) {
+      throw new UnsupportedOperationException(
+          "Property-level updates are not supported by this feature provider session");
+    }
 
     /** Commits all mutations performed against this session. Throws if already finalised. */
     void commit();

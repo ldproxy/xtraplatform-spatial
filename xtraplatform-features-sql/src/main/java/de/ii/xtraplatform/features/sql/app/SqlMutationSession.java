@@ -12,6 +12,7 @@ import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureTokenSource;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
 import de.ii.xtraplatform.features.domain.ImmutableMutationResult;
@@ -171,6 +172,517 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       builder.error(e);
     }
     return builder.build();
+  }
+
+  // Property-level partial update. Routes each PropertyUpdate to either the main-table SET path
+  // (`UPDATE main SET col = lit WHERE id_col = '<id>'`) or, for VALUE_ARRAY / one-to-many
+  // junction-backed properties, a DELETE-existing + INSERT-new pair against the junction table
+  // (`DELETE FROM junction WHERE fk IN (SELECT parent_pk FROM main WHERE id_col = ...); INSERT
+  // INTO junction (fk, value) SELECT parent_pk, v FROM main, (VALUES ...) v(value) WHERE
+  // id_col = ...`). Runs synchronously on the session's connection so prior writes within the
+  // same transaction are visible. Geometry properties on the main table are supported via the
+  // GeoJSON-to-WKT codec (ST_GeomFromText). M:N junctions, OBJECT_ARRAY/object-FK paths, and
+  // FEATURE_REF arrays are not yet supported and rejected with a clear error.
+  @Override
+  public FeatureTransactions.MutationResult patchFeature(
+      String featureType,
+      String featureId,
+      List<FeatureTransactions.PropertyUpdate> updates,
+      EpsgCrs crs) {
+    SqlQueryMapping mapping = requireMapping(featureType);
+    ImmutableMutationResult.Builder builder =
+        ImmutableMutationResult.builder()
+            .type(FeatureTransactions.MutationResult.Type.UPDATE)
+            .hasFeatures(false);
+    if (updates.isEmpty()) {
+      return builder.build();
+    }
+
+    Optional<
+            de.ii.xtraplatform.base.domain.util.Tuple<
+                de.ii.xtraplatform.features.sql.domain.SqlQuerySchema,
+                de.ii.xtraplatform.features.sql.domain.SqlQueryColumn>>
+        idColumn = mapping.getColumnForId();
+    if (idColumn.isEmpty()) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  "Feature type '" + featureType + "' has no id column; cannot patch in place."))
+          .build();
+    }
+    de.ii.xtraplatform.features.sql.domain.SqlQuerySchema mainTable = mapping.getMainTable();
+    String mainTableName = mainTable.getName();
+    String idColumnName = idColumn.get().second().getName();
+    String idLiteral = sqlString(featureId);
+
+    List<String> setClauses = new ArrayList<>();
+    // Junction-backed updates: ordered by first-touch path so deterministic SQL ordering.
+    java.util.LinkedHashMap<String, JunctionPatch> junctionPatches =
+        new java.util.LinkedHashMap<>();
+
+    for (FeatureTransactions.PropertyUpdate update : updates) {
+      String joined = String.join(".", update.getPath());
+      try {
+        // Try column lookup first: scalar/datetime/geometry on the main table, or VALUE_ARRAY's
+        // value column on a junction, all surface as a single column.
+        Optional<
+                de.ii.xtraplatform.base.domain.util.Tuple<
+                    de.ii.xtraplatform.features.sql.domain.SqlQuerySchema,
+                    de.ii.xtraplatform.features.sql.domain.SqlQueryColumn>>
+            resolved =
+                mapping.getColumnForValue(
+                    joined, de.ii.xtraplatform.features.domain.MappingRule.Scope.W);
+        if (resolved.isPresent()) {
+          de.ii.xtraplatform.features.sql.domain.SqlQuerySchema table = resolved.get().first();
+          de.ii.xtraplatform.features.sql.domain.SqlQueryColumn column = resolved.get().second();
+          if (Objects.equals(table.getName(), mainTableName)) {
+            String literal = encodeLiteral(column, update.getValue(), crs);
+            setClauses.add(column.getName() + " = " + literal);
+          } else if (table.isOne2N()) {
+            JunctionPatch patch =
+                junctionPatches.computeIfAbsent(
+                    table.getName(), k -> JunctionPatch.valueArray(table, column));
+            patch.appendValues(update.getValue());
+          } else {
+            return builder
+                .error(
+                    new IllegalArgumentException(
+                        "Property '"
+                            + joined
+                            + "' is backed by an M:N junction; not yet supported."))
+                .build();
+          }
+          continue;
+        }
+        // Not a column. May be an OBJECT_ARRAY parent (its children's columns live on a junction).
+        // SqlQueryMapping doesn't populate object-schemas, so resolve the parent FeatureSchema by
+        // walking the canonical path from the main schema.
+        Optional<de.ii.xtraplatform.features.sql.domain.SqlQuerySchema> objectTable =
+            mapping.getTableForObject(joined);
+        FeatureSchema objectSchema = resolveSchemaByPath(mapping.getMainSchema(), update.getPath());
+        if (objectTable.isPresent()
+            && objectSchema != null
+            && objectSchema.getType()
+                == de.ii.xtraplatform.features.domain.SchemaBase.Type.OBJECT_ARRAY
+            && objectTable.get().isOne2N()) {
+          JunctionPatch patch =
+              junctionPatches.computeIfAbsent(
+                  objectTable.get().getName(),
+                  k -> JunctionPatch.objectArray(objectTable.get(), objectSchema, mapping, joined));
+          patch.appendObjectValues(update.getValue());
+          continue;
+        }
+        return builder
+            .error(
+                new IllegalArgumentException(
+                    "Property '"
+                        + joined
+                        + "' is not a writable column of feature type '"
+                        + featureType
+                        + "'."))
+            .build();
+      } catch (IllegalArgumentException e) {
+        return builder.error(e).build();
+      }
+    }
+
+    try {
+      if (!setClauses.isEmpty()) {
+        String sql =
+            "UPDATE "
+                + mainTableName
+                + " SET "
+                + String.join(", ", setClauses)
+                + " WHERE "
+                + idColumnName
+                + " = "
+                + idLiteral
+                + " RETURNING "
+                + idColumnName
+                + ";";
+        List<String> returned = sqlSession.runReturning(sql);
+        if (returned.isEmpty()) {
+          return builder
+              .error(
+                  new IllegalArgumentException(
+                      "No feature with id '"
+                          + featureId
+                          + "' in collection '"
+                          + featureType
+                          + "'."))
+              .build();
+        }
+        for (String id : returned) {
+          builder.addIds(id);
+        }
+      }
+
+      for (JunctionPatch patch : junctionPatches.values()) {
+        runJunctionPatch(patch, mainTableName, idColumnName, idLiteral, crs);
+      }
+
+      // No main-table SET ran but at least one junction was patched: confirm the feature exists.
+      if (setClauses.isEmpty() && !junctionPatches.isEmpty()) {
+        List<String> exists =
+            sqlSession.runReturning(
+                "SELECT "
+                    + idColumnName
+                    + " FROM "
+                    + mainTableName
+                    + " WHERE "
+                    + idColumnName
+                    + " = "
+                    + idLiteral
+                    + ";");
+        if (exists.isEmpty()) {
+          return builder
+              .error(
+                  new IllegalArgumentException(
+                      "No feature with id '"
+                          + featureId
+                          + "' in collection '"
+                          + featureType
+                          + "'."))
+              .build();
+        }
+        builder.addIds(featureId);
+      }
+    } catch (RuntimeException e) {
+      builder.error(e);
+    }
+    return builder.build();
+  }
+
+  private void runJunctionPatch(
+      JunctionPatch patch,
+      String mainTableName,
+      String idColumnName,
+      String idLiteral,
+      EpsgCrs crs) {
+    // In SqlQueryJoin (read from the child/junction's perspective): `sourceField` is on the
+    // PARENT (its primary/sort key) and `targetField` is on the CHILD (the FK back to parent).
+    // See SqlInsertGenerator2 line ~132 (`parent.sourceField` used as the parent sort key) and
+    // line ~133 (`targetField` added to the child's column list).
+    de.ii.xtraplatform.features.sql.domain.SqlQueryJoin join = patch.junction.getRelations().get(0);
+    String junctionTable = patch.junction.getName();
+    String junctionFk = join.getTargetField();
+    String parentPk = join.getSourceField();
+
+    String deleteSql =
+        "DELETE FROM "
+            + junctionTable
+            + " WHERE "
+            + junctionFk
+            + " IN (SELECT "
+            + parentPk
+            + " FROM "
+            + mainTableName
+            + " WHERE "
+            + idColumnName
+            + " = "
+            + idLiteral
+            + ");";
+    sqlSession.runReturning(deleteSql);
+
+    if (patch.values.isEmpty()) {
+      return;
+    }
+
+    if (patch.objectChildColumns == null) {
+      // VALUE_ARRAY: single value column, one literal per element.
+      String valueCol = patch.valueColumn.getName();
+      StringBuilder valuesList = new StringBuilder();
+      for (int i = 0; i < patch.values.size(); i++) {
+        if (i > 0) valuesList.append(", ");
+        valuesList
+            .append("(")
+            .append(encodeLiteral(patch.valueColumn, Optional.of(patch.values.get(i)), crs))
+            .append(")");
+      }
+      String insertSql =
+          "INSERT INTO "
+              + junctionTable
+              + " ("
+              + junctionFk
+              + ", "
+              + valueCol
+              + ") SELECT m."
+              + parentPk
+              + ", v.val FROM "
+              + mainTableName
+              + " m, (VALUES "
+              + valuesList
+              + ") AS v(val) WHERE m."
+              + idColumnName
+              + " = "
+              + idLiteral
+              + ";";
+      sqlSession.runReturning(insertSql);
+      return;
+    }
+
+    // OBJECT_ARRAY: multi-column INSERT per element. Each JSON object value contributes one row
+    // with literals for the child columns it sets; unset child columns get SQL NULL.
+    List<String> childKeys = new ArrayList<>(patch.objectChildColumns.keySet());
+    StringBuilder cols = new StringBuilder(junctionFk);
+    for (String childKey : childKeys) {
+      cols.append(", ").append(patch.objectChildColumns.get(childKey).getName());
+    }
+    for (com.fasterxml.jackson.databind.JsonNode element : patch.values) {
+      if (!element.isObject()) {
+        throw new IllegalArgumentException(
+            "Object-array element for property '"
+                + patch.objectPath
+                + "' must be a JSON object, got: "
+                + element.getNodeType());
+      }
+      StringBuilder selectLits = new StringBuilder("m.").append(parentPk);
+      for (String childKey : childKeys) {
+        com.fasterxml.jackson.databind.JsonNode v = element.get(childKey);
+        selectLits.append(", ");
+        selectLits.append(
+            encodeLiteral(patch.objectChildColumns.get(childKey), Optional.ofNullable(v), crs));
+      }
+      String insertSql =
+          "INSERT INTO "
+              + junctionTable
+              + " ("
+              + cols
+              + ") SELECT "
+              + selectLits
+              + " FROM "
+              + mainTableName
+              + " m WHERE m."
+              + idColumnName
+              + " = "
+              + idLiteral
+              + ";";
+      sqlSession.runReturning(insertSql);
+    }
+  }
+
+  // Patch state for a junction-backed property. Two modes are encoded in the same record so the
+  // executor's per-path map can hold both kinds:
+  //   VALUE_ARRAY: `valueColumn` is the single value column; `objectChildColumns == null`.
+  //   OBJECT_ARRAY: `valueColumn == null`; `objectChildColumns` maps child schema-ids to their
+  //                 columns on the junction (in declaration order so SQL output is deterministic).
+  private static final class JunctionPatch {
+    final de.ii.xtraplatform.features.sql.domain.SqlQuerySchema junction;
+    final de.ii.xtraplatform.features.sql.domain.SqlQueryColumn valueColumn;
+    final java.util.LinkedHashMap<String, de.ii.xtraplatform.features.sql.domain.SqlQueryColumn>
+        objectChildColumns;
+    final String objectPath;
+    final List<com.fasterxml.jackson.databind.JsonNode> values = new ArrayList<>();
+
+    private JunctionPatch(
+        de.ii.xtraplatform.features.sql.domain.SqlQuerySchema junction,
+        de.ii.xtraplatform.features.sql.domain.SqlQueryColumn valueColumn,
+        java.util.LinkedHashMap<String, de.ii.xtraplatform.features.sql.domain.SqlQueryColumn>
+            objectChildColumns,
+        String objectPath) {
+      this.junction = junction;
+      this.valueColumn = valueColumn;
+      this.objectChildColumns = objectChildColumns;
+      this.objectPath = objectPath;
+    }
+
+    static JunctionPatch valueArray(
+        de.ii.xtraplatform.features.sql.domain.SqlQuerySchema junction,
+        de.ii.xtraplatform.features.sql.domain.SqlQueryColumn valueColumn) {
+      return new JunctionPatch(junction, valueColumn, null, null);
+    }
+
+    static JunctionPatch objectArray(
+        de.ii.xtraplatform.features.sql.domain.SqlQuerySchema junction,
+        FeatureSchema objectSchema,
+        SqlQueryMapping mapping,
+        String path) {
+      java.util.LinkedHashMap<String, de.ii.xtraplatform.features.sql.domain.SqlQueryColumn> cols =
+          new java.util.LinkedHashMap<>();
+      for (FeatureSchema child : objectSchema.getProperties()) {
+        if (child.getType() == de.ii.xtraplatform.features.domain.SchemaBase.Type.OBJECT
+            || child.getType() == de.ii.xtraplatform.features.domain.SchemaBase.Type.OBJECT_ARRAY) {
+          // Skip nested objects — only flat scalar children are supported in this phase. The
+          // caller will see a NULL for those keys, or an error if the user sets them.
+          continue;
+        }
+        String childPath = path + "." + child.getName();
+        mapping
+            .getColumnForValue(childPath, de.ii.xtraplatform.features.domain.MappingRule.Scope.W)
+            .ifPresent(t -> cols.put(child.getName(), t.second()));
+      }
+      if (cols.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Object-array property '"
+                + path
+                + "' has no writable scalar child columns; nested objects are not yet supported"
+                + " by partial updates.");
+      }
+      return new JunctionPatch(junction, null, cols, path);
+    }
+
+    void appendValues(Optional<com.fasterxml.jackson.databind.JsonNode> value) {
+      if (value.isEmpty() || value.get().isNull()) {
+        // Empty value means "clear" — discard any earlier-accumulated values for this path.
+        values.clear();
+        return;
+      }
+      com.fasterxml.jackson.databind.JsonNode node = value.get();
+      if (node.isArray()) {
+        for (com.fasterxml.jackson.databind.JsonNode element : node) {
+          if (!element.isNull()) {
+            values.add(element);
+          }
+        }
+      } else {
+        values.add(node);
+      }
+    }
+
+    void appendObjectValues(Optional<com.fasterxml.jackson.databind.JsonNode> value) {
+      if (value.isEmpty() || value.get().isNull()) {
+        values.clear();
+        return;
+      }
+      com.fasterxml.jackson.databind.JsonNode node = value.get();
+      if (node.isArray()) {
+        for (com.fasterxml.jackson.databind.JsonNode element : node) {
+          if (!element.isNull()) {
+            values.add(element);
+          }
+        }
+      } else if (node.isObject()) {
+        values.add(node);
+      } else {
+        throw new IllegalArgumentException(
+            "Object-array property '"
+                + objectPath
+                + "' requires a JSON object (or array of objects) as the value, got: "
+                + node.getNodeType());
+      }
+    }
+  }
+
+  // SQL literal for a typed column value. Scalar/datetime/boolean become a quoted/raw literal.
+  // Geometry columns (WKT/WKB operations) decode the JsonNode as a GeoJSON geometry, apply CRS
+  // transform from the request CRS to the provider's native CRS, and emit
+  // `ST_GeomFromText('<wkt>', <native_srid>)` (with `ST_ForcePolygonCW` for polygons, matching
+  // the encoding the INSERT path uses in FeatureEncoderSql.toWkt).
+  private String encodeLiteral(
+      de.ii.xtraplatform.features.sql.domain.SqlQueryColumn column,
+      Optional<com.fasterxml.jackson.databind.JsonNode> valueOpt,
+      EpsgCrs crs) {
+    if (valueOpt.isEmpty() || valueOpt.get().isNull()) {
+      return "NULL";
+    }
+    com.fasterxml.jackson.databind.JsonNode value = valueOpt.get();
+    if (column.hasOperation(de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation.WKT)
+        || column.hasOperation(
+            de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation.WKB)) {
+      return encodeGeometryLiteral(column, value, crs);
+    }
+    de.ii.xtraplatform.features.domain.SchemaBase.Type type = column.getType();
+    if (type == de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING
+        || type == de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME
+        || type == de.ii.xtraplatform.features.domain.SchemaBase.Type.DATE) {
+      return sqlString(value.asText());
+    }
+    if (type == de.ii.xtraplatform.features.domain.SchemaBase.Type.BOOLEAN) {
+      return value.asBoolean() ? "TRUE" : "FALSE";
+    }
+    if (type == de.ii.xtraplatform.features.domain.SchemaBase.Type.INTEGER
+        || type == de.ii.xtraplatform.features.domain.SchemaBase.Type.FLOAT) {
+      return value.asText();
+    }
+    // Fallback — treat as string. Avoids generating invalid SQL on niche column types we haven't
+    // wired up explicitly yet (FEATURE_REF, etc.).
+    return sqlString(value.asText());
+  }
+
+  private String encodeGeometryLiteral(
+      de.ii.xtraplatform.features.sql.domain.SqlQueryColumn column,
+      com.fasterxml.jackson.databind.JsonNode value,
+      EpsgCrs crs) {
+    if (!value.isObject()) {
+      throw new IllegalArgumentException(
+          "Geometry property '"
+              + column.getName()
+              + "' requires a GeoJSON geometry object as the value, got: "
+              + value.getNodeType());
+    }
+    de.ii.xtraplatform.geometries.domain.Geometry<?> geometry;
+    try {
+      geometry =
+          new de.ii.xtraplatform.geometries.domain.transcode.json.GeometryDecoderJson(true)
+              .decode(value, Optional.ofNullable(crs), Optional.empty());
+    } catch (java.io.IOException e) {
+      throw new IllegalArgumentException(
+          "Could not parse GeoJSON geometry for property '"
+              + column.getName()
+              + "': "
+              + e.getMessage(),
+          e);
+    }
+    if (crs != null && !Objects.equals(crs, nativeCrs)) {
+      Optional<de.ii.xtraplatform.crs.domain.CrsTransformer> transformer =
+          crsTransformerFactory.getTransformer(crs, nativeCrs);
+      if (transformer.isPresent()) {
+        geometry =
+            geometry.accept(
+                new de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer(
+                    de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform.of(
+                        Optional.empty(), transformer.get())));
+      }
+    }
+    String wkt;
+    try {
+      wkt =
+          new de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryEncoderWkt()
+              .encode(geometry);
+    } catch (java.io.IOException e) {
+      throw new IllegalStateException(
+          "Could not encode geometry as WKT for property '"
+              + column.getName()
+              + "': "
+              + e.getMessage(),
+          e);
+    }
+    String result = String.format("ST_GeomFromText('%s',%s)", wkt, nativeCrs.getCode());
+    if (geometry.getType() == de.ii.xtraplatform.geometries.domain.GeometryType.POLYGON
+        || geometry.getType() == de.ii.xtraplatform.geometries.domain.GeometryType.MULTI_POLYGON) {
+      result = String.format("ST_ForcePolygonCW(%s)", result);
+    }
+    return result;
+  }
+
+  // Walk a canonical schema-id path (e.g. ["mat"], or ["lzi","beg"]) from the feature's main
+  // schema. Returns the last matched FeatureSchema, or null if any segment doesn't resolve.
+  private static FeatureSchema resolveSchemaByPath(FeatureSchema root, List<String> path) {
+    if (root == null || path == null || path.isEmpty()) {
+      return null;
+    }
+    FeatureSchema cursor = root;
+    for (String segment : path) {
+      FeatureSchema next = null;
+      for (FeatureSchema child : cursor.getProperties()) {
+        if (Objects.equals(child.getName(), segment)) {
+          next = child;
+          break;
+        }
+      }
+      if (next == null) {
+        return null;
+      }
+      cursor = next;
+    }
+    return cursor;
+  }
+
+  private static String sqlString(String value) {
+    if (value == null) {
+      return "NULL";
+    }
+    return "'" + value.replace("'", "''") + "'";
   }
 
   @Override
