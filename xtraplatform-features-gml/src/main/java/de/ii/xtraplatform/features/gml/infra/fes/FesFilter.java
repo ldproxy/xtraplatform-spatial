@@ -27,11 +27,12 @@ public class FesFilter extends FesExpression {
   private final List<FesExpression> expressions;
 
   public FesFilter(List<FesExpression> expressions) {
+    super();
     this.expressions = expressions;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
 
     if (expressions.isEmpty()) {
       return;
@@ -43,7 +44,7 @@ public class FesFilter extends FesExpression {
         doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.FILTER));
 
     for (FesExpression expr : expressions) {
-      expr.toXML(version, ex, doc);
+      expr.appendXml(version, ex, doc);
     }
 
     if (ex.getChildNodes().getLength() > 0) {
@@ -52,6 +53,7 @@ public class FesFilter extends FesExpression {
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public Map<String, String> toKVP(VERSION version, XMLNamespaceNormalizer nsStore) {
     // check if the first level expression is BBOX
     try {
@@ -75,41 +77,41 @@ public class FesFilter extends FesExpression {
       // ignore
     }
 
-    if (expressions.get(0) != null) {
-      try {
-        XMLDocumentFactory documentFactory = new XMLDocumentFactory(nsStore);
-        XMLDocument doc = documentFactory.newDocument();
-        doc.addNamespace(FES.getNS(version), FES.getPR(version));
-        Element e =
-            doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.FILTER));
-        doc.appendChild(e);
-
-        expressions.get(0).toXML(version, e, doc);
-
-        if (e.hasChildNodes()) {
-
-          // attach the namespace(s) for the PropertyName value
-          for (String uri : nsStore.xgetNamespaceUris()) {
-            e.setAttribute("xmlns:" + uri + "", nsStore.getNamespaceURI(uri));
-          }
-
-          String filter = doc.toString(false);
-          filter =
-              filter.replace("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>", "");
-
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("FES filter: {}", filter);
-          }
-
-          filter = "(" + filter + ")";
-
-          return ImmutableMap.of("FILTER", filter);
-        }
-      } catch (ParserConfigurationException e) {
-        throw new IllegalStateException(e);
-      }
+    if (expressions.get(0) == null) {
+      return ImmutableMap.of();
     }
 
-    return ImmutableMap.of();
+    try {
+      XMLDocumentFactory documentFactory = new XMLDocumentFactory(nsStore);
+      XMLDocument doc = documentFactory.newDocument();
+      doc.addNamespace(FES.getNS(version), FES.getPR(version));
+      Element e =
+          doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.FILTER));
+      doc.appendChild(e);
+
+      expressions.get(0).appendXml(version, e, doc);
+
+      if (!e.hasChildNodes()) {
+        return ImmutableMap.of();
+      }
+
+      // attach the namespace(s) for the PropertyName value
+      for (String uri : nsStore.xgetNamespaceUris()) {
+        e.setAttribute("xmlns:" + uri, nsStore.getNamespaceURI(uri));
+      }
+
+      String filter = doc.toString(false);
+      filter = filter.replace("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>", "");
+
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("FES filter: {}", filter);
+      }
+
+      filter = "(" + filter + ")";
+
+      return ImmutableMap.of("FILTER", filter);
+    } catch (ParserConfigurationException e) {
+      throw new IllegalStateException(e);
+    }
   }
 }

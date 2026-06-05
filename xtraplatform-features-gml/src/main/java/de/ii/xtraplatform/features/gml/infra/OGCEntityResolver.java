@@ -35,9 +35,9 @@ import org.xml.sax.SAXException;
 public class OGCEntityResolver implements EntityResolver {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OGCEntityResolver.class);
-  private Map<String, String> uris = new HashMap();
+  private final Map<String, String> uris = new HashMap<>();
   private CloseableHttpClient untrustedSslHttpClient;
-  private boolean useBasicAuth = false;
+  private final boolean useBasicAuth;
   private String user;
   private String password;
 
@@ -49,38 +49,42 @@ public class OGCEntityResolver implements EntityResolver {
     this.useBasicAuth = true;
   }
 
-  public OGCEntityResolver() {}
+  public OGCEntityResolver() {
+    this.useBasicAuth = false;
+  }
 
   @Override
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   public InputSource resolveEntity(String publicId, String systemId)
       throws SAXException, IOException {
 
     // TODO: temporary basic auth hack
     // protected schema files
     if (systemId != null && systemId.startsWith("https://") && useBasicAuth) {
-      CloseableHttpResponse response = null;
       LOGGER.debug("resolving protected schema: {}", systemId);
-      try {
-        HttpGet httpGet = new HttpGet(systemId);
+      HttpGet httpGet = new HttpGet(systemId);
 
-        String basic_auth = new String(Base64.encodeBase64((user + ":" + password).getBytes()));
-        httpGet.addHeader("Authorization", "Basic " + basic_auth);
+      String basicAuth = new String(Base64.encodeBase64((user + ":" + password).getBytes()));
+      httpGet.addHeader("Authorization", "Basic " + basicAuth);
 
-        response = untrustedSslHttpClient.execute(httpGet, new BasicHttpContext());
+      try (CloseableHttpResponse response =
+          untrustedSslHttpClient.execute(httpGet, new BasicHttpContext())) {
         String stringFromStream =
             CharStreams.toString(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
         InputSource is = new InputSource(new StringReader(stringFromStream));
         is.setSystemId(systemId);
 
+        EntityUtils.consumeQuietly(response.getEntity());
         return is;
 
       } catch (IOException ex) {
-        ex.printStackTrace();
-        throw new IllegalStateException("Error parsing application schema. " + ex.getMessage());
-      } finally {
-        if (response != null) {
-          EntityUtils.consumeQuietly(response.getEntity());
-        }
+        LOGGER.error("Error parsing application schema.", ex);
+        throw new IllegalStateException("Error parsing application schema. " + ex.getMessage(), ex);
       }
     }
 
@@ -115,6 +119,8 @@ public class OGCEntityResolver implements EntityResolver {
                 "http://www.aixm.aero/gallery/content/public/schema/5.1/AIXM_Features.xsd");
           }
           break;
+        default:
+          break;
       }
     }
 
@@ -146,21 +152,9 @@ public class OGCEntityResolver implements EntityResolver {
       }
 
       // A4I workarounds
-      if (systemId.contains("/exts/InspireFeatureDownload/service")) {
-        String url = systemId;
-        // workaround for A4I 10.1 SP1 (Patch1) blank encoding bug in GET parameters
-        if (url.contains("OUTPUT_FORMAT=")) {
-          int start = url.indexOf("OUTPUT_FORMAT=") + 13;
-          int end = url.indexOf("&", start);
-          String out = url.substring(start, end).replaceAll("%20", "");
-          url = url.substring(0, start) + out + url.substring(end);
-        }
-
-        if (!url.equals(systemId)) {
-          LOGGER.debug("original systemId: {}", systemId);
-          LOGGER.debug("changed systemId: {}", url);
-          return new InputSource(url);
-        }
+      InputSource a4i = handleA4IWorkaround(systemId);
+      if (a4i != null) {
+        return a4i;
       }
     }
 
@@ -175,6 +169,26 @@ public class OGCEntityResolver implements EntityResolver {
     }
 
     return null;
+  }
+
+  private InputSource handleA4IWorkaround(String systemId) {
+    if (!systemId.contains("/exts/InspireFeatureDownload/service")) {
+      return null;
+    }
+    String url = systemId;
+    // workaround for A4I 10.1 SP1 (Patch1) blank encoding bug in GET parameters
+    if (url.contains("OUTPUT_FORMAT=")) {
+      int start = url.indexOf("OUTPUT_FORMAT=") + 13;
+      int end = url.indexOf('&', start);
+      String out = url.substring(start, end).replaceAll("%20", "");
+      url = url.substring(0, start) + out + url.substring(end);
+    }
+    if (url.equals(systemId)) {
+      return null;
+    }
+    LOGGER.debug("original systemId: {}", systemId);
+    LOGGER.debug("changed systemId: {}", url);
+    return new InputSource(url);
   }
 
   private InputSource getSchemaFromBundle(String publicId, String schemaPath) throws IOException {

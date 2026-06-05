@@ -19,7 +19,6 @@ import com.sun.xml.xsom.XSType;
 import com.sun.xml.xsom.parser.XSOMParser;
 import de.ii.xtraplatform.features.domain.FeatureProviderSchemaConsumer;
 import de.ii.xtraplatform.features.gml.infra.req.GML;
-import de.ii.xtraplatform.features.gml.infra.xml.XMLPathTracker;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
@@ -41,11 +40,11 @@ import org.xml.sax.SAXParseException;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.GodClass")
 public class GMLSchemaParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GMLSchemaParser.class);
   private final List<FeatureProviderSchemaConsumer> analyzers;
-  private final XMLPathTracker currentPath;
   private final List<XSElementDecl> abstractObjectDecl;
   private final List<XSElementDecl> abstractFeatureDecl;
   private final Map<String, String> namespaces;
@@ -65,12 +64,12 @@ public class GMLSchemaParser {
       Map<String, String> namespaces,
       EntityResolver entityResolver) {
     this.analyzers = analyzers;
-    this.currentPath = new XMLPathTracker();
-    this.abstractObjectDecl = new ArrayList<XSElementDecl>();
-    this.abstractFeatureDecl = new ArrayList<XSElementDecl>();
+    this.abstractObjectDecl = new ArrayList<>();
+    this.abstractFeatureDecl = new ArrayList<>();
     this.baseURI = baseURI;
     this.namespaces = namespaces;
     this.entityResolver = entityResolver;
+    this.complexTypes = new HashSet<>();
   }
 
   public void parse(
@@ -101,6 +100,12 @@ public class GMLSchemaParser {
     parse(is, elements, true, tracker);
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   private void parse(
       InputSource is,
       Map<String, List<String>> elements,
@@ -161,9 +166,11 @@ public class GMLSchemaParser {
         // and Schema
         // in this case we search in the targetNamespace of the Schema
         if (schema == null && lax) {
-          LOGGER.info(
-              "Schema for Namespace '{}' not found, searching in targetNamespace schema instead. ",
-              ns.getKey());
+          if (LOGGER.isInfoEnabled()) {
+            LOGGER.info(
+                "Schema for Namespace '{}' not found, searching in targetNamespace schema instead. ",
+                ns.getKey());
+          }
 
           // looks as if the schema for the targetNamespace of the document is always second in the
           // list
@@ -197,14 +204,7 @@ public class GMLSchemaParser {
                     0);
               }
             }
-            XSParticle particle = elem.getType().asComplexType().getContentType().asParticle();
-            if (particle != null) {
-              XSTerm term = particle.getTerm();
-              if (term.isModelGroup()) {
-                complexTypes = new HashSet<String>();
-                parseGroup(term.asModelGroup(), 1, false, i -> {});
-              }
-            }
+            parseRootElement(elem);
           }
         }
       }
@@ -216,7 +216,8 @@ public class GMLSchemaParser {
         throw new IllegalStateException(
             String.format(
                 "The GML application schema provided by the WFS imports schema '%s', but that schema cannot be accessed. A valid GML application schema is required to determine the layers of the proxy service and its characteristics.. Please contact the WFS provider to correct the schema error.",
-                ex.getCause().getMessage()));
+                ex.getCause().getMessage()),
+            ex);
       }
 
       String msg = ex.toString();
@@ -229,8 +230,22 @@ public class GMLSchemaParser {
 
       throw new IllegalStateException(
           "The GML application schema provided by the WFS is invalid. A valid GML application schema is required to determine the layers of the proxy service and its characteristics. Please contact the WFS provider to correct the schema error. \n"
-              + msgex);
+              + msgex,
+          ex);
     }
+  }
+
+  private void parseRootElement(XSElementDecl elem) {
+    XSParticle particle = elem.getType().asComplexType().getContentType().asParticle();
+    if (particle == null) {
+      return;
+    }
+    XSTerm term = particle.getTerm();
+    if (!term.isModelGroup()) {
+      return;
+    }
+    complexTypes.clear();
+    parseGroup(term.asModelGroup(), 1, false, i -> {});
   }
 
   private void track(
@@ -257,7 +272,7 @@ public class GMLSchemaParser {
     // reset already visited complex types for every first level property of the featuretype,
     // meaning for every new path that should not contain recursion
     if (depth == 2) {
-      complexTypes = new HashSet<String>();
+      complexTypes.clear();
     }
 
     XSParticle[] particles = xsModelGroup.getChildren();
@@ -283,6 +298,12 @@ public class GMLSchemaParser {
     }
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   private void parseElementDecl(
       XSElementDecl decl,
       long minOccurs,
@@ -291,17 +312,10 @@ public class GMLSchemaParser {
       boolean isParentMultible,
       Consumer<Integer> onFeature) {
 
-    String propertyName = null;
-    XSType propertyType = null;
     boolean isObject = false;
     boolean isFeature = false;
 
-    propertyName = decl.getName();
-
-    String typeName = decl.getType().getBaseType().getName();
-    String typeName0 = decl.getType().getName();
-
-    propertyType = decl.getType();
+    XSType propertyType = decl.getType();
 
     if (decl.getType().getName() != null) {
       XSElementDecl decl0 = decl.getSubstAffiliation();
@@ -330,13 +344,11 @@ public class GMLSchemaParser {
         decl0 = decl0.getSubstAffiliation();
       }
 
-      if (gcoObjectType != null) {
-        if (propertyType.isDerivedFrom(gcoObjectType)) {
-          isObject = true;
-        }
+      if (gcoObjectType != null && propertyType.isDerivedFrom(gcoObjectType)) {
+        isObject = true;
       }
 
-    } else if (!decl.getType().getBaseType().getName().equals("anyType")) {
+    } else if (!"anyType".equals(decl.getType().getBaseType().getName())) {
       propertyType = decl.getType().getBaseType();
     }
 
@@ -345,6 +357,8 @@ public class GMLSchemaParser {
       onFeature.accept(depth);
       return;
     }
+
+    String propertyName = decl.getName();
 
     String propertyTypeName = propertyType.getName();
 
@@ -451,21 +465,16 @@ public class GMLSchemaParser {
 
   private void parseComplexType(
       XSComplexType type, int depth, boolean isParenMultiple, Consumer<Integer> onFeature) {
-    if (type != null) {
+    if (type != null && complexTypes.add(type.getTargetNamespace() + ":" + type.getName())) {
       /*for (XSAttributeUse att : elem.getAttributeUses()) {
       LOGGER.debug("   - attribute {}, required: {}, type: {}, ns: {}", att.getDecl().getName(), att.isRequired(), att.getDecl().getType().getName(), att.getDecl().getTargetNamespace());
       analyzer.analyzeAttribute(att.getDecl().getTargetNamespace(), att.getDecl().getName(), att.getDecl().getType().getName(), att.isRequired());
       }*/
 
       // stop analyzing if the complex type already occurred in this path to avoid recursion
-      if (complexTypes.add(type.getTargetNamespace() + ":" + type.getName())) {
-        XSParticle particle = type.getContentType().asParticle();
-        if (particle != null) {
-          XSTerm term = particle.getTerm();
-          if (term.isModelGroup()) {
-            parseGroup(term.asModelGroup(), depth, isParenMultiple, onFeature);
-          }
-        }
+      XSParticle particle = type.getContentType().asParticle();
+      if (particle != null && particle.getTerm().isModelGroup()) {
+        parseGroup(particle.getTerm().asModelGroup(), depth, isParenMultiple, onFeature);
       }
     }
   }

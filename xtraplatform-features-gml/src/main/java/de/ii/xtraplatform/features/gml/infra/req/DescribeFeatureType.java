@@ -18,8 +18,6 @@ import org.w3c.dom.Element;
  */
 public class DescribeFeatureType implements WfsOperation {
 
-  public DescribeFeatureType() {}
-
   @Override
   public WFS.OPERATION getOperation() {
     return WFS.OPERATION.DESCRIBE_FEATURE_TYPE;

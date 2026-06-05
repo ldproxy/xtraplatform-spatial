@@ -17,17 +17,18 @@ public class FesNot extends FesExpression {
   private final List<FesExpression> operands;
 
   public FesNot(List<FesExpression> operands) {
+    super();
     this.operands = operands;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element ex = doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.NOT));
     e.appendChild(ex);
 
     for (FesExpression expr : operands) {
-      expr.toXML(version, ex, doc);
+      expr.appendXml(version, ex, doc);
     }
   }
 }

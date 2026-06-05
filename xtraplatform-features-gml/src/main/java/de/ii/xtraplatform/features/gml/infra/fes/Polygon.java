@@ -17,11 +17,13 @@ public class Polygon extends Geometry {
 
   private List<List<List<Double>>> rings;
 
-  public Polygon() {}
+  public Polygon() {
+    super();
+  }
 
   public Polygon(double[] coordinates, EpsgCrs sr) {
     this();
-    this.coordinates = coordinates;
+    this.coordinates = coordinates.clone();
     this.crs = sr;
   }
 
@@ -41,7 +43,7 @@ public class Polygon extends Geometry {
     return rings;
   }
 
-  private static double[] parseCoordinates(String[] coordinates) {
+  private static double[] parseCoordinates(String... coordinates) {
     double[] doubleCoordinates = new double[coordinates.length];
 
     for (int i = 0; i < coordinates.length; i++) {

@@ -61,6 +61,7 @@ public enum GmlGeometryType {
     return false;
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public GeometryType toSimpleFeatureGeometry() {
     return switch (this) {
       case POINT -> GeometryType.POINT;

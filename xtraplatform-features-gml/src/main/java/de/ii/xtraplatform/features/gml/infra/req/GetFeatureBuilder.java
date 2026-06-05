@@ -9,7 +9,7 @@ package de.ii.xtraplatform.features.gml.infra.req;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import de.ii.xtraplatform.features.gml.infra.req.GetFeature.RESULT_TYPE;
+import de.ii.xtraplatform.features.gml.infra.req.GetFeature.ResultType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +20,7 @@ public class GetFeatureBuilder {
   private Integer count;
   private Integer startIndex;
   private boolean hitsOnly;
-  private Map<String, String> additionalOperationParameters;
+  private final Map<String, String> additionalOperationParameters;
 
   public GetFeatureBuilder() {
     this.queries = new ArrayList<>();
@@ -58,7 +58,7 @@ public class GetFeatureBuilder {
         ImmutableList.copyOf(queries),
         count,
         startIndex,
-        hitsOnly ? RESULT_TYPE.HITS : RESULT_TYPE.RESULT,
+        hitsOnly ? ResultType.HITS : ResultType.RESULT,
         ImmutableMap.copyOf(additionalOperationParameters));
   }
 }

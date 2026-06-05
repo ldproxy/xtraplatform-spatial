@@ -21,13 +21,17 @@ public class FesTemporalLiteral extends FesExpression {
   protected final String beginPosition;
   protected final String endPosition;
 
+  @SuppressWarnings("PMD.NullAssignment")
   public FesTemporalLiteral(String position) {
+    super();
     this.position = position;
     this.beginPosition = null;
     this.endPosition = null;
   }
 
+  @SuppressWarnings("PMD.NullAssignment")
   public FesTemporalLiteral(String beginPosition, String endPosition) {
+    super();
     this.position = null;
     this.beginPosition = beginPosition;
     this.endPosition = endPosition;
@@ -42,7 +46,7 @@ public class FesTemporalLiteral extends FesExpression {
   }
 
   @Override
-  public void toXML(VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(VERSION version, Element e, XMLDocument doc) {
     GML.VERSION gmlVersion = version.getGmlVersion();
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     doc.addNamespace(GML.getNS(gmlVersion), GML.getPR(gmlVersion));

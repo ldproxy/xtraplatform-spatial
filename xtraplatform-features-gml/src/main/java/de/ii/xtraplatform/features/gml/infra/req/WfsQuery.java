@@ -14,17 +14,14 @@ import de.ii.xtraplatform.features.gml.infra.fes.FesFilter;
 import de.ii.xtraplatform.features.gml.infra.xml.XMLDocument;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.xml.transform.TransformerException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
 public class WfsQuery {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(WfsQuery.class);
 
   private final List<String> typeNames;
   private final Optional<FesFilter> filter;
@@ -49,16 +46,14 @@ public class WfsQuery {
       // final Node node =
       // document.adoptDocument(FILTER_ENCODERS.get(versions.getWfsVersion()).encode(filter.get(0)));
       // query.appendChild(node);
-      filter.get().toXML(versions.getWfsVersion().getFilterVersion(), query, document);
+      filter.get().appendXml(versions.getWfsVersion().getFilterVersion(), query, document);
     }
 
     query.setAttribute(
         WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.TYPENAMES), getTypeNames());
 
     if (this.crs != null) {
-      query.setAttribute(
-          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.SRSNAME),
-          getCrs(versions.getWfsVersion()));
+      query.setAttribute(WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.SRSNAME), getCrs());
     }
 
     return query;
@@ -69,13 +64,13 @@ public class WfsQuery {
     final ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
 
     builder.put(
-        WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.TYPENAMES).toUpperCase(),
+        WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.TYPENAMES).toUpperCase(Locale.ROOT),
         getTypeNames());
 
-    if (getCrs(versions.getWfsVersion()) != null) {
+    if (getCrs() != null) {
       builder.put(
-          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.SRSNAME).toUpperCase(),
-          getCrs(versions.getWfsVersion()));
+          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.SRSNAME).toUpperCase(Locale.ROOT),
+          getCrs());
     }
 
     if (filter.isPresent()) {
@@ -93,7 +88,7 @@ public class WfsQuery {
     return Joiner.on(',').skipNulls().join(typeNames);
   }
 
-  private String getCrs(WFS.VERSION version) {
+  private String getCrs() {
     if (this.crs != null) {
       return crs.toSimpleString();
     }

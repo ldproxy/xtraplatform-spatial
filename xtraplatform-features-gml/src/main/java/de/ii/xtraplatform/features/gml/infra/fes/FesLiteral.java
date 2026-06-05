@@ -17,6 +17,7 @@ public class FesLiteral extends FesExpression {
   protected final String value;
 
   public FesLiteral(String value) {
+    super();
     this.value = value;
   }
 
@@ -25,7 +26,7 @@ public class FesLiteral extends FesExpression {
   }
 
   @Override
-  public void toXML(VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(VERSION version, Element e, XMLDocument doc) {
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element ex =
         doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.LITERAL));

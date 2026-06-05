@@ -12,13 +12,19 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.hc.core5.net.URIBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author fischer
  */
+@SuppressWarnings("PMD.FieldNamingConventions")
 public class WFS extends VersionedVocabulary {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(WFS.class);
 
   public enum VERSION {
     _1_0_0("1.0.0", FES.VERSION._1_0_0, GML.VERSION._2_1_1),
@@ -28,8 +34,7 @@ public class WFS extends VersionedVocabulary {
     private final FES.VERSION filterVersion;
     private final GML.VERSION gmlVersion;
 
-    private VERSION(
-        String stringRepresentation, FES.VERSION filterVersion, GML.VERSION gmlVersion) {
+    VERSION(String stringRepresentation, FES.VERSION filterVersion, GML.VERSION gmlVersion) {
       this.stringRepresentation = stringRepresentation;
       this.filterVersion = filterVersion;
       this.gmlVersion = gmlVersion;
@@ -94,7 +99,7 @@ public class WFS extends VersionedVocabulary {
     NONE("");
     private final String stringRepresentation;
 
-    private OPERATION(String stringRepresentation) {
+    OPERATION(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -118,7 +123,7 @@ public class WFS extends VersionedVocabulary {
     POST("POST");
     private final String stringRepresentation;
 
-    private METHOD(String stringRepresentation) {
+    METHOD(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -350,9 +355,12 @@ public class WFS extends VersionedVocabulary {
       if (inUri.getQuery() != null && !inUri.getQuery().isEmpty()) {
         for (String inParam : inUri.getQuery().split("&")) {
           String[] param = inParam.split("=");
-          if (!WFS.hasKVPKey(param[0].toUpperCase())) {
-            if (param.length >= 2) outUri.addParameter(param[0], param[1]);
-            else System.out.println("SINGLE " + param[0]);
+          if (!WFS.hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
+            if (param.length >= 2) {
+              outUri.addParameter(param[0], param[1]);
+            } else {
+              LOGGER.debug("SINGLE {}", param[0]);
+            }
           }
         }
       }

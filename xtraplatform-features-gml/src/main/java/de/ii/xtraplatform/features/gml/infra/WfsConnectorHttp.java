@@ -28,16 +28,16 @@ import de.ii.xtraplatform.features.gml.infra.req.WfsOperation;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.web.domain.Http;
 import de.ii.xtraplatform.web.domain.HttpClient;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.hc.core5.net.URIBuilder;
 import org.codehaus.staxmate.SMInputFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author zahnen
@@ -46,18 +46,17 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
 
   public static final String CONNECTOR_TYPE = "HTTP";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(WfsConnectorHttp.class);
-  private static final SMInputFactory staxFactory = new SMInputFactory(new InputFactoryImpl());
+  private static final SMInputFactory STAX_FACTORY = new SMInputFactory(new InputFactoryImpl());
 
   private final HttpClient httpClient;
   private final WfsRequestEncoder wfsRequestEncoder;
-  private final boolean useHttpPost;
   private final Optional<Metadata> metadata;
   private Optional<Throwable> connectionError;
   private final String providerId;
   private final ConnectionInfoWfsHttp connectionInfo;
 
   @AssistedInject
+  @SuppressWarnings("PMD.ConstructorCallsOverridableMethod")
   WfsConnectorHttp(
       Http http,
       VolatileRegistry volatileRegistry,
@@ -65,7 +64,6 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
       @Assisted ConnectionInfoWfsHttp connectionInfo) {
     // TODO
     super(volatileRegistry);
-    this.useHttpPost = connectionInfo.getMethod() == ConnectionInfoWfsHttp.METHOD.POST;
 
     Map<String, Map<WFS.METHOD, URI>> urls =
         ImmutableMap.of(
@@ -110,7 +108,6 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
     super(null);
     httpClient = null;
     wfsRequestEncoder = null;
-    useHttpPost = false;
     metadata = Optional.empty();
     providerId = null;
     connectionInfo = null;
@@ -122,7 +119,7 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
     if (inUri.getQuery() != null && !inUri.getQuery().isEmpty()) {
       for (String inParam : inUri.getQuery().split("&")) {
         String[] param = inParam.split("=");
-        if (!WFS.hasKVPKey(param[0].toUpperCase())) {
+        if (!WFS.hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
           outUri.addParameter(param[0], param[1]);
         }
       }
@@ -150,17 +147,16 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
   public void stop() {}
 
   private Optional<Metadata> crawlMetadata() {
-    try {
-      InputStream inputStream = runWfsOperation(new GetCapabilities());
+    try (InputStream inputStream = runWfsOperation(new GetCapabilities())) {
       WfsCapabilitiesAnalyzer metadataConsumer = new WfsCapabilitiesAnalyzer();
       WFSCapabilitiesParser gmlSchemaParser =
-          new WFSCapabilitiesParser(metadataConsumer, staxFactory);
+          new WFSCapabilitiesParser(metadataConsumer, STAX_FACTORY);
       gmlSchemaParser.parse(inputStream);
 
       this.connectionError = Optional.empty();
 
       return Optional.of(metadataConsumer.getMetadata());
-    } catch (Throwable e) {
+    } catch (IOException | RuntimeException e) {
       this.connectionError = Optional.of(e);
     }
 

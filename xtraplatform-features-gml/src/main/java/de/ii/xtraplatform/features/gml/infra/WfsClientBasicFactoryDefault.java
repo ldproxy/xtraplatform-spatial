@@ -48,7 +48,7 @@ public class WfsClientBasicFactoryDefault implements WfsClientBasicFactory {
   @Override
   public void dispose(WfsClientBasic wfsClient) {
     if (wfsClient instanceof WfsConnector) {
-      connectorFactory.disposeConnector(((WfsConnector) wfsClient));
+      connectorFactory.disposeConnector((WfsConnector) wfsClient);
     }
   }
 }

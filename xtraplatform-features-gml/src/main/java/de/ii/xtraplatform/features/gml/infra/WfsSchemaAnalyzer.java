@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 import javax.xml.namespace.QName;
 
+@SuppressWarnings("PMD.GodClass")
 class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
 
   public static final String GML_NS_URI = GML.getNS(GML.VERSION._2_1_1);
@@ -80,7 +81,6 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
 
   @Override
   public void analyzeFeatureType(String nsUri, String localName) {
-    String currentPrefixedName = namespaceNormalizer.getQualifiedName(nsUri, localName);
     QName currentQualifiedName = namespaceNormalizer.getQName(nsUri, localName);
 
     mappedPaths.clear();
@@ -92,6 +92,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
       return;
     }
 
+    String currentPrefixedName = namespaceNormalizer.getQualifiedName(nsUri, localName);
     String currentLocalName = typeIds.get(currentQualifiedName);
     this.skip = false;
 
@@ -99,6 +100,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void analyzeAttribute(
       String nsUri, String localName, String type, boolean required, int depth) {
     // only first level gml:ids
@@ -110,8 +112,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
         namespaceNormalizer.getNamespacePrefix(nsUri), "@" + localName, depth + 1, false);
 
     if (depth == 0
-        && ((localName.equals("id") && nsUri.startsWith(GML_NS_URI)) || localName.equals("fid"))) {
-      String path = currentPath.toString();
+        && ("id".equals(localName) && nsUri.startsWith(GML_NS_URI) || "fid".equals(localName))) {
       // if (!isPathMapped(path)) {
       mappingBuilder.addValue(
           "id", currentPath.asList(), FeatureSchema.Type.STRING, FeatureSchema.Role.ID);
@@ -128,6 +129,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void analyzeProperty(
       String nsUri,
       String localName,
@@ -142,15 +144,14 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     String path = currentPath.toString();
 
     // skip first level gml properties
-    if ((nsUri.startsWith(GML_NS_URI)
+    if (nsUri.startsWith(GML_NS_URI)
             && (path.startsWith(namespaceNormalizer.getNamespacePrefix(nsUri) + ":")
-                || mappingBuilder.getPrev().filter(FeatureSchema::isSpatial).isPresent()))
+                || mappingBuilder.getPrev().filter(FeatureSchema::isSpatial).isPresent())
         || skip) {
       return;
     }
 
     boolean isMultiple = maxOccurs > 1 || maxOccurs == -1;
-    boolean isRequired = minOccurs > 0;
 
     // if (!isPathMapped(path)) {
     Optional<FeatureSchema.Type> propertyType =
@@ -162,7 +163,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     if (propertyType.isPresent()) {
       String fieldNameGml = currentPath.toFieldNameGml();
 
-      if (fieldNameGml.equals("id")) {
+      if ("id".equals(fieldNameGml)) {
         fieldNameGml = "_id_";
       }
 
@@ -203,7 +204,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
       boolean isObject,
       int pathLength) {
     boolean isObj =
-        ((isComplex || isObject) && pathLength % 2 == 0) || Objects.equals(type, "ReferenceType");
+        (isComplex || isObject) && pathLength % 2 == 0 || Objects.equals(type, "ReferenceType");
 
     if ((isMultiple || isParentMultiple) && isObj) {
       return Optional.of(FeatureSchema.Type.OBJECT_ARRAY);
@@ -246,6 +247,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     }*/
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private FeatureSchema.Type getFeatureSchemaType(GmlType dataType) {
     switch (dataType) {
       case BOOLEAN:
@@ -276,7 +278,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
       return false;
     }
 
-    String parent = path.substring(0, path.lastIndexOf("/"));
+    String parent = path.substring(0, path.lastIndexOf('/'));
     for (String mappedPath : mappedPaths) {
       if (parent.equals(mappedPath)) {
         return true;

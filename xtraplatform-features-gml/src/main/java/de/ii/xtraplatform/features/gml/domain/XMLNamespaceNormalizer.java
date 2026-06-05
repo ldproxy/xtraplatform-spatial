@@ -17,6 +17,7 @@ import javax.xml.namespace.QName;
 /**
  * @author fischer
  */
+@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
 public class XMLNamespaceNormalizer {
 
   private Map<String, String> namespaces;
@@ -80,13 +81,15 @@ public class XMLNamespaceNormalizer {
     addNamespace(prefix, namespaceURI);
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void addNamespace(String prefix, String namespaceURI) {
+    String effectivePrefix = prefix;
 
-    if (namespaces.containsKey(prefix)) {
-      prefix += "x";
+    if (namespaces.containsKey(effectivePrefix)) {
+      effectivePrefix += "x";
     }
 
-    if (prefix != null && prefix.isEmpty()) {
+    if (effectivePrefix != null && effectivePrefix.isEmpty()) {
       // defaultNamespaceURI = namespaceURI;
       // prefix = defaultNamespacePRE;
       // LOGGER.debug("Added Default-Namespace: {}, {}", prefix, namespaceURI);
@@ -98,14 +101,16 @@ public class XMLNamespaceNormalizer {
       if (namespaceURI.startsWith("http://www.opengis.net/gml")) {
         namespaces.put("gml", namespaceURI);
         // LOGGER.debug("Added gml Namespace: {}, {}", "gml", namespaceURI);
-      } else if (!namespaces.containsValue(namespaceURI) && prefix != null) {
-        namespaces.put(prefix, namespaceURI);
-        // LOGGER.debug("Added Namespace: {}, {}", prefix, namespaceURI);
+      } else if (!namespaces.containsValue(namespaceURI) && effectivePrefix != null) {
+        namespaces.put(effectivePrefix, namespaceURI);
+        // LOGGER.debug("Added Namespace: {}, {}", effectivePrefix, namespaceURI);
       }
     }
 
-    if (prefix != null && prefix.length() > 5 && !shortNamespaces.containsValue(namespaceURI)) {
-      String pre = prefix.substring(0, 5) + shortcount++;
+    if (effectivePrefix != null
+        && effectivePrefix.length() > 5
+        && !shortNamespaces.containsValue(namespaceURI)) {
+      String pre = effectivePrefix.substring(0, 5) + shortcount++;
       shortNamespaces.put(pre, namespaceURI);
     }
   }
@@ -137,12 +142,13 @@ public class XMLNamespaceNormalizer {
   */
 
   public String convertToShortForm(String longform) {
+    String shortForm = longform;
     for (Map.Entry<String, String> ns : namespaces.entrySet()) {
       if (ns != null && !ns.getValue().isEmpty()) {
-        longform = longform.replace(ns.getValue(), this.getNamespacePrefix(ns.getValue()));
+        shortForm = shortForm.replace(ns.getValue(), this.getNamespacePrefix(ns.getValue()));
       }
     }
-    return longform;
+    return shortForm;
   }
 
   /*
@@ -163,7 +169,7 @@ public class XMLNamespaceNormalizer {
   }
   */
   public String getLocalName(String qn) {
-    return qn.substring(qn.lastIndexOf(":") + 1);
+    return qn.substring(qn.lastIndexOf(':') + 1);
   }
 
   public String getQualifiedName(String lqn) {
@@ -193,7 +199,7 @@ public class XMLNamespaceNormalizer {
 
   public String extractURI(String qn) {
     if (qn.contains(":")) {
-      return qn.substring(0, qn.lastIndexOf(":"));
+      return qn.substring(0, qn.lastIndexOf(':'));
     } else {
       return "";
     }

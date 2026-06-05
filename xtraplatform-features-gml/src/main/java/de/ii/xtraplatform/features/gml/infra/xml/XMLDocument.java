@@ -69,7 +69,7 @@ public class XMLDocument {
 
   public void done() {
     for (String uri : nsn.xgetNamespaceUris()) {
-      this.doc.getDocumentElement().setAttribute("xmlns:" + uri + "", nsn.getNamespaceURI(uri));
+      this.doc.getDocumentElement().setAttribute("xmlns:" + uri, nsn.getNamespaceURI(uri));
     }
   }
 

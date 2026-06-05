@@ -16,7 +16,7 @@ import org.w3c.dom.Element;
 
 public abstract class FesExpression {
 
-  public abstract void toXML(FES.VERSION version, Element e, XMLDocument doc);
+  public abstract void appendXml(FES.VERSION version, Element e, XMLDocument doc);
 
   public Map<String, String> toKVP(FES.VERSION version, XMLNamespaceNormalizer nsStore) {
     return ImmutableMap.of();

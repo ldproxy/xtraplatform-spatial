@@ -127,7 +127,7 @@ public class AbstractFeatureProviderMetadataConsumer implements FeatureProviderM
 
   @Override
   public void analyzeFeatureTypeBoundingBox(
-      String featureTypeName, String xmin, String ymin, String xmax, String ymax) {}
+      String featureTypeName, BoundingBoxStrings boundingBox) {}
 
   @Override
   public void analyzeFeatureTypeDefaultCrs(String featureTypeName, String crs) {}

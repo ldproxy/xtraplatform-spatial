@@ -10,12 +10,14 @@ package de.ii.xtraplatform.features.gml.infra.req;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.hc.core5.net.URIBuilder;
 
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.FieldNamingConventions")
 public class CSW extends VersionedVocabulary {
 
   public enum VERSION {
@@ -25,7 +27,7 @@ public class CSW extends VersionedVocabulary {
     private final String stringRepresentation;
     private final FES.VERSION filterVersion;
 
-    private VERSION(String stringRepresentation, FES.VERSION filterVersion) {
+    VERSION(String stringRepresentation, FES.VERSION filterVersion) {
       this.stringRepresentation = stringRepresentation;
       this.filterVersion = filterVersion;
     }
@@ -81,7 +83,7 @@ public class CSW extends VersionedVocabulary {
     NONE("");
     private final String stringRepresentation;
 
-    private OPERATION(String stringRepresentation) {
+    OPERATION(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -105,7 +107,7 @@ public class CSW extends VersionedVocabulary {
     POST("POST");
     private final String stringRepresentation;
 
-    private METHOD(String stringRepresentation) {
+    METHOD(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -259,7 +261,7 @@ public class CSW extends VersionedVocabulary {
       if (inUri.getQuery() != null && !inUri.getQuery().isEmpty()) {
         for (String inParam : inUri.getQuery().split("&")) {
           String[] param = inParam.split("=");
-          if (!CSW.hasKVPKey(param[0].toUpperCase())) {
+          if (!CSW.hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
             outUri.addParameter(param[0], param[1]);
           }
         }
