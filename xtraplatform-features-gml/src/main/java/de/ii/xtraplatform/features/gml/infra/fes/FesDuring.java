@@ -18,16 +18,17 @@ public class FesDuring extends FesExpression {
   private final FesTemporalLiteral right;
 
   public FesDuring(FesValueReference left, FesTemporalLiteral right) {
+    super();
     this.left = left;
     this.right = right;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element ex = doc.createElementNS(FES.getNS(version), FES.getWord(version, VOCABULARY.DURING));
     e.appendChild(ex);
-    left.toXML(version, ex, doc);
-    right.toXML(version, ex, doc);
+    left.appendXml(version, ex, doc);
+    right.appendXml(version, ex, doc);
   }
 }

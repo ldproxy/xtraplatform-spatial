@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.infra.req;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.FieldNamingConventions")
 public class GML extends VersionedVocabulary {
 
   public enum VERSION {
@@ -22,7 +23,7 @@ public class GML extends VersionedVocabulary {
 
     private final String stringRepresentation;
 
-    private VERSION(String stringRepresentation) {
+    VERSION(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -42,15 +43,15 @@ public class GML extends VersionedVocabulary {
 
     public static VERSION fromOutputFormatString(String value) {
 
-      value = value.toLowerCase();
+      String normalized = value.toLowerCase(java.util.Locale.ROOT);
 
-      if (value.contains("gml2")) {
+      if (normalized.contains("gml2")) {
         return VERSION._2_1_1;
-      } else if (value.contains("text/xml") && value.contains("subtype=gml/3.1.1")) {
+      } else if (normalized.contains("text/xml") && normalized.contains("subtype=gml/3.1.1")) {
         return VERSION._3_1_1;
-      } else if (value.contains("text/xml") && value.contains("subtype=gml/3.2.1")) {
+      } else if (normalized.contains("text/xml") && normalized.contains("subtype=gml/3.2.1")) {
         return VERSION._3_2_1_OLD;
-      } else if (value.contains("application/gml+xml") && value.contains("version=3.2")) {
+      } else if (normalized.contains("application/gml+xml") && normalized.contains("version=3.2")) {
         return VERSION._3_2_1;
       }
 

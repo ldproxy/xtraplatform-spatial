@@ -12,11 +12,10 @@ import de.ii.xtraplatform.features.gml.infra.xml.XMLDocument;
 import de.ii.xtraplatform.features.gml.infra.xml.XMLDocumentFactory;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.xml.transform.TransformerException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
@@ -24,24 +23,22 @@ import org.xml.sax.SAXException;
  * @author zahnen
  */
 public class GetFeature implements WfsOperation {
-  enum RESULT_TYPE {
+  enum ResultType {
     RESULT,
     HITS
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GetFeature.class);
-
   private final List<WfsQuery> query;
   private final Integer count;
   private final Integer startIndex;
-  private final RESULT_TYPE resultType;
+  private final ResultType resultType;
   private final Map<String, String> additionalOperationParameters;
 
   public GetFeature(
       List<WfsQuery> query,
       Integer count,
       Integer startIndex,
-      RESULT_TYPE resultType,
+      ResultType resultType,
       Map<String, String> additionalOperationParameters) {
     this.query = query;
     this.count = count;
@@ -78,10 +75,10 @@ public class GetFeature implements WfsOperation {
           String.valueOf(startIndex));
     }
 
-    if (this.resultType == RESULT_TYPE.HITS) {
+    if (this.resultType == ResultType.HITS) {
       operation.setAttribute(
           WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.RESULT_TYPE),
-          String.valueOf(RESULT_TYPE.HITS).toLowerCase());
+          String.valueOf(ResultType.HITS).toLowerCase(Locale.ROOT));
     }
 
     if (versions.getGmlVersion() != null && versions.getWfsVersion() != null) {
@@ -119,25 +116,26 @@ public class GetFeature implements WfsOperation {
     // WFS.VOCABULARY.OUTPUT_FORMAT).toUpperCase(), GML.getWord(versions.getGmlVersion(),
     // GML.VOCABULARY.OUTPUTFORMAT_VALUE));
     builder.put(
-        WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.VERSION).toUpperCase(),
+        WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.VERSION).toUpperCase(Locale.ROOT),
         versions.getWfsVersion().toString());
 
     if (this.count != null) {
       builder.put(
-          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.COUNT).toUpperCase(),
+          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.COUNT).toUpperCase(Locale.ROOT),
           String.valueOf(count));
     }
 
     if (this.startIndex != null && versions.getWfsVersion().isGreaterOrEqual(WFS.VERSION._2_0_0)) {
       builder.put(
-          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.STARTINDEX).toUpperCase(),
+          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.STARTINDEX).toUpperCase(Locale.ROOT),
           String.valueOf(startIndex));
     }
 
-    if (this.resultType == RESULT_TYPE.HITS) {
+    if (this.resultType == ResultType.HITS) {
       builder.put(
-          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.RESULT_TYPE).toUpperCase(),
-          String.valueOf(RESULT_TYPE.HITS).toLowerCase());
+          WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.RESULT_TYPE)
+              .toUpperCase(Locale.ROOT),
+          String.valueOf(ResultType.HITS).toLowerCase(Locale.ROOT));
     }
 
     if (!additionalOperationParameters.isEmpty()) {

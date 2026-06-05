@@ -18,14 +18,15 @@ import org.w3c.dom.Element;
  */
 public class GetCapabilities implements WfsOperation {
 
-  private final WFS.VERSION m_version;
+  private final WFS.VERSION version;
 
+  @SuppressWarnings("PMD.NullAssignment")
   public GetCapabilities() {
-    m_version = null;
+    this.version = null;
   }
 
   public GetCapabilities(WFS.VERSION version) {
-    m_version = version;
+    this.version = version;
   }
 
   @Override
@@ -46,8 +47,8 @@ public class GetCapabilities implements WfsOperation {
             WFS.getNS(versions.getWfsVersion()), getOperationName(versions.getWfsVersion()));
     doc.appendChild(oper);
 
-    if (m_version != null) {
-      oper.setAttribute(WFS.getWord(m_version, WFS.VOCABULARY.VERSION), m_version.toString());
+    if (version != null) {
+      oper.setAttribute(WFS.getWord(version, WFS.VOCABULARY.VERSION), version.toString());
     }
 
     oper.setAttribute("service", "WFS");
@@ -62,8 +63,8 @@ public class GetCapabilities implements WfsOperation {
     builder.put("REQUEST", this.getOperation().toString());
     builder.put("SERVICE", "WFS");
 
-    if (m_version != null) {
-      builder.put("VERSION", m_version.toString());
+    if (version != null) {
+      builder.put("VERSION", version.toString());
     } else if (versions.getWfsVersion() != null) {
       builder.put("VERSION", versions.getWfsVersion().toString());
     }

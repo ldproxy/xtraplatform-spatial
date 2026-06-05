@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.infra.req;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.FieldNamingConventions")
 public class FES extends VersionedVocabulary {
 
   public enum VERSION {
@@ -20,7 +21,7 @@ public class FES extends VersionedVocabulary {
     private final String stringRepresentation;
     private final GML.VERSION gmlVersion;
 
-    private VERSION(String stringRepresentation, GML.VERSION gmlVersion) {
+    VERSION(String stringRepresentation, GML.VERSION gmlVersion) {
       this.stringRepresentation = stringRepresentation;
       this.gmlVersion = gmlVersion;
     }
@@ -44,19 +45,11 @@ public class FES extends VersionedVocabulary {
     }
 
     public boolean isGreaterOrEqual(FES.VERSION other) {
-      if (this.compareTo(other) >= 0) {
-        return true;
-      } else {
-        return false;
-      }
+      return this.compareTo(other) >= 0;
     }
 
     public boolean isEqual(FES.VERSION other) {
-      if (this.compareTo(other) == 0) {
-        return true;
-      } else {
-        return false;
-      }
+      return this.compareTo(other) == 0;
     }
   }
 

@@ -478,6 +478,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Void visit(Polygon geometry) {
     boolean asPatch = options.contains(Options.POLYGON_AS_PATCH);
     boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);

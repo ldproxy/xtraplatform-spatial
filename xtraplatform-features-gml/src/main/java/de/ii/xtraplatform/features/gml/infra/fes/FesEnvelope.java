@@ -17,6 +17,7 @@ public class FesEnvelope extends FesExpression {
   private final BoundingBox boundingBox;
 
   public FesEnvelope(BoundingBox boundingBox) {
+    super();
     this.boundingBox = boundingBox;
   }
 
@@ -25,5 +26,5 @@ public class FesEnvelope extends FesExpression {
   }
 
   @Override
-  public void toXML(VERSION version, Element e, XMLDocument doc) {}
+  public void appendXml(VERSION version, Element e, XMLDocument doc) {}
 }

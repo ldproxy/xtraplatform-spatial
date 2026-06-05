@@ -13,6 +13,7 @@ import java.util.Map;
 /**
  * @author zahnen
  */
+@SuppressWarnings({"PMD.UseUtilityClass", "PMD.FieldNamingConventions"})
 public class VersionedVocabulary {
 
   public enum NAMESPACE {

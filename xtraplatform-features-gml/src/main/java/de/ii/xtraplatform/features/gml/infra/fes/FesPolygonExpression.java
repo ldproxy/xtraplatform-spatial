@@ -11,21 +11,22 @@ import de.ii.xtraplatform.features.gml.infra.req.FES;
 import de.ii.xtraplatform.features.gml.infra.req.GML;
 import de.ii.xtraplatform.features.gml.infra.xml.XMLDocument;
 import java.util.List;
-import java.util.Map;
 import org.w3c.dom.Element;
 
 public class FesPolygonExpression extends FesExpression {
 
-  private Polygon poly;
-  private String geometryPath;
+  private final Polygon poly;
+  private final String geometryPath;
 
   public FesPolygonExpression(Polygon env, String geometryPath) {
+    super();
     this.geometryPath = geometryPath;
     this.poly = env;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
 
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element intersects =
@@ -78,7 +79,7 @@ public class FesPolygonExpression extends FesExpression {
       for (List<Double> ring : rings) {
         for (Double d : ring) {
           c.append(d);
-          c.append(" ");
+          c.append(' ');
         }
       }
 
@@ -88,19 +89,5 @@ public class FesPolygonExpression extends FesExpression {
       linearring.appendChild(poslist);
       poslist.setTextContent(c.toString());
     }
-  }
-
-  public void toKVP(FES.VERSION version, Map<String, String> params) {
-
-    /*
-    String min = env.getXmin() + "," + env.getYmin();
-    String max = env.getXmax() + "," + env.getYmax();
-    String bbox = min+","+max;
-
-    if( !env.getSpatialReference().getWkidString().equals("4326")) {
-    bbox += ","+env.getSpatialReference().getEPSGCode();
-    }
-    params.put(FES.getWord(version, FES.VOCABULARY.BBOX).toUpperCase(), bbox);
-    */
   }
 }
