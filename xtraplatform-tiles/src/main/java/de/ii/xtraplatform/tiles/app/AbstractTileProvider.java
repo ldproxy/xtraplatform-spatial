@@ -41,21 +41,29 @@ public abstract class AbstractTileProvider<T extends TileProviderData>
 
     onStateChange(
         (from, to) -> {
-          LOGGER.info("Tile provider with id '{}' state changed: {}", getId(), getState());
+          if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("Tile provider with id '{}' state changed: {}", getId(), getState());
+          }
         },
         true);
 
-    LOGGER.info("Tile provider with id '{}' started successfully.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Tile provider with id '{}' started successfully.", getId());
+    }
   }
 
   @Override
   protected void onReloaded(boolean forceReload) {
-    LOGGER.info("Tile provider with id '{}' reloaded successfully.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Tile provider with id '{}' reloaded successfully.", getId());
+    }
   }
 
   @Override
   protected void onStopped() {
-    LOGGER.info("Tile provider with id '{}' stopped.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Tile provider with id '{}' stopped.", getId());
+    }
   }
 
   @Override

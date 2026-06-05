@@ -61,8 +61,9 @@ class FeatureMerger {
     this.context = context;
   }
 
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.CognitiveComplexity"})
   List<MvtFeature> merge(Set<MvtFeature> mergeFeatures) {
-    ImmutableList<ImmutableList<Object>> valueGroups =
+    List<List<Object>> valueGroups =
         groupBy.stream()
             .map(
                 att ->
@@ -94,11 +95,13 @@ class FeatureMerger {
                   }
                 }
               });
-      LOGGER.trace(
-          "{}: {} merged polygon features, total pixel area: {}.",
-          context,
-          polygonFeatures.size(),
-          polygonFeatures.stream().mapToDouble(f -> f.getGeometry().getArea()).sum());
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace(
+            "{}: {} merged polygon features, total pixel area: {}.",
+            context,
+            polygonFeatures.size(),
+            polygonFeatures.stream().mapToDouble(f -> f.getGeometry().getArea()).sum());
+      }
     }
 
     if (mergeFeatures.stream()
@@ -121,17 +124,24 @@ class FeatureMerger {
                   }
                 }
               });
-      LOGGER.trace(
-          "{}: {} merged line string features, total pixel length: {}.",
-          context,
-          lineStringFeatures.size(),
-          lineStringFeatures.stream().mapToDouble(f -> f.getGeometry().getLength()).sum());
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace(
+            "{}: {} merged line string features, total pixel length: {}.",
+            context,
+            lineStringFeatures.size(),
+            lineStringFeatures.stream().mapToDouble(f -> f.getGeometry().getLength()).sum());
+      }
     }
 
     polygonFeatures.addAll(lineStringFeatures);
     return polygonFeatures;
   }
 
+  @SuppressWarnings({
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.CognitiveComplexity"
+  })
   private List<MvtFeature> mergePolygons(Set<MvtFeature> mergeFeatures, List<Object> values) {
     // merge all polygons with the values for the groupBy attributes
     ImmutableList.Builder<MvtFeature> result = ImmutableList.builder();
@@ -194,11 +204,13 @@ class FeatureMerger {
                       .flatMap(Collection::stream)
                       .map(Polygon.class::cast)
                       .collect(Collectors.toSet()));
-              if (key.getGeometry() instanceof MultiPolygon)
+              if (key.getGeometry() instanceof MultiPolygon) {
                 polygonBuilder.addAll(
                     TileGeometryUtil.splitMultiPolygon((MultiPolygon) key.getGeometry()));
-              else polygonBuilder.add((Polygon) key.getGeometry());
-              ImmutableSet<Polygon> polygons = polygonBuilder.build();
+              } else {
+                polygonBuilder.add((Polygon) key.getGeometry());
+              }
+              Set<Polygon> polygons = polygonBuilder.build();
               Geometry geom;
               switch (polygons.size()) {
                 case 0:
@@ -219,12 +231,14 @@ class FeatureMerger {
                       overlay.setStrictMode(true);
                       geom = overlay.getResult();
                     }
-                  } catch (Exception e) {
+                  } catch (RuntimeException e) {
                     geom = geometryFactory.createMultiPolygon(polygons.toArray(Polygon[]::new));
                   }
               }
-              LOGGER.trace(
-                  "{} grouped by {}: {} polygons", context, values, geom.getNumGeometries());
+              if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(
+                    "{} grouped by {}: {} polygons", context, values, geom.getNumGeometries());
+              }
               if (!geom.isValid()) {
                 geom = new GeometryFixer(geom).getResult();
               }
@@ -233,11 +247,13 @@ class FeatureMerger {
                   || geom.isEmpty()
                   || geom.getNumGeometries() == 0
                   || !geom.isValid()) {
-                LOGGER.debug(
-                    "{}: Merged polygon feature grouped by {} has no or an invalid geometry. Using {} unmerged features.",
-                    context,
-                    values,
-                    value.size() + 1);
+                if (LOGGER.isDebugEnabled()) {
+                  LOGGER.debug(
+                      "{}: Merged polygon feature grouped by {} has no or an invalid geometry. Using {} unmerged features.",
+                      context,
+                      values,
+                      value.size() + 1);
+                }
                 result.add(key);
                 value.forEach(result::add);
 
@@ -271,6 +287,7 @@ class FeatureMerger {
   }
 
   // merge all polygons with the values for the groupBy attributes
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.CognitiveComplexity"})
   private List<MvtFeature> mergeLineStrings(Set<MvtFeature> mergeFeatures, List<Object> values) {
     ImmutableList.Builder<MvtFeature> result = ImmutableList.builder();
 
@@ -332,11 +349,13 @@ class FeatureMerger {
                       .flatMap(Collection::stream)
                       .map(LineString.class::cast)
                       .collect(Collectors.toSet()));
-              if (key.getGeometry() instanceof MultiLineString)
+              if (key.getGeometry() instanceof MultiLineString) {
                 lineStringBuilder.addAll(
                     TileGeometryUtil.splitMultiLineString((MultiLineString) key.getGeometry()));
-              else lineStringBuilder.add((LineString) key.getGeometry());
-              ImmutableSet<LineString> lineStrings = lineStringBuilder.build();
+              } else {
+                lineStringBuilder.add((LineString) key.getGeometry());
+              }
+              Set<LineString> lineStrings = lineStringBuilder.build();
               Geometry geom;
               switch (lineStrings.size()) {
                 case 0:
@@ -358,18 +377,22 @@ class FeatureMerger {
                             lineStrings.toArray(LineString[]::new));
                   }
               }
-              LOGGER.trace(
-                  "{} grouped by {}: {} line strings", context, values, geom.getNumGeometries());
+              if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(
+                    "{} grouped by {}: {} line strings", context, values, geom.getNumGeometries());
+              }
               if (!geom.isValid()) {
                 geom = new GeometryFixer(geom).getResult();
               }
 
               if (geom.isEmpty() || geom.getNumGeometries() == 0 || !geom.isValid()) {
-                LOGGER.debug(
-                    "{}: Merged line string feature grouped by {} has no or an invalid geometry. Using {} unmerged features.",
-                    context,
-                    values,
-                    value.size());
+                if (LOGGER.isDebugEnabled()) {
+                  LOGGER.debug(
+                      "{}: Merged line string feature grouped by {} has no or an invalid geometry. Using {} unmerged features.",
+                      context,
+                      values,
+                      value.size());
+                }
                 result.add(key);
                 value.forEach(result::add);
 

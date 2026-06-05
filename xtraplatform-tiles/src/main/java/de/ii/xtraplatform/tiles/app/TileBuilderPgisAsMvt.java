@@ -84,6 +84,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileBuilderPgisAsMvt
     implements FeatureQueriesExtension, TileBuilder, DropwizardPlugin {
 
@@ -114,15 +115,11 @@ public class TileBuilderPgisAsMvt
   @Override
   public boolean isSupported(
       FeatureProviderConnector<?, ?, ?> connector, FeatureProviderDataV2 data) {
-    if (connector instanceof SqlConnector
+    // TODO: check mapping: ignore, warn, error
+    return connector instanceof SqlConnector
         && Objects.equals(((SqlConnector) connector).getDialect(), SqlDbmsPgis.ID)
         && (data instanceof FeatureProviderSqlData)
-        && getConfiguration(data.getExtensions()).isPresent()) {
-      // TODO: check mapping: ignore, warn, error
-      return true;
-    }
-
-    return false;
+        && getConfiguration(data.getExtensions()).isPresent();
   }
 
   @Override
@@ -169,6 +166,7 @@ public class TileBuilderPgisAsMvt
   }
 
   @Override
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.ExceptionAsFlowControl"})
   public byte[] getMvtData(
       TileQuery tileQuery,
       TilesetFeatures tileset,
@@ -224,7 +222,7 @@ public class TileBuilderPgisAsMvt
           return (byte[]) row.get(0);
         }
       }
-    } catch (Throwable e) {
+    } catch (Exception e) {
       LOGGER.error(
           "Error during optimized PostGIS MVT tile generation, using an empty tile: {}",
           e.getMessage());
@@ -255,7 +253,7 @@ public class TileBuilderPgisAsMvt
     String table = schema.getSourcePath().get().substring(1);
     String geomColumn =
         schema.getProperties().stream()
-            .filter(property -> property.isPrimaryGeometry())
+            .filter(SchemaBase::isPrimaryGeometry)
             .findFirst()
             .flatMap(SchemaBase::getSourcePath)
             .orElseThrow();
@@ -285,12 +283,12 @@ public class TileBuilderPgisAsMvt
             .filter(SchemaBase::isId)
             .filter(
                 property ->
-                    property.getSourcePath().isPresent() && Type.INTEGER.equals(property.getType()))
+                    property.getSourcePath().isPresent() && property.getType() == Type.INTEGER)
             .findFirst()
             .map(FeatureSchema::getName);
 
     String filter = filtersToSql(providerId, tileset, schema, tms.getId(), level);
-    int buffer = (tms.getTileExtent() / tms.getTileSize()) * TileBuilder.BUFFER_SIZE_FORMAL;
+    int buffer = tms.getTileExtent() / tms.getTileSize() * BUFFER_SIZE_FORMAL;
 
     String bounds = "bounds AS (SELECT %1$s AS geom, %2$s::box2d AS b2d)";
     String mvtgeom =
@@ -403,7 +401,7 @@ public class TileBuilderPgisAsMvt
         unsupportedMode == UnsupportedMode.WARN ? ", skipping transformations in properties" : "";
 
     if (!objectOrArrayProperties.isEmpty()) {
-      if (unsupportedMode != UnsupportedMode.IGNORE) {
+      if (unsupportedMode != UnsupportedMode.IGNORE && LOGGER.isWarnEnabled()) {
         LOGGER.warn(
             "Optimized PostGIS MVT tile generation is not supported for object and array properties{}: {}",
             skipping,
@@ -414,7 +412,7 @@ public class TileBuilderPgisAsMvt
       }
     }
     if (!transformedValueProperties.isEmpty()) {
-      if (unsupportedMode != UnsupportedMode.IGNORE) {
+      if (unsupportedMode != UnsupportedMode.IGNORE && LOGGER.isWarnEnabled()) {
         LOGGER.warn(
             "Optimized PostGIS MVT tile generation is not supported for value transformations{}: {}",
             skippingTransformations,
@@ -425,7 +423,7 @@ public class TileBuilderPgisAsMvt
       }
     }
     if (!joinedValueProperties.isEmpty()) {
-      if (unsupportedMode != UnsupportedMode.IGNORE) {
+      if (unsupportedMode != UnsupportedMode.IGNORE && LOGGER.isWarnEnabled()) {
         LOGGER.warn(
             "Optimized PostGIS MVT tile generation is not supported for joined value properties{}: {}",
             skipping,
@@ -436,14 +434,18 @@ public class TileBuilderPgisAsMvt
       }
     }
     if (hasCrsAxisSwap) {
-      LOGGER.warn(
-          "Optimized PostGIS MVT tile generation is not supported for native CRS with forced axis: {}",
-          data.getNativeCrs().get());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Optimized PostGIS MVT tile generation is not supported for native CRS with forced axis: {}",
+            data.getNativeCrs().get());
+      }
       isFeasible = false;
     }
 
     if (!isFeasible) {
-      LOGGER.warn("Optimized PostGIS MVT tile generation disabled");
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn("Optimized PostGIS MVT tile generation disabled");
+      }
       return false;
     }
 

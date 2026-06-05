@@ -142,14 +142,15 @@ public class TileCacheDynamic implements ChainedTileProvider, TileCache {
           try {
             tileStore.delete(tileset, tileMatrixSet, limits, false);
           } catch (IOException e) {
-            // ignore
-            LOGGER.debug(
-                "{}: error while purging cached tiles for {}, tileset {}, tile matrix {}. Reason: {}",
-                TileSeedingJobSet.LABEL,
-                tileSourceLabel,
-                tileset,
-                limits.getTileMatrix(),
-                e.getMessage());
+            if (LOGGER.isDebugEnabled()) {
+              LOGGER.debug(
+                  "{}: error while purging cached tiles for {}, tileset {}, tile matrix {}. Reason: {}",
+                  TileSeedingJobSet.LABEL,
+                  tileSourceLabel,
+                  tileset,
+                  limits.getTileMatrix(),
+                  e.getMessage());
+            }
           }
         });
   }
