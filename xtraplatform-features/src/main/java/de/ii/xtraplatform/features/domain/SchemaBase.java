@@ -33,6 +33,19 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     PRIMARY_INSTANT,
     PRIMARY_INTERVAL_START,
     PRIMARY_INTERVAL_END,
+    /**
+     * Denormalised pointer to the predecessor version's PRIMARY_INTERVAL_START value. On versioned
+     * collections, write paths maintain this so a feature can be walked backwards through its
+     * version chain without an extra join. The strategy's mutation pipeline populates it (see
+     * {@code MutationStrategy.insertRoleOverrides}).
+     */
+    PREDECESSOR_INTERVAL_START,
+    /**
+     * Denormalised pointer to the successor version's PRIMARY_INTERVAL_START value. Set on the
+     * retired row by the mutation pipeline at retire time so a feature can be walked forwards
+     * through its version chain.
+     */
+    SUCCESSOR_INTERVAL_START,
     SECONDARY_GEOMETRY,
     FILTER_GEOMETRY,
     EMBEDDED_FEATURE,
