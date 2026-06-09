@@ -199,15 +199,24 @@ public interface FeatureSchema
   Optional<GeometryType> getGeometryType();
 
   /**
-   * @langEn Optional name for an object type, used for example in JSON Schema. For properties that
-   *     should be mapped as links according to *RFC 8288*, use `Link`.
-   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name hat i.d.R. nur
-   *     informativen Charakter und wird z.B. bei der Erzeugung von JSON-Schemas verwendet. Bei
-   *     Eigenschaften, die als Web-Links nach RFC 8288 abgebildet werden sollen, ist immer "Link"
-   *     anzugeben.
-   * @default
+   * @langEn Optional name for an object type, used for example in JSON Schema.
+   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name wird z.B. bei der
+   *     Erzeugung von JSON-Schemas verwendet.
+   * @default null
    */
   Optional<String> getObjectType();
+
+  /**
+   * The object type whose schema fragment originally listed this property — set by the fragment
+   * resolver when a property is merged in from a fragment that declares {@code objectType}. Codecs
+   * that qualify property element names per object type (for example, XML with namespaces) use the
+   * origin's object type instead of the containing object's, so a property defined in a base
+   * fragment retains the base fragment's context even when nested under an object that declares a
+   * different {@code objectType}.
+   */
+  @JsonIgnore
+  @DocIgnore
+  Optional<String> getOriginObjectType();
 
   /**
    * @langEn Label for the schema object, used for example in HTML representations.
