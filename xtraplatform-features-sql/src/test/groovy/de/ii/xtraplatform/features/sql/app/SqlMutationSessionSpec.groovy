@@ -124,8 +124,7 @@ class SqlMutationSessionSpec extends Specification {
         def session = buildSession([:])
 
         when:
-        session.assertNoConflictingVersion(
-                'unknown_type', '42', java.time.Instant.parse('2026-06-06T10:00:00Z'))
+        session.assertNoConflictingVersion('unknown_type', '42')
 
         then:
         def ex = thrown(IllegalArgumentException)

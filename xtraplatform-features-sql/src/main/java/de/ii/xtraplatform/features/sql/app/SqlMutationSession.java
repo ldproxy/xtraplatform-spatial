@@ -439,14 +439,14 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     return builder.build();
   }
 
-  // Versioned-Insert pre-flight (plan §1.5 Part A.insert): refuses to write a new version if any
-  // existing row for the same role-id would conflict — another open version (end IS NULL), an
-  // overlapping closed version (end > insertTimestamp), or a backdating violation (start >=
-  // insertTimestamp). The check runs as a single SELECT on the main table and returns an error
-  // result the caller maps to a 409.
+  // Versioned-Insert pre-flight (plan §1.5 Part A.insert): refuses to write a new feature row when
+  // any version of the same role-id already exists (open or retired). Clients add new versions of
+  // an existing feature through Replace / Update / Delete; Insert is reserved for brand-new ids.
+  // The check runs as a single SELECT on the main table and returns an error result the caller
+  // maps to a 409.
   @Override
   public FeatureTransactions.MutationResult assertNoConflictingVersion(
-      String featureType, String featureId, Instant insertTimestamp) {
+      String featureType, String featureId) {
     SqlQueryMapping mapping = requireMapping(featureType);
     ImmutableMutationResult.Builder builder =
         ImmutableMutationResult.builder()
@@ -454,36 +454,17 @@ public class SqlMutationSession implements FeatureTransactions.Session {
             .hasFeatures(false);
     Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> idColumn =
         mapping.getColumnForId();
-    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
-        startColumn = mapping.getColumnForRole(SchemaBase.Role.PRIMARY_INTERVAL_START);
-    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> endColumn =
-        mapping.getColumnForRole(SchemaBase.Role.PRIMARY_INTERVAL_END);
-    if (idColumn.isEmpty() || startColumn.isEmpty() || endColumn.isEmpty()) {
+    if (idColumn.isEmpty()) {
       return builder
           .error(
               new IllegalStateException(
                   "Feature type '"
                       + featureType
-                      + "' is missing ID / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END role"
-                      + " columns; cannot run the versioned-insert pre-flight."))
+                      + "' has no id column; cannot run the versioned-insert pre-flight."))
           .build();
     }
     String mainTableName = idColumn.get().first().getName();
-    if (!Objects.equals(startColumn.get().first().getName(), mainTableName)
-        || !Objects.equals(endColumn.get().first().getName(), mainTableName)) {
-      return builder
-          .error(
-              new IllegalStateException(
-                  "Feature type '"
-                      + featureType
-                      + "' has id / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END on more than"
-                      + " one table; pre-flight requires all three on the main table."))
-          .build();
-    }
     String idCol = idColumn.get().second().getName();
-    String startCol = startColumn.get().second().getName();
-    String endCol = endColumn.get().second().getName();
-    String tsLit = sqlString(insertTimestamp.toString());
     String sql =
         "SELECT 1 FROM "
             + mainTableName
@@ -491,31 +472,19 @@ public class SqlMutationSession implements FeatureTransactions.Session {
             + idCol
             + " = "
             + sqlString(featureId)
-            + " AND ("
-            + endCol
-            + " IS NULL OR "
-            + endCol
-            + " > "
-            + tsLit
-            + " OR "
-            + startCol
-            + " >= "
-            + tsLit
-            + ") LIMIT 1;";
+            + " LIMIT 1;";
     try {
       List<String> hit = sqlSession.runReturning(sql);
       if (!hit.isEmpty()) {
         return builder
             .error(
                 new IllegalArgumentException(
-                    "Cannot create a new version of feature id '"
+                    "Cannot create feature id '"
                         + featureId
                         + "' in collection '"
                         + featureType
-                        + "' at "
-                        + insertTimestamp
-                        + ": a conflicting version exists (another open version, an overlapping"
-                        + " closed version, or a version at or after this timestamp)."))
+                        + "': a version of this feature already exists (use Replace or Update to"
+                        + " add a new version)."))
             .build();
       }
     } catch (RuntimeException e) {
@@ -673,6 +642,382 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     }
 
     return patchInternal(featureType, featureId, updates, crs, extra, "open version of feature");
+  }
+
+  // Versioned Update CLONE_AND_PATCH (plan §1.3): create a new version of the open row, carry
+  // forward every column, apply the property updates, and retire the previous open version. The
+  // sequence is:
+  //   1. SELECT the open row's surrogate PK ([+ start when the predecessor role is bound]).
+  //   2. INSERT INTO main (cols) SELECT … FROM main m WHERE m.pk = OLD_PK, with role-driven
+  //      overrides (start=ts, end=NULL, predecessor=OLD_start, successor=NULL); RETURNING NEW_PK.
+  //   3. For each writable junction table, INSERT … SELECT carrying every column forward except
+  //      the FK, which is redirected to NEW_PK.
+  //   4. Retire OLD: UPDATE main SET endCol=ts [, successorCol=ts] WHERE pk=OLD_PK AND endCol IS
+  //      NULL AND startCol < ts. (Same guards as retireFeature.)
+  //   5. Apply property patches to the now-only open row via patchInternal — main-table scalar
+  //      patches land as a single UPDATE; VALUE_ARRAY / OBJECT_ARRAY patches reuse the existing
+  //      DELETE+INSERT junction path.
+  // An empty result on step 1 → caller maps to 409 (or 412 when `expectedStart` was present).
+  @Override
+  public FeatureTransactions.MutationResult cloneAndPatchFeature(
+      String featureType,
+      String featureId,
+      List<FeatureTransactions.PropertyUpdate> updates,
+      Instant mutationTimestamp,
+      EpsgCrs crs,
+      Optional<Instant> expectedStart) {
+    SqlQueryMapping mapping = requireMapping(featureType);
+    ImmutableMutationResult.Builder builder =
+        ImmutableMutationResult.builder()
+            .type(FeatureTransactions.MutationResult.Type.UPDATE)
+            .hasFeatures(false);
+
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> idColumn =
+        mapping.getColumnForId();
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
+        startColumn = mapping.getColumnForRole(SchemaBase.Role.PRIMARY_INTERVAL_START);
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> endColumn =
+        mapping.getColumnForRole(SchemaBase.Role.PRIMARY_INTERVAL_END);
+    if (idColumn.isEmpty() || startColumn.isEmpty() || endColumn.isEmpty()) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  "Feature type '"
+                      + featureType
+                      + "' is missing ID / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END role"
+                      + " columns; cannot clone-and-patch."))
+          .build();
+    }
+    SqlQuerySchema mainTable = idColumn.get().first();
+    String mainTableName = mainTable.getName();
+    if (!Objects.equals(startColumn.get().first().getName(), mainTableName)
+        || !Objects.equals(endColumn.get().first().getName(), mainTableName)) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  "Feature type '"
+                      + featureType
+                      + "' has id / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END on more than"
+                      + " one table; clone-and-patch requires all three on the main table."))
+          .build();
+    }
+    String idColumnName = idColumn.get().second().getName();
+    String startColumnName = startColumn.get().second().getName();
+    String endColumnName = endColumn.get().second().getName();
+    String pkColumnName = mainTable.getSortKey();
+    String tsLiteral = sqlString(mutationTimestamp.toString());
+
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
+        predecessorColumn = mapping.getColumnForRole(SchemaBase.Role.PREDECESSOR_INTERVAL_START);
+    boolean predecessorOnMain =
+        predecessorColumn.isPresent()
+            && Objects.equals(predecessorColumn.get().first().getName(), mainTableName);
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
+        successorColumn = mapping.getColumnForRole(SchemaBase.Role.SUCCESSOR_INTERVAL_START);
+    boolean successorOnMain =
+        successorColumn.isPresent()
+            && Objects.equals(successorColumn.get().first().getName(), mainTableName);
+
+    // Step 1: capture the open row's surrogate PK (and reject early if no open row matches).
+    StringBuilder findPk =
+        new StringBuilder("SELECT ")
+            .append(pkColumnName)
+            .append(" FROM ")
+            .append(mainTableName)
+            .append(" WHERE ")
+            .append(idColumnName)
+            .append(" = ")
+            .append(sqlString(featureId))
+            .append(" AND ")
+            .append(endColumnName)
+            .append(" IS NULL");
+    if (expectedStart.isPresent()) {
+      findPk
+          .append(" AND ")
+          .append(startColumnName)
+          .append(" = ")
+          .append(sqlString(expectedStart.get().toString()));
+    }
+    findPk.append(" LIMIT 1;");
+    List<String> oldPkRows;
+    try {
+      oldPkRows = sqlSession.runReturning(findPk.toString());
+    } catch (RuntimeException e) {
+      return builder.error(e).build();
+    }
+    if (oldPkRows.isEmpty()) {
+      // No open version (concurrent retirement / unknown id) — or expectedStart mismatch (412).
+      // Caller distinguishes by the presence of expectedStart.
+      return builder.build();
+    }
+    String oldPkLit = sqlLiteralForPk(oldPkRows.get(0));
+
+    // Step 1b: capture the open row's start, when needed for the predecessor denorm column.
+    Optional<String> oldStart = Optional.empty();
+    if (predecessorOnMain) {
+      try {
+        List<String> startRows =
+            sqlSession.runReturning(
+                "SELECT "
+                    + startColumnName
+                    + " FROM "
+                    + mainTableName
+                    + " WHERE "
+                    + pkColumnName
+                    + " = "
+                    + oldPkLit
+                    + ";");
+        if (!startRows.isEmpty()) {
+          oldStart = Optional.of(startRows.get(0));
+        }
+      } catch (RuntimeException e) {
+        return builder.error(e).build();
+      }
+    }
+
+    // Resolve which property updates land on the main table — those become inline overrides on the
+    // clone INSERT, so the patches don't need a second UPDATE round-trip.
+    Map<String, String> mainColumnPatches = new java.util.LinkedHashMap<>();
+    for (FeatureTransactions.PropertyUpdate u : updates) {
+      String joined = String.join(".", u.getPath());
+      Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> resolved =
+          mapping.getColumnForValue(joined, MappingRule.Scope.W);
+      if (resolved.isPresent() && Objects.equals(resolved.get().first().getName(), mainTableName)) {
+        SqlQueryColumn col = resolved.get().second();
+        mainColumnPatches.put(col.getName(), encodeLiteral(col, u.getValue(), crs));
+      }
+    }
+
+    // Step 2: clone the main row with literal overrides for role-bearing columns and inline
+    // main-column patches; carry-forward everything else.
+    List<String> insertCols = new ArrayList<>();
+    List<String> selectExprs = new ArrayList<>();
+    for (SqlQueryColumn col : mainTable.getColumns()) {
+      String name = col.getName();
+      if (Objects.equals(name, pkColumnName)) {
+        continue; // auto-PK — let the DB generate the new value
+      }
+      insertCols.add(name);
+      Optional<SchemaBase.Role> role = col.getRole();
+      if (role.isPresent()) {
+        if (role.get() == SchemaBase.Role.PRIMARY_INTERVAL_START) {
+          selectExprs.add(tsLiteral);
+          continue;
+        }
+        if (role.get() == SchemaBase.Role.PRIMARY_INTERVAL_END) {
+          selectExprs.add("NULL");
+          continue;
+        }
+        if (role.get() == SchemaBase.Role.PREDECESSOR_INTERVAL_START) {
+          selectExprs.add(oldStart.map(SqlMutationSession::sqlString).orElse("NULL"));
+          continue;
+        }
+        if (role.get() == SchemaBase.Role.SUCCESSOR_INTERVAL_START) {
+          // The new row is open — no successor yet.
+          selectExprs.add("NULL");
+          continue;
+        }
+      }
+      String patchLit = mainColumnPatches.get(name);
+      selectExprs.add(patchLit != null ? patchLit : "m." + name);
+    }
+    String cloneMainSql =
+        "INSERT INTO "
+            + mainTableName
+            + " ("
+            + String.join(", ", insertCols)
+            + ") SELECT "
+            + String.join(", ", selectExprs)
+            + " FROM "
+            + mainTableName
+            + " m WHERE m."
+            + pkColumnName
+            + " = "
+            + oldPkLit
+            + " RETURNING "
+            + pkColumnName
+            + ";";
+    List<String> newPkRows;
+    try {
+      newPkRows = sqlSession.runReturning(cloneMainSql);
+    } catch (RuntimeException e) {
+      return builder.error(e).build();
+    }
+    if (newPkRows.isEmpty()) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  "Clone-and-patch of feature id '"
+                      + featureId
+                      + "' in collection '"
+                      + featureType
+                      + "' did not return a new row PK; clone INSERT must have inserted 0 rows."))
+          .build();
+    }
+    String newPkLit = sqlLiteralForPk(newPkRows.get(0));
+
+    // Step 3: clone every writable junction table's rows for OLD_PK, redirecting the FK to NEW_PK.
+    // Deduplicate junctions across writable-table entries (multiple property paths can map to one
+    // junction).
+    java.util.Set<String> clonedJunctions = new java.util.LinkedHashSet<>();
+    for (SqlQuerySchema junction : mapping.getWritableTables().values()) {
+      if (junction == null || Objects.equals(junction.getName(), mainTableName)) {
+        continue;
+      }
+      if (!clonedJunctions.add(junction.getName())) {
+        continue;
+      }
+      try {
+        cloneJunctionRows(junction, oldPkLit, newPkLit);
+      } catch (RuntimeException e) {
+        return builder.error(e).build();
+      }
+    }
+
+    // Step 4: retire OLD. Same guard as retireFeature — no-backdating + must be the open row.
+    StringBuilder retireSet = new StringBuilder(endColumnName).append(" = ").append(tsLiteral);
+    if (successorOnMain) {
+      retireSet
+          .append(", ")
+          .append(successorColumn.get().second().getName())
+          .append(" = ")
+          .append(tsLiteral);
+    }
+    String retireSql =
+        "UPDATE "
+            + mainTableName
+            + " SET "
+            + retireSet
+            + " WHERE "
+            + pkColumnName
+            + " = "
+            + oldPkLit
+            + " AND "
+            + endColumnName
+            + " IS NULL AND "
+            + startColumnName
+            + " < "
+            + tsLiteral
+            + " RETURNING "
+            + pkColumnName
+            + ";";
+    List<String> retiredRows;
+    try {
+      retiredRows = sqlSession.runReturning(retireSql);
+    } catch (RuntimeException e) {
+      return builder.error(e).build();
+    }
+    if (retiredRows.isEmpty()) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  "Clone-and-patch of feature id '"
+                      + featureId
+                      + "' in collection '"
+                      + featureType
+                      + "': failed to retire the previous open version (concurrent modification or"
+                      + " no-backdating violation)."))
+          .build();
+    }
+
+    // Step 5: patches on the new (now only) open row. Main-column patches already applied inline
+    // during the clone (Step 2); only junction-backed patches need post-clone DELETE+INSERT. The
+    // junction patch path uses `idCol = ? AND endCol IS NULL` to find the parent PK — that resolves
+    // to NEW_PK now that OLD has been retired.
+    List<FeatureTransactions.PropertyUpdate> junctionUpdates = new ArrayList<>();
+    for (FeatureTransactions.PropertyUpdate u : updates) {
+      String joined = String.join(".", u.getPath());
+      Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> resolved =
+          mapping.getColumnForValue(joined, MappingRule.Scope.W);
+      boolean onMain =
+          resolved.isPresent() && Objects.equals(resolved.get().first().getName(), mainTableName);
+      if (!onMain) {
+        junctionUpdates.add(u);
+      }
+    }
+    if (!junctionUpdates.isEmpty()) {
+      FeatureTransactions.MutationResult patchResult =
+          patchInternal(
+              featureType,
+              featureId,
+              junctionUpdates,
+              crs,
+              " AND " + endColumnName + " IS NULL",
+              "open version of feature");
+      if (patchResult.getError().isPresent()) {
+        return builder.error(patchResult.getError().get()).build();
+      }
+    }
+
+    builder.addIds(featureId);
+    return builder.build();
+  }
+
+  // Clone every row of `junction` whose FK = oldPkLit into a new row whose FK = newPkLit. Carries
+  // every other column forward. The junction's own auto-PK column (sortKey) is omitted so the DB
+  // generates fresh values per cloned row.
+  private void cloneJunctionRows(SqlQuerySchema junction, String oldPkLit, String newPkLit) {
+    if (junction.getRelations().isEmpty()) {
+      return;
+    }
+    SqlQueryJoin join = junction.getRelations().get(0);
+    String fkColumn = join.getTargetField();
+    String junctionPk = junction.getSortKey();
+    List<String> insertCols = new ArrayList<>();
+    List<String> selectExprs = new ArrayList<>();
+    boolean fkSeen = false;
+    for (SqlQueryColumn col : junction.getColumns()) {
+      String name = col.getName();
+      if (Objects.equals(name, junctionPk)) {
+        continue; // auto-PK on the junction itself
+      }
+      insertCols.add(name);
+      if (Objects.equals(name, fkColumn)) {
+        selectExprs.add(newPkLit);
+        fkSeen = true;
+      } else {
+        selectExprs.add(name);
+      }
+    }
+    if (!fkSeen) {
+      // The FK column may live outside getColumns() when the schema mapping doesn't expose it as a
+      // data column (it's only the relation key). Add it explicitly so the cloned row is reachable.
+      insertCols.add(fkColumn);
+      selectExprs.add(newPkLit);
+    }
+    if (insertCols.isEmpty()) {
+      return;
+    }
+    String sql =
+        "INSERT INTO "
+            + junction.getName()
+            + " ("
+            + String.join(", ", insertCols)
+            + ") SELECT "
+            + String.join(", ", selectExprs)
+            + " FROM "
+            + junction.getName()
+            + " WHERE "
+            + fkColumn
+            + " = "
+            + oldPkLit
+            + ";";
+    sqlSession.runReturning(sql);
+  }
+
+  // Format a captured PK value (returned by SqlSession.runReturning as a String) for inlining as
+  // a SQL literal. Surrogate PKs are typically auto-increment integers; fall back to quoting for
+  // anything that isn't a plain integer.
+  private static String sqlLiteralForPk(String raw) {
+    if (raw == null) {
+      return "NULL";
+    }
+    try {
+      Long.parseLong(raw);
+      return raw;
+    } catch (NumberFormatException ignored) {
+      return sqlString(raw);
+    }
   }
 
   private FeatureTransactions.MutationResult patchInternal(

@@ -195,16 +195,14 @@ public interface FeatureTransactions {
     }
 
     /**
-     * Reject an insert that would create a conflicting version for {@code featureId} at {@code
-     * insertTimestamp}: an existing row matches when its {@code PRIMARY_INTERVAL_END} is {@code
-     * NULL} (another open version), when its {@code end} is later than {@code insertTimestamp}
-     * (overlap), or when its {@code start} is at or after {@code insertTimestamp} (no-backdating).
-     * Returns a result with {@code error} set when a conflict is found; an empty success result
-     * otherwise. The default implementation returns success (no check) for providers that have not
-     * adopted the API.
+     * Reject an insert that targets a {@code featureId} which already exists in any version — open
+     * or retired. Versioned-collection clients add new versions of an existing feature through
+     * {@code Replace} / {@code Update} / {@code Delete}, not through {@code Insert}, so any
+     * existing row for the same id is a conflict regardless of its interval state. Returns a result
+     * with {@code error} set when a row is found; an empty success result otherwise. The default
+     * implementation returns success (no check) for providers that have not adopted the API.
      */
-    default MutationResult assertNoConflictingVersion(
-        String featureType, String featureId, java.time.Instant insertTimestamp) {
+    default MutationResult assertNoConflictingVersion(String featureType, String featureId) {
       return ImmutableMutationResult.builder()
           .type(MutationResult.Type.CREATE)
           .hasFeatures(false)
@@ -264,6 +262,23 @@ public interface FeatureTransactions {
         List<PropertyUpdate> updates,
         java.time.Instant mutationTimestamp,
         EpsgCrs crs) {
+      return cloneAndPatchFeature(
+          featureType, featureId, updates, mutationTimestamp, crs, Optional.empty());
+    }
+
+    /**
+     * Variant of {@link #cloneAndPatchFeature(String, String, List, java.time.Instant, EpsgCrs)}
+     * that adds an If-Unmodified-Since-style predicate: the open version's {@code
+     * PRIMARY_INTERVAL_START} must equal {@code expectedStart}, otherwise the open-version lookup
+     * matches 0 rows and the caller maps that to a 412 Precondition Failed.
+     */
+    default MutationResult cloneAndPatchFeature(
+        String featureType,
+        String featureId,
+        List<PropertyUpdate> updates,
+        java.time.Instant mutationTimestamp,
+        EpsgCrs crs,
+        Optional<java.time.Instant> expectedStart) {
       throw new UnsupportedOperationException(
           "Clone-and-patch is not supported by this feature provider session");
     }

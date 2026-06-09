@@ -29,7 +29,8 @@ import java.time.Instant
  *
  * <ul>
  *   <li>{@code assertNoConflictingVersion} (Insert pre-flight, §1.5):
- *       SELECT gated by {@code endCol IS NULL OR endCol > ts OR startCol >= ts}.
+ *       SELECT gated by an id-existence check — any version (open or retired) of
+ *       the same id rejects the Insert.
  *   <li>{@code retireFeature} (Replace's retire half, §1.3/§1.5/§1.6/§1.8):
  *       SET adds {@code _nachfolger_lzi_beg = ts}; WHERE adds
  *       {@code endCol IS NULL AND startCol < ts AND startCol = expectedStart}.
@@ -62,19 +63,17 @@ class VersionedMutationSqlSpec extends Specification {
                 sqlSession, mappings, null, null, null, Optional.empty(), null)
     }
 
-    def 'Insert pre-flight: assertNoConflictingVersion SQL includes all three conflict predicates'() {
+    def 'Insert pre-flight: assertNoConflictingVersion SQL is a plain id-existence check'() {
         when:
-        session.assertNoConflictingVersion(
-                FEATURE_TYPE, 'DEABCDEF12345678', Instant.parse('2025-10-21T05:24:49Z'))
+        session.assertNoConflictingVersion(FEATURE_TYPE, 'DEABCDEF12345678')
 
         then:
         1 * sqlSession.runReturning({ String sql ->
             sql.contains("SELECT 1 FROM ${TABLE}") &&
                     sql.contains("${COL_ID} = 'DEABCDEF12345678'") &&
-                    sql.contains("${COL_END} IS NULL") &&
-                    sql.contains("${COL_END} > '2025-10-21T05:24:49Z'") &&
-                    sql.contains("${COL_START} >= '2025-10-21T05:24:49Z'") &&
-                    sql.contains('LIMIT 1')
+                    sql.contains('LIMIT 1') &&
+                    !sql.contains(COL_END) &&
+                    !sql.contains(COL_START)
         }) >> []
     }
 
@@ -100,6 +99,91 @@ class VersionedMutationSqlSpec extends Specification {
                     sql.contains("${COL_START} = '2025-10-21T05:24:49Z'") &&
                     sql.contains("RETURNING ${COL_ID}")
         }) >> ['DEABCDEF12345678']
+    }
+
+    def 'Update clone-and-patch: cloneAndPatchFeature emits SELECT pk, INSERT clone, retire UPDATE'() {
+        given:
+        // The fixture has no PREDECESSOR_INTERVAL_START role, so no second OLD-start SELECT runs.
+        // `text` is a regular scalar; we patch it to verify the literal lands inline in the clone's
+        // SELECT (rather than as a separate UPDATE round-trip after retire).
+        FeatureTransactions.PropertyUpdate setText =
+                new ImmutablePropertyUpdate.Builder()
+                        .path(['text'])
+                        .value(Optional.of(
+                                com.fasterxml.jackson.databind.node.TextNode.valueOf('updated')))
+                        .build()
+
+        when:
+        session.cloneAndPatchFeature(
+                FEATURE_TYPE,
+                'DEABCDEF12345678',
+                [setText],
+                Instant.parse('2025-10-21T05:46:11Z'),
+                null,
+                Optional.empty())
+
+        then:
+        // (1) Capture OLD_PK.
+        1 * sqlSession.runReturning({ String sql ->
+            sql.startsWith('SELECT id FROM ') &&
+                    sql.contains(TABLE) &&
+                    sql.contains("${COL_ID} = 'DEABCDEF12345678'") &&
+                    sql.contains("${COL_END} IS NULL")
+        }) >> ['42']
+
+        then:
+        // (2) Clone main row with role-driven overrides + inline patch literal.
+        1 * sqlSession.runReturning({ String sql ->
+            sql.startsWith("INSERT INTO ${TABLE} (") &&
+                    sql.contains(COL_ID) &&
+                    sql.contains(COL_START) &&
+                    sql.contains(COL_END) &&
+                    sql.contains(COL_SUCC) &&
+                    sql.contains('text') &&
+                    sql.contains('SELECT') &&
+                    sql.contains("m.${COL_ID}") &&
+                    sql.contains("'2025-10-21T05:46:11Z'") && // start override
+                    sql.contains('NULL') &&                    // end + successor
+                    sql.contains("'updated'") &&               // patch literal inline
+                    sql.contains("WHERE m.id = 42") &&
+                    sql.contains('RETURNING id')
+        }) >> ['43']
+
+        then:
+        // (3) Retire OLD by surrogate PK with the no-backdating guard.
+        1 * sqlSession.runReturning({ String sql ->
+            sql.startsWith("UPDATE ${TABLE} SET ") &&
+                    sql.contains("${COL_END} = '2025-10-21T05:46:11Z'") &&
+                    sql.contains("${COL_SUCC} = '2025-10-21T05:46:11Z'") &&
+                    sql.contains('WHERE id = 42') &&
+                    sql.contains("${COL_END} IS NULL") &&
+                    sql.contains("${COL_START} < '2025-10-21T05:46:11Z'") &&
+                    sql.contains('RETURNING id')
+        }) >> ['42']
+    }
+
+    def 'Update clone-and-patch: empty OLD_PK SELECT returns no ids (caller maps to 409/412)'() {
+        when:
+        def result = session.cloneAndPatchFeature(
+                FEATURE_TYPE,
+                'UNKNOWN_ID',
+                [],
+                Instant.parse('2025-10-21T05:46:11Z'),
+                null,
+                Optional.of(Instant.parse('2025-10-21T05:24:49Z')))
+
+        then:
+        // The OLD-PK SELECT carries the expectedStart predicate — its emptiness is the 412 signal.
+        1 * sqlSession.runReturning({ String sql ->
+            sql.contains('SELECT id FROM ') &&
+                    sql.contains("${COL_ID} = 'UNKNOWN_ID'") &&
+                    sql.contains("${COL_END} IS NULL") &&
+                    sql.contains("${COL_START} = '2025-10-21T05:24:49Z'")
+        }) >> []
+        // No subsequent SQL runs.
+        0 * sqlSession.runReturning(_)
+        result.ids.isEmpty()
+        result.error.isEmpty()
     }
 
     def 'Update retire-in-place: patchOpenVersion SQL sets end and gates on expectedStart + startCol < newEnd'() {
@@ -146,19 +230,24 @@ class VersionedMutationSqlSpec extends Specification {
                 COL_SUCC,
                 SchemaBase.Type.DATETIME,
                 SchemaBase.Role.SUCCESSOR_INTERVAL_START)
+        // Regular scalar column — no role — used by the clone-and-patch test to verify both
+        // carry-forward (`m.text`) and inline patch literal (`'updated'`).
+        SqlQueryColumn text = plainColumn('text', SchemaBase.Type.STRING)
         SqlQuerySchema main = new ImmutableSqlQuerySchema.Builder()
                 .name(TABLE)
                 .pathSegment(TABLE)
-                .columns([id, start, end, succ])
-                .writableColumns([id, start, end, succ])
+                .columns([id, start, end, succ, text])
+                .writableColumns([id, start, end, succ, text])
                 .build()
         return new ImmutableSqlQueryMapping.Builder()
                 .addTables(main)
                 // patchInternal resolves the end-setting update via getColumnForValue('lzi.end',
                 // Scope.W); populate writableTables/writableColumns for the property paths
-                // patchOpenVersion needs to walk.
+                // patchOpenVersion / cloneAndPatchFeature need to walk.
                 .putWritableTables('lzi.end', main)
                 .putWritableColumns('lzi.end', end)
+                .putWritableTables('text', main)
+                .putWritableColumns('text', text)
                 .build()
     }
 
@@ -168,6 +257,15 @@ class VersionedMutationSqlSpec extends Specification {
                 .pathSegment(name)
                 .type(type)
                 .role(role)
+                .schemaIndex(0)
+                .build()
+    }
+
+    private static SqlQueryColumn plainColumn(String name, SchemaBase.Type type) {
+        return new ImmutableSqlQueryColumn.Builder()
+                .name(name)
+                .pathSegment(name)
+                .type(type)
                 .schemaIndex(0)
                 .build()
     }
