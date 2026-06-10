@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -28,8 +29,15 @@ import java.util.function.Consumer;
  * FeatureStream.ResultReduced} via {@code getRoleLinks()} so the response handler can build HTTP
  * {@code Link} headers and per-feature link items in the response body.
  *
- * <p>The result-level map captures the most recent feature's role values; for the single-feature
- * endpoint that is the only feature, which is the primary use case.
+ * <p>Per-feature role values are written to {@link ModifiableContext#setRoleLinks(java.util.Map)}
+ * on every feature so writers can emit per-feature link items.
+ *
+ * <p>The result-level map drives the response's HTTP {@code Link} headers and is only meaningful
+ * for the single-feature endpoint. Within a single-feature response that streams several versions,
+ * the feature with the greatest {@code PRIMARY_INTERVAL_START} wins — that is the latest version,
+ * and its predecessor/successor links describe the navigation that applies to the response as a
+ * whole. For non-versioned single-feature responses (no {@code PRIMARY_INTERVAL_START} on any
+ * feature) the only feature in the stream wins.
  */
 public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
 
@@ -38,18 +46,29 @@ public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
 
   private final Consumer<Map<String, String>> roleLinksSetter;
   private Map<String, String> current = new LinkedHashMap<>();
+  private boolean isSingleFeature = false;
+  private Instant currentStart;
+  private Instant latestStart;
+  private Map<String, String> latestRoleLinks;
 
   public FeatureTokenTransformerLinkRoles(ImmutableResult.Builder resultBuilder) {
-    this.roleLinksSetter = resultBuilder::putAllRoleLinks;
+    this.roleLinksSetter = resultBuilder::roleLinks;
   }
 
   public <X> FeatureTokenTransformerLinkRoles(ImmutableResultReduced.Builder<X> resultBuilder) {
-    this.roleLinksSetter = resultBuilder::putAllRoleLinks;
+    this.roleLinksSetter = resultBuilder::roleLinks;
+  }
+
+  @Override
+  public void onStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    this.isSingleFeature = context.metadata().isSingleFeature();
+    super.onStart(context);
   }
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     this.current = new LinkedHashMap<>();
+    this.currentStart = null;
     context.setRoleLinks(Map.of());
     super.onFeatureStart(context);
   }
@@ -61,6 +80,10 @@ public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
     if (linkRelation.isPresent() && Objects.nonNull(context.value())) {
       current.put(linkRelation.get(), normalizeToIso(context.value()));
       return;
+    }
+    if (Objects.nonNull(context.value())
+        && context.schema().filter(SchemaBase::isPrimaryIntervalStart).isPresent()) {
+      currentStart = parseToInstant(context.value());
     }
     super.onValue(context);
   }
@@ -84,12 +107,46 @@ public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
     }
   }
 
+  static Instant parseToInstant(String value) {
+    try {
+      TemporalAccessor ta =
+          FLEXIBLE_PARSER.parseBest(
+              value, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
+      if (ta instanceof OffsetDateTime) {
+        return ((OffsetDateTime) ta).toInstant();
+      } else if (ta instanceof LocalDateTime) {
+        return ((LocalDateTime) ta).atZone(ZoneId.of("UTC")).toInstant();
+      } else {
+        return ((LocalDate) ta).atStartOfDay(ZoneId.of("UTC")).toInstant();
+      }
+    } catch (Throwable ignore) {
+      return null;
+    }
+  }
+
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (!current.isEmpty()) {
-      roleLinksSetter.accept(current);
       context.setRoleLinks(current);
+      // Pick the feature with the greatest PRIMARY_INTERVAL_START for the result-level map.
+      // For non-versioned single-feature responses there is no start, so the only feature wins.
+      if (currentStart != null) {
+        if (latestStart == null || currentStart.isAfter(latestStart)) {
+          latestStart = currentStart;
+          latestRoleLinks = current;
+        }
+      } else if (latestStart == null) {
+        latestRoleLinks = current;
+      }
     }
     super.onFeatureEnd(context);
+  }
+
+  @Override
+  public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    if (isSingleFeature && Objects.nonNull(latestRoleLinks)) {
+      roleLinksSetter.accept(latestRoleLinks);
+    }
+    super.onEnd(context);
   }
 }
