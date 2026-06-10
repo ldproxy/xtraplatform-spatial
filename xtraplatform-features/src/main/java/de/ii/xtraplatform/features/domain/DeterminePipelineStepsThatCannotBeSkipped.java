@@ -164,6 +164,19 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       if (schema.getConstraints().filter(SchemaConstraints::isRequired).isEmpty()) {
         steps.add(PipelineSteps.CLEAN);
       }
+
+      // Versioned-features roles: keep value mappings so the default DATETIME_FORMAT
+      // transformer runs and the captured timestamps are ISO 8601 before reaching the
+      // FeatureTokenTransformerLinkRoles / FeatureTokenTransformerCompositeId / Memento-Datetime
+      // header construction. Without this the raw PostgreSQL text (or whatever the SQL provider
+      // emits) would flow through, and the role-link headers / composite-id rewrite would have
+      // to do their own parsing.
+      if (schema.isId()
+          || schema.isPrimaryIntervalStart()
+          || schema.isPrimaryIntervalEnd()
+          || schema.getRole().flatMap(SchemaBase.Role::getLinkRelation).isPresent()) {
+        steps.add(PipelineSteps.MAPPING_VALUES);
+      }
     }
 
     return steps.build();

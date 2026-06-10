@@ -99,11 +99,25 @@ public class FeatureStreamImpl implements FeatureStream {
 
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
           ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
+          // LinkRoles must run before the per-format value-transformation step so it captures
+          // the raw ISO timestamp, not a locale-formatted variant used in the body
+          FeatureTokenSource source =
+              tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder));
+          // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
+          // the same pre-format slot so they see raw provider values and can mutate tokens before
+          // any format-specific transformation
+          if (query instanceof FeatureQuery) {
+            for (FeatureQueryExtension ext : ((FeatureQuery) query).getExtensions()) {
+              if (ext instanceof FeatureTokenTransformerExtension) {
+                source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
+              }
+            }
+          }
+          source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(source, mergedTransformations)
+                  : source;
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -124,6 +138,8 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
+
+          source = source.via(new FeatureTokenTransformerVersionIntervals(resultBuilder));
 
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
@@ -166,11 +182,25 @@ public class FeatureStreamImpl implements FeatureStream {
 
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
           ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
+          // LinkRoles must run before the per-format value-transformation step so it captures
+          // the raw ISO timestamp, not a locale-formatted variant used in the body
+          FeatureTokenSource source =
+              tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder));
+          // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
+          // the same pre-format slot so they see raw provider values and can mutate tokens before
+          // any format-specific transformation
+          if (query instanceof FeatureQuery) {
+            for (FeatureQueryExtension ext : ((FeatureQuery) query).getExtensions()) {
+              if (ext instanceof FeatureTokenTransformerExtension) {
+                source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
+              }
+            }
+          }
+          source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(source, mergedTransformations)
+                  : source;
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -190,6 +220,9 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
+
+          source = source.via(new FeatureTokenTransformerVersionIntervals(resultBuilder));
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 

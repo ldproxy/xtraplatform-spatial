@@ -82,6 +82,23 @@ public interface FeatureEventHandler<
 
     Map<String, String> additionalInfo();
 
+    /**
+     * Captured (linkRelation, value) pairs for the current feature, populated by {@link
+     * FeatureTokenTransformerLinkRoles} from schema properties whose {@link SchemaBase.Role role
+     * declares a link relation}. Encoders use it to emit per-feature link entries.
+     */
+    Map<String, String> roleLinks();
+
+    /**
+     * Canonical (untransformed) feature id, captured when a profile rewrites the id token (e.g.
+     * {@code versions-as-features-unique-ids} produces a composite {@code id.<timestamp>}).
+     * Encoders that need the stable id rather than the composite — most notably {@code
+     * gml:identifier} — read this; when null, {@code context.value()} on the id property is the
+     * canonical id and should be used.
+     */
+    @Nullable
+    String canonicalFeatureId();
+
     @Value.Lazy
     default Optional<T> schema() {
       if (Objects.isNull(mapping())) {
@@ -304,6 +321,10 @@ public interface FeatureEventHandler<
     ModifiableContext<T, U> setIsUseTargetPaths(boolean isUseTargetPaths);
 
     ModifiableContext<T, U> putAdditionalInfo(String key, String value);
+
+    ModifiableContext<T, U> setRoleLinks(Map<String, ? extends String> roleLinks);
+
+    ModifiableContext<T, U> setCanonicalFeatureId(@Nullable String canonicalFeatureId);
   }
 
   // T createContext();

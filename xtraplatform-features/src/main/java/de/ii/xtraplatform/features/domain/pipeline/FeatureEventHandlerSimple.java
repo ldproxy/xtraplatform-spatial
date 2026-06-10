@@ -91,6 +91,8 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
     }
 
     Map<String, String> additionalInfo();
+
+    Map<String, String> roleLinks();
   }
 
   interface ModifiableContext<T, U> extends Context<T, U> {
@@ -164,6 +166,8 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
     ModifiableContext<T, U> setIsUseTargetPaths(boolean isUseTargetPaths);
 
     ModifiableContext<T, U> putAdditionalInfo(String key, String value);
+
+    ModifiableContext<T, U> setRoleLinks(Map<String, ? extends String> roleLinks);
   }
 
   @Modifiable
