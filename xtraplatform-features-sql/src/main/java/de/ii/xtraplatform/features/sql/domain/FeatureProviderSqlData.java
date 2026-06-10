@@ -48,7 +48,7 @@ public interface FeatureProviderSqlData
    * @langEn Dataset change handling, for details see [Dataset Changes](10-sql.md#dataset-changes)
    *     below.
    * @langDe Behandlung von Datensatzänderungen, für Details siehe
-   *     [Datensatzänderungen](10-sql.md#dataset-changes).
+   *     [Datensatzänderungen](10-sql.md#datensatzanderungen).
    * @since v4.3
    */
   @DocMarker("specific")
@@ -59,7 +59,7 @@ public interface FeatureProviderSqlData
    * @langEn Defaults for the path expressions in `sourcePath`, for details see [Source Path
    *     Defaults](10-sql.md#source-path-defaults) below.
    * @langDe Defaults für die Pfad-Ausdrücke in `sourcePath`, für Details siehe
-   *     [SQL-Pfad-Defaults](10-sql.md#source-path-defaults).
+   *     [SQL-Pfad-Defaults](10-sql.md#sql-pfad-defaults).
    */
   @DocMarker("specific")
   @Nullable
@@ -69,7 +69,7 @@ public interface FeatureProviderSqlData
    * @langEn Options for query generation, for details see [Query
    *     Generation](10-sql.md#query-generation) below.
    * @langDe Einstellungen für die Query-Generierung, für Details siehe
-   *     [Query-Generierung](10-sql.md#query-generation).
+   *     [Query-Generierung](10-sql.md#query-generierung).
    */
   @DocMarker("specific")
   @Nullable
@@ -79,7 +79,7 @@ public interface FeatureProviderSqlData
    * @langEn Options for query processing, for details see [Query
    *     Processing](10-sql.md#query-processing) below.
    * @langDe Einstellungen für die Query-Verarbeitung, für Details siehe
-   *     [Query-Verarbeitung](10-sql.md#query-processing).
+   *     [Query-Verarbeitung](10-sql.md#query-verarbeitung).
    * @since v4.6
    */
   @DocMarker("specific")

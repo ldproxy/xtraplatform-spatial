@@ -185,7 +185,7 @@ import org.threeten.extra.Interval;
  *     <p>{@docTable:queryProcessing}
  *     <p>### Source Path Defaults
  *     <p>Defaults for the path expressions in `sourcePath`, also see [Source Path
- *     Syntax](#path-syntax).
+ *     Syntax](#source-path-syntax).
  *     <p>{@docTable:sourcePathDefaults}
  *     <p>### Source Path Syntax
  *     <p>The fundamental elements of the path syntax are demonstrated in the example above. The
@@ -252,7 +252,7 @@ import org.threeten.extra.Interval;
  *   user is inserted.
  * - **Other column, auto-generated** The `sourcePath` of the property with `role: ID` does not
  *   match the `primaryKey`, and the `sourcePath` of the main table has a matching `inserts` flag
- *   with a generation function, e.g. `{inserts=id=gen_random_uuid()'}` (see [Source Path Syntax](#source-path-syntax)).
+ *   with a generation function, e.g. `{inserts=id=gen_random_uuid()}` (see [Source Path Syntax](#source-path-syntax)).
  * - **Other column, user-defined** The `sourcePath` of the property with `role: ID` does not match
  *   the `primaryKey`, and the `sourcePath` of the main table does not have a matching `inserts`
  *   flag, the value from the payload given by the user is inserted.
@@ -278,7 +278,7 @@ import org.threeten.extra.Interval;
  *     <p>{@docTable:queryProcessing}
  *     <p>### SQL-Pfad-Defaults
  *     <p>Defaults für die Pfad-Ausdrücke in `sourcePath`, siehe auch
- *     [SQL-Pfad-Syntax](#path-syntax).
+ *     [SQL-Pfad-Syntax](#sql-pfad-syntax).
  *     <p>{@docTable:sourcePathDefaults}
  *     <p>### SQL-Pfad-Syntax
  *     <p>In dem Beispiel oben sind die wesentlichen Elemente der Pfadsyntax in der Datenbank
@@ -356,7 +356,7 @@ import org.threeten.extra.Interval;
  * - **Andere Spalte, automatisch generiert** Der `sourcePath` der Eigenschaft mit `role: ID`
  *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat ein
  *   entsprechendes `inserts`-Flag mit einer Generierungsfunktion, z.B.
- *   `{inserts=id=gen_random_uuid()'}` (siehe [SQL-Pfad-Syntax](#sql-pfad-syntax)).
+ *   `{inserts=id=gen_random_uuid()}` (siehe [SQL-Pfad-Syntax](#sql-pfad-syntax)).
  * - **Andere Spalte, benutzerdefiniert** Der `sourcePath` der Eigenschaft mit `role: ID`
  *   entspricht nicht dem `primaryKey`, und der `sourcePath` der Haupttabelle hat kein
  *   entsprechendes `inserts`-Flag, der Wert aus der Nutzlast wird eingefügt.
@@ -953,11 +953,7 @@ public class FeatureProviderSql
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
       return false;
     }
-    if (!getData().getDatasetChanges().isModeCrud()) {
-      return false;
-    }
-
-    return true;
+    return getData().getDatasetChanges().isModeCrud();
   }
 
   @Override
@@ -1355,7 +1351,7 @@ public class FeatureProviderSql
                     crsTransformerFactory,
                     getData().getNativeTimeZone(),
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            .via(Transformer.map(feature -> (FeatureDataSql) feature));
+            .via(Transformer.map(feature -> feature));
 
     if (partial) {
       featureSqlSource =
