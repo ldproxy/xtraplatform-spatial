@@ -26,6 +26,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
   private final List<Map<String, Object>> featureList = new ArrayList<>();
   private final boolean includePropertyValues;
   private final List<String> propertyNames;
+  private boolean logAllProperties = false;
 
   public FeatureTokenTransformerAudit(String requestId, AuditLog auditLog) {
     this.requestId = requestId;
@@ -38,14 +39,19 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     featureHolder.clear();
     propertyNames.clear();
+    context
+        .mappings()
+        .get(context.type())
+        .getTargetSchema()
+        .getAudit()
+        .ifPresent(b -> logAllProperties = b);
     super.onFeatureStart(context);
   }
 
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    String type = context.type();
     Optional<FeatureSchema> prop =
-        context.mappings().get(type).getTargetSchema().getProperties().stream()
+        context.mappings().get(context.type()).getTargetSchema().getProperties().stream()
             .filter(p -> p.getFullPathAsString().equals(context.pathTracker().toString()))
             .findFirst();
 
@@ -58,15 +64,38 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
     FeatureSchema schema = prop.get();
     if (schema.getRole().filter(Role.ID::equals).isPresent()) {
       featureHolder.put("id", context.value());
-    } else if (schema.getAudit().isPresent()) {
-      String schemaName = schema.getName();
-      if (includePropertyValues) {
-        featureHolder.put(schemaName, context.value());
-      } else {
-        propertyNames.add(schemaName);
-      }
+      super.onValue(context);
+      return;
     }
+
+    // Gather necessary information about the property
+    String schemaName = schema.getName();
+    String value = context.value();
+    Optional<Boolean> optAudit = schema.getAudit();
+
+    // Property should explicitly be audited / not audited
+    if (optAudit.isPresent()) {
+      if (Boolean.TRUE.equals(optAudit.get())) {
+        addProperty(schemaName, value);
+      }
+      super.onValue(context);
+      return;
+    }
+
+    // Case logAllProperties
+    if (logAllProperties) {
+      addProperty(schemaName, value);
+    }
+
     super.onValue(context);
+  }
+
+  private void addProperty(String schemaName, String value) {
+    if (includePropertyValues) {
+      featureHolder.put(schemaName, value);
+    } else {
+      propertyNames.add(schemaName);
+    }
   }
 
   @Override
@@ -75,6 +104,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
       featureHolder.put("properties", new ArrayList<>(propertyNames));
     }
     featureList.add(new LinkedHashMap<>(featureHolder));
+    logAllProperties = false;
     super.onFeatureEnd(context);
   }
 
