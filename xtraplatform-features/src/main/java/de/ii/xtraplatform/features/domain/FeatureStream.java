@@ -101,8 +101,6 @@ public interface FeatureStream {
     Optional<Tuple<Instant, Instant>> getTemporalExtent();
 
     Map<String, String> getRoleLinks();
-
-    java.util.List<Tuple<Instant, Instant>> getVersionIntervals();
   }
 
   @Value.Immutable
@@ -125,8 +123,6 @@ public interface FeatureStream {
     Optional<Tuple<Instant, Instant>> getTemporalExtent();
 
     Map<String, String> getRoleLinks();
-
-    java.util.List<Tuple<Instant, Instant>> getVersionIntervals();
   }
 
   interface ResultBase {

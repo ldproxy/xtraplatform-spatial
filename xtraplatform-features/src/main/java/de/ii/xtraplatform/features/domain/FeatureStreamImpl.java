@@ -139,8 +139,6 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
-          source = source.via(new FeatureTokenTransformerVersionIntervals(resultBuilder));
-
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
@@ -220,8 +218,6 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
-
-          source = source.via(new FeatureTokenTransformerVersionIntervals(resultBuilder));
 
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
