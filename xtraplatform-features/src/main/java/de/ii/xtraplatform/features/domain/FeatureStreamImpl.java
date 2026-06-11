@@ -93,7 +93,8 @@ public class FeatureStreamImpl implements FeatureStream {
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepAudit =
-        !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
+        auditLog.isEnabled()
+            && !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
@@ -281,13 +282,11 @@ public class FeatureStreamImpl implements FeatureStream {
 
           FeatureTokenTransformerAudit auditTransformer = null;
           if (stepAudit) {
-            if (auditLog.isEnabled()) {
-              if (requestId.isEmpty()) {
-                LOGGER.error("Audit logging not possible, no request-id provided!");
-              } else if (auditLog.logIsAvailable(requestId.get())) {
-                auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
-                source = source.via(auditTransformer);
-              }
+            if (requestId.isEmpty()) {
+              LOGGER.error("Audit logging not possible, no request-id provided!");
+            } else if (auditLog.logIsAvailable(requestId.get())) {
+              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+              source = source.via(auditTransformer);
             }
           }
           final Runnable finishAuditLog =
@@ -363,15 +362,17 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
+          FeatureTokenTransformerAudit auditTransformer = null;
           if (stepAudit) {
-            if (auditLog.isEnabled()) {
-              if (requestId.isEmpty()) {
-                LOGGER.error("Audit logging not possible, no request-id provided!");
-              } else if (auditLog.logIsAvailable(requestId.get())) {
-                source = source.via(new FeatureTokenTransformerAudit(requestId.get(), auditLog));
-              }
+            if (requestId.isEmpty()) {
+              LOGGER.error("Audit logging not possible, no request-id provided!");
+            } else if (auditLog.logIsAvailable(requestId.get())) {
+              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+              source = source.via(auditTransformer);
             }
           }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
 
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
@@ -395,6 +396,8 @@ public class FeatureStreamImpl implements FeatureStream {
                   })
               .handleEnd(
                   (ImmutableResultReduced.Builder<X> xBuilder) -> {
+                    finishAuditLog.run();
+
                     if (strongETag) {
                       xBuilder.eTag(eTag.build(ETag.Type.STRONG));
                     }
