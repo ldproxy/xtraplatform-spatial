@@ -379,7 +379,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     String idColumnName = idColumn.get().second().getName();
     String tsLiteral = sqlString(retirementTimestamp.toString());
 
-    // Denorm SUCCESSOR_INTERVAL_START (plan §1.6, option (i)): if the schema mapping binds the
+    // Denorm SUCCESSOR_INTERVAL_START: if the schema mapping binds the
     // role to a column on the main table, set it to the retirement timestamp — which is also
     // the new version's start in retire-and-insert flows. Opt-in: no SUCCESSOR_INTERVAL_START
     // role on the schema means no SET clause is added.
@@ -397,10 +397,10 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
     // Optimistic-concurrency + no-backdating in one atomic UPDATE: the row must be the open
     // version (endCol IS NULL) AND its start must be strictly before the retirement timestamp
-    // (no-backdating, plan §1.5). A backdated or non-existent retire matches 0 rows; the caller
+    // (no-backdating). A backdated or non-existent retire matches 0 rows; the caller
     // surfaces that as a 409. When `expectedStart` is present, an additional `startCol =
     // expectedStart` predicate is appended — an If-Unmodified-Since-style check that maps to a
-    // 412 on miss (plan §1.8 composite-id convention).
+    // 412 on miss (composite-id convention).
     StringBuilder where =
         new StringBuilder(idColumnName)
             .append(" = ")
@@ -439,7 +439,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     return builder.build();
   }
 
-  // Versioned-Insert pre-flight (plan §1.5 Part A.insert): refuses to write a new feature row when
+  // Versioned-Insert pre-flight: refuses to write a new feature row when
   // any version of the same role-id already exists (open or retired). Clients add new versions of
   // an existing feature through Replace / Update / Delete; Insert is reserved for brand-new ids.
   // The check runs as a single SELECT on the main table and returns an error result the caller
@@ -494,7 +494,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   }
 
   // Reads the open version's PRIMARY_INTERVAL_START value for `featureId`. Used by versioned
-  // retire-and-insert flows (plan §1.6) to populate the new row's PREDECESSOR_INTERVAL_START
+  // retire-and-insert flows to populate the new row's PREDECESSOR_INTERVAL_START
   // denorm column. Returns empty when no open version exists or the type lacks the required
   // columns — the caller treats the value as "no predecessor info available" and omits the
   // override.
@@ -583,7 +583,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // whose PRIMARY_INTERVAL_END column is currently NULL). The same predicate is propagated into
   // every junction patch's subquery so junction rows are only touched on the open parent.
   //
-  // No-backdating (plan §1.5): when one of the `updates` sets the PRIMARY_INTERVAL_END column to
+  // No-backdating: when one of the `updates` sets the PRIMARY_INTERVAL_END column to
   // a value V, also require `startCol < V` in the WHERE so a retire-in-place Update that would
   // produce a zero-or-negative interval matches 0 rows and surfaces as a 409. We scan the
   // updates upfront, find the end-setting one, format the value as the same SQL literal the
@@ -632,7 +632,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
           break;
         }
       }
-      // Composite-id If-Unmodified-Since predicate (plan §1.8): the open version's start must
+      // Composite-id If-Unmodified-Since predicate: the open version's start must
       // equal the value the client encoded in the rid's suffix. Otherwise the UPDATE matches 0
       // rows and the caller maps that to a 412 Precondition Failed.
       if (expectedStart.isPresent()) {
@@ -644,7 +644,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     return patchInternal(featureType, featureId, updates, crs, extra, "open version of feature");
   }
 
-  // Versioned Update CLONE_AND_PATCH (plan §1.3): create a new version of the open row, carry
+  // Versioned Update CLONE_AND_PATCH: create a new version of the open row, carry
   // forward every column, apply the property updates, and retire the previous open version. The
   // sequence is:
   //   1. SELECT the open row's surrogate PK ([+ start when the predecessor role is bound]).

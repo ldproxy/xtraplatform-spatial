@@ -28,13 +28,13 @@ import java.time.Instant
  * SQL contains every predicate the versioning semantics require:
  *
  * <ul>
- *   <li>{@code assertNoConflictingVersion} (Insert pre-flight, §1.5):
+ *   <li>{@code assertNoConflictingVersion} (Insert pre-flight):
  *       SELECT gated by an id-existence check — any version (open or retired) of
  *       the same id rejects the Insert.
- *   <li>{@code retireFeature} (Replace's retire half, §1.3/§1.5/§1.6/§1.8):
+ *   <li>{@code retireFeature} (Replace's retire half):
  *       SET adds {@code _nachfolger_lzi_beg = ts}; WHERE adds
  *       {@code endCol IS NULL AND startCol < ts AND startCol = expectedStart}.
- *   <li>{@code patchOpenVersion} (Update's RETIRE_IN_PLACE, §1.3/§1.5/§1.8):
+ *   <li>{@code patchOpenVersion} (Update's RETIRE_IN_PLACE):
  *       UPDATE's WHERE adds {@code endCol IS NULL AND startCol < newEnd AND
  *       startCol = expectedStart}.
  * </ul>

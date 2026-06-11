@@ -83,8 +83,7 @@ import org.slf4j.LoggerFactory;
  * a {@code VALUE_PROPERTY} is treated as a {@code VALUE_WRAPPER} around the property's scalar text,
  * no explicit {@code valueWrap} entry required. Wrappers in other namespaces (e.g. {@code
  * <adv:AX_LI_ProcessStep_Punktort_Description>}) still need explicit {@code valueWrap}
- * configuration on the input profile. To be documented as a Phase 5 restriction of the GML building
- * block.
+ * configuration on the input profile. A known restriction of the GML building block.
  */
 public class FeatureTokenDecoderGml
     extends FeatureTokenDecoderSimple<
@@ -102,8 +101,8 @@ public class FeatureTokenDecoderGml
    * <gco:CharacterString>}, {@code <gmd:CI_RoleCode>}). When such an element appears as a child of
    * a scalar property element the decoder treats it as a value wrapper around the scalar text, even
    * without an explicit {@code valueWrap} entry. Any other external namespace that follows the same
-   * convention needs a similar entry here when the need arises — documented as a known restriction
-   * in Phase 5 of the GML building block.
+   * convention needs a similar entry here when the need arises — a known restriction of the GML
+   * building block.
    */
   private static final String GMD_NS = "http://www.isotc211.org/2005/gmd";
 
