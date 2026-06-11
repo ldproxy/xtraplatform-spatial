@@ -28,6 +28,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -49,6 +50,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
+  private final boolean hasLinkRoles;
 
   public FeatureStreamImpl(
       Query query,
@@ -86,6 +88,29 @@ public class FeatureStreamImpl implements FeatureStream {
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.hasLinkRoles = hasLinkRelationRoles(query, data);
+  }
+
+  // Only versioned types have properties whose role declares a link relation
+  // (PREDECESSOR_INTERVAL_START / SUCCESSOR_INTERVAL_START), so for all other types the
+  // LinkRoles transformer would be a per-token no-op and is not wired at all.
+  private static boolean hasLinkRelationRoles(Query query, FeatureProviderDataV2 data) {
+    return getTypes(query).stream()
+        .map(type -> data.getTypes().get(type))
+        .filter(Objects::nonNull)
+        .flatMap(schema -> schema.getAllNestedProperties().stream())
+        .anyMatch(
+            property -> property.getRole().flatMap(SchemaBase.Role::getLinkRelation).isPresent());
+  }
+
+  private static List<String> getTypes(Query query) {
+    if (query instanceof FeatureQuery) {
+      return List.of(((FeatureQuery) query).getType());
+    }
+    if (query instanceof MultiFeatureQuery) {
+      return ((MultiFeatureQuery) query).getQueries().stream().map(TypeQuery::getType).toList();
+    }
+    return List.of();
   }
 
   @Override
@@ -103,7 +128,9 @@ public class FeatureStreamImpl implements FeatureStream {
           // LinkRoles must run before the per-format value-transformation step so it captures
           // the raw ISO timestamp, not a locale-formatted variant used in the body
           FeatureTokenSource source =
-              tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder));
+              hasLinkRoles
+                  ? tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder))
+                  : tokenSource;
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
           // any format-specific transformation
@@ -184,7 +211,9 @@ public class FeatureStreamImpl implements FeatureStream {
           // LinkRoles must run before the per-format value-transformation step so it captures
           // the raw ISO timestamp, not a locale-formatted variant used in the body
           FeatureTokenSource source =
-              tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder));
+              hasLinkRoles
+                  ? tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder))
+                  : tokenSource;
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
           // any format-specific transformation
