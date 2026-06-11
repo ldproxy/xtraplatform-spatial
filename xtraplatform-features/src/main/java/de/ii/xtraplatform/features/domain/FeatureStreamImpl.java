@@ -279,15 +279,19 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
+          FeatureTokenTransformerAudit auditTransformer = null;
           if (stepAudit) {
             if (auditLog.isEnabled()) {
               if (requestId.isEmpty()) {
                 LOGGER.error("Audit logging not possible, no request-id provided!");
               } else if (auditLog.logIsAvailable(requestId.get())) {
-                source = source.via(new FeatureTokenTransformerAudit(requestId.get(), auditLog));
+                auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+                source = source.via(auditTransformer);
               }
             }
           }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
 
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
@@ -309,9 +313,12 @@ public class FeatureStreamImpl implements FeatureStream {
                   })
               .handleEnd(
                   (ImmutableResult.Builder builder1) -> {
+                    finishAuditLog.run();
+
                     if (strongETag) {
                       builder1.eTag(eTag.build(ETag.Type.STRONG));
                     }
+
                     return builder1.build();
                   });
         };

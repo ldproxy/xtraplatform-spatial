@@ -108,9 +108,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
     super.onFeatureEnd(context);
   }
 
-  @Override
-  public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+  public void appendToLog() {
     auditLog.setTarget(requestId, Map.of("features", featureList));
-    super.onEnd(context);
   }
 }
