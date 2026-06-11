@@ -24,15 +24,20 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
   private final AuditLog auditLog;
   private final Map<String, Object> featureHolder = new LinkedHashMap<>();
   private final List<Map<String, Object>> featureList = new ArrayList<>();
+  private final boolean includePropertyValues;
+  private final List<String> propertyNames;
 
   public FeatureTokenTransformerAudit(String requestId, AuditLog auditLog) {
     this.requestId = requestId;
     this.auditLog = auditLog;
+    includePropertyValues = auditLog.getIncludePropertyValues(requestId);
+    propertyNames = new ArrayList<>();
   }
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     featureHolder.clear();
+    propertyNames.clear();
     super.onFeatureStart(context);
   }
 
@@ -50,16 +55,25 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
       return;
     }
 
-    if (prop.get().getRole().filter(Role.ID::equals).isPresent()) {
+    FeatureSchema schema = prop.get();
+    if (schema.getRole().filter(Role.ID::equals).isPresent()) {
       featureHolder.put("id", context.value());
-    } else if (prop.get().getAudit().isPresent()) {
-      featureHolder.put(prop.get().getName(), context.value());
+    } else if (schema.getAudit().isPresent()) {
+      String schemaName = schema.getName();
+      if (includePropertyValues) {
+        featureHolder.put(schemaName, context.value());
+      } else {
+        propertyNames.add(schemaName);
+      }
     }
     super.onValue(context);
   }
 
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    if (!includePropertyValues) {
+      featureHolder.put("properties", new ArrayList<>(propertyNames));
+    }
     featureList.add(new LinkedHashMap<>(featureHolder));
     super.onFeatureEnd(context);
   }
