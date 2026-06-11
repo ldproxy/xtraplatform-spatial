@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_BoeschungKliff gml:id="DENW36AL1UL0001j" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL1UL0001j</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2024-10-15T07:55:13Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:sonstigesModell xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_WeitereModellart/NWABK" xlink:title="NWABK"/>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704" xlink:title="Qualitätssicherung und Datenpflege"/>
+          <adv:zeigtAufExternes>
+            <adv:AA_Fachdatenverbindung>
+              <adv:art>urn:adv:fdv:0901</adv:art>
+              <adv:fachdatenobjekt>
+                <adv:AA_Fachdatenobjekt>
+                  <adv:uri>urn:adv:oid:DENW36PS00000OVB</adv:uri>
+                </adv:AA_Fachdatenobjekt>
+              </adv:fachdatenobjekt>
+            </adv:AA_Fachdatenverbindung>
+          </adv:zeigtAufExternes>
+        </adv:AX_BoeschungKliff>

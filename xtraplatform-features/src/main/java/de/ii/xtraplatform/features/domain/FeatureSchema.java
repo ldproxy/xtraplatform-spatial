@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
   "geometryType",
   "objectType",
   "label",
+  "alias",
   "description",
   "unit",
   "format",
@@ -215,6 +216,23 @@ public interface FeatureSchema
    * @langDe Eine Bezeichnung des Schemaobjekts, z.B. für die Angabe in der HTML-Ausgabe.
    */
   Optional<String> getLabel();
+
+  /**
+   * @langEn An alternative property name used by feature encodings that opt in to alias mode (for
+   *     example, GML with `useAlias: true`). Unlike `label` (which is free-text for display), the
+   *     alias must satisfy the encoding's identifier constraints (e.g. an XML element name or a
+   *     JSON property name). When alias mode is active and an alias is set, the encoded property
+   *     name is the alias instead of the schema name; an explicit `rename` transformation still
+   *     takes precedence over the alias.
+   * @langDe Ein alternativer Eigenschaftsname, der von Feature-Kodierungen verwendet wird, die den
+   *     Alias-Modus aktiviert haben (z.B. GML mit `useAlias: true`). Anders als `label` (ein freier
+   *     Anzeigetext) muss der Alias den Identifier-Regeln der Kodierung entsprechen (z.B.
+   *     XML-Elementname oder JSON-Eigenschaftsname). Bei aktivem Alias-Modus und gesetztem Alias
+   *     wird der Alias anstelle des Schemanamens als Eigenschaftsname kodiert; eine explizite
+   *     `rename`-Transformation hat weiterhin Vorrang vor dem Alias.
+   * @default null
+   */
+  Optional<String> getAlias();
 
   /**
    * @langEn Description for the schema object, used for example in HTML representations or JSON

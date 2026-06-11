@@ -115,7 +115,7 @@ public class SqlQueryTemplatesDeriver {
 
         columns += getSortColumn("A", sortKey, i) + ", ";
       }
-      columns += String.format("A.%s AS " + SKEY, schema.getSortKey());
+      columns += getSkeyColumn("A", schema, "", false);
       String orderBy = getOrderBy(additionalSortKeys);
       String minMaxColumns = getMinMaxColumns(additionalSortKeys);
 
@@ -180,14 +180,11 @@ public class SqlQueryTemplatesDeriver {
               ? sqlFilter
               : toWhereClause(
                   aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
+      boolean useRangePaging = additionalSortKeys.isEmpty() && minMaxKeys.isPresent();
       Optional<String> pagingClause =
-          additionalSortKeys.isEmpty() || (limit == 0 && offset == 0)
+          useRangePaging || (limit == 0 && offset == 0)
               ? Optional.empty()
-              : Optional.of(
-                  String.format(
-                      "%s%s",
-                      limit > 0 ? sqlDialect.applyToLimit(limit) : "",
-                      offset > 0 ? sqlDialect.applyToOffset(offset) : ""));
+              : Optional.of(sqlDialect.applyToLimitAndOffset(limit, offset));
 
       return getTableQuery(
           schema,
@@ -348,11 +345,29 @@ public class SqlQueryTemplatesDeriver {
     return String.format("'%s'", sqlDialect.escapeString(literalString));
   }
 
+  private String getSkeyExpression(
+      String alias, SqlQueryTable table, boolean useRowNumberForNonUnique) {
+    if (table.isSortKeyUnique()) {
+      return String.format("%s.%s", alias, table.getSortKey());
+    }
+
+    if (!useRowNumberForNonUnique) {
+      return String.format("%s.%s", alias, table.getSortKey());
+    }
+
+    return String.format("ROW_NUMBER() OVER (ORDER BY %s.%s)", alias, table.getSortKey());
+  }
+
+  private String getSkeyColumn(
+      String alias, SqlQueryTable table, String suffix, boolean useRowNumberForNonUnique) {
+    return String.format(
+        "%s AS SKEY%s", getSkeyExpression(alias, table, useRowNumberForNonUnique), suffix);
+  }
+
   private List<String> getSortFields(
       SqlQuerySchema schema, List<String> aliases, List<SortKey> additionalSortKeys) {
 
     final int[] i = {0};
-    final int[] j = {0};
     Stream<String> customSortKeys =
         additionalSortKeys.stream().map(sortKey -> getSortColumn(aliases.get(0), sortKey, i[0]++));
 
@@ -370,14 +385,7 @@ public class SqlQueryTemplatesDeriver {
           .collect(Collectors.toList());
     } else {
       return Stream.concat(
-              customSortKeys,
-              Stream.of(
-                  String.format(
-                      schema.isSortKeyUnique()
-                          ? "%s.%s AS SKEY"
-                          : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
-                      aliases.get(0),
-                      schema.getSortKey())))
+              customSortKeys, Stream.of(getSkeyColumn(aliases.get(0), schema, "", true)))
           .collect(Collectors.toList());
     }
   }
@@ -445,17 +453,10 @@ public class SqlQueryTemplatesDeriver {
     ImmutableList.Builder<String> keys = ImmutableList.builder();
 
     int keyIndex = keyIndexStart;
-    SqlQueryTable previousRelation = null;
 
     if (!onlyRelations) {
       // add key for value table
-      keys.add(
-          String.format(
-              tables.get(0).isSortKeyUnique()
-                  ? "%s.%s AS SKEY"
-                  : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
-              aliasesIterator.next(),
-              tables.get(0).getSortKey()));
+      keys.add(getSkeyColumn(aliasesIterator.next(), tables.get(0), "", true));
       keyIndex++;
     }
 
@@ -465,11 +466,9 @@ public class SqlQueryTemplatesDeriver {
 
       if (!(relation instanceof SqlQueryJoin) || !((SqlQueryJoin) relation).isJunction()) {
         String suffix = keyIndex > 0 ? "_" + keyIndex : "";
-        keys.add(String.format("%s.%s AS SKEY%s", alias, relation.getSortKey(), suffix));
+        keys.add(getSkeyColumn(alias, relation, suffix, true));
         keyIndex++;
       }
-
-      previousRelation = relation;
     }
 
     return keys.build();

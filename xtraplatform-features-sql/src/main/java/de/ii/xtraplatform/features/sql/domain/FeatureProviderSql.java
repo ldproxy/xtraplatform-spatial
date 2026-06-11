@@ -20,6 +20,8 @@ import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -94,6 +96,7 @@ import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
 import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
+import de.ii.xtraplatform.features.sql.app.SqlMutationSession;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
@@ -114,6 +117,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -468,6 +472,7 @@ public class FeatureProviderSql
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SqlQueryMapping>> queryMappings;
+  private List<CustomFunction> cql2Functions;
   private String cronJob;
 
   @AssistedInject
@@ -538,6 +543,7 @@ public class FeatureProviderSql
     this.subdecoders = subdecoders;
     this.cronJob = null;
     this.tableSchemas = null;
+    this.cql2Functions = List.of();
   }
 
   private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
@@ -578,6 +584,7 @@ public class FeatureProviderSql
     }
 
     SqlDialect sqlDialect = dbmsAdapters.getDialect(getData().getConnectionInfo().getDialect());
+    this.cql2Functions = getDialectAwareCustomFunctions(sqlDialect);
     String accentiCollation =
         Objects.nonNull(getData().getQueryGeneration())
             ? getData().getQueryGeneration().getAccentiCollation().orElse(null)
@@ -589,6 +596,7 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
+            getCql2Functions(),
             accentiCollation);
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
@@ -1246,6 +1254,18 @@ public class FeatureProviderSql
   }
 
   @Override
+  public Session openSession() {
+    return new SqlMutationSession(
+        getSqlClient().openSession(),
+        queryMappings,
+        featureMutationsSql,
+        getNativeCrs(),
+        crsTransformerFactory,
+        getData().getNativeTimeZone(),
+        getStreamRunner());
+  }
+
+  @Override
   public MutationResult deleteFeature(String featureType, String id) {
     Optional<List<SqlQueryMapping>> queryMapping =
         Optional.ofNullable(queryMappings.get(featureType));
@@ -1482,6 +1502,41 @@ public class FeatureProviderSql
   @Override
   public boolean supportsIsNull() {
     return true;
+  }
+
+  @Override
+  public List<CustomFunction> getCql2Functions() {
+    return CqlBuiltInFunctions.prependBuiltInFunctions(cql2Functions);
+  }
+
+  private List<CustomFunction> getDialectAwareCustomFunctions(SqlDialect sqlDialect) {
+    final String dialectKey = "SQL/" + sqlDialect.getId().toUpperCase(Locale.ROOT);
+
+    return getData().getCql2Functions().stream()
+        .filter(
+            function -> {
+              if (Objects.nonNull(function.getExpression())
+                  && !function.getExpression().isBlank()) {
+                return true;
+              }
+
+              Map<String, String> expressions = function.getExpressions();
+              boolean hasDialectExpression = expressions.containsKey(dialectKey);
+              boolean hasGenericExpression = expressions.containsKey("SQL");
+
+              if (hasDialectExpression || hasGenericExpression) {
+                return true;
+              }
+
+              LOGGER.error(
+                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no expression is defined for dialect '{}' (available keys: {}).",
+                  getId(),
+                  function.getName(),
+                  dialectKey,
+                  expressions.keySet());
+              return false;
+            })
+        .toList();
   }
 
   @Override

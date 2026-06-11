@@ -44,8 +44,10 @@ public interface CircularString extends SingleCurve {
   default void check() {
     Preconditions.checkState(
         isEmpty() || getValue().getNumPositions() > 2 && getValue().getNumPositions() % 2 == 1,
-        "A non-empty circular string must have an odd number of positions and at least three positions, found %d positions.",
-        getValue().getNumPositions());
+        "A non-empty circular string must have an odd number of positions and at least three positions, found %d positions with axes %s: %s",
+        getValue().getNumPositions(),
+        getValue().getAxes(),
+        GeometryFormatting.formatPositions(getValue().getCoordinates(), getValue().getAxes(), 6));
   }
 
   @Override
