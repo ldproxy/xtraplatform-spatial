@@ -83,11 +83,12 @@ public interface FeatureEventHandler<
     Map<String, String> additionalInfo();
 
     /**
-     * Captured (linkRelation, value) pairs for the current feature, populated by {@link
-     * FeatureTokenTransformerLinkRoles} from schema properties whose {@link SchemaBase.Role role
-     * declares a link relation}. Encoders use it to emit per-feature link entries.
+     * Captured links for the current feature, populated by {@link
+     * FeatureTokenTransformerPropertyLinks} from schema properties with an {@link
+     * FeatureSchema#getEffectiveLink() effective link}. Encoders use it to emit per-feature link
+     * entries.
      */
-    Map<String, String> roleLinks();
+    List<PropertyLink> propertyLinks();
 
     /**
      * Canonical (untransformed) feature id, captured when a profile rewrites the id token (e.g.
@@ -322,7 +323,7 @@ public interface FeatureEventHandler<
 
     ModifiableContext<T, U> putAdditionalInfo(String key, String value);
 
-    ModifiableContext<T, U> setRoleLinks(Map<String, ? extends String> roleLinks);
+    ModifiableContext<T, U> setPropertyLinks(Iterable<? extends PropertyLink> propertyLinks);
 
     ModifiableContext<T, U> setCanonicalFeatureId(@Nullable String canonicalFeatureId);
   }

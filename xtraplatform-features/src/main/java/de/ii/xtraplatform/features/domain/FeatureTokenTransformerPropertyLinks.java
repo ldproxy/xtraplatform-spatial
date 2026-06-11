@@ -14,46 +14,52 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * Strips property values whose schema role declares a {@link SchemaBase.Role#getLinkRelation() link
- * relation} (e.g. {@code PREDECESSOR_INTERVAL_START}, {@code SUCCESSOR_INTERVAL_START}) from the
- * token stream so downstream encoders do not emit them as inline feature properties. This applies
- * to every response that streams features of a versioned type — single feature, items, search.
+ * Strips property values whose schema declares an {@link FeatureSchema#getEffectiveLink() effective
+ * link} — an explicit {@link SchemaLink} or a {@link SchemaBase.Role role} with a link relation
+ * (e.g. {@code PREDECESSOR_INTERVAL_START}, {@code SUCCESSOR_INTERVAL_START}) — from the token
+ * stream so downstream encoders do not emit them as inline feature properties. This applies to
+ * every response that streams features of a type with such properties — single feature, items,
+ * search.
  *
- * <p>The captured {@code (linkRelation, value)} pairs are surfaced twice:
+ * <p>The captured {@link PropertyLink}s are surfaced twice:
  *
  * <ul>
- *   <li>Per feature, via {@link ModifiableContext#setRoleLinks(java.util.Map)}, on every feature in
+ *   <li>Per feature, via {@link ModifiableContext#setPropertyLinks(Iterable)}, on every feature in
  *       any response, so format writers can emit per-feature link items in the response body.
- *   <li>Per result, via {@code getRoleLinks()} on {@link FeatureStream.Result} / {@link
+ *   <li>Per result, via {@code getPropertyLinks()} on {@link FeatureStream.Result} / {@link
  *       FeatureStream.ResultReduced}, which drives the response's HTTP {@code Link} headers. This
  *       is only meaningful for the single-feature endpoint, where the response carries exactly one
- *       feature version (the {@code datetime} parameter resolves to a single instant), so the links
- *       of the only feature in the stream are the links of the response.
+ *       feature, so the links of the only feature in the stream are the links of the response.
  * </ul>
+ *
+ * <p>The URI templates are not resolved here — the provider does not know the request URIs; the API
+ * layer resolves them against the service, collection and feature URIs.
  */
-public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
+public class FeatureTokenTransformerPropertyLinks extends FeatureTokenTransformer {
 
   private static final DateTimeFormatter FLEXIBLE_PARSER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss[.SSS]][X]");
 
-  private final Consumer<Map<String, String>> roleLinksSetter;
-  private Map<String, String> current = new LinkedHashMap<>();
-  private boolean isSingleFeature = false;
-  private Map<String, String> resultRoleLinks;
+  private final Consumer<List<PropertyLink>> propertyLinksSetter;
+  private List<PropertyLink> current = new ArrayList<>();
+  private boolean isSingleFeature;
+  private List<PropertyLink> resultPropertyLinks;
 
-  public FeatureTokenTransformerLinkRoles(ImmutableResult.Builder resultBuilder) {
-    this.roleLinksSetter = resultBuilder::roleLinks;
+  public FeatureTokenTransformerPropertyLinks(ImmutableResult.Builder resultBuilder) {
+    super();
+    this.propertyLinksSetter = resultBuilder::propertyLinks;
   }
 
-  public <X> FeatureTokenTransformerLinkRoles(ImmutableResultReduced.Builder<X> resultBuilder) {
-    this.roleLinksSetter = resultBuilder::roleLinks;
+  public <X> FeatureTokenTransformerPropertyLinks(ImmutableResultReduced.Builder<X> resultBuilder) {
+    super();
+    this.propertyLinksSetter = resultBuilder::propertyLinks;
   }
 
   @Override
@@ -64,17 +70,23 @@ public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    this.current = new LinkedHashMap<>();
-    context.setRoleLinks(Map.of());
+    this.current = new ArrayList<>();
+    context.setPropertyLinks(List.of());
     super.onFeatureStart(context);
   }
 
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    Optional<String> linkRelation =
-        context.schema().flatMap(SchemaBase::getRole).flatMap(SchemaBase.Role::getLinkRelation);
-    if (linkRelation.isPresent() && Objects.nonNull(context.value())) {
-      current.put(linkRelation.get(), normalizeToIso(context.value()));
+    Optional<SchemaLink> link = context.schema().flatMap(FeatureSchema::getEffectiveLink);
+    if (link.isPresent() && Objects.nonNull(context.value())) {
+      FeatureSchema schema = context.schema().get();
+      String value =
+          schema.getType() == SchemaBase.Type.DATETIME
+              ? normalizeToIso(context.value())
+              : context.value();
+      current.add(
+          PropertyLink.of(
+              link.get().getRel(), link.get().getUriTemplate(), value, schema.getLabel()));
       return;
     }
     super.onValue(context);
@@ -102,16 +114,17 @@ public class FeatureTokenTransformerLinkRoles extends FeatureTokenTransformer {
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (!current.isEmpty()) {
-      context.setRoleLinks(current);
-      this.resultRoleLinks = current;
+      List<PropertyLink> links = List.copyOf(current);
+      context.setPropertyLinks(links);
+      this.resultPropertyLinks = links;
     }
     super.onFeatureEnd(context);
   }
 
   @Override
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (isSingleFeature && Objects.nonNull(resultRoleLinks)) {
-      roleLinksSetter.accept(resultRoleLinks);
+    if (isSingleFeature && Objects.nonNull(resultPropertyLinks)) {
+      propertyLinksSetter.accept(resultPropertyLinks);
     }
     super.onEnd(context);
   }

@@ -50,7 +50,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
-  private final boolean hasLinkRoles;
+  private final boolean hasPropertyLinks;
 
   public FeatureStreamImpl(
       Query query,
@@ -88,19 +88,18 @@ public class FeatureStreamImpl implements FeatureStream {
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-    this.hasLinkRoles = hasLinkRelationRoles(query, data);
+    this.hasPropertyLinks = hasPropertyLinks(query, data);
   }
 
-  // Only versioned types have properties whose role declares a link relation
-  // (PREDECESSOR_INTERVAL_START / SUCCESSOR_INTERVAL_START), so for all other types the
-  // LinkRoles transformer would be a per-token no-op and is not wired at all.
-  private static boolean hasLinkRelationRoles(Query query, FeatureProviderDataV2 data) {
+  // For types without properties that are represented as links (an explicit `link` in the
+  // schema or a role that declares a link relation) the PropertyLinks transformer would be a
+  // per-token no-op and is not wired at all.
+  private static boolean hasPropertyLinks(Query query, FeatureProviderDataV2 data) {
     return getTypes(query).stream()
         .map(type -> data.getTypes().get(type))
         .filter(Objects::nonNull)
         .flatMap(schema -> schema.getAllNestedProperties().stream())
-        .anyMatch(
-            property -> property.getRole().flatMap(SchemaBase.Role::getLinkRelation).isPresent());
+        .anyMatch(property -> property.getEffectiveLink().isPresent());
   }
 
   private static List<String> getTypes(Query query) {
@@ -125,11 +124,11 @@ public class FeatureStreamImpl implements FeatureStream {
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
           ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
-          // LinkRoles must run before the per-format value-transformation step so it captures
-          // the raw ISO timestamp, not a locale-formatted variant used in the body
+          // PropertyLinks must run before the per-format value-transformation step so it
+          // captures the raw ISO timestamp, not a locale-formatted variant used in the body
           FeatureTokenSource source =
-              hasLinkRoles
-                  ? tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder))
+              hasPropertyLinks
+                  ? tokenSource.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
                   : tokenSource;
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
@@ -208,11 +207,11 @@ public class FeatureStreamImpl implements FeatureStream {
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
           ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
-          // LinkRoles must run before the per-format value-transformation step so it captures
-          // the raw ISO timestamp, not a locale-formatted variant used in the body
+          // PropertyLinks must run before the per-format value-transformation step so it
+          // captures the raw ISO timestamp, not a locale-formatted variant used in the body
           FeatureTokenSource source =
-              hasLinkRoles
-                  ? tokenSource.via(new FeatureTokenTransformerLinkRoles(resultBuilder))
+              hasPropertyLinks
+                  ? tokenSource.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
                   : tokenSource;
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before

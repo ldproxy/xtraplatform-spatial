@@ -17,6 +17,7 @@ import jakarta.ws.rs.InternalServerErrorException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.EntityTag;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -100,7 +101,7 @@ public interface FeatureStream {
 
     Optional<Tuple<Instant, Instant>> getTemporalExtent();
 
-    Map<String, String> getRoleLinks();
+    List<PropertyLink> getPropertyLinks();
   }
 
   @Value.Immutable
@@ -122,7 +123,7 @@ public interface FeatureStream {
 
     Optional<Tuple<Instant, Instant>> getTemporalExtent();
 
-    Map<String, String> getRoleLinks();
+    List<PropertyLink> getPropertyLinks();
   }
 
   interface ResultBase {

@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
   "excludedScopes",
   "transformations",
   "constraints",
+  "link",
   "properties"
 })
 public interface FeatureSchema
@@ -148,7 +149,12 @@ public interface FeatureSchema
    *     be used for `datetime` queries, provided that a time instant describes the temporal extent
    *     of the features. If, on the other hand, the temporal extent is a time interval, then
    *     `PRIMARY_INTERVAL_START` and `PRIMARY_INTERVAL_END` should be specified at the respective
-   *     temporal properties.
+   *     temporal properties. If the dataset contains multiple versions of the features,
+   *     `PREDECESSOR_INTERVAL_START` and `SUCCESSOR_INTERVAL_START` can be specified at the
+   *     temporal properties that contain the start of the primary interval of the previous and next
+   *     version of the feature. These properties are not represented as feature properties, but as
+   *     links with the link relation types `predecessor-version` and `successor-version` (see
+   *     [Links](../details/links.md); the default link can be overridden with `link`).
    * @langDe Kennzeichnet besondere Bedeutungen der Eigenschaft. `ID` ist bei der Eigenschaft eines
    *     Objekts anzugeben, die für die `featureId` in der API zu verwenden ist. Diese Eigenschaft
    *     ist typischerweise die erste Eigenschaft im `properties`-Objekt. Erlaubte Zeichen in diesen
@@ -163,7 +169,13 @@ public interface FeatureSchema
    *     angegeben werden, die für `datetime`-Abfragen verwendet werden soll, sofern ein Zeitpunkt
    *     die zeitliche Ausdehnung der Features beschreibt. Ist die zeitliche Ausdehnung hingegen ein
    *     Zeitintervall, dann sind `PRIMARY_INTERVAL_START` und `PRIMARY_INTERVAL_END` bei den
-   *     jeweiligen zeitlichen Eigenschaften anzugeben.
+   *     jeweiligen zeitlichen Eigenschaften anzugeben. Enthält der Datensatz mehrere Versionen der
+   *     Features, dann können `PREDECESSOR_INTERVAL_START` und `SUCCESSOR_INTERVAL_START` bei den
+   *     zeitlichen Eigenschaften angegeben werden, die den Beginn des primären Zeitintervalls der
+   *     vorherigen bzw. nächsten Version des Features enthalten. Diese Eigenschaften werden nicht
+   *     als Feature-Eigenschaften repräsentiert, sondern als Links mit den Linkrelationen
+   *     `predecessor-version` und `successor-version` (siehe [Links](../details/links.md); der
+   *     Standard-Link kann mit `link` überschrieben werden).
    * @default null
    */
   @Override
@@ -419,6 +431,34 @@ public interface FeatureSchema
    */
   @Override
   Optional<SchemaConstraints> getConstraints();
+
+  /**
+   * @langEn Option to represent the property as a web link instead of an inline value, see
+   *     [Links](../details/links.md). Only meaningful for value properties.
+   * @langDe Option um die Eigenschaft als Web-Link statt als Wert in den Feature-Eigenschaften zu
+   *     repräsentieren, siehe [Links](../details/links.md). Nur bei Werteigenschaften sinnvoll.
+   * @default null
+   */
+  Optional<SchemaLink> getLink();
+
+  /**
+   * The link of the property: the configured {@link #getLink() link}, or for properties whose
+   * {@link SchemaBase.Role role} declares a link relation (e.g. {@code
+   * PREDECESSOR_INTERVAL_START}), a default link to the feature version that starts at the property
+   * value.
+   */
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default Optional<SchemaLink> getEffectiveLink() {
+    if (getLink().isPresent()) {
+      return getLink();
+    }
+    return getRole()
+        .flatMap(SchemaBase.Role::getLinkRelation)
+        .filter(rel -> "predecessor-version".equals(rel) || "successor-version".equals(rel))
+        .map(rel -> SchemaLink.of(rel, SchemaLink.FEATURE_URI + "?datetime=" + SchemaLink.VALUE));
+  }
 
   /**
    * @langEn Option to disable enforcement of counter-clockwise orientation for exterior rings and a
