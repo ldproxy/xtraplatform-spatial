@@ -19,4 +19,13 @@ public interface MultiFeatureQuery extends Query {
   }
 
   List<SubQuery> getQueries();
+
+  /**
+   * If enabled, a feature that is selected by more than one query is only included in the response
+   * once.
+   */
+  @Value.Default
+  default boolean getDeduplicate() {
+    return false;
+  }
 }

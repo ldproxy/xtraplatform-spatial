@@ -51,6 +51,8 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepEtag;
   private final boolean stepMetadata;
   private final boolean hasPropertyLinks;
+  private final boolean deduplicate;
+  private final boolean idsArePerType;
 
   public FeatureStreamImpl(
       Query query,
@@ -89,6 +91,9 @@ public class FeatureStreamImpl implements FeatureStream {
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.hasPropertyLinks = hasPropertyLinks(query, data);
+    this.deduplicate =
+        query instanceof MultiFeatureQuery && ((MultiFeatureQuery) query).getDeduplicate();
+    this.idsArePerType = !data.getGloballyUniqueFeatureIds();
   }
 
   // For types without properties that are represented as links (an explicit `link` in the
@@ -124,12 +129,17 @@ public class FeatureStreamImpl implements FeatureStream {
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
           ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
+          // duplicates are dropped first so that no downstream step sees them
+          FeatureTokenSource deduplicated =
+              deduplicate
+                  ? tokenSource.via(new FeatureTokenTransformerDeduplicate(idsArePerType))
+                  : tokenSource;
           // PropertyLinks must run before the per-format value-transformation step so it
           // captures the raw ISO timestamp, not a locale-formatted variant used in the body
           FeatureTokenSource source =
               hasPropertyLinks
-                  ? tokenSource.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
-                  : tokenSource;
+                  ? deduplicated.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
+                  : deduplicated;
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
           // any format-specific transformation
@@ -207,12 +217,17 @@ public class FeatureStreamImpl implements FeatureStream {
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
           ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
+          // duplicates are dropped first so that no downstream step sees them
+          FeatureTokenSource deduplicated =
+              deduplicate
+                  ? tokenSource.via(new FeatureTokenTransformerDeduplicate(idsArePerType))
+                  : tokenSource;
           // PropertyLinks must run before the per-format value-transformation step so it
           // captures the raw ISO timestamp, not a locale-formatted variant used in the body
           FeatureTokenSource source =
               hasPropertyLinks
-                  ? tokenSource.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
-                  : tokenSource;
+                  ? deduplicated.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
+                  : deduplicated;
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
           // any format-specific transformation
