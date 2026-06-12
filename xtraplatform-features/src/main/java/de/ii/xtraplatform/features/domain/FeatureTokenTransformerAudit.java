@@ -60,7 +60,8 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
       return;
     }
 
-    boolean doAudit = logAllProperties || schema.getAudit().orElse(false);
+    boolean doAudit =
+        (logAllProperties && schema.getAudit().orElse(true)) || schema.getAudit().orElse(false);
     if (doAudit) {
       String schemaName = schema.getFullPathAsString();
       String value = context.value();
