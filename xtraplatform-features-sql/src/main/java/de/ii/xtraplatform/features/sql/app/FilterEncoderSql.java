@@ -37,6 +37,7 @@ import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
@@ -100,6 +101,7 @@ public class FilterEncoderSql {
   private final Cql cql;
   private final String accentiCollation;
   private final Map<String, CustomFunction> customFunctions;
+  private final java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -120,12 +122,33 @@ public class FilterEncoderSql {
       Cql cql,
       List<CustomFunction> customFunctions,
       String accentiCollation) {
+    this(
+        nativeCrs,
+        sqlDialect,
+        crsTransformerFactory,
+        crsInfo,
+        cql,
+        customFunctions,
+        accentiCollation,
+        type -> Optional.empty());
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation,
+      java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver) {
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
     this.crsInfo = crsInfo;
     this.cql = cql;
     this.accentiCollation = accentiCollation;
+    this.mappingResolver = mappingResolver;
     this.customFunctions =
         ImmutableMap.copyOf(
             CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
@@ -784,6 +807,11 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSet) {
+        throw new IllegalArgumentException(
+            String.format("Filter is invalid. %s is not supported here.", InResultSet.TYPE));
+      }
+
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
       List<String> expressions = processBinary(scalarOperation.getArgs(), children);
@@ -1765,12 +1793,87 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSet) {
+        return encodeInResultSet((InResultSet) scalarOperation, children.get(0));
+      }
+
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
       List<String> expressions = processBinary(scalarOperation.getArgs(), children);
 
       String operation = String.format(" %s %s", operator, expressions.get(1));
       return String.format(expressions.get(0), "", operation);
+    }
+
+    private String encodeInResultSet(InResultSet inResultSet, String mainExpression) {
+      if (!operandHasSelect(mainExpression)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The first argument of %s must be a queryable.",
+                InResultSet.TYPE));
+      }
+
+      String setName = inResultSet.getSetName();
+      String producerType =
+          inResultSet
+              .getProducerType()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+
+      if (inResultSet.getProducerValues().isPresent()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. Result set '%s' is a projected result set, which is not supported.",
+                setName));
+      }
+
+      SqlQueryMapping producerMapping =
+          mappingResolver
+              .apply(producerType)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format(
+                              "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                              setName, producerType)));
+
+      SqlQuerySchema producerTable = producerMapping.getMainTable();
+      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> idColumn =
+          producerMapping
+              .getColumnForId()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format(
+                              "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
+                              producerType, setName)));
+
+      if (!idColumn.first().getRelations().isEmpty()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The id property of feature type '%s' is not a column of the main table, result set '%s' is not supported.",
+                producerType, setName));
+      }
+
+      Optional<Cql2Expression> tableFilter =
+          producerTable.getFilter().map(filter -> (Cql2Expression) filter);
+      Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
+      Optional<Cql2Expression> effectiveFilter =
+          tableFilter.isPresent() && producerFilter.isPresent()
+              ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
+              : tableFilter.isPresent() ? tableFilter : producerFilter;
+
+      String where =
+          effectiveFilter.map(filter -> " WHERE " + encode(filter, producerMapping)).orElse("");
+
+      String subquery =
+          String.format(
+              "SELECT A.%2$s FROM %1$s A%3$s",
+              producerTable.getName(), idColumn.second().getName(), where);
+
+      return String.format(mainExpression, "", String.format(" IN (%s)", subquery));
     }
 
     @Override

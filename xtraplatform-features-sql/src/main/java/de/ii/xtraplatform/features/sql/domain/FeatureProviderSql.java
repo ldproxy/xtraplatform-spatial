@@ -592,7 +592,11 @@ public class FeatureProviderSql
             crsInfo,
             cql,
             getCql2Functions(),
-            accentiCollation);
+            accentiCollation,
+            type ->
+                Optional.ofNullable(queryMappings.get(type))
+                    .filter(mappings -> mappings.size() == 1)
+                    .map(mappings -> mappings.get(0)));
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
