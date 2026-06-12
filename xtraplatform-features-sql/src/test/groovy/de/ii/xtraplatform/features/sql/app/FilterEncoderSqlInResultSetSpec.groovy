@@ -42,7 +42,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def mappingDeriver = new SqlMappingDeriver(pathParser, new ImmutableQueryGeneratorSettings.Builder().build())
         def mappingOperationResolver = new MappingOperationResolver()
 
-        ["simple", "value_array"].each { name ->
+        ["simple", "value_array", "simple_filter"].each { name ->
             def schema = FeatureSchemaFixtures.fromYaml(name)
             def resolved = schema.accept(mappingOperationResolver, List.of())
             def rules = MappingRuleFixtures.fromYaml(name)
@@ -54,11 +54,18 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
     }
 
     static InResultSet resolved(InResultSet inResultSet, String producerType, de.ii.xtraplatform.cql.domain.Cql2Expression producerFilter) {
+        return resolved(inResultSet, producerType, producerFilter, null)
+    }
+
+    static InResultSet resolved(InResultSet inResultSet, String producerType, de.ii.xtraplatform.cql.domain.Cql2Expression producerFilter, String values) {
         def builder = new ImmutableInResultSet.Builder()
                 .from(inResultSet)
                 .producerType(producerType)
         if (producerFilter != null) {
             builder.producerFilter(producerFilter)
+        }
+        if (values != null) {
+            builder.producerValues(values)
         }
         return builder.build()
     }
@@ -129,19 +136,49 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         e.message.contains("unknown")
     }
 
-    def 'a projected result set is rejected'() {
+    def 'projected result set over a junction table'() {
+        given: 'the set consists of the values referenced by an array property of the selected features'
+        def filter = resolved(InResultSet.of("id", "s1"), "value_array",
+                Eq.of(Property.of("id"), ScalarLiteral.of("foo")), "externalprovidername")
+
+        when:
+        def sql = filterEncoder.encode(filter, mappings["simple"])
+
+        then:
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT B.externalprovidername FROM externalprovider A JOIN externalprovider_externalprovidername B ON (A.id=B.externalprovider_fk) WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')))"
+    }
+
+    def 'projected result set over a column of the main table'() {
         given:
-        def filter = new ImmutableInResultSet.Builder()
-                .from(InResultSet.of("id", "s1"))
-                .producerType("simple")
-                .producerValues("ref")
-                .build()
+        def filter = resolved(InResultSet.of("id", "s1"), "simple", null, "id")
+
+        when:
+        def sql = filterEncoder.encode(filter, mappings["value_array"])
+
+        then:
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A))"
+    }
+
+    def 'the filter of the producer main table is applied to the result set'() {
+        given:
+        def filter = resolved(InResultSet.of("id", "s1"), "simple_filter", null)
+
+        when:
+        def sql = filterEncoder.encode(filter, mappings["simple"])
+
+        then:
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.type = 1)))"
+    }
+
+    def 'an unknown projected property is rejected'() {
+        given:
+        def filter = resolved(InResultSet.of("id", "s1"), "simple", null, "nosuchproperty")
 
         when:
         filterEncoder.encode(filter, mappings["value_array"])
 
         then:
         def e = thrown IllegalArgumentException
-        e.message.contains("projected")
+        e.message.contains("nosuchproperty")
     }
 }

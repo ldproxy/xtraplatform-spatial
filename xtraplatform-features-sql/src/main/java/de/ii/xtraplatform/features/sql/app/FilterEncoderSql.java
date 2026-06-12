@@ -1822,13 +1822,6 @@ public class FilterEncoderSql {
                       new IllegalArgumentException(
                           String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
 
-      if (inResultSet.getProducerValues().isPresent()) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Filter is invalid. Result set '%s' is a projected result set, which is not supported.",
-                setName));
-      }
-
       SqlQueryMapping producerMapping =
           mappingResolver
               .apply(producerType)
@@ -1839,26 +1832,37 @@ public class FilterEncoderSql {
                               "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
                               setName, producerType)));
 
-      SqlQuerySchema producerTable = producerMapping.getMainTable();
-      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> idColumn =
-          producerMapping
-              .getColumnForId()
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          String.format(
-                              "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
-                              producerType, setName)));
+      // a projected result set consists of the ids referenced by a property of the selected
+      // features, a plain result set of the ids of the selected features
+      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> setColumn =
+          inResultSet.getProducerValues().isPresent()
+              ? producerMapping
+                  .getColumnForValue(inResultSet.getProducerValues().get())
+                  .orElseThrow(
+                      () ->
+                          new IllegalArgumentException(
+                              String.format(
+                                  "Filter is invalid. Result set '%s' projects the property '%s', which is unknown for feature type '%s'.",
+                                  setName, inResultSet.getProducerValues().get(), producerType)))
+              : producerMapping
+                  .getColumnForId()
+                  .orElseThrow(
+                      () ->
+                          new IllegalArgumentException(
+                              String.format(
+                                  "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
+                                  producerType, setName)));
 
-      if (!idColumn.first().getRelations().isEmpty()) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Filter is invalid. The id property of feature type '%s' is not a column of the main table, result set '%s' is not supported.",
-                producerType, setName));
-      }
+      SqlQuerySchema valueTable = setColumn.first();
+      List<String> aliases = AliasGenerator.getAliases(valueTable);
+      SqlQueryTable producerMain =
+          valueTable.getRelations().isEmpty() ? valueTable : valueTable.getRelations().get(0);
+      String join = JoinGenerator.getJoins(valueTable, aliases, FilterEncoderSql.this);
+      String valueColumn =
+          String.format("%s.%s", aliases.get(aliases.size() - 1), setColumn.second().getName());
 
       Optional<Cql2Expression> tableFilter =
-          producerTable.getFilter().map(filter -> (Cql2Expression) filter);
+          producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
       Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
       Optional<Cql2Expression> effectiveFilter =
           tableFilter.isPresent() && producerFilter.isPresent()
@@ -1870,8 +1874,13 @@ public class FilterEncoderSql {
 
       String subquery =
           String.format(
-              "SELECT A.%2$s FROM %1$s A%3$s",
-              producerTable.getName(), idColumn.second().getName(), where);
+              "SELECT %2$s FROM %1$s %3$s%4$s%5$s%6$s",
+              producerMain.getName(),
+              valueColumn,
+              aliases.get(0),
+              join.isEmpty() ? "" : " ",
+              join,
+              where);
 
       return String.format(mainExpression, "", String.format(" IN (%s)", subquery));
     }
