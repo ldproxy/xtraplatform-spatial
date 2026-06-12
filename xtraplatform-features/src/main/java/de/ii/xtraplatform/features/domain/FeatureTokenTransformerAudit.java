@@ -7,95 +7,85 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import de.ii.xtraplatform.services.domain.AuditLog;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenTransformerAudit.class);
   private final String requestId;
   private final AuditLog auditLog;
-  private final Map<String, Object> featureHolder = new LinkedHashMap<>();
-  private final List<Map<String, Object>> featureList = new ArrayList<>();
+  private final Map<String, Object> featureHolder;
+  private final List<Map<String, Object>> featureList;
   private final boolean includePropertyValues;
   private final List<String> propertyNames;
-  private boolean logAllProperties = false;
+  private boolean logAllProperties;
 
   public FeatureTokenTransformerAudit(String requestId, AuditLog auditLog) {
     this.requestId = requestId;
     this.auditLog = auditLog;
-    includePropertyValues = auditLog.getIncludePropertyValues(requestId);
-    propertyNames = new ArrayList<>();
+    this.includePropertyValues = auditLog.getIncludePropertyValues(requestId);
+    this.propertyNames = new ArrayList<>();
+    this.featureHolder = new LinkedHashMap<>();
+    this.featureList = new ArrayList<>();
+    this.logAllProperties = false;
   }
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     featureHolder.clear();
     propertyNames.clear();
-    context
-        .mappings()
-        .get(context.type())
-        .getTargetSchema()
-        .getAudit()
-        .ifPresent(b -> logAllProperties = b);
+
+    this.logAllProperties = context.schema().flatMap(FeatureSchema::getAudit).orElse(false);
+
     super.onFeatureStart(context);
   }
 
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    Optional<FeatureSchema> prop =
-        context.mappings().get(context.type()).getTargetSchema().getProperties().stream()
-            .filter(p -> p.getFullPathAsString().equals(context.pathTracker().toString()))
-            .findFirst();
+    Optional<FeatureSchema> prop = context.schema();
 
     if (prop.isEmpty()) {
-      LOGGER.error("No property found with path: {}", context.pathTracker().toString());
       super.onValue(context);
       return;
     }
 
     FeatureSchema schema = prop.get();
-    if (schema.getRole().filter(Role.ID::equals).isPresent()) {
+    if (schema.isId()) {
       featureHolder.put("id", context.value());
       super.onValue(context);
       return;
     }
 
-    // Gather necessary information about the property
-    String schemaName = schema.getName();
-    String value = context.value();
-    Optional<Boolean> optAudit = schema.getAudit();
+    boolean doAudit = logAllProperties || schema.getAudit().orElse(false);
+    if (doAudit) {
+      String schemaName = schema.getFullPathAsString();
+      String value = context.value();
 
-    // Property should explicitly be audited / not audited
-    if (optAudit.isPresent()) {
-      if (Boolean.TRUE.equals(optAudit.get())) {
-        addProperty(schemaName, value);
-      }
-      super.onValue(context);
-      return;
-    }
-
-    // Case logAllProperties
-    if (logAllProperties) {
-      addProperty(schemaName, value);
+      addProperty(schemaName, value, context.inArray());
     }
 
     super.onValue(context);
   }
 
-  private void addProperty(String schemaName, String value) {
-    if (includePropertyValues) {
-      featureHolder.put(schemaName, value);
-    } else {
+  private void addProperty(String schemaName, String value, boolean isMultiValue) {
+    if (!includePropertyValues) {
       propertyNames.add(schemaName);
+      return;
     }
+
+    if (!isMultiValue) {
+      featureHolder.put(schemaName, value);
+      return;
+    }
+
+    List<String> values =
+        (List<String>) featureHolder.computeIfAbsent(schemaName, k -> new ArrayList<String>());
+
+    values.add(value);
   }
 
   @Override
@@ -105,6 +95,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
     }
     featureList.add(new LinkedHashMap<>(featureHolder));
     logAllProperties = false;
+
     super.onFeatureEnd(context);
   }
 
