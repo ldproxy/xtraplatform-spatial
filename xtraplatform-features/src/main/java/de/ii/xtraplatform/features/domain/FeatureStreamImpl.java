@@ -349,6 +349,8 @@ public class FeatureStreamImpl implements FeatureStream {
     }
 
     if (query instanceof MultiFeatureQuery multiFeatureQuery) {
+      // multiple queries may use the same feature type, the transformations only depend on the
+      // type
       return multiFeatureQuery.getQueries().stream()
           .map(
               typeQuery ->
@@ -358,7 +360,8 @@ public class FeatureStreamImpl implements FeatureStream {
                           featureSchemas,
                           typeQuery,
                           Optional.ofNullable(propertyTransformations.get(typeQuery.getType())))))
-          .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+          .collect(
+              ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
     }
 
     return ImmutableMap.of();

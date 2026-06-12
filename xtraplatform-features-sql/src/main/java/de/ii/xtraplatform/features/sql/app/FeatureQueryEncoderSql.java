@@ -113,7 +113,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                                     query,
                                     query,
                                     additionalQueryParameters,
-                                    query.returnsSingleFeature())))
+                                    query.returnsSingleFeature(),
+                                    0)))
             .flatMap(s -> s)
             .collect(Collectors.toList());
 
@@ -133,9 +134,11 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     int chunks = (query.getLimit() / chunkSize) + (query.getLimit() % chunkSize > 0 ? 1 : 0);
 
     List<SqlQuerySet> querySets =
-        query.getQueries().stream()
+        IntStream.range(0, query.getQueries().size())
+            .boxed()
             .flatMap(
-                typeQuery -> {
+                queryIndex -> {
+                  TypeQuery typeQuery = query.getQueries().get(queryIndex);
                   List<SqlQueryTemplates> queryTemplates =
                       allQueryTemplates.get(typeQuery.getType());
 
@@ -153,7 +156,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                                               typeQuery,
                                               query,
                                               additionalQueryParameters,
-                                              false)))
+                                              false,
+                                              queryIndex)))
                       .flatMap(s -> s);
                 })
             .collect(Collectors.toList());
@@ -176,7 +180,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
       TypeQuery typeQuery,
       Query query,
       Map<String, String> additionalQueryParameters,
-      boolean skipMetaQuery) {
+      boolean skipMetaQuery,
+      int queryIndex) {
     List<SortKey> sortKeys =
         transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
     boolean useMinMaxKeys = queryTemplates.getMapping().getMainTable().isSortKeyUnique();
@@ -228,6 +233,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .metaQuery(metaQuery)
         .valueQueries(valueQueries)
         .options(getOptions(typeQuery, query))
+        .queryIndex(queryIndex)
         .build()
         .withTableSchemas(queryTemplates.getMapping().getTables());
   }

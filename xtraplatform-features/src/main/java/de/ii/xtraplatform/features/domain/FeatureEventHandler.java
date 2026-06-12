@@ -261,30 +261,37 @@ public interface FeatureEventHandler<
 
     private boolean shouldInclude(T schema, List<T> parentSchemas, String path) {
       return schema.isId()
-          || (schema.isSpatial() && (Objects.isNull(typeQuery()) || !typeQuery().skipGeometry()))
+          || (schema.isSpatial()
+              && (typeQueries().isEmpty()
+                  || typeQueries().stream().anyMatch(typeQuery -> !typeQuery.skipGeometry())))
           // TODO: enable if projected output needs to be schema valid
           // || isRequired(schema, parentSchemas)
           || (!schema.isId() && propertyIsInFields(path));
     }
 
-    private TypeQuery typeQuery() {
+    // multiple queries of a multi-query may use the same feature type, the projections of such
+    // queries are merged
+    private List<? extends TypeQuery> typeQueries() {
       return query() instanceof FeatureQuery
-          ? (FeatureQuery) query()
+          ? List.of((FeatureQuery) query())
           : query() instanceof MultiFeatureQuery
               ? ((MultiFeatureQuery) query())
                   .getQueries().stream()
                       .filter(subQuery -> Objects.equals(subQuery.getType(), type()))
-                      .findFirst()
-                      .orElse(null)
-              : null;
+                      .toList()
+              : List.of();
     }
 
     default boolean propertyIsInFields(String property) {
-      TypeQuery typeQuery = typeQuery();
-      return Objects.nonNull(typeQuery)
-          && (typeQuery.getFields().isEmpty()
-              || typeQuery.getFields().contains("*")
-              || typeQuery.getFields().stream().anyMatch(field -> field.startsWith(property)));
+      List<? extends TypeQuery> typeQueries = typeQueries();
+      return !typeQueries.isEmpty()
+          && typeQueries.stream()
+              .anyMatch(
+                  typeQuery ->
+                      typeQuery.getFields().isEmpty()
+                          || typeQuery.getFields().contains("*")
+                          || typeQuery.getFields().stream()
+                              .anyMatch(field -> field.startsWith(property)));
     }
 
     default boolean isRequired(T schema, List<T> parentSchemas) {
