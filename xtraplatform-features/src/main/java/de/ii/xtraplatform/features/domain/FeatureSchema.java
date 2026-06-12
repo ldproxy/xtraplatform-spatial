@@ -74,6 +74,28 @@ public interface FeatureSchema
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
 
+  static FeatureSchema apply(
+      FeatureSchema schema, Consumer<ImmutableFeatureSchema.Builder> changes) {
+    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder().from(schema);
+
+    changes.accept(builder);
+
+    return builder.build();
+  }
+
+  /**
+   * @langEn For a property of `properties`, this can be set to `true`/`false` to explicitly
+   *     include/exclude the property in the audit log. If set to `true` for `type`, all properties
+   *     of it are included in the audit log except for those explicitly excluded. Geometries are
+   *     always excluded.
+   * @langDe Für eine Property aus `properties` kann dies auf `true`/`false` gesetzt werden, um
+   *     diese Property explizit in das Audit-Log ein- oder auszuschließen. Falls für `type` auf
+   *     `true` gesetzt, werden alle Properties dessen in das Audit-Log aufgenommen, außer die, die
+   *     explizit ausgeschlossen sind. Geometrien sind immer ausgeschlossen.
+   * @default false
+   */
+  Optional<Boolean> getAudit();
+
   @JsonIgnore
   @Override
   String getName();
@@ -333,6 +355,8 @@ public interface FeatureSchema
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
 
+  // returnable() is unchanged, no need to override
+
   @Override
   @JsonIgnore
   @Value.Derived
@@ -346,8 +370,6 @@ public interface FeatureSchema
         && !Objects.equals(getType(), Type.UNKNOWN)
         && !getExcludedScopes().contains(Scope.SORTABLE);
   }
-
-  // returnable() is unchanged, no need to override
 
   @Override
   @JsonIgnore
@@ -497,51 +519,6 @@ public interface FeatureSchema
    * @default []
    */
   List<FeatureSchema> getConcat();
-
-  abstract class Builder
-      extends PropertiesSchema.Builder<FeatureSchema, ImmutableFeatureSchema.Builder, FeatureSchema>
-      implements PropertiesSchema.BuilderWithName<FeatureSchema, ImmutableFeatureSchema.Builder> {
-
-    public abstract ImmutableFeatureSchema.Builder desiredType(
-        @Nullable SchemaBase.Type desiredType);
-
-    @JsonIgnore
-    public ImmutableFeatureSchema.Builder type(SchemaBase.Type type) {
-      return desiredType(type);
-    }
-
-    @JsonIgnore
-    public abstract ImmutableFeatureSchema.Builder concat(
-        Iterable<? extends FeatureSchema> elements);
-
-    public abstract ImmutableFeatureSchema.Builder addAllConcatBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements);
-
-    @JsonProperty("concat")
-    public ImmutableFeatureSchema.Builder concatBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements) {
-      for (ImmutableFeatureSchema.Builder element : elements) {
-        element.name(CONCAT_ELEMENT);
-      }
-      return addAllConcatBuilders(elements);
-    }
-
-    @JsonIgnore
-    public abstract ImmutableFeatureSchema.Builder coalesce(
-        Iterable<? extends FeatureSchema> elements);
-
-    public abstract ImmutableFeatureSchema.Builder addAllCoalesceBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements);
-
-    @JsonProperty("coalesce")
-    public ImmutableFeatureSchema.Builder coalesceBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements) {
-      for (ImmutableFeatureSchema.Builder element : elements) {
-        element.name(COALESCE_ELEMENT);
-      }
-      return addAllCoalesceBuilders(elements);
-    }
-  }
 
   @Override
   default ImmutableFeatureSchema.Builder getBuilder() {
@@ -1164,8 +1141,7 @@ public interface FeatureSchema
                               .map(
                                   entry ->
                                       new SimpleEntry<>(
-                                          entry.getKey(),
-                                          (FeatureSchema) visit.apply(entry.getValue())))
+                                          entry.getKey(), visit.apply(entry.getValue())))
                               .collect(
                                   ImmutableMap.toImmutableMap(
                                       Map.Entry::getKey, Map.Entry::getValue)))
@@ -1196,12 +1172,48 @@ public interface FeatureSchema
     return builder.build();
   }
 
-  static FeatureSchema apply(
-      FeatureSchema schema, Consumer<ImmutableFeatureSchema.Builder> changes) {
-    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder().from(schema);
+  abstract class Builder
+      extends PropertiesSchema.Builder<FeatureSchema, ImmutableFeatureSchema.Builder, FeatureSchema>
+      implements PropertiesSchema.BuilderWithName<FeatureSchema, ImmutableFeatureSchema.Builder> {
 
-    changes.accept(builder);
+    public abstract ImmutableFeatureSchema.Builder desiredType(
+        @Nullable SchemaBase.Type desiredType);
 
-    return builder.build();
+    @JsonIgnore
+    public ImmutableFeatureSchema.Builder type(SchemaBase.Type type) {
+      return desiredType(type);
+    }
+
+    @JsonIgnore
+    public abstract ImmutableFeatureSchema.Builder concat(
+        Iterable<? extends FeatureSchema> elements);
+
+    public abstract ImmutableFeatureSchema.Builder addAllConcatBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements);
+
+    @JsonProperty("concat")
+    public ImmutableFeatureSchema.Builder concatBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements) {
+      for (ImmutableFeatureSchema.Builder element : elements) {
+        element.name(CONCAT_ELEMENT);
+      }
+      return addAllConcatBuilders(elements);
+    }
+
+    @JsonIgnore
+    public abstract ImmutableFeatureSchema.Builder coalesce(
+        Iterable<? extends FeatureSchema> elements);
+
+    public abstract ImmutableFeatureSchema.Builder addAllCoalesceBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements);
+
+    @JsonProperty("coalesce")
+    public ImmutableFeatureSchema.Builder coalesceBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements) {
+      for (ImmutableFeatureSchema.Builder element : elements) {
+        element.name(COALESCE_ELEMENT);
+      }
+      return addAllCoalesceBuilders(elements);
+    }
   }
 }

@@ -34,6 +34,7 @@ import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
 import de.ii.xtraplatform.features.domain.transform.WithScope;
 import de.ii.xtraplatform.features.domain.transform.WithoutProperties;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Runner;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
@@ -85,6 +86,8 @@ public abstract class AbstractFeatureProvider<
   private boolean datasetChangedForced;
   private String previousDataset;
 
+  protected AuditLog auditLog;
+
   protected AbstractFeatureProvider(
       ConnectorFactory connectorFactory,
       Reactive reactive,
@@ -92,6 +95,7 @@ public abstract class AbstractFeatureProvider<
       CrsInfo crsInfo,
       ProviderExtensionRegistry extensionRegistry,
       Values<Codelist> codelistStore,
+      AuditLog auditLog,
       FeatureProviderDataV2 data,
       VolatileRegistry volatileRegistry) {
     super(data, volatileRegistry);
@@ -101,6 +105,7 @@ public abstract class AbstractFeatureProvider<
     this.crsInfo = crsInfo;
     this.extensionRegistry = extensionRegistry;
     this.codelistStore = codelistStore;
+    this.auditLog = auditLog;
     this.volatileRegistry = volatileRegistry;
     this.changeHandler = new FeatureChangeHandlerImpl();
     this.connector =
@@ -520,7 +525,8 @@ public abstract class AbstractFeatureProvider<
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        !query.hitsOnly());
+        !query.hitsOnly(),
+        auditLog);
   }
 
   // TODO: more tests
@@ -587,8 +593,7 @@ public abstract class AbstractFeatureProvider<
 
   private Map<String, SchemaMapping> createMapping(
       Query query, Map<String, PropertyTransformations> propertyTransformations) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
+    if (query instanceof FeatureQuery featureQuery) {
 
       WithScope withScope =
           featureQuery.getSchemaScope() == SchemaBase.Scope.RETURNABLE

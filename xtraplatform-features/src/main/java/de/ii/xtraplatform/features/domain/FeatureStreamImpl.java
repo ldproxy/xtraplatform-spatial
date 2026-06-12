@@ -19,6 +19,7 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
@@ -49,6 +50,9 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
+  private final boolean stepAudit;
+
+  private final AuditLog auditLog;
 
   public FeatureStreamImpl(
       Query query,
@@ -57,7 +61,8 @@ public class FeatureStreamImpl implements FeatureStream {
       boolean nativeCrsIs3d,
       Map<String, Codelist> codelists,
       QueryRunner runner,
-      boolean doTransform) {
+      boolean doTransform,
+      AuditLog auditLog) {
     this.query = query;
     this.data = data;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -65,6 +70,7 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
+    this.auditLog = auditLog;
 
     this.stepMappingSchema =
         !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
@@ -86,196 +92,10 @@ public class FeatureStreamImpl implements FeatureStream {
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-  }
-
-  @Override
-  public CompletionStage<Result> runWith(
-      Sink<Object> sink,
-      Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
-
-    Map<String, PropertyTransformations> mergedTransformations =
-        getMergedTransformations(data.getTypes(), query, propertyTransformations);
-
-    BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
-        (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
-          ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
-          final ETag.Incremental eTag = ETag.incremental();
-          final boolean strongETag =
-              query instanceof FeatureQuery
-                  && ((FeatureQuery) query)
-                      .getETag()
-                      .filter(type -> type == ETag.Type.STRONG)
-                      .isPresent();
-
-          if (stepEtag
-              && query instanceof FeatureQuery
-              && ((FeatureQuery) query)
-                  .getETag()
-                  .filter(type -> type == ETag.Type.WEAK)
-                  .isPresent()) {
-            source = source.via(new FeatureTokenTransformerWeakETag(resultBuilder));
-          }
-
-          if (stepMetadata) {
-            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
-          }
-
-          source =
-              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
-
-          Reactive.BasicStream<?, Void> basicStream =
-              sink instanceof Reactive.SinkTransformed
-                  ? source.to((Reactive.SinkTransformed<Object, ?>) sink)
-                  : source.to(sink);
-
-          return basicStream
-              .withResult(resultBuilder.isEmpty(true).hasFeatures(false))
-              .handleError(ImmutableResult.Builder::error)
-              .handleItem(
-                  (builder, x) -> {
-                    if (strongETag && x instanceof byte[]) {
-                      eTag.put((byte[]) x);
-                    }
-                    return builder.isEmpty(x instanceof byte[] ? ((byte[]) x).length <= 0 : false);
-                  })
-              .handleEnd(
-                  (ImmutableResult.Builder builder1) -> {
-                    if (strongETag) {
-                      builder1.eTag(eTag.build(ETag.Type.STRONG));
-                    }
-                    return builder1.build();
-                  });
-        };
-
-    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
-  }
-
-  @Override
-  public <X> CompletionStage<ResultReduced<X>> runWith(
-      SinkReduced<Object, X> sink,
-      Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
-
-    Map<String, PropertyTransformations> mergedTransformations =
-        getMergedTransformations(data.getTypes(), query, propertyTransformations);
-
-    BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
-        (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
-          ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
-          final ETag.Incremental eTag = ETag.incremental();
-          final boolean strongETag =
-              query instanceof FeatureQuery
-                  && ((FeatureQuery) query)
-                      .getETag()
-                      .filter(type -> type == ETag.Type.STRONG)
-                      .isPresent();
-
-          if (stepEtag
-              && query instanceof FeatureQuery
-              && ((FeatureQuery) query)
-                  .getETag()
-                  .filter(type -> type == ETag.Type.WEAK)
-                  .isPresent()) {
-            source = source.via(new FeatureTokenTransformerWeakETag(resultBuilder));
-          }
-          if (stepMetadata) {
-            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
-          }
-          source =
-              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
-
-          Reactive.BasicStream<?, X> basicStream =
-              sink instanceof Reactive.SinkReducedTransformed
-                  ? source.to((Reactive.SinkReducedTransformed<Object, ?, X>) sink)
-                  : source.to(sink);
-
-          return basicStream
-              .withResult(resultBuilder.isEmpty(true).hasFeatures(false))
-              .handleError(ImmutableResultReduced.Builder::error)
-              .handleItem(
-                  (builder, x) -> {
-                    if (strongETag && x instanceof byte[]) {
-                      eTag.put((byte[]) x);
-                    }
-                    return builder
-                        .reduced((X) x)
-                        .isEmpty(x instanceof byte[] && ((byte[]) x).length <= 0);
-                  })
-              .handleEnd(
-                  (ImmutableResultReduced.Builder<X> xBuilder) -> {
-                    if (strongETag) {
-                      xBuilder.eTag(eTag.build(ETag.Type.STRONG));
-                    }
-                    return xBuilder.build();
-                  });
-        };
-
-    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
-  }
-
-  private FeatureTokenSource getFeatureTokenSourceTransformed(
-      FeatureTokenSource featureTokenSource,
-      Map<String, PropertyTransformations> propertyTransformations) {
-    FeatureTokenSource tokenSourceTransformed = featureTokenSource;
-
-    if (stepMappingSchema) {
-      FeatureTokenTransformerMappings schemaMapper =
-          new FeatureTokenTransformerMappings(
-              propertyTransformations,
-              codelists,
-              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
-      tokenSourceTransformed = tokenSourceTransformed.via(schemaMapper);
-    } else if (stepMappingValues) {
-      FeatureTokenTransformerMappingValuesOnly valueMapper =
-          new FeatureTokenTransformerMappingValuesOnly(
-              propertyTransformations,
-              codelists,
-              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
-      tokenSourceTransformed = tokenSourceTransformed.via(valueMapper);
-    }
-    if (stepGeometry) {
-      FeatureTokenTransformerGeometry geometryMapper = new FeatureTokenTransformerGeometry();
-      tokenSourceTransformed = tokenSourceTransformed.via(geometryMapper);
-    }
-    if (stepCoordinates) {
-      Optional<CrsTransformer> crsTransformer =
-          query
-              .getCrs()
-              .flatMap(
-                  targetCrs ->
-                      crsTransformerFactory.getTransformer(
-                          data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
-      Optional<CrsTransformer> crsTransformerWgs84 =
-          query
-              .getCrs()
-              .flatMap(
-                  targetCrs ->
-                      crsTransformerFactory.getTransformer(
-                          data.getNativeCrs().orElse(OgcCrs.CRS84),
-                          nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
-      FeatureTokenTransformerCoordinates coordinatesMapper =
-          new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
-      tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
-    }
-    if (stepClean) {
-      FeatureTokenTransformerRemoveEmptyOptionals cleaner =
-          new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);
-      tokenSourceTransformed = tokenSourceTransformed.via(cleaner);
-    }
-    if (FeatureTokenValidator.LOGGER.isTraceEnabled()) {
-      tokenSourceTransformed = tokenSourceTransformed.via(new FeatureTokenValidator());
-    }
-
-    return tokenSourceTransformed;
+    this.stepAudit =
+        auditLog.isEnabled()
+            && !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
   static Map<String, PropertyTransformations> getMergedTransformations(
@@ -420,5 +240,227 @@ public class FeatureStreamImpl implements FeatureStream {
                 // TODO: mark transformations with scope?
                 .filter(pt -> scope != SchemaBase.Scope.RECEIVABLE || pt.getWrap().isPresent())
                 .toList()));
+  }
+
+  @Override
+  public CompletionStage<Result> runWith(
+      Sink<Object> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId) {
+
+    Map<String, PropertyTransformations> mergedTransformations =
+        getMergedTransformations(data.getTypes(), query, propertyTransformations);
+
+    BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
+        (tokenSource, virtualTables) -> {
+          FeatureTokenSource source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
+                  : tokenSource;
+          ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
+          final ETag.Incremental eTag = ETag.incremental();
+          final boolean strongETag =
+              query instanceof FeatureQuery
+                  && ((FeatureQuery) query)
+                      .getETag()
+                      .filter(type -> type == ETag.Type.STRONG)
+                      .isPresent();
+
+          if (stepEtag
+              && query instanceof FeatureQuery
+              && ((FeatureQuery) query)
+                  .getETag()
+                  .filter(type -> type == ETag.Type.WEAK)
+                  .isPresent()) {
+            source = source.via(new FeatureTokenTransformerWeakETag(resultBuilder));
+          }
+
+          if (stepMetadata) {
+            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+          }
+
+          FeatureTokenTransformerAudit auditTransformer = null;
+          if (stepAudit) {
+            if (requestId.isEmpty()) {
+              LOGGER.error("Audit logging not possible, no request-id provided!");
+            } else if (auditLog.logIsAvailable(requestId.get())) {
+              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+              source = source.via(auditTransformer);
+            }
+          }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
+
+          source =
+              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
+
+          Reactive.BasicStream<?, Void> basicStream =
+              sink instanceof Reactive.SinkTransformed
+                  ? source.to((Reactive.SinkTransformed<Object, ?>) sink)
+                  : source.to(sink);
+
+          return basicStream
+              .withResult(resultBuilder.isEmpty(true).hasFeatures(false))
+              .handleError(ImmutableResult.Builder::error)
+              .handleItem(
+                  (builder, x) -> {
+                    if (strongETag && x instanceof byte[]) {
+                      eTag.put((byte[]) x);
+                    }
+                    return builder.isEmpty(x instanceof byte[] && ((byte[]) x).length <= 0);
+                  })
+              .handleEnd(
+                  (ImmutableResult.Builder builder1) -> {
+                    finishAuditLog.run();
+
+                    if (strongETag) {
+                      builder1.eTag(eTag.build(ETag.Type.STRONG));
+                    }
+
+                    return builder1.build();
+                  });
+        };
+
+    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
+  }
+
+  @Override
+  public <X> CompletionStage<ResultReduced<X>> runWith(
+      SinkReduced<Object, X> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId) {
+
+    Map<String, PropertyTransformations> mergedTransformations =
+        getMergedTransformations(data.getTypes(), query, propertyTransformations);
+
+    BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
+        (tokenSource, virtualTables) -> {
+          FeatureTokenSource source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
+                  : tokenSource;
+          ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.builder();
+          final ETag.Incremental eTag = ETag.incremental();
+          final boolean strongETag =
+              query instanceof FeatureQuery
+                  && ((FeatureQuery) query)
+                      .getETag()
+                      .filter(type -> type == ETag.Type.STRONG)
+                      .isPresent();
+
+          if (stepEtag
+              && query instanceof FeatureQuery
+              && ((FeatureQuery) query)
+                  .getETag()
+                  .filter(type -> type == ETag.Type.WEAK)
+                  .isPresent()) {
+            source = source.via(new FeatureTokenTransformerWeakETag(resultBuilder));
+          }
+          if (stepMetadata) {
+            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+          }
+
+          FeatureTokenTransformerAudit auditTransformer = null;
+          if (stepAudit) {
+            if (requestId.isEmpty()) {
+              LOGGER.error("Audit logging not possible, no request-id provided!");
+            } else if (auditLog.logIsAvailable(requestId.get())) {
+              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+              source = source.via(auditTransformer);
+            }
+          }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
+
+          source =
+              source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
+
+          Reactive.BasicStream<?, X> basicStream =
+              sink instanceof Reactive.SinkReducedTransformed
+                  ? source.to((Reactive.SinkReducedTransformed<Object, ?, X>) sink)
+                  : source.to(sink);
+
+          return basicStream
+              .withResult(resultBuilder.isEmpty(true).hasFeatures(false))
+              .handleError(ImmutableResultReduced.Builder::error)
+              .handleItem(
+                  (builder, x) -> {
+                    if (strongETag && x instanceof byte[]) {
+                      eTag.put((byte[]) x);
+                    }
+                    return builder
+                        .reduced((X) x)
+                        .isEmpty(x instanceof byte[] && ((byte[]) x).length <= 0);
+                  })
+              .handleEnd(
+                  (ImmutableResultReduced.Builder<X> xBuilder) -> {
+                    finishAuditLog.run();
+
+                    if (strongETag) {
+                      xBuilder.eTag(eTag.build(ETag.Type.STRONG));
+                    }
+                    return xBuilder.build();
+                  });
+        };
+
+    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
+  }
+
+  private FeatureTokenSource getFeatureTokenSourceTransformed(
+      FeatureTokenSource featureTokenSource,
+      Map<String, PropertyTransformations> propertyTransformations) {
+    FeatureTokenSource tokenSourceTransformed = featureTokenSource;
+
+    if (stepMappingSchema) {
+      FeatureTokenTransformerMappings schemaMapper =
+          new FeatureTokenTransformerMappings(
+              propertyTransformations,
+              codelists,
+              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
+      tokenSourceTransformed = tokenSourceTransformed.via(schemaMapper);
+    } else if (stepMappingValues) {
+      FeatureTokenTransformerMappingValuesOnly valueMapper =
+          new FeatureTokenTransformerMappingValuesOnly(
+              propertyTransformations,
+              codelists,
+              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
+      tokenSourceTransformed = tokenSourceTransformed.via(valueMapper);
+    }
+    if (stepGeometry) {
+      FeatureTokenTransformerGeometry geometryMapper = new FeatureTokenTransformerGeometry();
+      tokenSourceTransformed = tokenSourceTransformed.via(geometryMapper);
+    }
+    if (stepCoordinates) {
+      Optional<CrsTransformer> crsTransformer =
+          query
+              .getCrs()
+              .flatMap(
+                  targetCrs ->
+                      crsTransformerFactory.getTransformer(
+                          data.getNativeCrs().orElse(OgcCrs.CRS84), targetCrs));
+      Optional<CrsTransformer> crsTransformerWgs84 =
+          query
+              .getCrs()
+              .flatMap(
+                  targetCrs ->
+                      crsTransformerFactory.getTransformer(
+                          data.getNativeCrs().orElse(OgcCrs.CRS84),
+                          nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
+      FeatureTokenTransformerCoordinates coordinatesMapper =
+          new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
+      tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
+    }
+    if (stepClean) {
+      FeatureTokenTransformerRemoveEmptyOptionals cleaner =
+          new FeatureTokenTransformerRemoveEmptyOptionals(propertyTransformations);
+      tokenSourceTransformed = tokenSourceTransformed.via(cleaner);
+    }
+    if (FeatureTokenValidator.LOGGER.isTraceEnabled()) {
+      tokenSourceTransformed = tokenSourceTransformed.via(new FeatureTokenValidator());
+    }
+
+    return tokenSourceTransformed;
   }
 }

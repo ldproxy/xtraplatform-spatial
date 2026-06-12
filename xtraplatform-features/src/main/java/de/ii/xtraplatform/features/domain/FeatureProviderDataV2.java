@@ -166,8 +166,8 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    *     definitions](#schema-definitions) with `type: OBJECT` and at least one property with `role:
    *     ID`.
    * @langDe Definition von Feature-Types. Die Einträge sind
-   *     [Schema-Definitionen](#schema-definitions) mit `type: OBJECT` und mindestens einem Property
-   *     mit `role: ID`.
+   *     [Schema-Definitionen](#schema-definitionen) mit `type: OBJECT` und mindestens einem
+   *     Property mit `role: ID`.
    * @default {}
    */
   @JsonMerge
@@ -179,7 +179,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    *     `types`. The entries are arbitrary [schema definitions](#schema-definitions).
    * @langDe Definition von wiederverwendbaren Schema-Fragmenten, die mittels `schema` in `types`
    *     referenziert werden können. Die Einträge sind beliebige
-   *     [Schema-Definitionen](#schema-definitions).
+   *     [Schema-Definitionen](#schema-definitionen).
    * @default {}
    */
   @JsonMerge
