@@ -853,9 +853,7 @@ public class Tile3dGeneratorFeatures extends AbstractVolatileComposed implements
     return Optional.of(
         Polygon.of(
             List.of(
-                PositionList.of(
-                    Axes.XY,
-                    new double[] {x0, y0, x1, y0, x1, y1, x2, y1, x2, y2, x0, y2, x0, y0})),
+                PositionList.of(Axes.XY, x0, y0, x1, y0, x1, y1, x2, y1, x2, y2, x0, y2, x0, y0)),
             Optional.of(OgcCrs.CRS84)));
   }
 
