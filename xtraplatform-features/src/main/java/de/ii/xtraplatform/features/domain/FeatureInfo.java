@@ -29,4 +29,13 @@ public interface FeatureInfo {
   default boolean hasGeneratedId(String featureType) {
     return true;
   }
+
+  /**
+   * Whether feature ids are unique across all feature types of the provider, not just within a
+   * single type. Consumers that merge features from multiple types into one response can rely on
+   * this to keep ids unqualified.
+   */
+  default boolean featureIdsAreGloballyUnique() {
+    return false;
+  }
 }

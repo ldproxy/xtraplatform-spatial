@@ -96,7 +96,8 @@ public class SqlQueryTemplatesDeriver {
         virtualTables,
         withNumberSkipped,
         withNumberReturned,
-        forceNumberMatched) -> {
+        forceNumberMatched,
+        withNumberMatched) -> {
       String limitAndOffsetSql = sqlDialect.applyToLimitAndOffset(limit, offset);
       String skipOffsetSql = skipOffset > 0 ? sqlDialect.applyToOffset(skipOffset) : "";
       String asIds = sqlDialect.applyToAsIds();
@@ -130,7 +131,7 @@ public class SqlQueryTemplatesDeriver {
                       sqlDialect.castToBigInt(0)));
 
       String numberMatched =
-          computeNumberMatched || forceNumberMatched
+          (computeNumberMatched || forceNumberMatched) && withNumberMatched
               ? String.format(
                   "SELECT count(*) AS numberMatched FROM (SELECT A.%2$s AS %4$s FROM %1$s A%3$s ORDER BY 1)%5$s",
                   tableName, schema.getSortKey(), where, SKEY, asIds)

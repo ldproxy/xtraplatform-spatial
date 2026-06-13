@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
   "role",
   "valueType",
   "geometryType",
+  "geometryTypes",
   "objectType",
   "label",
   "alias",
@@ -211,10 +212,23 @@ public interface FeatureSchema
   Optional<GeometryType> getGeometryType();
 
   /**
+   * @langEn Multiple admissible geometry types for properties with `type: GEOMETRY`. Use this
+   *     instead of `geometryType` when more than one geometry type is allowed (e.g. `[POINT,
+   *     MULTI_POINT]`). Values are the same as for `geometryType`.
+   * @langDe Mehrere zulässige Geometrietypen für Eigenschaften mit `type: GEOMETRY`. Wird anstelle
+   *     von `geometryType` verwendet, wenn mehr als ein Geometrietyp erlaubt ist (z.B. `[POINT,
+   *     MULTI_POINT]`). Werte siehe `geometryType`.
+   * @default []
+   * @since v4.8
+   */
+  @Override
+  List<GeometryType> getGeometryTypes();
+
+  /**
    * @langEn Optional name for an object type, used for example in JSON Schema.
-   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name wird z.B. bei der
-   *     Erzeugung von JSON-Schemas verwendet.
-   * @default null
+   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name hat i.d.R. nur
+   *     informativen Charakter und wird z.B. bei der Erzeugung von JSON-Schemas verwendet.
+   * @default
    */
   Optional<String> getObjectType();
 
@@ -851,6 +865,21 @@ public interface FeatureSchema
                         .collect(Collectors.joining("', '")),
                     getName());
               });
+    }
+  }
+
+  @Value.Check
+  default void warnOnConflictingGeometryTypes() {
+    if (getGeometryType().isPresent() && !getGeometryTypes().isEmpty()) {
+      List<GeometryType> types = getGeometryTypes();
+      boolean consistent = types.size() == 1 && types.get(0) == getGeometryType().get();
+      if (!consistent) {
+        LOGGER.warn(
+            "Both 'geometryType' ({}) and 'geometryTypes' ({}) are set on property '{}'; 'geometryTypes' takes precedence.",
+            getGeometryType().get(),
+            types,
+            getFullPathAsString());
+      }
     }
   }
 
