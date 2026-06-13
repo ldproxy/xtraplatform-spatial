@@ -7,8 +7,6 @@
  */
 package de.ii.xtraplatform.features.domain;
 
-import static de.ii.xtraplatform.geometries.domain.GeometryType.ANY;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -148,6 +146,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   Optional<Type> getValueType();
 
   Optional<GeometryType> getGeometryType();
+
+  List<GeometryType> getGeometryTypes();
 
   Optional<String> getFormat();
 
@@ -373,11 +373,10 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
-  default List<GeometryType> getGeometryTypes() {
+  default List<GeometryType> collectEffectiveGeometryTypes() {
     return getPrimaryGeometries().stream()
-        .map(SchemaBase::getGeometryType)
-        .filter(Optional::isPresent)
-        .map(Optional::get)
+        .map(SchemaBase::getEffectiveGeometryTypes)
+        .flatMap(List::stream)
         .distinct()
         .collect(Collectors.toList());
   }
@@ -385,15 +384,25 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
+  default List<GeometryType> getEffectiveGeometryTypes() {
+    return getGeometryTypes().isEmpty()
+        ? List.of(getGeometryType().orElse(GeometryType.ANY))
+        : getGeometryTypes();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
   default GeometryType getEffectiveGeometryType() {
-    return getGeometryTypes().stream().reduce((a, b) -> ANY).orElse(ANY);
+    return GeometryType.effectiveType(
+        isSpatial() ? getEffectiveGeometryTypes() : collectEffectiveGeometryTypes());
   }
 
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
   default Optional<Integer> getEffectiveGeometryDimension() {
-    return getGeometryTypes().stream()
+    return collectEffectiveGeometryTypes().stream()
         .map(GeometryType::getGeometryDimension)
         .reduce(
             (a, b) -> {

@@ -338,8 +338,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
         break;
       case GEOMETRY:
         valueSchema =
-            getSchemaForGeometry(
-                schema.getGeometryType().orElse(GeometryType.ANY), label, description, role);
+            getSchemaForGeometry(schema.getEffectiveGeometryTypes(), label, description, role);
         break;
       case OBJECT:
       case OBJECT_ARRAY:
@@ -438,7 +437,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       Optional<String> codelistId);
 
   protected abstract T getSchemaForGeometry(
-      GeometryType geometryType,
+      List<GeometryType> geometryTypes,
       Optional<String> title,
       Optional<String> description,
       Optional<String> role);
