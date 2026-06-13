@@ -31,10 +31,43 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     PRIMARY_INSTANT,
     PRIMARY_INTERVAL_START,
     PRIMARY_INTERVAL_END,
+    /**
+     * Denormalised pointer to the predecessor version's PRIMARY_INTERVAL_START value. On versioned
+     * collections, write paths maintain this so a feature can be walked backwards through its
+     * version chain without an extra join. The strategy's mutation pipeline populates it (see
+     * {@code MutationStrategy.insertRoleOverrides}). At query time the value is not emitted inline;
+     * it is surfaced as a link with the rel {@code predecessor-version}.
+     */
+    PREDECESSOR_INTERVAL_START("predecessor-version"),
+    /**
+     * Denormalised pointer to the successor version's PRIMARY_INTERVAL_START value. Set on the
+     * retired row by the mutation pipeline at retire time so a feature can be walked forwards
+     * through its version chain. At query time the value is not emitted inline; it is surfaced as a
+     * link with the rel {@code successor-version}.
+     */
+    SUCCESSOR_INTERVAL_START("successor-version"),
     SECONDARY_GEOMETRY,
     FILTER_GEOMETRY,
     EMBEDDED_FEATURE,
-    FEATURE_REF
+    FEATURE_REF;
+
+    private final String linkRelation;
+
+    Role() {
+      this(null);
+    }
+
+    Role(String linkRelation) {
+      this.linkRelation = linkRelation;
+    }
+
+    /**
+     * Returns the link relation type for roles that should be surfaced as link relations rather
+     * than inline property values, or empty for ordinary roles.
+     */
+    public Optional<String> getLinkRelation() {
+      return Optional.ofNullable(linkRelation);
+    }
   }
 
   enum Type {

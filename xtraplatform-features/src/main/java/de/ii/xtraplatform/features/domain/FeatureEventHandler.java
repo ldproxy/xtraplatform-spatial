@@ -82,6 +82,24 @@ public interface FeatureEventHandler<
 
     Map<String, String> additionalInfo();
 
+    /**
+     * Captured links for the current feature, populated by {@link
+     * FeatureTokenTransformerPropertyLinks} from schema properties with an {@link
+     * FeatureSchema#getEffectiveLink() effective link}. Encoders use it to emit per-feature link
+     * entries.
+     */
+    List<PropertyLink> propertyLinks();
+
+    /**
+     * Canonical (untransformed) feature id, captured when a profile rewrites the id token (e.g.
+     * {@code versions-as-features-unique-ids} produces a composite {@code id.<timestamp>}).
+     * Encoders that need the stable id rather than the composite — most notably {@code
+     * gml:identifier} — read this; when null, {@code context.value()} on the id property is the
+     * canonical id and should be used.
+     */
+    @Nullable
+    String canonicalFeatureId();
+
     @Value.Lazy
     default Optional<T> schema() {
       if (Objects.isNull(mapping())) {
@@ -304,6 +322,10 @@ public interface FeatureEventHandler<
     ModifiableContext<T, U> setIsUseTargetPaths(boolean isUseTargetPaths);
 
     ModifiableContext<T, U> putAdditionalInfo(String key, String value);
+
+    ModifiableContext<T, U> setPropertyLinks(Iterable<? extends PropertyLink> propertyLinks);
+
+    ModifiableContext<T, U> setCanonicalFeatureId(@Nullable String canonicalFeatureId);
   }
 
   // T createContext();
