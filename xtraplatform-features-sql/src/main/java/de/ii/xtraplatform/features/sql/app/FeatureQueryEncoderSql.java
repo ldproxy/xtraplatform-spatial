@@ -185,6 +185,10 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     List<SortKey> sortKeys =
         transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
     boolean useMinMaxKeys = queryTemplates.getMapping().getMainTable().isSortKeyUnique();
+    // a multi-query may opt out of computing numberMatched to avoid a count query per sub-query
+    boolean computeNumberMatched =
+        !(query instanceof MultiFeatureQuery)
+            || ((MultiFeatureQuery) query).getComputeNumberMatched();
 
     BiFunction<Long, Long, Optional<String>> metaQuery =
         (maxLimit, skipped) ->
@@ -205,7 +209,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                             query.hitsOnly(),
                             // numberMatched is invariant across chunks, so compute it only on the
                             // first chunk of each collection; later chunks reuse that value
-                            chunk == 0));
+                            chunk == 0 && computeNumberMatched));
 
     TriFunction<SqlRowMeta, Long, Long, Stream<String>> valueQueries =
         (metaResult, maxLimit, skipped) ->

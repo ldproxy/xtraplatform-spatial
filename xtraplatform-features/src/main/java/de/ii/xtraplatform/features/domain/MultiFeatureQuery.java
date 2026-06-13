@@ -28,4 +28,13 @@ public interface MultiFeatureQuery extends Query {
   default boolean getDeduplicate() {
     return false;
   }
+
+  /**
+   * If disabled, {@code numberMatched} is not computed. For a multi-query this avoids a count query
+   * per sub-query, each of which carries the full (possibly deeply nested) filter.
+   */
+  @Value.Default
+  default boolean getComputeNumberMatched() {
+    return true;
+  }
 }
