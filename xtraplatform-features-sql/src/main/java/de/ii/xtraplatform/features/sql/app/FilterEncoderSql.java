@@ -55,6 +55,7 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
@@ -74,12 +75,15 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -382,6 +386,66 @@ public class FilterEncoderSql {
     Cql2Expression mergedFilter = And.of(targetFilter.get(), cqlFilter.get());
 
     return Optional.of(encodeNested(null, mergedFilter, table.get(), true));
+  }
+
+  private static final String DYNAMIC_REF_TYPE = "DYNAMIC";
+
+  /** The valid target types of a property in a mapping, or empty if they are not constrained. */
+  private Optional<Set<String>> targetTypes(SqlQueryMapping mapping, String propertyName) {
+    FeatureSchema schema =
+        mapping
+            .getSchemaForObject(propertyName)
+            .or(() -> mapping.getSchemaForValue(propertyName))
+            .orElse(null);
+    return validTargetTypes(schema);
+  }
+
+  /**
+   * The valid target types of a feature-reference property: from its {@code refType} (case 1), the
+   * union over its {@code concat}/{@code coalesce} members (case 2), or a constant or enum on its
+   * {@code type} sub-property (case 3). Empty when the target type is not constrained (case 4) or
+   * any branch is open.
+   */
+  Optional<Set<String>> validTargetTypes(FeatureSchema schema) {
+    if (Objects.isNull(schema)) {
+      return Optional.empty();
+    }
+
+    List<FeatureSchema> members =
+        !schema.getConcat().isEmpty()
+            ? schema.getConcat()
+            : !schema.getCoalesce().isEmpty() ? schema.getCoalesce() : List.of();
+    if (!members.isEmpty()) {
+      Set<String> types = new LinkedHashSet<>();
+      for (FeatureSchema member : members) {
+        Optional<Set<String>> memberTypes = validTargetTypes(member);
+        if (memberTypes.isEmpty()) {
+          return Optional.empty(); // an open branch leaves the overall target type unconstrained
+        }
+        types.addAll(memberTypes.get());
+      }
+      return types.isEmpty() ? Optional.empty() : Optional.of(types);
+    }
+
+    if (schema.getRefType().filter(type -> !DYNAMIC_REF_TYPE.equals(type)).isPresent()) {
+      return Optional.of(Set.of(schema.getRefType().get()));
+    }
+
+    Optional<FeatureSchema> typeProperty =
+        schema.getProperties().stream().filter(FeatureSchema::isType).findFirst();
+    if (typeProperty.isPresent()) {
+      FeatureSchema type = typeProperty.get();
+      if (type.getConstantValue().isPresent()) {
+        return Optional.of(Set.of(type.getConstantValue().get()));
+      }
+      List<String> enumValues =
+          type.getConstraints().map(SchemaConstraints::getEnumValues).orElse(List.of());
+      if (!enumValues.isEmpty()) {
+        return Optional.of(new LinkedHashSet<>(enumValues));
+      }
+    }
+
+    return Optional.empty();
   }
 
   private static Predicate<SchemaSql> getPropertyNameMatcher(
@@ -1831,6 +1895,32 @@ public class FilterEncoderSql {
                           String.format(
                               "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
                               setName, producerType)));
+
+      // type compatibility: the value type of the result set must be a valid target type of the
+      // consumed property. The target types of a property are known when it has a refType, a
+      // concat/coalesce, or a type sub-property with a constant or enum; otherwise they are
+      // unconstrained and the check is skipped (no false negatives).
+      String consumerProperty =
+          ((Property) inResultSet.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+      Optional<Set<String>> consumerTargets = targetTypes(mapping, consumerProperty);
+      Optional<Set<String>> setTypes =
+          inResultSet.getProducerValues().isPresent()
+              ? targetTypes(producerMapping, inResultSet.getProducerValues().get())
+              : Optional.of(Set.of(producerType));
+      if (consumerTargets.isPresent()
+          && setTypes.isPresent()
+          && Collections.disjoint(consumerTargets.get(), setTypes.get())) {
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn(
+              "inResultSet: the value type(s) {} of result set '{}' are not among the valid target"
+                  + " types {} of property '{}'; the relation cannot match and the hop is skipped.",
+              setTypes.get(),
+              setName,
+              consumerTargets.get(),
+              consumerProperty);
+        }
+        return "1 = 0";
+      }
 
       // a projected result set consists of the ids referenced by a property of the selected
       // features, a plain result set of the ids of the selected features
