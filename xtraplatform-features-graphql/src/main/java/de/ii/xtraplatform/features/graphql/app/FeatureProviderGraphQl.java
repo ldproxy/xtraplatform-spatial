@@ -14,7 +14,6 @@ import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
-import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -307,7 +306,7 @@ public class FeatureProviderGraphQl
   @Override
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public long getFeatureCount(String typeName) {
-    if (getData().getTypes().containsKey(typeName)) {
+    if (!getData().getTypes().containsKey(typeName)) {
       return -1;
     }
 
@@ -353,8 +352,13 @@ public class FeatureProviderGraphQl
   @Override
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
-    if (getData().getTypes().containsKey(typeName)) {
+    if (!getData().getTypes().containsKey(typeName)) {
       return Optional.empty();
+    }
+
+    Optional<BoundingBox> configured = getConfiguredSpatialExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
     }
 
     try {
@@ -378,23 +382,15 @@ public class FeatureProviderGraphQl
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
-        .flatMap(
-            boundingBox ->
-                crsTransformerFactory
-                    .getTransformer(getNativeCrs(), crs, false)
-                    .flatMap(
-                        crsTransformer -> {
-                          try {
-                            return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
-                          } catch (CrsTransformationException e) {
-                            return Optional.empty();
-                          }
-                        }));
+        .flatMap(boundingBox -> transformSpatialExtent(boundingBox, crs));
   }
 
   @Override
   public Optional<Interval> getTemporalExtent(String typeName) {
-    return Optional.empty();
+    if (!getData().getTypes().containsKey(typeName)) {
+      return Optional.empty();
+    }
+    return getConfiguredTemporalExtent(typeName);
   }
 
   @Override
