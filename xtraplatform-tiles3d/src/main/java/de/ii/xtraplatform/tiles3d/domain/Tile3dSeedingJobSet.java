@@ -267,7 +267,8 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
   interface Tileset3dProgress extends JobProgress {
     @JsonIgnore
     @Nullable
-    Map<String, AtomicIntegerArray> getLevels();
+    @SuppressWarnings("PMD.LooseCoupling")
+    LinkedHashMap<String, AtomicIntegerArray> getLevels();
 
     @JsonProperty(value = "levels", access = Access.WRITE_ONLY)
     Map<String, List<Integer>> getLevelsInput();
@@ -295,7 +296,8 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
     default Tileset3dProgress deser() {
       // Ensure that levels is initialized
       if (getLevels() == null) {
-        Map<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
+        @SuppressWarnings("PMD.LooseCoupling")
+        LinkedHashMap<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
         for (Map.Entry<String, List<Integer>> entry : getLevelsInput().entrySet()) {
           List<Integer> levelList = entry.getValue();
           AtomicIntegerArray atomicArray = new AtomicIntegerArray(levelList.size());
@@ -305,10 +307,7 @@ public interface Tile3dSeedingJobSet extends JobSetDetails {
           levelsMap.put(entry.getKey(), atomicArray);
         }
 
-        return new ImmutableTileset3dProgress.Builder()
-            .from(this)
-            .levels(new LinkedHashMap<>(levelsMap))
-            .build();
+        return new ImmutableTileset3dProgress.Builder().from(this).levels(levelsMap).build();
       }
       return this;
     }

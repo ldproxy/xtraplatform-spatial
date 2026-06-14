@@ -239,7 +239,7 @@ public class FeatureProviderWfs
         new QName(
             namespaceNormalizer.getNamespaceURI(namespaceNormalizer.extractURI(name)),
             namespaceNormalizer.getLocalName(name));
-    return new FeatureTokenDecoderGml(
+    return new FeatureTokenDecoderGmlFromWfs(
         namespaces,
         ImmutableList.of(qualifiedName),
         featureSchema,

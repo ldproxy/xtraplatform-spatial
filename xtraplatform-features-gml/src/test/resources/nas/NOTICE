@@ -1,0 +1,10 @@
+The XML files in this directory are bare-feature slices extracted from the
+ALKIS NAS data set of the City of Bonn:
+
+  Datenlizenz Deutschland - Zero - Version 2.0
+  https://www.govdata.de/dl-de/zero-2-0
+
+Each file holds the first feature of the named type from open data
+publication of the ALKIS data from Bonn, reformatted as a self-
+contained bare-feature document with the namespace declarations the GML
+decoder needs.

@@ -112,9 +112,19 @@ public class SchemaGeneratorSql implements SchemaGenerator {
 
                                   return getFeatureType(table, geoInfo);
                                 } catch (Throwable e) {
+                                  LOGGER.warn(
+                                      "Could not generate schema for {}.{}: {} ({})",
+                                      schema.getKey(),
+                                      tableName,
+                                      e.getClass().getSimpleName(),
+                                      Objects.requireNonNullElse(e.getMessage(), "no message"));
+                                  if (LOGGER.isDebugEnabled()) {
+                                    LOGGER.debug("Stacktrace:", e);
+                                  }
                                   return null;
                                 }
                               }))
+              .filter(Objects::nonNull)
               .collect(Collectors.toList());
 
       LOGGER.debug("Finished crawling SQL schema");

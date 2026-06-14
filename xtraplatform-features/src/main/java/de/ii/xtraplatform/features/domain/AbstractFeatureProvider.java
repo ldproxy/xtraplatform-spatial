@@ -338,6 +338,11 @@ public abstract class AbstractFeatureProvider<
     return Set.copyOf(types);
   }
 
+  @Override
+  public boolean featureIdsAreGloballyUnique() {
+    return getData().getGloballyUniqueFeatureIds();
+  }
+
   private boolean softClosePrevious(
       Runner previousRunner, FeatureProviderConnector<T, U, V> previousConnector) {
     if (Objects.nonNull(previousConnector) || Objects.nonNull(previousRunner)) {

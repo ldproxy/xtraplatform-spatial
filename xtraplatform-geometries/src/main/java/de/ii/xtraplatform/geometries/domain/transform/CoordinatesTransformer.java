@@ -98,7 +98,7 @@ public class CoordinatesTransformer implements GeometryTransformer {
       return transformationChain.onCoordinates(
           coordinates, coordinates.length, dimension, interpolation, minNumberOfPositions);
     } catch (IOException e) {
-      throw new IllegalStateException("Error transforming coordinates.", e);
+      throw new IllegalStateException(e.getMessage(), e);
     }
   }
 }

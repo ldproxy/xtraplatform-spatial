@@ -136,6 +136,24 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
   List<GeometryType> getProvidesGeometryTypes();
 
   /**
+   * @langEn If `true`, feature ids are unique across all feature types of the provider, not just
+   *     within a single type. Consumers that combine features from multiple types into one response
+   *     (for example the *Search* building block) can then keep the ids unchanged instead of
+   *     qualifying them with the collection to avoid collisions.
+   * @langDe Bei `true` sind Feature-Ids über alle Objektarten des Providers hinweg eindeutig, nicht
+   *     nur innerhalb einer Objektart. Komponenten, die Features aus mehreren Objektarten in einer
+   *     Antwort zusammenführen (zum Beispiel der Baustein *Search*), können die Ids dann
+   *     unverändert lassen, anstatt sie zur Vermeidung von Kollisionen mit der Collection zu
+   *     qualifizieren.
+   * @default false
+   * @since v4.8
+   */
+  @Value.Default
+  default boolean getGloballyUniqueFeatureIds() {
+    return false;
+  }
+
+  /**
    * @langEn Optional custom CQL2 functions that can be used in filters. See [Custom CQL2
    *     Functions](#custom-cql2-functions) for details and examples.
    * @langDe Optionale benutzerdefinierte CQL2-Funktionen, die in Filtern genutzt werden können.

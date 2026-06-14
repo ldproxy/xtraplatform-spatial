@@ -53,7 +53,6 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
   private final Map<String, List<SqlQueryTemplates>> allQueryTemplates;
   private final Map<String, List<SqlQueryTemplates>> allQueryTemplatesMutations;
   private final int chunkSize;
-  private final boolean skipRedundantMetaQueries;
   private final SqlDialect sqlDialect;
   private final boolean geometryAsWkb;
 
@@ -65,7 +64,6 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     this.allQueryTemplates = allQueryTemplates;
     this.allQueryTemplatesMutations = allQueryTemplatesMutations;
     this.chunkSize = queryGeneratorSettings.getChunkSize();
-    this.skipRedundantMetaQueries = !queryGeneratorSettings.getComputeNumberMatched();
     this.geometryAsWkb = queryGeneratorSettings.getGeometryAsWkb();
     this.sqlDialect = sqlDialect;
   }
@@ -126,7 +124,6 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .offset(query.getOffset())
         .chunkSize(chunkSize)
         .isSingleFeature(query.returnsSingleFeature())
-        .isAllowSkipMetaQueries(skipRedundantMetaQueries)
         .build()
         .withQuerySets(querySets);
   }
@@ -182,6 +179,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
       boolean skipMetaQuery) {
     List<SortKey> sortKeys =
         transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
+    boolean useMinMaxKeys = queryTemplates.getMapping().getMainTable().isSortKeyUnique();
 
     BiFunction<Long, Long, Optional<String>> metaQuery =
         (maxLimit, skipped) ->
@@ -199,7 +197,10 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                             additionalQueryParameters,
                             query.getOffset() > 0,
                             maxLimit > 0 && !query.hitsOnly(),
-                            query.hitsOnly()));
+                            query.hitsOnly(),
+                            // numberMatched is invariant across chunks, so compute it only on the
+                            // first chunk of each collection; later chunks reuse that value
+                            chunk == 0));
 
     TriFunction<SqlRowMeta, Long, Long, Stream<String>> valueQueries =
         (metaResult, maxLimit, skipped) ->
@@ -212,9 +213,10 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                             sortKeys,
                             typeQuery.getFilter(),
                             typeQuery.forceSimpleFeatureGeometry(),
-                            ((Objects.nonNull(metaResult.getMinKey())
-                                        && Objects.nonNull(metaResult.getMaxKey()))
-                                    || metaResult.getNumberReturned() == 0)
+                            (useMinMaxKeys
+                                    && ((Objects.nonNull(metaResult.getMinKey())
+                                            && Objects.nonNull(metaResult.getMaxKey()))
+                                        || metaResult.getNumberReturned() == 0))
                                 ? Optional.of(
                                     Tuple.of(metaResult.getMinKey(), metaResult.getMaxKey()))
                                 : Optional.empty(),

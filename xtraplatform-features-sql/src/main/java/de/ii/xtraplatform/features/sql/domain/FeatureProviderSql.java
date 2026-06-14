@@ -96,6 +96,7 @@ import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
 import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
+import de.ii.xtraplatform.features.sql.app.SqlMutationSession;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
@@ -1248,6 +1249,18 @@ public class FeatureProviderSql
         Optional.of(featureId),
         crs,
         partial);
+  }
+
+  @Override
+  public Session openSession() {
+    return new SqlMutationSession(
+        getSqlClient().openSession(),
+        queryMappings,
+        featureMutationsSql,
+        getNativeCrs(),
+        crsTransformerFactory,
+        getData().getNativeTimeZone(),
+        getStreamRunner());
   }
 
   @Override

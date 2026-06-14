@@ -32,9 +32,15 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 
 /**
+ * Decodes a streaming WFS response (a {@code wfs:FeatureCollection} of many features) into the
+ * platform's feature token stream. Path emission uses the qualified XML names directly, on the
+ * assumption that the consumer keys off XML-shaped paths (e.g. {@code adv:Flurstueck}, {@code
+ * gml:@id}). For consumers that key off the schema's property-name paths (e.g. the SQL feature
+ * encoder), use {@link FeatureTokenDecoderGml}.
+ *
  * @author zahnen
  */
-public class FeatureTokenDecoderGml
+public class FeatureTokenDecoderGmlFromWfs
     extends FeatureTokenDecoder<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>> {
 
@@ -59,7 +65,7 @@ public class FeatureTokenDecoderGml
   private OptionalInt srsDimension = OptionalInt.empty();
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
 
-  public FeatureTokenDecoderGml(
+  public FeatureTokenDecoderGmlFromWfs(
       Map<String, String> namespaces,
       List<QName> featureTypes,
       FeatureSchema featureSchema,
@@ -122,7 +128,6 @@ public class FeatureTokenDecoderGml
     }
   }
 
-  // TODO: single feature or collection
   protected boolean advanceParser() {
 
     boolean feedMeMore = false;

@@ -51,7 +51,6 @@ public interface SqlConnector
     private final long limit;
     private final long offset;
     private final long chunkSize;
-    private final boolean allowSkipMetaQueries;
     private long featureCountdown;
     private long numberSkipped;
     private String lastTable;
@@ -59,11 +58,10 @@ public interface SqlConnector
     private long lastNumberSkipped;
     private boolean noOffset;
 
-    public Paging(long limit, long offset, long chunkSize, boolean allowSkipMetaQueries) {
+    public Paging(long limit, long offset, long chunkSize) {
       this.limit = limit;
       this.offset = offset;
       this.chunkSize = chunkSize;
-      this.allowSkipMetaQueries = allowSkipMetaQueries;
 
       this.featureCountdown = limit;
       this.numberSkipped = 0L;
@@ -76,8 +74,11 @@ public interface SqlConnector
     Optional<Tuple<Long, Long>> get(String currentTable) {
       long found = lastNumberReturned + lastNumberSkipped;
 
+      // Once the limit is reached or the current collection is exhausted (its last chunk returned
+      // fewer rows than the chunk size), no further meta query is needed: there are no more rows to
+      // read and numberMatched was already computed on the collection's first chunk.
       if (featureCountdown <= 0 || (Objects.equals(lastTable, currentTable) && found < chunkSize)) {
-        return allowSkipMetaQueries ? Optional.empty() : Optional.of(Tuple.of(0L, offset));
+        return Optional.empty();
       }
 
       long ns = numberSkipped;
@@ -108,11 +109,7 @@ public interface SqlConnector
   default Reactive.Source<SqlRow> getSourceStream(
       SqlQueryBatch queryBatch, SqlQueryOptions options) {
     Paging paging =
-        new Paging(
-            queryBatch.getLimit(),
-            queryBatch.getOffset(),
-            queryBatch.getChunkSize(),
-            queryBatch.isAllowSkipMetaQueries());
+        new Paging(queryBatch.getLimit(), queryBatch.getOffset(), queryBatch.getChunkSize());
 
     Source<SqlRow> sqlRowSource1 =
         Source.iterable(queryBatch.getQuerySets())
@@ -245,8 +242,7 @@ public interface SqlConnector
                           new Paging(
                               queryBatch.getLimit(),
                               queryBatch.getOffset(),
-                              queryBatch.getChunkSize(),
-                              queryBatch.isAllowSkipMetaQueries());
+                              queryBatch.getChunkSize());
                       int[] i = {0};
 
                       if (options.isHitsOnly()) {

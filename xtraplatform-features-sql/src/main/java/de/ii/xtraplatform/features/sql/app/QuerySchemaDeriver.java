@@ -343,6 +343,9 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
                           newParentPath.get(newParentPath.size() - 1)
                               + "{sortKey="
                               + entry.getValue().get(0).getSortKey().get()
+                              + "}"
+                              + "{sortKeyUnique="
+                              + entry.getValue().get(0).getSortKeyUnique()
                               + "}")
                       : pathParser.parseTablePath(newParentPath.get(newParentPath.size() - 1));
 
