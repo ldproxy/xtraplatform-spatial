@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -73,40 +74,51 @@ public class ResultSetMaterializer {
     }
 
     Map<String, List<Object>> materialized = new HashMap<>();
-    for (String name : topologicalOrder(sets)) {
-      InResultSet node = sets.get(name);
-      InResultSet prepared =
-          node.getProducerFilter().isPresent()
-              ? new ImmutableInResultSet.Builder()
-                  .from(node)
-                  .producerFilter(applyMaterialized(node.getProducerFilter().get(), materialized))
-                  .build()
-              : node;
+    // materialize level by level: within a level the producers are independent and run concurrently
+    // (bounded by the connection pool). SQL is built single-threaded between levels, so the filter
+    // encoder is never invoked concurrently and the materialized map is only mutated on this
+    // thread.
+    for (List<String> level : topologicalLevels(sets)) {
+      Map<String, CompletableFuture<Collection<SqlRow>>> running = new LinkedHashMap<>();
+      Map<String, SchemaBase.Type> valueTypes = new HashMap<>();
+      for (String name : level) {
+        InResultSet node = sets.get(name);
+        InResultSet prepared =
+            node.getProducerFilter().isPresent()
+                ? new ImmutableInResultSet.Builder()
+                    .from(node)
+                    .producerFilter(applyMaterialized(node.getProducerFilter().get(), materialized))
+                    .build()
+                : node;
 
-      // bound the fetch to one past the cap so an oversized set is detected without loading it all
-      String producerQuery =
-          filterEncoder.encodeResultSetProducer(prepared) + " LIMIT " + (maxSetSize + 1);
-      SchemaBase.Type valueType = filterEncoder.resultSetValueType(node);
-      Collection<SqlRow> rows = sqlClient.get().run(producerQuery, SqlQueryOptions.single()).join();
-
-      if (rows.size() > maxSetSize) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn(
-              "Result set '{}' has {} members, exceeding the materialization cap of {}; falling back"
-                  + " to inline evaluation for this set.",
-              name,
-              rows.size(),
-              maxSetSize);
-        }
-        continue;
+        // bound the fetch to one past the cap so an oversized set is detected without loading it
+        // all
+        String producerQuery =
+            filterEncoder.encodeResultSetProducer(prepared) + " LIMIT " + (maxSetSize + 1);
+        valueTypes.put(name, filterEncoder.resultSetValueType(node));
+        running.put(name, sqlClient.get().run(producerQuery, SqlQueryOptions.single()));
       }
 
-      List<Object> values =
-          rows.stream()
-              .map(row -> coerce(row.getValues().get(0), valueType))
-              .distinct()
-              .collect(Collectors.toList());
-      materialized.put(name, values);
+      for (Map.Entry<String, CompletableFuture<Collection<SqlRow>>> entry : running.entrySet()) {
+        String name = entry.getKey();
+        Collection<SqlRow> rows = entry.getValue().join();
+        if (rows.size() > maxSetSize) {
+          if (LOGGER.isWarnEnabled()) {
+            LOGGER.warn(
+                "Result set '{}' has more than the materialization cap of {} members; falling back"
+                    + " to inline evaluation for this set.",
+                name,
+                maxSetSize);
+          }
+          continue;
+        }
+        List<Object> values =
+            rows.stream()
+                .map(row -> coerce(row.getValues().get(0), valueTypes.get(name)))
+                .distinct()
+                .collect(Collectors.toList());
+        materialized.put(name, values);
+      }
     }
 
     List<SubQuery> rewritten =
@@ -151,31 +163,49 @@ public class ResultSetMaterializer {
     }
   }
 
-  private List<String> topologicalOrder(Map<String, InResultSet> sets) {
-    List<String> order = new ArrayList<>();
-    Set<String> visited = new HashSet<>();
+  /**
+   * Groups the result sets into dependency levels: level 0 has no dependencies, level n depends
+   * only on sets in earlier levels. Sets within a level are independent and may be materialized
+   * concurrently.
+   */
+  private List<List<String>> topologicalLevels(Map<String, InResultSet> sets) {
+    Map<String, Set<String>> deps = new HashMap<>();
     for (String name : sets.keySet()) {
-      visit(name, sets, visited, order);
+      deps.put(name, dependenciesOf(sets.get(name), sets));
     }
-    return order;
+    List<List<String>> levels = new ArrayList<>();
+    Set<String> done = new HashSet<>();
+    while (done.size() < sets.size()) {
+      List<String> level =
+          sets.keySet().stream()
+              .filter(name -> !done.contains(name) && done.containsAll(deps.get(name)))
+              .collect(Collectors.toList());
+      if (level.isEmpty()) {
+        // no progress (should not happen for forward-only references) — emit the rest as one level
+        level =
+            sets.keySet().stream()
+                .filter(name -> !done.contains(name))
+                .collect(Collectors.toList());
+      }
+      levels.add(level);
+      done.addAll(level);
+    }
+    return levels;
   }
 
-  private void visit(
-      String name, Map<String, InResultSet> sets, Set<String> visited, List<String> order) {
-    if (!visited.add(name)) {
-      return;
+  private static Set<String> dependenciesOf(InResultSet node, Map<String, InResultSet> sets) {
+    if (node.getProducerFilter().isEmpty()) {
+      return Set.of();
     }
-    InResultSet node = sets.get(name);
-    if (node != null && node.getProducerFilter().isPresent()) {
-      Collector collector = new Collector();
-      node.getProducerFilter().get().accept(collector);
-      for (InResultSet dependency : collector.found) {
-        if (sets.containsKey(dependency.getSetName())) {
-          visit(dependency.getSetName(), sets, visited, order);
-        }
+    Collector collector = new Collector();
+    node.getProducerFilter().get().accept(collector);
+    Set<String> deps = new HashSet<>();
+    for (InResultSet dependency : collector.found) {
+      if (sets.containsKey(dependency.getSetName())) {
+        deps.add(dependency.getSetName());
       }
     }
-    order.add(name);
+    return deps;
   }
 
   private static Cql2Expression applyMaterialized(
