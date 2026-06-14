@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -52,6 +53,15 @@ public interface InResultSet extends BinaryScalarOperation {
    */
   @JsonIgnore
   Optional<String> getProducerValues();
+
+  /**
+   * Values of the result set, materialized by the service before the filter is encoded. When
+   * present, the predicate is encoded as a literal {@code IN} list rather than a nested subquery;
+   * an empty list means the result set has no members. When absent, the result set is re-derived
+   * inline (subquery / CTE).
+   */
+  @JsonIgnore
+  Optional<List<Object>> getMaterializedValues();
 
   @JsonIgnore
   @Value.Lazy

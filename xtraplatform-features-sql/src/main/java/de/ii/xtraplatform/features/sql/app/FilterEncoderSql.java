@@ -76,6 +76,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -86,6 +87,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -262,6 +264,149 @@ public class FilterEncoderSql {
           "");
     }
     return expression;
+  }
+
+  // output column alias of every result-set CTE; consumers reference it as `SELECT <col> FROM
+  // <cte>`
+  private static final String CTE_VALUE_COL = "rs_value";
+
+  /**
+   * Collects the result-set subqueries of one top-level {@code inResultSet} predicate as named,
+   * materialized CTEs so that each result set is evaluated exactly once instead of being
+   * re-embedded (and re-evaluated) at every nesting level. CTEs are stored in dependency order — a
+   * nested set is registered while building the body of its parent, so it is inserted first and may
+   * be referenced by the parent.
+   */
+  private static final class CteCollector {
+    private final LinkedHashMap<String, String> ctes = new LinkedHashMap<>();
+    private final Map<String, String> namesBySet = new java.util.HashMap<>();
+    private int counter;
+
+    String register(String setName, Supplier<String> bodySupplier) {
+      String existing = namesBySet.get(setName);
+      if (existing != null) {
+        return existing;
+      }
+      String name = "_rs_" + (counter++) + "_" + setName.replaceAll("[^A-Za-z0-9_]", "_");
+      namesBySet.put(setName, name);
+      // building the body registers any nested result sets first, preserving dependency order
+      String body = bodySupplier.get();
+      ctes.put(name, body);
+      return name;
+    }
+
+    String renderWith(SqlDialect dialect) {
+      return "WITH "
+          + ctes.entrySet().stream()
+              .map(e -> dialect.materializedCte(e.getKey(), e.getValue()))
+              .collect(Collectors.joining(", "));
+    }
+  }
+
+  private static String renderInlineLiteral(Object value) {
+    if (value instanceof String) {
+      return "'" + ((String) value).replace("'", "''") + "'";
+    }
+    return String.valueOf(value);
+  }
+
+  /**
+   * Build the producer SELECT of a result set: {@code SELECT <value column> FROM <producer main>
+   * <joins> WHERE <producer filter>}. With {@code withValueAlias} the value column is aliased as
+   * the CTE value column (for use inside a CTE); without it the bare value column is selected (for
+   * the materializer, which reads that single column). The optional collector lets nested result
+   * sets in the producer filter hoist into the same WITH clause.
+   */
+  String resultSetProducerSelect(
+      InResultSet inResultSet, boolean withValueAlias, CteCollector collector) {
+    String setName = inResultSet.getSetName();
+    String producerType =
+        inResultSet
+            .getProducerType()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+    SqlQueryMapping producerMapping =
+        mappingResolver
+            .apply(producerType)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format(
+                            "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                            setName, producerType)));
+    de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> setColumn =
+        inResultSet.getProducerValues().isPresent()
+            ? producerMapping
+                .getColumnForValue(inResultSet.getProducerValues().get())
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. Result set '%s' projects the property '%s', which is unknown for feature type '%s'.",
+                                setName, inResultSet.getProducerValues().get(), producerType)))
+            : producerMapping
+                .getColumnForId()
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
+                                producerType, setName)));
+
+    SqlQuerySchema valueTable = setColumn.first();
+    List<String> aliases = AliasGenerator.getAliases(valueTable);
+    SqlQueryTable producerMain =
+        valueTable.getRelations().isEmpty() ? valueTable : valueTable.getRelations().get(0);
+    String join = JoinGenerator.getJoins(valueTable, aliases, this);
+    String valueColumn =
+        String.format("%s.%s", aliases.get(aliases.size() - 1), setColumn.second().getName());
+
+    Optional<Cql2Expression> tableFilter =
+        producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
+    Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
+    Optional<Cql2Expression> effectiveFilter =
+        tableFilter.isPresent() && producerFilter.isPresent()
+            ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
+            : tableFilter.isPresent() ? tableFilter : producerFilter;
+    String where =
+        effectiveFilter
+            .map(
+                filter ->
+                    " WHERE "
+                        + prepareExpression(filter)
+                            .accept(new CqlToSql2(producerMapping, collector)))
+            .orElse("");
+
+    String valueExpr =
+        withValueAlias ? String.format("%s AS %s", valueColumn, CTE_VALUE_COL) : valueColumn;
+    return String.format(
+        "SELECT %2$s FROM %1$s %3$s%4$s%5$s%6$s",
+        producerMain.getName(), valueExpr, aliases.get(0), join.isEmpty() ? "" : " ", join, where);
+  }
+
+  /**
+   * Producer SELECT of a result set for up-front materialization: returns the bare value column so
+   * the caller can run it once and collect the values. Any nested result sets referenced by the
+   * producer filter that already carry materialized values are inlined as literals.
+   */
+  public String encodeResultSetProducer(InResultSet inResultSet) {
+    return resultSetProducerSelect(inResultSet, false, null);
+  }
+
+  /**
+   * Type of the value column of a result set, used to coerce and render its materialized values.
+   */
+  public de.ii.xtraplatform.features.domain.SchemaBase.Type resultSetValueType(
+      InResultSet inResultSet) {
+    String producerType = inResultSet.getProducerType().orElseThrow();
+    SqlQueryMapping producerMapping = mappingResolver.apply(producerType).orElseThrow();
+    return (inResultSet.getProducerValues().isPresent()
+            ? producerMapping.getColumnForValue(inResultSet.getProducerValues().get())
+            : producerMapping.getColumnForId())
+        .map(column -> column.second().getType())
+        .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING);
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -1418,10 +1563,18 @@ public class FilterEncoderSql {
   private class CqlToSql2 extends CqlToText {
 
     private final SqlQueryMapping mapping;
+    // non-null while encoding the producer filter of an enclosing inResultSet, so that nested
+    // result sets register their CTEs with the same collector instead of nesting inline
+    private final CteCollector collector;
 
     private CqlToSql2(SqlQueryMapping mapping) {
+      this(mapping, null);
+    }
+
+    private CqlToSql2(SqlQueryMapping mapping, CteCollector collector) {
       super(coordinatesTransformer);
       this.mapping = mapping;
+      this.collector = collector;
     }
 
     protected FeatureSchema getSchema(
@@ -1922,57 +2075,34 @@ public class FilterEncoderSql {
         return "1 = 0";
       }
 
-      // a projected result set consists of the ids referenced by a property of the selected
-      // features, a plain result set of the ids of the selected features
-      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> setColumn =
-          inResultSet.getProducerValues().isPresent()
-              ? producerMapping
-                  .getColumnForValue(inResultSet.getProducerValues().get())
-                  .orElseThrow(
-                      () ->
-                          new IllegalArgumentException(
-                              String.format(
-                                  "Filter is invalid. Result set '%s' projects the property '%s', which is unknown for feature type '%s'.",
-                                  setName, inResultSet.getProducerValues().get(), producerType)))
-              : producerMapping
-                  .getColumnForId()
-                  .orElseThrow(
-                      () ->
-                          new IllegalArgumentException(
-                              String.format(
-                                  "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
-                                  producerType, setName)));
+      // if the result set has been materialized up front, inline its values as a literal IN list
+      if (inResultSet.getMaterializedValues().isPresent()) {
+        List<Object> values = inResultSet.getMaterializedValues().get();
+        if (values.isEmpty()) {
+          return "1 = 0";
+        }
+        String list =
+            values.stream()
+                .map(FilterEncoderSql::renderInlineLiteral)
+                .collect(Collectors.joining(", "));
+        return String.format(mainExpression, "", String.format(" IN (%s)", list));
+      }
 
-      SqlQuerySchema valueTable = setColumn.first();
-      List<String> aliases = AliasGenerator.getAliases(valueTable);
-      SqlQueryTable producerMain =
-          valueTable.getRelations().isEmpty() ? valueTable : valueTable.getRelations().get(0);
-      String join = JoinGenerator.getJoins(valueTable, aliases, FilterEncoderSql.this);
-      String valueColumn =
-          String.format("%s.%s", aliases.get(aliases.size() - 1), setColumn.second().getName());
+      // otherwise re-derive the result set inline; hoist it (and any nested result sets referenced
+      // by its producer filter) into materialized CTEs so each is evaluated once within the
+      // statement. CTEs are emitted in dependency order; the outermost predicate prepends the WITH.
+      boolean outermost = collector == null;
+      CteCollector coll = outermost ? new CteCollector() : collector;
+      String cteName =
+          coll.register(setName, () -> resultSetProducerSelect(inResultSet, true, coll));
 
-      Optional<Cql2Expression> tableFilter =
-          producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
-      Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
-      Optional<Cql2Expression> effectiveFilter =
-          tableFilter.isPresent() && producerFilter.isPresent()
-              ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
-              : tableFilter.isPresent() ? tableFilter : producerFilter;
+      String reference =
+          outermost
+              ? String.format(
+                  " IN (%s SELECT %s FROM %s)", coll.renderWith(sqlDialect), CTE_VALUE_COL, cteName)
+              : String.format(" IN (SELECT %s FROM %s)", CTE_VALUE_COL, cteName);
 
-      String where =
-          effectiveFilter.map(filter -> " WHERE " + encode(filter, producerMapping)).orElse("");
-
-      String subquery =
-          String.format(
-              "SELECT %2$s FROM %1$s %3$s%4$s%5$s%6$s",
-              producerMain.getName(),
-              valueColumn,
-              aliases.get(0),
-              join.isEmpty() ? "" : " ",
-              join,
-              where);
-
-      return String.format(mainExpression, "", String.format(" IN (%s)", subquery));
+      return String.format(mainExpression, "", reference);
     }
 
     @Override

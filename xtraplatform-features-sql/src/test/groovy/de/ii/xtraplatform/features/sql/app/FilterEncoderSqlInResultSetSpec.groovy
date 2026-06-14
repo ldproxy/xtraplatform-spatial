@@ -79,7 +79,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["value_array"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')) SELECT rs_value FROM _rs_0_s1))"
     }
 
     def 'plain id set without a producer filter'() {
@@ -90,7 +90,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["value_array"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A) SELECT rs_value FROM _rs_0_s1))"
     }
 
     def 'plain id set, consumer matches an array property in a junction table'() {
@@ -102,7 +102,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["value_array"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IN (SELECT A.id FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')) SELECT rs_value FROM _rs_0_s1))"
     }
 
     def 'chained result sets nest recursively'() {
@@ -115,7 +115,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(outer, mappings["value_array"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')))))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (WITH _rs_1_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')), _rs_0_s2 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT rs_value FROM _rs_1_s1))) SELECT rs_value FROM _rs_0_s2))"
     }
 
     def 'an unresolved result set reference is rejected'() {
@@ -145,7 +145,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["simple"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT B.externalprovidername FROM externalprovider A JOIN externalprovider_externalprovidername B ON (A.id=B.externalprovider_fk) WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT B.externalprovidername AS rs_value FROM externalprovider A JOIN externalprovider_externalprovidername B ON (A.id=B.externalprovider_fk) WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id = 'foo')) SELECT rs_value FROM _rs_0_s1))"
     }
 
     def 'projected result set over a column of the main table'() {
@@ -156,7 +156,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["value_array"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A) SELECT rs_value FROM _rs_0_s1))"
     }
 
     def 'the filter of the producer main table is applied to the result set'() {
@@ -167,7 +167,37 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["simple"])
 
         then:
-        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (SELECT A.id FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.type = 1)))"
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.type = 1)) SELECT rs_value FROM _rs_0_s1))"
+    }
+
+    def 'a materialized result set is inlined as a literal IN list'() {
+        given:
+        def filter = new ImmutableInResultSet.Builder()
+                .from(InResultSet.of("id", "s1"))
+                .producerType("simple")
+                .materializedValues(["foo", "bar"])
+                .build()
+
+        when:
+        def sql = filterEncoder.encode(filter, mappings["value_array"])
+
+        then:
+        sql == "A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.id IN ('foo', 'bar'))"
+    }
+
+    def 'an empty materialized result set yields a false predicate'() {
+        given:
+        def filter = new ImmutableInResultSet.Builder()
+                .from(InResultSet.of("id", "s1"))
+                .producerType("simple")
+                .materializedValues([])
+                .build()
+
+        when:
+        def sql = filterEncoder.encode(filter, mappings["value_array"])
+
+        then:
+        sql == "1 = 0"
     }
 
     def 'an unknown projected property is rejected'() {
