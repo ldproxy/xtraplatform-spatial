@@ -154,8 +154,7 @@ public interface FeatureSchema
    *     `PREDECESSOR_INTERVAL_START` and `SUCCESSOR_INTERVAL_START` can be specified at the
    *     temporal properties that contain the start of the primary interval of the previous and next
    *     version of the feature. These properties are not represented as feature properties, but as
-   *     links with the link relation types `predecessor-version` and `successor-version` (see
-   *     [Links](../details/links.md); the default link can be overridden with `link`).
+   *     links with the link relation types `predecessor-version` and `successor-version`.
    * @langDe Kennzeichnet besondere Bedeutungen der Eigenschaft. `ID` ist bei der Eigenschaft eines
    *     Objekts anzugeben, die für die `featureId` in der API zu verwenden ist. Diese Eigenschaft
    *     ist typischerweise die erste Eigenschaft im `properties`-Objekt. Erlaubte Zeichen in diesen
@@ -175,8 +174,7 @@ public interface FeatureSchema
    *     zeitlichen Eigenschaften angegeben werden, die den Beginn des primären Zeitintervalls der
    *     vorherigen bzw. nächsten Version des Features enthalten. Diese Eigenschaften werden nicht
    *     als Feature-Eigenschaften repräsentiert, sondern als Links mit den Linkrelationen
-   *     `predecessor-version` und `successor-version` (siehe [Links](../details/links.md); der
-   *     Standard-Link kann mit `link` überschrieben werden).
+   *     `predecessor-version` und `successor-version`.
    * @default null
    */
   @Override
@@ -226,9 +224,15 @@ public interface FeatureSchema
 
   /**
    * @langEn Optional name for an object type, used for example in JSON Schema.
-   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name hat i.d.R. nur
-   *     informativen Charakter und wird z.B. bei der Erzeugung von JSON-Schemas verwendet.
-   * @default
+   *     <p>For properties that should be mapped as links, the value `Link` can still be used. This
+   *     convention is deprecated an will be removed in the future. Use FEATURE_REF or
+   *     FEATURE_REF_ARRAY as the type of the property instead.
+   * @langDe Optional kann ein Name für den Typ spezifiziert werden, z.B. für die Erzeugung von
+   *     JSON-Schemas.
+   *     <p>Für Eigenschaften, die als Links abgebildet werden sollen, kann weiterhin der Wert
+   *     `Link` verwendet werden. Diese Konvention ist veraltet und wird in Zukunft entfernt.
+   *     Verwenden Sie stattdessen FEATURE_REF oder FEATURE_REF_ARRAY als Typ der Eigenschaft.
+   * @default null
    */
   Optional<String> getObjectType();
 
@@ -447,12 +451,11 @@ public interface FeatureSchema
   Optional<SchemaConstraints> getConstraints();
 
   /**
-   * @langEn Option to represent the property as a web link instead of an inline value, see
-   *     [Links](../details/links.md). Only meaningful for value properties.
-   * @langDe Option um die Eigenschaft als Web-Link statt als Wert in den Feature-Eigenschaften zu
-   *     repräsentieren, siehe [Links](../details/links.md). Nur bei Werteigenschaften sinnvoll.
-   * @default null
+   * Option to represent the property as a web link instead of an inline value. Only meaningful for
+   * value properties. Internal: not part of the public provider configuration.
    */
+  @JsonIgnore
+  @DocIgnore
   Optional<SchemaLink> getLink();
 
   /**
