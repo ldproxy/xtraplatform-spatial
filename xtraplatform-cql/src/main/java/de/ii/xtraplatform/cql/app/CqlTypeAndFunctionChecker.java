@@ -42,6 +42,7 @@ import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
+import de.ii.xtraplatform.cql.domain.Parameter;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -252,6 +253,13 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
           return Type.UNKNOWN;
       }
     }
+    return Type.UNKNOWN;
+  }
+
+  @Override
+  public Type visit(Parameter parameter, List<Type> children) {
+    // an unbound parameter (e.g. in a stored query validated before invocation) has no known type;
+    // treat it as a wildcard so the concrete operands are still checked
     return Type.UNKNOWN;
   }
 
