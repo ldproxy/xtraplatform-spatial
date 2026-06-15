@@ -61,8 +61,9 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
       return null;
     }
 
+    String resolvedOrigin = resolved.getObjectType().orElse(null);
     Map<String, FeatureSchema> properties =
-        merge(original.getPropertyMap(), resolved.getPropertyMap());
+        merge(original.getPropertyMap(), resolved.getPropertyMap(), resolvedOrigin);
 
     Builder builder =
         new Builder()
@@ -85,8 +86,9 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
   }
 
   private PartialObjectSchema merge(PartialObjectSchema original, FeatureSchema resolved) {
+    String resolvedOrigin = resolved.getObjectType().orElse(null);
     Map<String, FeatureSchema> properties =
-        merge(original.getPropertyMap(), resolved.getPropertyMap());
+        merge(original.getPropertyMap(), resolved.getPropertyMap(), resolvedOrigin);
 
     return new ImmutablePartialObjectSchema.Builder()
         .from(original)
@@ -97,8 +99,10 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
   }
 
   private PartialObjectSchema merge(FeatureSchema original, PartialObjectSchema resolved) {
+    // PartialObjectSchema doesn't carry an objectType — its properties keep whatever origin tag
+    // they already had (set when their own fragment was resolved earlier in the chain).
     Map<String, FeatureSchema> properties =
-        merge(original.getPropertyMap(), resolved.getPropertyMap());
+        merge(original.getPropertyMap(), resolved.getPropertyMap(), null);
 
     return new ImmutablePartialObjectSchema.Builder()
         .from(resolved)
@@ -107,19 +111,22 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
   }
 
   private Map<String, FeatureSchema> merge(
-      Map<String, FeatureSchema> original, Map<String, FeatureSchema> resolved) {
+      Map<String, FeatureSchema> original,
+      Map<String, FeatureSchema> resolved,
+      String resolvedOrigin) {
     Map<String, FeatureSchema> properties = new LinkedHashMap<>();
 
     resolved.forEach(
         (key, property) -> {
+          FeatureSchema tagged = tagOrigin(property, resolvedOrigin);
           if (original.containsKey(key)) {
-            FeatureSchema merged = merge(original.get(key), property);
+            FeatureSchema merged = merge(original.get(key), tagged);
 
             if (Objects.nonNull(merged)) {
               properties.put(key, merged);
             }
           } else {
-            properties.put(key, property);
+            properties.put(key, tagged);
           }
         });
     original.forEach(
@@ -130,6 +137,40 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
         });
 
     return properties;
+  }
+
+  // Tags `property` (and recursively its sub-properties) with `originObjectType = originType` —
+  // but only where the tag is missing. An existing tag wins so an outer fragment's listing
+  // doesn't get overwritten by a base fragment further down the chain. Codecs that qualify
+  // property element names per object type (notably GML with `objectTypeNamespaces`) read this
+  // tag at runtime; without it they'd inherit the containing feature's objectType, which is
+  // wrong for properties that come from a different schema fragment than the feature itself.
+  private static FeatureSchema tagOrigin(FeatureSchema property, String originType) {
+    if (originType == null) {
+      return property;
+    }
+    boolean missing = property.getOriginObjectType().isEmpty();
+    Map<String, FeatureSchema> taggedChildren = null;
+    for (Map.Entry<String, FeatureSchema> e : property.getPropertyMap().entrySet()) {
+      FeatureSchema childTagged = tagOrigin(e.getValue(), originType);
+      if (childTagged != e.getValue()) {
+        if (taggedChildren == null) {
+          taggedChildren = new LinkedHashMap<>(property.getPropertyMap());
+        }
+        taggedChildren.put(e.getKey(), childTagged);
+      }
+    }
+    if (!missing && taggedChildren == null) {
+      return property;
+    }
+    Builder b = new Builder().from(property);
+    if (missing) {
+      b.originObjectType(originType);
+    }
+    if (taggedChildren != null) {
+      b.propertyMap(taggedChildren);
+    }
+    return b.build();
   }
 
   private FeatureSchema resolve(String ref, FeatureProviderDataV2 data) {

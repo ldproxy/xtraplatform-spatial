@@ -156,6 +156,11 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     newContext.pathTracker().track(List.of());
     newContext.setType(context.type());
+    // Propagate per-feature state set by upstream transformers (e.g. link captures
+    // from FeatureTokenTransformerPropertyLinks, canonical id captured by
+    // FeatureTokenTransformerCompositeId) into the rebuilt context that downstream sees.
+    newContext.setPropertyLinks(context.propertyLinks());
+    newContext.setCanonicalFeatureId(context.canonicalFeatureId());
 
     downstream.onFeatureStart(newContext);
     downstream.bufferStart();
@@ -167,6 +172,14 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     applyTokenSliceTransformers(context.type());
+
+    // Upstream transformers (PropertyLinks, CompositeId) may have populated per-feature context
+    // state during/after the property events; propagate it to newContext before the buffer
+    // is flushed so encoders that read these slots during the buffered playback (e.g.
+    // GmlWriterId reading context.canonicalFeatureId() to override the gml:identifier
+    // placeholder) see the up-to-date values.
+    newContext.setPropertyLinks(context.propertyLinks());
+    newContext.setCanonicalFeatureId(context.canonicalFeatureId());
 
     downstream.bufferStop(true);
 

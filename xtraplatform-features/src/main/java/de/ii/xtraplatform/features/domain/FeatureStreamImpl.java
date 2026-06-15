@@ -28,6 +28,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -49,6 +50,7 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
+  private final boolean hasPropertyLinks;
 
   public FeatureStreamImpl(
       Query query,
@@ -86,6 +88,28 @@ public class FeatureStreamImpl implements FeatureStream {
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.hasPropertyLinks = hasPropertyLinks(query, data);
+  }
+
+  // For types without properties that are represented as links (an explicit `link` in the
+  // schema or a role that declares a link relation) the PropertyLinks transformer would be a
+  // per-token no-op and is not wired at all.
+  private static boolean hasPropertyLinks(Query query, FeatureProviderDataV2 data) {
+    return getTypes(query).stream()
+        .map(type -> data.getTypes().get(type))
+        .filter(Objects::nonNull)
+        .flatMap(schema -> schema.getAllNestedProperties().stream())
+        .anyMatch(property -> property.getEffectiveLink().isPresent());
+  }
+
+  private static List<String> getTypes(Query query) {
+    if (query instanceof FeatureQuery) {
+      return List.of(((FeatureQuery) query).getType());
+    }
+    if (query instanceof MultiFeatureQuery) {
+      return ((MultiFeatureQuery) query).getQueries().stream().map(TypeQuery::getType).toList();
+    }
+    return List.of();
   }
 
   @Override
@@ -99,11 +123,27 @@ public class FeatureStreamImpl implements FeatureStream {
 
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
           ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
+          // PropertyLinks must run before the per-format value-transformation step so it
+          // captures the raw ISO timestamp, not a locale-formatted variant used in the body
+          FeatureTokenSource source =
+              hasPropertyLinks
+                  ? tokenSource.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
+                  : tokenSource;
+          // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
+          // the same pre-format slot so they see raw provider values and can mutate tokens before
+          // any format-specific transformation
+          if (query instanceof FeatureQuery) {
+            for (FeatureQueryExtension ext : ((FeatureQuery) query).getExtensions()) {
+              if (ext instanceof FeatureTokenTransformerExtension) {
+                source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
+              }
+            }
+          }
+          source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(source, mergedTransformations)
+                  : source;
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -166,11 +206,27 @@ public class FeatureStreamImpl implements FeatureStream {
 
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
           ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
+          // PropertyLinks must run before the per-format value-transformation step so it
+          // captures the raw ISO timestamp, not a locale-formatted variant used in the body
+          FeatureTokenSource source =
+              hasPropertyLinks
+                  ? tokenSource.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
+                  : tokenSource;
+          // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
+          // the same pre-format slot so they see raw provider values and can mutate tokens before
+          // any format-specific transformation
+          if (query instanceof FeatureQuery) {
+            for (FeatureQueryExtension ext : ((FeatureQuery) query).getExtensions()) {
+              if (ext instanceof FeatureTokenTransformerExtension) {
+                source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
+              }
+            }
+          }
+          source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(source, mergedTransformations)
+                  : source;
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -190,6 +246,7 @@ public class FeatureStreamImpl implements FeatureStream {
           if (stepMetadata) {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 

@@ -92,4 +92,56 @@ class SqlMutationSessionSpec extends Specification {
         ex.message.contains('unknown_type')
         0 * sqlSession.run(_, _, _)
     }
+
+    def 'retireFeature for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.retireFeature('unknown_type', '42', java.time.Instant.parse('2026-06-06T10:00:00Z'))
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
+
+    def 'patchOpenVersion for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.patchOpenVersion('unknown_type', '42', [], null)
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
+
+    def 'assertNoConflictingVersion for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.assertNoConflictingVersion('unknown_type', '42')
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
+
+    def 'getOpenVersionStart for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.getOpenVersionStart('unknown_type', '42')
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
 }
