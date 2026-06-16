@@ -173,10 +173,32 @@ public interface CustomFunction {
     return Map.of();
   }
 
+  /**
+   * A built-in function that is only meaningful within a query expression (a semi-join against a
+   * result set defined by another query) and is encoded by a dedicated handler rather than a SQL
+   * template. Such a function therefore defines neither {@code expression} nor {@code expressions}.
+   * Not intended for user-defined functions.
+   */
+  @Value.Default
+  default boolean getQueryExpressionOnly() {
+    return false;
+  }
+
   @Value.Check
   default void checkExpressionDefinition() {
     boolean hasExpression = getExpression() != null && !getExpression().isBlank();
     boolean hasExpressions = !getExpressions().isEmpty();
+
+    if (getQueryExpressionOnly()) {
+      if (hasExpression || hasExpressions) {
+        throw new IllegalStateException(
+            String.format(
+                "Custom function '%s' is restricted to query expressions and must not define a SQL"
+                    + " expression",
+                getName()));
+      }
+      return;
+    }
 
     if (hasExpression == hasExpressions) {
       throw new IllegalStateException(
@@ -222,6 +244,20 @@ public interface CustomFunction {
         .arguments(arguments)
         .returns(returns)
         .expressions(expressions)
+        .build();
+  }
+
+  static CustomFunction ofQueryExpressionOnly(
+      String name,
+      @Nullable String description,
+      List<Cql2FunctionArgument> arguments,
+      List<String> returns) {
+    return new ImmutableCustomFunction.Builder()
+        .name(name)
+        .description(description)
+        .arguments(arguments)
+        .returns(returns)
+        .queryExpressionOnly(true)
         .build();
   }
 }

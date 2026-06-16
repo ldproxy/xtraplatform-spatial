@@ -1018,7 +1018,9 @@ public class FilterEncoderSql {
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
       if (scalarOperation instanceof InResultSet) {
         throw new IllegalArgumentException(
-            String.format("Filter is invalid. %s is not supported here.", InResultSet.TYPE));
+            String.format(
+                "Filter is invalid. %s can only be used within a query expression.",
+                InResultSet.TYPE));
       }
 
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());

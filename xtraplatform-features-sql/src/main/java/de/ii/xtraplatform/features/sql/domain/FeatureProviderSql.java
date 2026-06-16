@@ -1536,6 +1536,11 @@ public class FeatureProviderSql
     return getData().getCql2Functions().stream()
         .filter(
             function -> {
+              if (function.getQueryExpressionOnly()) {
+                // encoded by a dedicated handler, not a SQL template; not template-renderable
+                return false;
+              }
+
               if (Objects.nonNull(function.getExpression())
                   && !function.getExpression().isBlank()) {
                 return true;
