@@ -16,8 +16,11 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SchemaMappingBase;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -198,9 +201,122 @@ public class FeatureEventBuffer<
   }
 
   public void bufferFlush() {
-    buffer.add(FeatureTokenType.FLUSH);
-    buffer.forEach(bufferOut::onToken);
+    List<Object> ordered = orderedBySchema(buffer);
+    ordered.add(FeatureTokenType.FLUSH);
+    ordered.forEach(bufferOut::onToken);
     buffer.clear();
+  }
+
+  /**
+   * Re-sorts the buffered feature so that properties are emitted in the order declared in the
+   * schema, regardless of the order in which the provider produced them. The incremental buffer
+   * accounting places a property where its tokens first arrive, which is the SQL provider's
+   * per-table order, not the schema order: a property backed by a joined table (object, object
+   * array, value array, feature reference) is produced after the columns of the main table even
+   * when it is declared before them. Running after the slice transformers, this pass rebuilds the
+   * token stream as a tree and serialises each object's children in schema-position order. Array
+   * elements keep their (data) order; the children inside each element are ordered by schema
+   * position like any other object.
+   */
+  private List<Object> orderedBySchema(List<Object> tokens) {
+    SchemaMapping mapping = Objects.isNull(lastType) ? null : mappings.get(lastType);
+
+    if (Objects.isNull(mapping) || tokens.isEmpty()) {
+      return new ArrayList<>(tokens);
+    }
+
+    Node root = new Node(null, List.of());
+    buildTree(tokens, root);
+    orderChildren(root, mapping);
+
+    List<Object> ordered = new ArrayList<>(tokens.size());
+    for (Node child : root.children) {
+      child.flattenInto(ordered);
+    }
+    return ordered;
+  }
+
+  private static void buildTree(List<Object> tokens, Node root) {
+    Deque<Node> stack = new ArrayDeque<>();
+    stack.push(root);
+
+    int i = 0;
+    while (i < tokens.size()) {
+      // a token group is a marker (FeatureTokenType) followed by its context tokens up to the next
+      // marker
+      int j = i + 1;
+      while (j < tokens.size() && !(tokens.get(j) instanceof FeatureTokenType)) {
+        j++;
+      }
+      List<Object> group = new ArrayList<>(tokens.subList(i, j));
+      FeatureTokenType type =
+          tokens.get(i) instanceof FeatureTokenType ? (FeatureTokenType) tokens.get(i) : null;
+
+      if (type == FeatureTokenType.OBJECT || type == FeatureTokenType.ARRAY) {
+        Node node = new Node(type, group);
+        stack.peek().children.add(node);
+        stack.push(node);
+      } else if (type == FeatureTokenType.OBJECT_END || type == FeatureTokenType.ARRAY_END) {
+        if (stack.size() > 1) {
+          stack.pop().close = group;
+        }
+      } else {
+        stack.peek().children.add(new Node(type, group));
+      }
+
+      i = j;
+    }
+  }
+
+  private static void orderChildren(Node node, SchemaMapping mapping) {
+    // array elements keep their data order; the children of any object (including each array
+    // element) are ordered by their schema position
+    if (node.type != FeatureTokenType.ARRAY && node.children.size() > 1) {
+      node.children.sort(Comparator.comparingInt(child -> positionOf(child, mapping)));
+    }
+    for (Node child : node.children) {
+      orderChildren(child, mapping);
+    }
+  }
+
+  private static int positionOf(Node node, SchemaMapping mapping) {
+    List<String> path = node.path();
+    if (path.isEmpty()) {
+      return Integer.MAX_VALUE;
+    }
+    List<Integer> positions = mapping.getPositionsForTargetPath(path);
+    int position = positions.isEmpty() ? -1 : positions.get(0);
+    // keep paths without a known position at the end, in their original (stable) order
+    return position < 0 ? Integer.MAX_VALUE : position;
+  }
+
+  private static final class Node {
+    private final FeatureTokenType type;
+    private final List<Object> open;
+    private final List<Node> children = new ArrayList<>();
+    private List<Object> close;
+
+    private Node(FeatureTokenType type, List<Object> open) {
+      this.type = type;
+      this.open = open;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> path() {
+      return open.size() > 1 && open.get(1) instanceof List
+          ? (List<String>) open.get(1)
+          : List.of();
+    }
+
+    private void flattenInto(List<Object> out) {
+      out.addAll(open);
+      for (Node child : children) {
+        child.flattenInto(out);
+      }
+      if (Objects.nonNull(close)) {
+        out.addAll(close);
+      }
+    }
   }
 
   public boolean isBuffering() {
