@@ -993,6 +993,10 @@ public class CqlFilterExamples {
           Property.of("location"),
           ArrayLiteral.of(ImmutableList.of(ScalarLiteral.of("id"), ScalarLiteral.of("location"))));
 
+  public static final Cql2Expression EXAMPLE_AContains_SingleValue_ValidFor_JOINED_GEOMETRY =
+      AContains.of(
+          Property.of("location"), ArrayLiteral.of(ImmutableList.of(ScalarLiteral.of("id"))));
+
   public static final Cql2Expression EXAMPLE_AEquals_ValidFor_JOINED_GEOMETRY =
       AEquals.of(
           Property.of("location"),

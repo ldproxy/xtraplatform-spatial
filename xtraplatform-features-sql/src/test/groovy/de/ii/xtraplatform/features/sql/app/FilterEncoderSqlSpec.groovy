@@ -714,6 +714,23 @@ class FilterEncoderSqlSpec extends Specification {
 
     }
 
+    def 'test AContains with a single value omits the tautological HAVING'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = CqlFilterExamples.EXAMPLE_AContains_SingleValue_ValidFor_JOINED_GEOMETRY
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id') GROUP BY AA.id)"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
+
+    }
+
     def 'test AContains with not'() {
 
         given:
