@@ -227,6 +227,86 @@ class FeatureTokenFixtures {
             FeatureTokenType.INPUT_END
     ]
 
+    public static final List<Object> SINGLE_FEATURE_NESTED_OBJECT_REQUIRED_NULLS = [
+            FeatureTokenType.INPUT,
+            true,
+            FeatureTokenType.FEATURE,
+            FeatureTokenType.VALUE,
+            ["id"],
+            "24",
+            Type.STRING,
+            FeatureTokenType.OBJECT,
+            ["optional_with_required"],
+            FeatureTokenType.VALUE,
+            ["optional_with_required", "numerator"],
+            null,
+            Type.FLOAT,
+            FeatureTokenType.VALUE,
+            ["optional_with_required", "denominator"],
+            null,
+            Type.FLOAT,
+            FeatureTokenType.OBJECT_END,
+            ["optional_with_required"],
+            FeatureTokenType.VALUE,
+            ["kennung"],
+            "611320001-1",
+            Type.STRING,
+            FeatureTokenType.FEATURE_END,
+            FeatureTokenType.INPUT_END
+    ]
+
+    public static final List<Object> SINGLE_FEATURE_NESTED_OBJECT_REQUIRED_NULLS_PARTIAL = [
+            FeatureTokenType.INPUT,
+            true,
+            FeatureTokenType.FEATURE,
+            FeatureTokenType.VALUE,
+            ["id"],
+            "24",
+            Type.STRING,
+            FeatureTokenType.OBJECT,
+            ["optional_with_required"],
+            FeatureTokenType.VALUE,
+            ["optional_with_required", "numerator"],
+            "0.5",
+            Type.FLOAT,
+            FeatureTokenType.VALUE,
+            ["optional_with_required", "denominator"],
+            null,
+            Type.FLOAT,
+            FeatureTokenType.OBJECT_END,
+            ["optional_with_required"],
+            FeatureTokenType.VALUE,
+            ["kennung"],
+            "611320001-1",
+            Type.STRING,
+            FeatureTokenType.FEATURE_END,
+            FeatureTokenType.INPUT_END
+    ]
+
+    public static final List<Object> SINGLE_FEATURE_NESTED_OBJECT_REQUIRED_NULLS_PARTIAL_REDUCED = [
+            FeatureTokenType.INPUT,
+            true,
+            FeatureTokenType.FEATURE,
+            FeatureTokenType.VALUE,
+            ["id"],
+            "24",
+            Type.STRING,
+            FeatureTokenType.OBJECT,
+            ["optional_with_required"],
+            FeatureTokenType.VALUE,
+            ["optional_with_required", "numerator"],
+            "0.5",
+            Type.FLOAT,
+            FeatureTokenType.OBJECT_END,
+            ["optional_with_required"],
+            FeatureTokenType.VALUE,
+            ["kennung"],
+            "611320001-1",
+            Type.STRING,
+            FeatureTokenType.FEATURE_END,
+            FeatureTokenType.INPUT_END
+    ]
+
     public static final List<Object> SINGLE_FEATURE_VALUE_ARRAY = [
             FeatureTokenType.INPUT,
             true,
