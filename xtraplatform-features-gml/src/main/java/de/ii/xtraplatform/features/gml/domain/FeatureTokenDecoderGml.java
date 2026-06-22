@@ -1029,7 +1029,9 @@ public class FeatureTokenDecoderGml
     String wireUri = wireNamespaceUri == null ? "" : wireNamespaceUri;
     for (FeatureSchema p : parent.getProperties()) {
       String key = propertyKey(p, useAlias);
-      if (!wireLocalName.equals(stripPrefix(key))) {
+      String base = stripPrefix(key);
+      boolean suffixed = inputProfile.getObjectTypeSuffixedProperties().contains(base);
+      if (!(wireLocalName.equals(base) || (suffixed && wireLocalName.startsWith(base + "_")))) {
         continue;
       }
       String expectedUri = expectedNamespaceUri(p, parent, key);
