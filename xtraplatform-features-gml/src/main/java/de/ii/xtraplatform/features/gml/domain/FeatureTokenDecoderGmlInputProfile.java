@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.domain;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.immutables.value.Value;
 
 /**
@@ -161,6 +162,18 @@ public interface FeatureTokenDecoderGmlInputProfile {
   List<String> getXmlAttributes();
 
   Map<String, List<String>> getValueWrap();
+
+  /**
+   * Reverse of {@code GmlConfiguration#objectTypeSuffixedProperties}: the name (or alias, when
+   * {@link #getUseAlias()}) of each FEATURE_REF property whose GML element on the wire is the base
+   * property name plus a {@code _<ObjectType>} suffix naming the referenced feature type (e.g. base
+   * {@code gehoertZuBauwerk} → {@code gehoertZuBauwerk_AX_Turm}). For these properties the decoder
+   * accepts an element whose local name is the base name optionally followed by a {@code
+   * _<segment>} suffix and maps it to the base property. The suffix is ignored: the referenced
+   * object type is carried independently through the FEATURE_REF join, so it need not be captured
+   * from the wire.
+   */
+  Set<String> getObjectTypeSuffixedProperties();
 
   static FeatureTokenDecoderGmlInputProfile empty() {
     return ImmutableFeatureTokenDecoderGmlInputProfile.builder().build();
