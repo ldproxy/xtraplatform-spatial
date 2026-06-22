@@ -516,6 +516,69 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         !tokens.contains("urn:adv:oid:DENW36AL00000AAA")
     }
 
+    static final FeatureTokenDecoderGmlInputProfile NAS_TEMPLATES_SUFFIXED =
+            ImmutableFeatureTokenDecoderGmlInputProfile.builder()
+                    .useAlias(true)
+                    .featureRefTemplate("urn:adv:oid:{{value}}")
+                    .addObjectTypeSuffixedProperties("istGebucht")
+                    .build()
+
+    def 'objectTypeSuffixedProperties: a _<ObjectType>-suffixed element maps to the base feature-ref property'() {
+        given:
+        // ALKIS NAS names this element adv:gehoertZuBauwerk_AX_Turm; istGebucht stands in here as a
+        // declared suffixed property. The _AX_Turm suffix is ignored and the href is reduced as for
+        // the plain element.
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES_SUFFIXED)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht_AX_Turm xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["11001-21008"]) == "DENW36ALl800005x"
+    }
+
+    def 'objectTypeSuffixedProperties: the unsuffixed element still matches a declared property'() {
+        given:
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES_SUFFIXED)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["11001-21008"]) == "DENW36ALl800005x"
+    }
+
+    def 'a suffixed element is not matched when the property is not declared in objectTypeSuffixedProperties'() {
+        given:
+        // Same element, but the default profile declares no suffixed properties: the suffix is not
+        // stripped, the element matches no property and is skipped (the FK is not emitted).
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht_AX_Turm xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["11001-21008"]) == null
+    }
+
     def 'xlink:href is emitted unchanged when no template is configured'() {
         given:
         def profile = ImmutableFeatureTokenDecoderGmlInputProfile.builder()
