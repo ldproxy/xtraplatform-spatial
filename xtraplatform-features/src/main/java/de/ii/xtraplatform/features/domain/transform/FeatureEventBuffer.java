@@ -18,6 +18,7 @@ import de.ii.xtraplatform.features.domain.SchemaMappingBase;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -37,7 +38,7 @@ public class FeatureEventBuffer<
   private final FeatureTokenEmitter2<U, V, W> bufferIn;
   private final FeatureTokenReader<U, V, W> bufferOut;
 
-  private final Vector<Integer> events;
+  private final int[] events;
   private final Vector<List<Integer>> enclosings;
   private final Map<String, SchemaMapping> mappings;
   private boolean doBuffer;
@@ -51,7 +52,6 @@ public class FeatureEventBuffer<
     this.buffer = new ArrayList<>();
     this.bufferIn = (FeatureTokenEmitter2<U, V, W>) (this::append);
     this.bufferOut = new FeatureTokenReader<>(downstream, context);
-    this.events = new Vector<>();
     this.enclosings = new Vector<>();
     this.mappings = mappings;
 
@@ -66,7 +66,7 @@ public class FeatureEventBuffer<
                     .orElseThrow()
                 * 2
             + 2;
-    events.setSize(maxEvents);
+    this.events = new int[maxEvents];
     enclosings.setSize(maxEvents);
   }
 
@@ -92,7 +92,7 @@ public class FeatureEventBuffer<
    * @return first index for event position in buffer
    */
   private int start(int pos) {
-    return events.get(pos * 2);
+    return events[pos * 2];
   }
 
   /**
@@ -100,7 +100,7 @@ public class FeatureEventBuffer<
    * @return length for event position in buffer
    */
   private int length(int pos) {
-    return events.get((pos * 2) + 1);
+    return events[(pos * 2) + 1];
   }
 
   /**
@@ -135,12 +135,12 @@ public class FeatureEventBuffer<
   private void plus(int pos, int delta, boolean propagate) {
     // increase length of pos
     int lenPos = (pos * 2) + 1;
-    events.set(lenPos, events.get(lenPos) + delta);
+    events[lenPos] += delta;
 
     // increase start of following pos
     if (propagate) {
-      for (int i = (pos + 1) * 2; i < events.size(); i += 2) {
-        events.set(i, events.get(i) + delta);
+      for (int i = (pos + 1) * 2; i < events.length; i += 2) {
+        events[i] += delta;
       }
     }
   }
@@ -170,7 +170,7 @@ public class FeatureEventBuffer<
   }
 
   void reset(String type) {
-    Collections.fill(events, 0);
+    Arrays.fill(events, 0);
 
     if (!Objects.equals(lastType, type)) {
       Collections.fill(enclosings, List.of());
