@@ -86,6 +86,15 @@ public interface SqlDialect {
     return select;
   }
 
+  /**
+   * Render a common table expression that is guaranteed to be evaluated only once. The default is a
+   * plain {@code name AS (query)}; dialects that would otherwise inline a single-reference CTE
+   * (PostgreSQL 12+) must force materialization.
+   */
+  default String materializedCte(String name, String query) {
+    return name + " AS (" + query + ")";
+  }
+
   String castToBigInt(int value);
 
   Optional<BoundingBox> parseExtent(String extent, EpsgCrs crs);

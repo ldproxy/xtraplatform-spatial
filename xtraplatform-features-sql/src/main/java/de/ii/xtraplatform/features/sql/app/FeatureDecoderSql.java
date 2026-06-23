@@ -57,6 +57,7 @@ public class FeatureDecoderSql
   private boolean started;
   private boolean featureStarted;
   private Object currentId;
+  private int currentQueryIndex;
   private boolean isAtLeastOneFeatureWritten;
 
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
@@ -189,7 +190,9 @@ public class FeatureDecoderSql
       schemaIndexes.clear();
     }
 
-    if (!Objects.equals(currentId, featureId) || !Objects.equals(context.type(), featureType)) {
+    if (!Objects.equals(currentId, featureId)
+        || !Objects.equals(context.type(), featureType)
+        || currentQueryIndex != sqlRow.getQueryIndex()) {
       if (featureStarted) {
         getDownstream().onFeatureEnd(context);
         this.featureStarted = false;
@@ -202,6 +205,7 @@ public class FeatureDecoderSql
       getDownstream().onFeatureStart(context);
       this.featureStarted = true;
       this.currentId = featureId;
+      this.currentQueryIndex = sqlRow.getQueryIndex();
     }
 
     List<Integer> multiplicitiesForPath =

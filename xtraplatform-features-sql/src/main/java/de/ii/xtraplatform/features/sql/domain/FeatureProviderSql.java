@@ -94,6 +94,7 @@ import de.ii.xtraplatform.features.sql.app.ModifiableFeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
+import de.ii.xtraplatform.features.sql.app.ResultSetMaterializer;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
 import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlMutationSession;
@@ -468,6 +469,7 @@ public class FeatureProviderSql
   private PathParserSql pathParser2;
   private SqlPathParser pathParser3;
   private FilterEncoderSql filterEncoder;
+  private ResultSetMaterializer resultSetMaterializer;
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SqlQueryMapping>> queryMappings;
@@ -592,7 +594,11 @@ public class FeatureProviderSql
             crsInfo,
             cql,
             getCql2Functions(),
-            accentiCollation);
+            accentiCollation,
+            type ->
+                Optional.ofNullable(queryMappings.get(type))
+                    .filter(mappings -> mappings.size() == 1)
+                    .map(mappings -> mappings.get(0)));
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
@@ -618,6 +624,12 @@ public class FeatureProviderSql
     this.queryTransformer =
         new FeatureQueryEncoderSql(
             allQueryTemplates, allQueryTemplates, getData().getQueryGeneration(), sqlDialect);
+
+    this.resultSetMaterializer =
+        new ResultSetMaterializer(
+            this::getSqlClient,
+            filterEncoder,
+            getData().getQueryGeneration().getResultSetMaterializationMaxSize());
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
@@ -1426,29 +1438,40 @@ public class FeatureProviderSql
       // - disable optimized paging as soon as a sort key is specified for at least one subquery
       // - fix a bug in SqlRowVals or transformations, it seems that the same number of columns is
       // expected for all queries
-      List<SubQuery> queries = ((MultiFeatureQuery) query).getQueries();
+      MultiFeatureQuery multiQuery = (MultiFeatureQuery) query;
+      List<SubQuery> queries = multiQuery.getQueries();
       OptionalInt maxSortKeys =
           queries.stream().mapToInt(subQuery -> subQuery.getSortKeys().size()).max();
 
       if (maxSortKeys.orElse(0) > 0) {
-        return ImmutableMultiFeatureQuery.builder()
-            .from(query)
-            .queries(
-                queries.stream()
-                    .map(
-                        subQuery ->
-                            ImmutableSubQuery.builder()
-                                .from(subQuery)
-                                .sortKeys(
-                                    subQuery.getSortKeys().size() < maxSortKeys.getAsInt()
-                                        ? IntStream.range(0, maxSortKeys.getAsInt())
-                                            .mapToObj(i -> SortKey.of(ID_PLACEHOLDER))
-                                            .collect(Collectors.toList())
-                                        : subQuery.getSortKeys())
-                                .build())
-                    .collect(Collectors.toList()))
-            .build();
+        multiQuery =
+            ImmutableMultiFeatureQuery.builder()
+                .from(multiQuery)
+                .queries(
+                    queries.stream()
+                        .map(
+                            subQuery ->
+                                ImmutableSubQuery.builder()
+                                    .from(subQuery)
+                                    .sortKeys(
+                                        subQuery.getSortKeys().size() < maxSortKeys.getAsInt()
+                                            ? IntStream.range(0, maxSortKeys.getAsInt())
+                                                .mapToObj(i -> SortKey.of(ID_PLACEHOLDER))
+                                                .collect(Collectors.toList())
+                                            : subQuery.getSortKeys())
+                                    .build())
+                        .collect(Collectors.toList()))
+                .build();
       }
+
+      // materialize the result sets of a multi-query once and reuse them across its queries,
+      // instead
+      // of re-deriving each shared result set in every sub-query statement
+      if (ResultSetMaterializer.hasResultSets(multiQuery)) {
+        multiQuery = resultSetMaterializer.materialize(multiQuery);
+      }
+
+      return multiQuery;
     }
 
     return query;
@@ -1513,6 +1536,11 @@ public class FeatureProviderSql
     return getData().getCql2Functions().stream()
         .filter(
             function -> {
+              if (function.getQueryExpressionOnly()) {
+                // encoded by a dedicated handler, not a SQL template; not template-renderable
+                return false;
+              }
+
               if (Objects.nonNull(function.getExpression())
                   && !function.getExpression().isBlank()) {
                 return true;
