@@ -29,6 +29,28 @@ import java.util.Objects;
 import java.util.Vector;
 import java.util.stream.Collectors;
 
+/**
+ * Per-feature token buffer with two distinct responsibilities:
+ *
+ * <ol>
+ *   <li><b>A position-addressable slice index</b> for the in-buffer token-slice transformers
+ *       (flatten, concat, codelist, …): {@link #getSlice(int)}/{@link #replaceSlice(int, List)}
+ *       read and rewrite a property - or an enclosing object together with its descendants - by its
+ *       schema position. The index ({@link #start(int)}/{@link #length(int)}) is derived on demand
+ *       from the buffered tokens by {@link #computeIndex()}; the transformers rewrite within a
+ *       property and do not reorder across properties.
+ *   <li><b>Emission order</b>, applied by the single {@link #orderedBySchema(List)} pass.
+ * </ol>
+ *
+ * <p>{@link #append(Object)} stores tokens in the order the provider produces them, which is the
+ * provider's per-table order, not the schema order: a property backed by a joined table (object,
+ * object array, value array, feature reference) is produced after the main table's columns even
+ * when it is declared before them, and a property produced from several tables arrives as several
+ * fragments. {@link #ensureOrdered()} applies the schema-order pass in place, lazily and exactly
+ * once per feature: before the slice transformers read the buffer - so each property's fragments
+ * are contiguous and a transformer's slice cannot swallow an unrelated property emitted between
+ * them - and at the latest at flush when no transformer ran.
+ */
 public class FeatureEventBuffer<
         U extends SchemaBase<U>, V extends SchemaMappingBase<U>, W extends ModifiableContext<U, V>>
     implements FeatureTokenEmitter2<U, V, W> {
@@ -42,8 +64,8 @@ public class FeatureEventBuffer<
   private final Vector<List<Integer>> enclosings;
   private final Map<String, SchemaMapping> mappings;
   private boolean doBuffer;
-  public int current;
-  public List<Integer> currentEnclosing;
+  private boolean indexStale;
+  private boolean schemaOrdered;
   private String lastType;
 
   public FeatureEventBuffer(
@@ -56,8 +78,8 @@ public class FeatureEventBuffer<
     this.mappings = mappings;
 
     this.doBuffer = false;
-    this.current = 0;
-    this.currentEnclosing = List.of();
+    this.indexStale = true;
+    this.schemaOrdered = false;
 
     int maxEvents =
         mappings.values().stream()
@@ -72,15 +94,6 @@ public class FeatureEventBuffer<
 
   public FeatureTokenEmitter2<U, V, W> getBuffer() {
     return bufferIn;
-  }
-
-  public void next(int pos) {
-    next(pos, List.of());
-  }
-
-  public void next(int pos, List<Integer> enclosing) {
-    this.current = pos;
-    this.currentEnclosing = enclosing;
   }
 
   /**
@@ -112,36 +125,16 @@ public class FeatureEventBuffer<
   }
 
   /**
-   * Increase length for given event position in buffer.
-   *
-   * @param pos event position
+   * Updates the index after a slice changed size: grows the length of {@code pos} by {@code delta}
+   * and shifts the start of every later position by the same amount. The buffer is in
+   * schema-position order when this runs (see {@link #ensureOrdered()}), so a resized slice moves
+   * every position after it by {@code delta} - this keeps the index correct without a full {@link
+   * #computeIndex()} rebuild per slice rewrite.
    */
-  private void increase(int pos) {
-    plus(pos, 1);
-  }
-
-  private void increase(int pos, List<Integer> enclosing) {
-    plus(pos, 1);
-
-    for (int pos2 : enclosing) {
-      plus(pos2, 1, false);
-    }
-  }
-
   private void plus(int pos, int delta) {
-    plus(pos, delta, true);
-  }
-
-  private void plus(int pos, int delta, boolean propagate) {
-    // increase length of pos
-    int lenPos = (pos * 2) + 1;
-    events[lenPos] += delta;
-
-    // increase start of following pos
-    if (propagate) {
-      for (int i = (pos + 1) * 2; i < events.length; i += 2) {
-        events[i] += delta;
-      }
+    events[(pos * 2) + 1] += delta;
+    for (int i = (pos + 1) * 2; i < events.length; i += 2) {
+      events[i] += delta;
     }
   }
 
@@ -160,17 +153,110 @@ public class FeatureEventBuffer<
     return enclosing.get(enclosing.size() - 1);
   }
 
+  /**
+   * Buffers a token in the order the provider produces it. No ordering is attempted here; {@link
+   * #orderedBySchema(List)} applies schema order later, on demand. The buffer is marked unordered
+   * and its slice index stale, both rebuilt lazily the next time a slice is read, written, or
+   * flushed.
+   */
   void append(Object token) {
-    int end = end(current);
-    buffer.add(end, token);
+    buffer.add(token);
+    schemaOrdered = false;
+    indexStale = true;
+  }
 
-    int minPos = minPos(current, currentEnclosing);
+  /**
+   * Re-sorts the buffer into schema order in place, once. This must run before the in-buffer slice
+   * transformers read or rewrite a slice: a property produced by the provider as several per-table
+   * fragments (e.g. a concatenated object array) is contiguous only after sorting, and {@link
+   * #getSlice(int)} hands a transformer a contiguous buffer range - without this, an unrelated
+   * property emitted between two fragments would be swallowed into the slice. It is also the single
+   * place schema order is applied for the final emission. The slice transformers preserve schema
+   * order (they rewrite within a property), so it is not repeated after they run.
+   */
+  private void ensureOrdered() {
+    if (schemaOrdered) {
+      return;
+    }
+    List<Object> ordered = orderedBySchema(buffer);
+    buffer.clear();
+    buffer.addAll(ordered);
+    schemaOrdered = true;
+    indexStale = true;
+  }
 
-    increase(minPos);
+  /**
+   * Rebuilds the position-addressable slice index from the buffered tokens in a single pass. Each
+   * token group is accrued to its outermost enclosing position ({@link #minPos(int, List)} of the
+   * token's position and its ancestors, or the token's own position when it is top-level) - the
+   * property whose slice encloses it. An enclosing object's range therefore spans all of its
+   * descendants even when the object's own marker is not emitted (e.g. a flattened source object),
+   * which is exactly the slice {@link #getSlice(int)} hands to a transformer. Runs only when a
+   * slice is actually accessed, so features without slice transformers never pay for it.
+   */
+  private void computeIndex() {
+    Arrays.fill(events, 0);
+    indexStale = false;
+
+    SchemaMapping mapping = Objects.isNull(lastType) ? null : mappings.get(lastType);
+    if (Objects.isNull(mapping) || buffer.isEmpty()) {
+      return;
+    }
+
+    int i = 0;
+    while (i < buffer.size()) {
+      int j = i + 1;
+      while (j < buffer.size() && !(buffer.get(j) instanceof FeatureTokenType)) {
+        j++;
+      }
+      List<String> path =
+          i + 1 < buffer.size() && buffer.get(i + 1) instanceof List
+              ? (List<String>) buffer.get(i + 1)
+              : List.of();
+      int pos = positionForPath(mapping, path);
+      if (pos >= 0) {
+        setSpan(minPos(pos, enclosings.get(pos)), i, j);
+      }
+
+      i = j;
+    }
+  }
+
+  /**
+   * Records the buffer range [start, end) for a schema position. A position can occur more than
+   * once at the same level - object-array elements share the array's position, and several
+   * consecutive arrays at the same path are merged by the concat transformer - so repeated spans
+   * are unioned into the enclosing range rather than overwritten. The occurrences are contiguous in
+   * production order, so the union is the full span the transformer expects.
+   */
+  private void setSpan(int pos, int start, int end) {
+    if (pos < 0) {
+      return;
+    }
+    int length = length(pos);
+    if (length == 0) {
+      events[pos * 2] = start;
+      events[(pos * 2) + 1] = end - start;
+    } else {
+      int unionStart = Math.min(start(pos), start);
+      int unionEnd = Math.max(end(pos), end);
+      events[pos * 2] = unionStart;
+      events[(pos * 2) + 1] = unionEnd - unionStart;
+    }
+  }
+
+  private int positionForPath(SchemaMapping mapping, List<String> path) {
+    if (path.isEmpty()) {
+      return -1;
+    }
+    List<Integer> positions = mapping.getPositionsForTargetPath(path);
+    return positions.isEmpty() ? -1 : positions.get(0);
   }
 
   void reset(String type) {
     Arrays.fill(events, 0);
+    this.indexStale = true;
+    this.schemaOrdered = false;
 
     if (!Objects.equals(lastType, type)) {
       Collections.fill(enclosings, List.of());
@@ -201,22 +287,22 @@ public class FeatureEventBuffer<
   }
 
   public void bufferFlush() {
-    List<Object> ordered = orderedBySchema(buffer);
-    ordered.add(FeatureTokenType.FLUSH);
-    ordered.forEach(bufferOut::onToken);
+    ensureOrdered();
+    buffer.forEach(bufferOut::onToken);
+    bufferOut.onToken(FeatureTokenType.FLUSH);
     buffer.clear();
   }
 
   /**
    * Re-sorts the buffered feature so that properties are emitted in the order declared in the
-   * schema, regardless of the order in which the provider produced them. The incremental buffer
-   * accounting places a property where its tokens first arrive, which is the SQL provider's
-   * per-table order, not the schema order: a property backed by a joined table (object, object
-   * array, value array, feature reference) is produced after the columns of the main table even
-   * when it is declared before them. Running after the slice transformers, this pass rebuilds the
-   * token stream as a tree and serialises each object's children in schema-position order. Array
-   * elements keep their (data) order; the children inside each element are ordered by schema
-   * position like any other object.
+   * schema, regardless of the order in which the provider produced them. The buffer holds tokens in
+   * the provider's per-table order, not the schema order: a property backed by a joined table
+   * (object, object array, value array, feature reference) is produced after the columns of the
+   * main table even when it is declared before them. The pass rebuilds the token stream as a tree
+   * and serialises each object's children in schema-position order; array elements keep their
+   * (data) order, and the children inside each element are ordered by schema position like any
+   * other object. {@link #ensureOrdered()} applies it in place, before the slice transformers read
+   * the buffer (so each property's fragments are contiguous) and at the latest by flush.
    */
   private List<Object> orderedBySchema(List<Object> tokens) {
     SchemaMapping mapping = Objects.isNull(lastType) ? null : mappings.get(lastType);
@@ -273,10 +359,38 @@ public class FeatureEventBuffer<
     // element) are ordered by their schema position
     if (node.type != FeatureTokenType.ARRAY && node.children.size() > 1) {
       node.children.sort(Comparator.comparingInt(child -> positionOf(child, mapping)));
+      coalesceSplitObjects(node, mapping);
     }
     for (Node child : node.children) {
       orderChildren(child, mapping);
     }
+  }
+
+  /**
+   * Coalesces adjacent OBJECT children that share a schema position into one object. The provider
+   * produces a single-valued object backed by more than one table as several per-table fragments -
+   * separate {@code OBJECT[path]…OBJECT_END[path]} blocks at the same position - which must become
+   * one object. Object-array elements are never affected: they are children of an ARRAY node, which
+   * is excluded from sorting and coalescing by the caller. Runs after the sort, so the fragments
+   * are already adjacent; the merged children are ordered by the recursive {@link #orderChildren}
+   * pass.
+   */
+  private static void coalesceSplitObjects(Node node, SchemaMapping mapping) {
+    List<Node> coalesced = new ArrayList<>(node.children.size());
+    for (Node child : node.children) {
+      Node previous = coalesced.isEmpty() ? null : coalesced.get(coalesced.size() - 1);
+      if (Objects.nonNull(previous)
+          && previous.type == FeatureTokenType.OBJECT
+          && child.type == FeatureTokenType.OBJECT
+          && positionOf(child, mapping) != Integer.MAX_VALUE
+          && positionOf(previous, mapping) == positionOf(child, mapping)) {
+        previous.children.addAll(child.children);
+      } else {
+        coalesced.add(child);
+      }
+    }
+    node.children.clear();
+    node.children.addAll(coalesced);
   }
 
   private static int positionOf(Node node, SchemaMapping mapping) {
@@ -327,22 +441,20 @@ public class FeatureEventBuffer<
     if (pos < 0) {
       return List.of();
     }
+
+    ensureOrdered();
+
     if (pos == 0) {
       return Collections.unmodifiableList(buffer);
+    }
+
+    if (indexStale) {
+      computeIndex();
     }
 
     int enclosing = minPos(pos, enclosings.get(pos));
 
     List<Object> slice = buffer.subList(start(enclosing), end(enclosing));
-
-    /*if (slice.isEmpty() && !enclosings.get(pos).isEmpty()) {
-      for (int pos2: enclosings.get(pos)) {
-        slice = buffer.subList(start(pos2), end(pos2));
-        if (!slice.isEmpty()) {
-          break;
-        }
-      }
-    }*/
 
     return Collections.unmodifiableList(slice);
   }
@@ -352,19 +464,35 @@ public class FeatureEventBuffer<
       return false;
     }
 
-    int enclosing = minPos(pos, enclosings.get(pos));
+    ensureOrdered();
 
-    List<Object> slice = pos == 0 ? buffer : buffer.subList(start(enclosing), end(enclosing));
+    if (pos == 0) {
+      if (Objects.equals(buffer, replacement)) {
+        return false;
+      }
+      buffer.clear();
+      buffer.addAll(replacement);
+      // the whole buffer was replaced; rebuild the index before the next slice access
+      indexStale = true;
+      return true;
+    }
+
+    if (indexStale) {
+      computeIndex();
+    }
+
+    int enclosing = minPos(pos, enclosings.get(pos));
+    List<Object> slice = buffer.subList(start(enclosing), end(enclosing));
 
     if (Objects.equals(slice, replacement)) {
       return false;
     }
 
     int delta = replacement.size() - slice.size();
-
     slice.clear();
     slice.addAll(replacement);
 
+    // keep the index correct in place instead of rebuilding it for every slice rewrite
     if (delta != 0) {
       plus(enclosing, delta);
     }

@@ -164,7 +164,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
 
     downstream.onFeatureStart(newContext);
     downstream.bufferStart();
-    downstream.next(0);
 
     this.currentValueTransformerChain = valueTransformerChains.get(context.type());
   }
@@ -205,7 +204,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onObjectStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     int pos = context.pos();
     if (pos > -1) {
-      downstream.next(pos, context.parentPos());
 
       if (context.schema().filter(schema -> schema.isObject() || schema.isSpatial()).isPresent()) {
         FeatureSchema schema = context.schema().get();
@@ -219,7 +217,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onObjectEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     int pos = context.pos();
     if (pos > -1) {
-      downstream.next(pos, context.parentPos());
 
       if (context.schema().filter(schema -> schema.isObject() || schema.isSpatial()).isPresent()) {
         FeatureSchema schema = context.schema().get();
@@ -232,7 +229,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onArrayStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     int pos = context.pos();
     if (pos > -1) {
-      downstream.next(pos, context.parentPos());
 
       if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
         FeatureSchema schema = context.schema().get();
@@ -246,7 +242,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onArrayEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     int pos = context.pos();
     if (pos > -1) {
-      downstream.next(pos, context.parentPos());
 
       if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
         FeatureSchema schema = context.schema().get();
@@ -259,7 +254,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     int pos = context.pos();
     if (pos > -1) {
-      downstream.next(pos, context.parentPos());
 
       if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
         FeatureSchema schema = context.schema().get();
@@ -273,7 +267,6 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     int pos = context.pos();
     if (pos > -1) {
-      downstream.next(pos, context.parentPos());
 
       if (context.schema().filter(FeatureSchema::isValue).isPresent()) {
         FeatureSchema schema = context.schema().get();
