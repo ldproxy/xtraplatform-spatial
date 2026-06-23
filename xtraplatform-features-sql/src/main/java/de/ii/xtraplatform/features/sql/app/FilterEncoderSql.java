@@ -1374,14 +1374,22 @@ public class FilterEncoderSql {
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
+          // group selected by `IN (<one value>)` trivially has one distinct value); dropping it
+          // keeps the result identical but lets the planner estimate the grouped row count, which
+          // it cannot do across a count(distinct) HAVING filter
           String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
-                  secondExpression,
-                  aliases.get(0),
-                  rootSchema.getSortKey().get(),
-                  qualifiedColumn.first(),
-                  elementCount);
+              elementCount == 1
+                  ? String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s",
+                      secondExpression, aliases.get(0), rootSchema.getSortKey().get())
+                  : String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
+                      secondExpression,
+                      aliases.get(0),
+                      rootSchema.getSortKey().get(),
+                      qualifiedColumn.first(),
+                      elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_EQUALS) {
           String arrayQuery =
@@ -2452,14 +2460,22 @@ public class FilterEncoderSql {
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
+          // group selected by `IN (<one value>)` trivially has one distinct value); dropping it
+          // keeps the result identical but lets the planner estimate the grouped row count, which
+          // it cannot do across a count(distinct) HAVING filter
           String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
-                  secondExpression,
-                  aliases.get(0),
-                  mapping.getMainTable().getSortKey(),
-                  qualifiedColumn.first(),
-                  elementCount);
+              elementCount == 1
+                  ? String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s",
+                      secondExpression, aliases.get(0), mapping.getMainTable().getSortKey())
+                  : String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
+                      secondExpression,
+                      aliases.get(0),
+                      mapping.getMainTable().getSortKey(),
+                      qualifiedColumn.first(),
+                      elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_EQUALS) {
           String arrayQuery =
