@@ -19,4 +19,22 @@ public interface MultiFeatureQuery extends Query {
   }
 
   List<SubQuery> getQueries();
+
+  /**
+   * If enabled, a feature that is selected by more than one query is only included in the response
+   * once.
+   */
+  @Value.Default
+  default boolean getDeduplicate() {
+    return false;
+  }
+
+  /**
+   * If disabled, {@code numberMatched} is not computed. For a multi-query this avoids a count query
+   * per sub-query, each of which carries the full (possibly deeply nested) filter.
+   */
+  @Value.Default
+  default boolean getComputeNumberMatched() {
+    return true;
+  }
 }

@@ -66,4 +66,48 @@ class CustomFunctionSpec extends Specification {
         function.getExpression() == null
         function.getExpressions().get('SQL/PGIS') == 'UPPER($value) LIKE $pattern'
     }
+
+    def 'accepts a query-expression-only function without an expression'() {
+        when:
+        def function = new ImmutableCustomFunction.Builder()
+                .name('OK_QE')
+                .arguments([])
+                .returns(['BOOLEAN'])
+                .queryExpressionOnly(true)
+                .build()
+
+        then:
+        function.getQueryExpressionOnly()
+        function.getExpression() == null
+        function.getExpressions().isEmpty()
+    }
+
+    def 'rejects a query-expression-only function that defines an expression'() {
+        when:
+        new ImmutableCustomFunction.Builder()
+                .name('BAD_QE')
+                .arguments([])
+                .returns(['BOOLEAN'])
+                .queryExpressionOnly(true)
+                .expression('UPPER($value)')
+                .build()
+
+        then:
+        def ex = thrown(IllegalStateException)
+        ex.message.contains('restricted to query expressions')
+    }
+
+    def 'inResultSet is a registered built-in function restricted to query expressions'() {
+        when:
+        def function = CqlBuiltInFunctions.FUNCTIONS.find { it.name == InResultSet.TYPE }
+
+        then:
+        function != null
+        function.getQueryExpressionOnly()
+        function.getExpression() == null
+        function.getExpressions().isEmpty()
+        function.getReturns() == ['BOOLEAN']
+        // each argument declares a single value type, so /functions renders no duplicate types
+        function.getArguments().every { it.getType().size() == 1 }
+    }
 }

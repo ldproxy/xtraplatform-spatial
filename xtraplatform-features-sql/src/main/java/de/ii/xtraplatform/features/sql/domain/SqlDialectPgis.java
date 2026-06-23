@@ -40,6 +40,14 @@ public class SqlDialectPgis implements SqlDialect {
     return SqlDbmsPgis.ID;
   }
 
+  @Override
+  public String materializedCte(String name, String query) {
+    // PostgreSQL 12+ inlines a CTE that is referenced only once; MATERIALIZED forces a single
+    // evaluation, which is what lets a result set be computed once instead of re-evaluated per
+    // nesting level.
+    return name + " AS MATERIALIZED (" + query + ")";
+  }
+
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
   private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =

@@ -62,7 +62,6 @@ import org.slf4j.LoggerFactory;
   "excludedScopes",
   "transformations",
   "constraints",
-  "link",
   "properties"
 })
 public interface FeatureSchema

@@ -28,6 +28,7 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureQueriesExtension.LIFECYCLE_HOOK;
 import de.ii.xtraplatform.features.domain.FeatureStream.ResultBase;
 import de.ii.xtraplatform.features.domain.ImmutableSchemaMapping.Builder;
+import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
@@ -41,6 +42,7 @@ import de.ii.xtraplatform.values.domain.Values;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -605,17 +607,41 @@ public abstract class AbstractFeatureProvider<
     }
 
     if (query instanceof MultiFeatureQuery) {
-      return ((MultiFeatureQuery) query)
-          .getQueries().stream()
-              .map(
-                  typeQuery ->
-                      Map.entry(
-                          typeQuery.getType(),
-                          createMapping(typeQuery, WITH_SCOPE_RETURNABLE, propertyTransformations)))
-              .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+      // multiple queries may use the same feature type; the mapping is per type, so the
+      // projections of such queries are merged
+      Map<String, TypeQuery> queriesByType = new LinkedHashMap<>();
+      for (SubQuery subQuery : ((MultiFeatureQuery) query).getQueries()) {
+        queriesByType.merge(
+            subQuery.getType(), subQuery, AbstractFeatureProvider::mergeProjections);
+      }
+
+      return queriesByType.entrySet().stream()
+          .map(
+              entry ->
+                  Map.entry(
+                      entry.getKey(),
+                      createMapping(
+                          entry.getValue(), WITH_SCOPE_RETURNABLE, propertyTransformations)))
+          .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
     }
 
     return Map.of();
+  }
+
+  private static TypeQuery mergeProjections(TypeQuery query1, TypeQuery query2) {
+    List<String> fields =
+        query1.getFields().contains("*") || query2.getFields().contains("*")
+            ? List.of("*")
+            : java.util.stream.Stream.concat(
+                    query1.getFields().stream(), query2.getFields().stream())
+                .distinct()
+                .toList();
+
+    return ImmutableSubQuery.builder()
+        .from((SubQuery) query1)
+        .fields(fields)
+        .skipGeometry(query1.skipGeometry() && query2.skipGeometry())
+        .build();
   }
 
   private SchemaMapping createMapping(

@@ -116,7 +116,12 @@ public interface SqlConnector
             .via(
                 Transformer.flatMap(
                     querySet -> {
-                      String currentTable = querySet.getTableSchemas().get(0).getFullPathAsString();
+                      // multiple queries may use the same feature type, so the key includes the
+                      // query index
+                      String currentTable =
+                          querySet.getQueryIndex()
+                              + "_"
+                              + querySet.getTableSchemas().get(0).getFullPathAsString();
 
                       Optional<Tuple<Long, Long>> maxLimitAndSkipped = paging.get(currentTable);
 
@@ -226,6 +231,10 @@ public interface SqlConnector
                                                                           .getOptions()
                                                                           .getType())
                                                                   .containerPriority(i[0]++)
+                                                                  .queryIndex(
+                                                                      querySets
+                                                                          .get(index)
+                                                                          .getQueryIndex())
                                                                   .build()))
                                               .toArray(
                                                   (IntFunction<Source<SqlRow>[]>) Source[]::new);
@@ -257,11 +266,13 @@ public interface SqlConnector
                               Transformer.flatMap(
                                   index -> {
                                     String currentTable =
-                                        querySets
-                                            .get(index)
-                                            .getTableSchemas()
-                                            .get(0)
-                                            .getFullPathAsString();
+                                        querySets.get(index).getQueryIndex()
+                                            + "_"
+                                            + querySets
+                                                .get(index)
+                                                .getTableSchemas()
+                                                .get(0)
+                                                .getFullPathAsString();
                                     int[] j = {0};
 
                                     if (metaResults.get(index).getNumberReturned() <= 0) {
@@ -298,6 +309,10 @@ public interface SqlConnector
                                                                         .getOptions()
                                                                         .getType())
                                                                 .containerPriority(i[0]++)
+                                                                .queryIndex(
+                                                                    querySets
+                                                                        .get(index)
+                                                                        .getQueryIndex())
                                                                 .build()))
                                             .toArray((IntFunction<Source<SqlRow>[]>) Source[]::new);
 

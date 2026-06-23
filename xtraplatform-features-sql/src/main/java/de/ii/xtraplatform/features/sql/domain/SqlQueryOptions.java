@@ -68,6 +68,12 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
     return 0;
   }
 
+  /** Index of the query in a multi-query that this query belongs to. */
+  @Value.Default
+  default int getQueryIndex() {
+    return 0;
+  }
+
   @Value.Default
   default int getChunkSize() {
     return 1000;
