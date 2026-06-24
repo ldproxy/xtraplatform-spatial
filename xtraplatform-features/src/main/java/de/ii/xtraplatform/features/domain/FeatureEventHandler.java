@@ -82,6 +82,24 @@ public interface FeatureEventHandler<
 
     Map<String, String> additionalInfo();
 
+    /**
+     * Captured links for the current feature, populated by {@link
+     * FeatureTokenTransformerPropertyLinks} from schema properties with an {@link
+     * FeatureSchema#getEffectiveLink() effective link}. Encoders use it to emit per-feature link
+     * entries.
+     */
+    List<PropertyLink> propertyLinks();
+
+    /**
+     * Canonical (untransformed) feature id, captured when a profile rewrites the id token (e.g.
+     * {@code versions-as-features-unique-ids} produces a composite {@code id.<timestamp>}).
+     * Encoders that need the stable id rather than the composite — most notably {@code
+     * gml:identifier} — read this; when null, {@code context.value()} on the id property is the
+     * canonical id and should be used.
+     */
+    @Nullable
+    String canonicalFeatureId();
+
     @Value.Lazy
     default Optional<T> schema() {
       if (Objects.isNull(mapping())) {
@@ -243,30 +261,37 @@ public interface FeatureEventHandler<
 
     private boolean shouldInclude(T schema, List<T> parentSchemas, String path) {
       return schema.isId()
-          || (schema.isSpatial() && (Objects.isNull(typeQuery()) || !typeQuery().skipGeometry()))
+          || (schema.isSpatial()
+              && (typeQueries().isEmpty()
+                  || typeQueries().stream().anyMatch(typeQuery -> !typeQuery.skipGeometry())))
           // TODO: enable if projected output needs to be schema valid
           // || isRequired(schema, parentSchemas)
           || (!schema.isId() && propertyIsInFields(path));
     }
 
-    private TypeQuery typeQuery() {
+    // multiple queries of a multi-query may use the same feature type, the projections of such
+    // queries are merged
+    private List<? extends TypeQuery> typeQueries() {
       return query() instanceof FeatureQuery
-          ? (FeatureQuery) query()
+          ? List.of((FeatureQuery) query())
           : query() instanceof MultiFeatureQuery
               ? ((MultiFeatureQuery) query())
                   .getQueries().stream()
                       .filter(subQuery -> Objects.equals(subQuery.getType(), type()))
-                      .findFirst()
-                      .orElse(null)
-              : null;
+                      .toList()
+              : List.of();
     }
 
     default boolean propertyIsInFields(String property) {
-      TypeQuery typeQuery = typeQuery();
-      return Objects.nonNull(typeQuery)
-          && (typeQuery.getFields().isEmpty()
-              || typeQuery.getFields().contains("*")
-              || typeQuery.getFields().stream().anyMatch(field -> field.startsWith(property)));
+      List<? extends TypeQuery> typeQueries = typeQueries();
+      return !typeQueries.isEmpty()
+          && typeQueries.stream()
+              .anyMatch(
+                  typeQuery ->
+                      typeQuery.getFields().isEmpty()
+                          || typeQuery.getFields().contains("*")
+                          || typeQuery.getFields().stream()
+                              .anyMatch(field -> field.startsWith(property)));
     }
 
     default boolean isRequired(T schema, List<T> parentSchemas) {
@@ -304,6 +329,10 @@ public interface FeatureEventHandler<
     ModifiableContext<T, U> setIsUseTargetPaths(boolean isUseTargetPaths);
 
     ModifiableContext<T, U> putAdditionalInfo(String key, String value);
+
+    ModifiableContext<T, U> setPropertyLinks(Iterable<? extends PropertyLink> propertyLinks);
+
+    ModifiableContext<T, U> setCanonicalFeatureId(@Nullable String canonicalFeatureId);
   }
 
   // T createContext();

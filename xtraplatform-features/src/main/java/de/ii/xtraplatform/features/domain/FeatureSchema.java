@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
   "role",
   "valueType",
   "geometryType",
+  "geometryTypes",
   "objectType",
   "label",
   "alias",
@@ -161,7 +162,11 @@ public interface FeatureSchema
    *     be used for `datetime` queries, provided that a time instant describes the temporal extent
    *     of the features. If, on the other hand, the temporal extent is a time interval, then
    *     `PRIMARY_INTERVAL_START` and `PRIMARY_INTERVAL_END` should be specified at the respective
-   *     temporal properties.
+   *     temporal properties. If the dataset contains multiple versions of the features,
+   *     `PREDECESSOR_INTERVAL_START` and `SUCCESSOR_INTERVAL_START` can be specified at the
+   *     temporal properties that contain the start of the primary interval of the previous and next
+   *     version of the feature. These properties are not represented as feature properties, but as
+   *     links with the link relation types `predecessor-version` and `successor-version`.
    * @langDe Kennzeichnet besondere Bedeutungen der Eigenschaft. `ID` ist bei der Eigenschaft eines
    *     Objekts anzugeben, die für die `featureId` in der API zu verwenden ist. Diese Eigenschaft
    *     ist typischerweise die erste Eigenschaft im `properties`-Objekt. Erlaubte Zeichen in diesen
@@ -176,7 +181,12 @@ public interface FeatureSchema
    *     angegeben werden, die für `datetime`-Abfragen verwendet werden soll, sofern ein Zeitpunkt
    *     die zeitliche Ausdehnung der Features beschreibt. Ist die zeitliche Ausdehnung hingegen ein
    *     Zeitintervall, dann sind `PRIMARY_INTERVAL_START` und `PRIMARY_INTERVAL_END` bei den
-   *     jeweiligen zeitlichen Eigenschaften anzugeben.
+   *     jeweiligen zeitlichen Eigenschaften anzugeben. Enthält der Datensatz mehrere Versionen der
+   *     Features, dann können `PREDECESSOR_INTERVAL_START` und `SUCCESSOR_INTERVAL_START` bei den
+   *     zeitlichen Eigenschaften angegeben werden, die den Beginn des primären Zeitintervalls der
+   *     vorherigen bzw. nächsten Version des Features enthalten. Diese Eigenschaften werden nicht
+   *     als Feature-Eigenschaften repräsentiert, sondern als Links mit den Linkrelationen
+   *     `predecessor-version` und `successor-version`.
    * @default null
    */
   @Override
@@ -212,15 +222,43 @@ public interface FeatureSchema
   Optional<GeometryType> getGeometryType();
 
   /**
-   * @langEn Optional name for an object type, used for example in JSON Schema. For properties that
-   *     should be mapped as links according to *RFC 8288*, use `Link`.
-   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name hat i.d.R. nur
-   *     informativen Charakter und wird z.B. bei der Erzeugung von JSON-Schemas verwendet. Bei
-   *     Eigenschaften, die als Web-Links nach RFC 8288 abgebildet werden sollen, ist immer "Link"
-   *     anzugeben.
-   * @default
+   * @langEn Multiple admissible geometry types for properties with `type: GEOMETRY`. Use this
+   *     instead of `geometryType` when more than one geometry type is allowed (e.g. `[POINT,
+   *     MULTI_POINT]`). Values are the same as for `geometryType`.
+   * @langDe Mehrere zulässige Geometrietypen für Eigenschaften mit `type: GEOMETRY`. Wird anstelle
+   *     von `geometryType` verwendet, wenn mehr als ein Geometrietyp erlaubt ist (z.B. `[POINT,
+   *     MULTI_POINT]`). Werte siehe `geometryType`.
+   * @default []
+   * @since v4.8
+   */
+  @Override
+  List<GeometryType> getGeometryTypes();
+
+  /**
+   * @langEn Optional name for an object type, used for example in JSON Schema.
+   *     <p>For properties that should be mapped as links, the value `Link` can still be used. This
+   *     convention is deprecated an will be removed in the future. Use FEATURE_REF or
+   *     FEATURE_REF_ARRAY as the type of the property instead.
+   * @langDe Optional kann ein Name für den Typ spezifiziert werden, z.B. für die Erzeugung von
+   *     JSON-Schemas.
+   *     <p>Für Eigenschaften, die als Links abgebildet werden sollen, kann weiterhin der Wert
+   *     `Link` verwendet werden. Diese Konvention ist veraltet und wird in Zukunft entfernt.
+   *     Verwenden Sie stattdessen FEATURE_REF oder FEATURE_REF_ARRAY als Typ der Eigenschaft.
+   * @default null
    */
   Optional<String> getObjectType();
+
+  /**
+   * The object type whose schema fragment originally listed this property — set by the fragment
+   * resolver when a property is merged in from a fragment that declares {@code objectType}. Codecs
+   * that qualify property element names per object type (for example, XML with namespaces) use the
+   * origin's object type instead of the containing object's, so a property defined in a base
+   * fragment retains the base fragment's context even when nested under an object that declares a
+   * different {@code objectType}.
+   */
+  @JsonIgnore
+  @DocIgnore
+  Optional<String> getOriginObjectType();
 
   /**
    * @langEn Label for the schema object, used for example in HTML representations.
@@ -423,6 +461,33 @@ public interface FeatureSchema
    */
   @Override
   Optional<SchemaConstraints> getConstraints();
+
+  /**
+   * Option to represent the property as a web link instead of an inline value. Only meaningful for
+   * value properties. Internal: not part of the public provider configuration.
+   */
+  @JsonIgnore
+  @DocIgnore
+  Optional<SchemaLink> getLink();
+
+  /**
+   * The link of the property: the configured {@link #getLink() link}, or for properties whose
+   * {@link SchemaBase.Role role} declares a link relation (e.g. {@code
+   * PREDECESSOR_INTERVAL_START}), a default link to the feature version that starts at the property
+   * value.
+   */
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default Optional<SchemaLink> getEffectiveLink() {
+    if (getLink().isPresent()) {
+      return getLink();
+    }
+    return getRole()
+        .flatMap(SchemaBase.Role::getLinkRelation)
+        .filter(rel -> "predecessor-version".equals(rel) || "successor-version".equals(rel))
+        .map(rel -> SchemaLink.of(rel, SchemaLink.FEATURE_URI + "?datetime=" + SchemaLink.VALUE));
+  }
 
   /**
    * @langEn Option to disable enforcement of counter-clockwise orientation for exterior rings and a
@@ -815,6 +880,21 @@ public interface FeatureSchema
                         .collect(Collectors.joining("', '")),
                     getName());
               });
+    }
+  }
+
+  @Value.Check
+  default void warnOnConflictingGeometryTypes() {
+    if (getGeometryType().isPresent() && !getGeometryTypes().isEmpty()) {
+      List<GeometryType> types = getGeometryTypes();
+      boolean consistent = types.size() == 1 && types.get(0) == getGeometryType().get();
+      if (!consistent) {
+        LOGGER.warn(
+            "Both 'geometryType' ({}) and 'geometryTypes' ({}) are set on property '{}'; 'geometryTypes' takes precedence.",
+            getGeometryType().get(),
+            types,
+            getFullPathAsString());
+      }
     }
   }
 

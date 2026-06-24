@@ -38,6 +38,7 @@ import de.ii.xtraplatform.cql.domain.ImmutableLt;
 import de.ii.xtraplatform.cql.domain.ImmutableLte;
 import de.ii.xtraplatform.cql.domain.ImmutableNeq;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.Not;
@@ -602,6 +603,15 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
         ctx.argumentList().positionalArgument().argument().stream()
             .map(arg -> (Operand) arg.accept(this))
             .collect(Collectors.toList());
+
+    if ("INRESULTSET".equalsIgnoreCase(functionName)
+        && args.size() == 2
+        && args.get(0) instanceof Property
+        && args.get(1) instanceof ScalarLiteral) {
+      return InResultSet.of(
+          (Property) args.get(0), String.valueOf(((ScalarLiteral) args.get(1)).getValue()));
+    }
+
     return Function.of(functionName, args);
   }
 

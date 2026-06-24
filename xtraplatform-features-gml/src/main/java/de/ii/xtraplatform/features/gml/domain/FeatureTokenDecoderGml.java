@@ -83,8 +83,7 @@ import org.slf4j.LoggerFactory;
  * a {@code VALUE_PROPERTY} is treated as a {@code VALUE_WRAPPER} around the property's scalar text,
  * no explicit {@code valueWrap} entry required. Wrappers in other namespaces (e.g. {@code
  * <adv:AX_LI_ProcessStep_Punktort_Description>}) still need explicit {@code valueWrap}
- * configuration on the input profile. To be documented as a Phase 5 restriction of the GML building
- * block.
+ * configuration on the input profile. A known restriction of the GML building block.
  */
 public class FeatureTokenDecoderGml
     extends FeatureTokenDecoderSimple<
@@ -102,8 +101,8 @@ public class FeatureTokenDecoderGml
    * <gco:CharacterString>}, {@code <gmd:CI_RoleCode>}). When such an element appears as a child of
    * a scalar property element the decoder treats it as a value wrapper around the scalar text, even
    * without an explicit {@code valueWrap} entry. Any other external namespace that follows the same
-   * convention needs a similar entry here when the need arises — documented as a known restriction
-   * in Phase 5 of the GML building block.
+   * convention needs a similar entry here when the need arises — a known restriction of the GML
+   * building block.
    */
   private static final String GMD_NS = "http://www.isotc211.org/2005/gmd";
 
@@ -1030,10 +1029,12 @@ public class FeatureTokenDecoderGml
     String wireUri = wireNamespaceUri == null ? "" : wireNamespaceUri;
     for (FeatureSchema p : parent.getProperties()) {
       String key = propertyKey(p, useAlias);
-      if (!wireLocalName.equals(stripPrefix(key))) {
+      String base = stripPrefix(key);
+      boolean suffixed = inputProfile.getObjectTypeSuffixedProperties().contains(base);
+      if (!(wireLocalName.equals(base) || (suffixed && wireLocalName.startsWith(base + "_")))) {
         continue;
       }
-      String expectedUri = expectedNamespaceUri(parent, key);
+      String expectedUri = expectedNamespaceUri(p, parent, key);
       if (expectedUri == null || expectedUri.equals(wireUri)) {
         return Optional.of(p);
       }
@@ -1062,15 +1063,24 @@ public class FeatureTokenDecoderGml
   }
 
   /**
-   * Resolves the XML namespace URI expected for a property of {@code parent} whose schema
-   * name/alias is {@code key}. Mirrors the encoder's qualification chain:
+   * Resolves the XML namespace URI expected for {@code property}, whose schema name/alias is {@code
+   * key}. Mirrors the encoder's qualification chain:
    *
    * <ol>
    *   <li>An explicit {@code prefix:name} in the schema name/alias takes precedence. The prefix is
    *       resolved against the constructor's namespace map (predefined + {@code
    *       applicationNamespaces}).
-   *   <li>Otherwise the parent's {@code objectType} is looked up in {@code objectTypeNamespaces};
-   *       its prefix resolves to the URI.
+   *   <li>Otherwise the property's {@code originObjectType} — the object type from the fragment
+   *       that originally listed this property — is looked up in {@code objectTypeNamespaces}; its
+   *       prefix resolves to the URI. The property's own origin always wins over the parent's
+   *       {@code objectType}; setting it deliberately falls through to the default namespace if the
+   *       type isn't mapped, suppressing the parent walk.
+   *   <li>Otherwise the parent's {@code objectType} is looked up in {@code objectTypeNamespaces} —
+   *       but only when the parent is a NESTED OBJECT, not the feature root. The feature root's
+   *       {@code objectType} pins the namespace of the feature element itself; it must not
+   *       propagate down to property children that inherited from a different schema fragment.
+   *       Nested OBJECTs (e.g. ISO 19115 {@code LI_Lineage}) do propagate, since their inline child
+   *       properties belong to the nested object's own namespace.
    *   <li>Otherwise the input profile's {@code defaultNamespace} prefix resolves to the URI.
    * </ol>
    *
@@ -1078,16 +1088,24 @@ public class FeatureTokenDecoderGml
    * then matches by local name only, preserving the decoder's behaviour when no namespace data is
    * provided in the input profile.
    */
-  private String expectedNamespaceUri(FeatureSchema parent, String key) {
+  private String expectedNamespaceUri(FeatureSchema property, FeatureSchema parent, String key) {
     int colon = key.indexOf(':');
     if (colon > 0) {
       return namespaceNormalizer.getNamespaceURI(key.substring(0, colon));
     }
-    Optional<String> parentObjectType = parent.getObjectType();
-    if (parentObjectType.isPresent()) {
-      String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
+    Optional<String> originObjectType = property.getOriginObjectType();
+    if (originObjectType.isPresent()) {
+      String prefix = inputProfile.getObjectTypeNamespaces().get(originObjectType.get());
       if (prefix != null) {
         return namespaceNormalizer.getNamespaceURI(prefix);
+      }
+    } else if (parent != featureSchema) {
+      Optional<String> parentObjectType = parent.getObjectType();
+      if (parentObjectType.isPresent()) {
+        String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
+        if (prefix != null) {
+          return namespaceNormalizer.getNamespaceURI(prefix);
+        }
       }
     }
     String defaultPrefix = inputProfile.getDefaultNamespace();

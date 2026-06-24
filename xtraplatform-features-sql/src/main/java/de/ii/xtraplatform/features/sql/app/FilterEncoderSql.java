@@ -37,6 +37,7 @@ import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
@@ -54,6 +55,7 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
@@ -73,14 +75,19 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +107,7 @@ public class FilterEncoderSql {
   private final Cql cql;
   private final String accentiCollation;
   private final Map<String, CustomFunction> customFunctions;
+  private final java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -120,12 +128,33 @@ public class FilterEncoderSql {
       Cql cql,
       List<CustomFunction> customFunctions,
       String accentiCollation) {
+    this(
+        nativeCrs,
+        sqlDialect,
+        crsTransformerFactory,
+        crsInfo,
+        cql,
+        customFunctions,
+        accentiCollation,
+        type -> Optional.empty());
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation,
+      java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver) {
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
     this.crsInfo = crsInfo;
     this.cql = cql;
     this.accentiCollation = accentiCollation;
+    this.mappingResolver = mappingResolver;
     this.customFunctions =
         ImmutableMap.copyOf(
             CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
@@ -235,6 +264,149 @@ public class FilterEncoderSql {
           "");
     }
     return expression;
+  }
+
+  // output column alias of every result-set CTE; consumers reference it as `SELECT <col> FROM
+  // <cte>`
+  private static final String CTE_VALUE_COL = "rs_value";
+
+  /**
+   * Collects the result-set subqueries of one top-level {@code inResultSet} predicate as named,
+   * materialized CTEs so that each result set is evaluated exactly once instead of being
+   * re-embedded (and re-evaluated) at every nesting level. CTEs are stored in dependency order — a
+   * nested set is registered while building the body of its parent, so it is inserted first and may
+   * be referenced by the parent.
+   */
+  private static final class CteCollector {
+    private final LinkedHashMap<String, String> ctes = new LinkedHashMap<>();
+    private final Map<String, String> namesBySet = new java.util.HashMap<>();
+    private int counter;
+
+    String register(String setName, Supplier<String> bodySupplier) {
+      String existing = namesBySet.get(setName);
+      if (existing != null) {
+        return existing;
+      }
+      String name = "_rs_" + (counter++) + "_" + setName.replaceAll("[^A-Za-z0-9_]", "_");
+      namesBySet.put(setName, name);
+      // building the body registers any nested result sets first, preserving dependency order
+      String body = bodySupplier.get();
+      ctes.put(name, body);
+      return name;
+    }
+
+    String renderWith(SqlDialect dialect) {
+      return "WITH "
+          + ctes.entrySet().stream()
+              .map(e -> dialect.materializedCte(e.getKey(), e.getValue()))
+              .collect(Collectors.joining(", "));
+    }
+  }
+
+  private static String renderInlineLiteral(Object value) {
+    if (value instanceof String) {
+      return "'" + ((String) value).replace("'", "''") + "'";
+    }
+    return String.valueOf(value);
+  }
+
+  /**
+   * Build the producer SELECT of a result set: {@code SELECT <value column> FROM <producer main>
+   * <joins> WHERE <producer filter>}. With {@code withValueAlias} the value column is aliased as
+   * the CTE value column (for use inside a CTE); without it the bare value column is selected (for
+   * the materializer, which reads that single column). The optional collector lets nested result
+   * sets in the producer filter hoist into the same WITH clause.
+   */
+  String resultSetProducerSelect(
+      InResultSet inResultSet, boolean withValueAlias, CteCollector collector) {
+    String setName = inResultSet.getSetName();
+    String producerType =
+        inResultSet
+            .getProducerType()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+    SqlQueryMapping producerMapping =
+        mappingResolver
+            .apply(producerType)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format(
+                            "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                            setName, producerType)));
+    de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> setColumn =
+        inResultSet.getProducerValues().isPresent()
+            ? producerMapping
+                .getColumnForValue(inResultSet.getProducerValues().get())
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. Result set '%s' projects the property '%s', which is unknown for feature type '%s'.",
+                                setName, inResultSet.getProducerValues().get(), producerType)))
+            : producerMapping
+                .getColumnForId()
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
+                                producerType, setName)));
+
+    SqlQuerySchema valueTable = setColumn.first();
+    List<String> aliases = AliasGenerator.getAliases(valueTable);
+    SqlQueryTable producerMain =
+        valueTable.getRelations().isEmpty() ? valueTable : valueTable.getRelations().get(0);
+    String join = JoinGenerator.getJoins(valueTable, aliases, this);
+    String valueColumn =
+        String.format("%s.%s", aliases.get(aliases.size() - 1), setColumn.second().getName());
+
+    Optional<Cql2Expression> tableFilter =
+        producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
+    Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
+    Optional<Cql2Expression> effectiveFilter =
+        tableFilter.isPresent() && producerFilter.isPresent()
+            ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
+            : tableFilter.isPresent() ? tableFilter : producerFilter;
+    String where =
+        effectiveFilter
+            .map(
+                filter ->
+                    " WHERE "
+                        + prepareExpression(filter)
+                            .accept(new CqlToSql2(producerMapping, collector)))
+            .orElse("");
+
+    String valueExpr =
+        withValueAlias ? String.format("%s AS %s", valueColumn, CTE_VALUE_COL) : valueColumn;
+    return String.format(
+        "SELECT %2$s FROM %1$s %3$s%4$s%5$s%6$s",
+        producerMain.getName(), valueExpr, aliases.get(0), join.isEmpty() ? "" : " ", join, where);
+  }
+
+  /**
+   * Producer SELECT of a result set for up-front materialization: returns the bare value column so
+   * the caller can run it once and collect the values. Any nested result sets referenced by the
+   * producer filter that already carry materialized values are inlined as literals.
+   */
+  public String encodeResultSetProducer(InResultSet inResultSet) {
+    return resultSetProducerSelect(inResultSet, false, null);
+  }
+
+  /**
+   * Type of the value column of a result set, used to coerce and render its materialized values.
+   */
+  public de.ii.xtraplatform.features.domain.SchemaBase.Type resultSetValueType(
+      InResultSet inResultSet) {
+    String producerType = inResultSet.getProducerType().orElseThrow();
+    SqlQueryMapping producerMapping = mappingResolver.apply(producerType).orElseThrow();
+    return (inResultSet.getProducerValues().isPresent()
+            ? producerMapping.getColumnForValue(inResultSet.getProducerValues().get())
+            : producerMapping.getColumnForId())
+        .map(column -> column.second().getType())
+        .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING);
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -359,6 +531,66 @@ public class FilterEncoderSql {
     Cql2Expression mergedFilter = And.of(targetFilter.get(), cqlFilter.get());
 
     return Optional.of(encodeNested(null, mergedFilter, table.get(), true));
+  }
+
+  private static final String DYNAMIC_REF_TYPE = "DYNAMIC";
+
+  /** The valid target types of a property in a mapping, or empty if they are not constrained. */
+  private Optional<Set<String>> targetTypes(SqlQueryMapping mapping, String propertyName) {
+    FeatureSchema schema =
+        mapping
+            .getSchemaForObject(propertyName)
+            .or(() -> mapping.getSchemaForValue(propertyName))
+            .orElse(null);
+    return validTargetTypes(schema);
+  }
+
+  /**
+   * The valid target types of a feature-reference property: from its {@code refType} (case 1), the
+   * union over its {@code concat}/{@code coalesce} members (case 2), or a constant or enum on its
+   * {@code type} sub-property (case 3). Empty when the target type is not constrained (case 4) or
+   * any branch is open.
+   */
+  Optional<Set<String>> validTargetTypes(FeatureSchema schema) {
+    if (Objects.isNull(schema)) {
+      return Optional.empty();
+    }
+
+    List<FeatureSchema> members =
+        !schema.getConcat().isEmpty()
+            ? schema.getConcat()
+            : !schema.getCoalesce().isEmpty() ? schema.getCoalesce() : List.of();
+    if (!members.isEmpty()) {
+      Set<String> types = new LinkedHashSet<>();
+      for (FeatureSchema member : members) {
+        Optional<Set<String>> memberTypes = validTargetTypes(member);
+        if (memberTypes.isEmpty()) {
+          return Optional.empty(); // an open branch leaves the overall target type unconstrained
+        }
+        types.addAll(memberTypes.get());
+      }
+      return types.isEmpty() ? Optional.empty() : Optional.of(types);
+    }
+
+    if (schema.getRefType().filter(type -> !DYNAMIC_REF_TYPE.equals(type)).isPresent()) {
+      return Optional.of(Set.of(schema.getRefType().get()));
+    }
+
+    Optional<FeatureSchema> typeProperty =
+        schema.getProperties().stream().filter(FeatureSchema::isType).findFirst();
+    if (typeProperty.isPresent()) {
+      FeatureSchema type = typeProperty.get();
+      if (type.getConstantValue().isPresent()) {
+        return Optional.of(Set.of(type.getConstantValue().get()));
+      }
+      List<String> enumValues =
+          type.getConstraints().map(SchemaConstraints::getEnumValues).orElse(List.of());
+      if (!enumValues.isEmpty()) {
+        return Optional.of(new LinkedHashSet<>(enumValues));
+      }
+    }
+
+    return Optional.empty();
   }
 
   private static Predicate<SchemaSql> getPropertyNameMatcher(
@@ -784,6 +1016,13 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSet) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. %s can only be used within a query expression.",
+                InResultSet.TYPE));
+      }
+
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
       List<String> expressions = processBinary(scalarOperation.getArgs(), children);
@@ -1135,14 +1374,22 @@ public class FilterEncoderSql {
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
+          // group selected by `IN (<one value>)` trivially has one distinct value); dropping it
+          // keeps the result identical but lets the planner estimate the grouped row count, which
+          // it cannot do across a count(distinct) HAVING filter
           String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
-                  secondExpression,
-                  aliases.get(0),
-                  rootSchema.getSortKey().get(),
-                  qualifiedColumn.first(),
-                  elementCount);
+              elementCount == 1
+                  ? String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s",
+                      secondExpression, aliases.get(0), rootSchema.getSortKey().get())
+                  : String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
+                      secondExpression,
+                      aliases.get(0),
+                      rootSchema.getSortKey().get(),
+                      qualifiedColumn.first(),
+                      elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_EQUALS) {
           String arrayQuery =
@@ -1326,10 +1573,18 @@ public class FilterEncoderSql {
   private class CqlToSql2 extends CqlToText {
 
     private final SqlQueryMapping mapping;
+    // non-null while encoding the producer filter of an enclosing inResultSet, so that nested
+    // result sets register their CTEs with the same collector instead of nesting inline
+    private final CteCollector collector;
 
     private CqlToSql2(SqlQueryMapping mapping) {
+      this(mapping, null);
+    }
+
+    private CqlToSql2(SqlQueryMapping mapping, CteCollector collector) {
       super(coordinatesTransformer);
       this.mapping = mapping;
+      this.collector = collector;
     }
 
     protected FeatureSchema getSchema(
@@ -1765,12 +2020,99 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSet) {
+        return encodeInResultSet((InResultSet) scalarOperation, children.get(0));
+      }
+
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
       List<String> expressions = processBinary(scalarOperation.getArgs(), children);
 
       String operation = String.format(" %s %s", operator, expressions.get(1));
       return String.format(expressions.get(0), "", operation);
+    }
+
+    private String encodeInResultSet(InResultSet inResultSet, String mainExpression) {
+      if (!operandHasSelect(mainExpression)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The first argument of %s must be a queryable.",
+                InResultSet.TYPE));
+      }
+
+      String setName = inResultSet.getSetName();
+      String producerType =
+          inResultSet
+              .getProducerType()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+
+      SqlQueryMapping producerMapping =
+          mappingResolver
+              .apply(producerType)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format(
+                              "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                              setName, producerType)));
+
+      // type compatibility: the value type of the result set must be a valid target type of the
+      // consumed property. The target types of a property are known when it has a refType, a
+      // concat/coalesce, or a type sub-property with a constant or enum; otherwise they are
+      // unconstrained and the check is skipped (no false negatives).
+      String consumerProperty =
+          ((Property) inResultSet.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+      Optional<Set<String>> consumerTargets = targetTypes(mapping, consumerProperty);
+      Optional<Set<String>> setTypes =
+          inResultSet.getProducerValues().isPresent()
+              ? targetTypes(producerMapping, inResultSet.getProducerValues().get())
+              : Optional.of(Set.of(producerType));
+      if (consumerTargets.isPresent()
+          && setTypes.isPresent()
+          && Collections.disjoint(consumerTargets.get(), setTypes.get())) {
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn(
+              "inResultSet: the value type(s) {} of result set '{}' are not among the valid target"
+                  + " types {} of property '{}'; the relation cannot match and the hop is skipped.",
+              setTypes.get(),
+              setName,
+              consumerTargets.get(),
+              consumerProperty);
+        }
+        return "1 = 0";
+      }
+
+      // if the result set has been materialized up front, inline its values as a literal IN list
+      if (inResultSet.getMaterializedValues().isPresent()) {
+        List<Object> values = inResultSet.getMaterializedValues().get();
+        if (values.isEmpty()) {
+          return "1 = 0";
+        }
+        String list =
+            values.stream()
+                .map(FilterEncoderSql::renderInlineLiteral)
+                .collect(Collectors.joining(", "));
+        return String.format(mainExpression, "", String.format(" IN (%s)", list));
+      }
+
+      // otherwise re-derive the result set inline; hoist it (and any nested result sets referenced
+      // by its producer filter) into materialized CTEs so each is evaluated once within the
+      // statement. CTEs are emitted in dependency order; the outermost predicate prepends the WITH.
+      boolean outermost = collector == null;
+      CteCollector coll = outermost ? new CteCollector() : collector;
+      String cteName =
+          coll.register(setName, () -> resultSetProducerSelect(inResultSet, true, coll));
+
+      String reference =
+          outermost
+              ? String.format(
+                  " IN (%s SELECT %s FROM %s)", coll.renderWith(sqlDialect), CTE_VALUE_COL, cteName)
+              : String.format(" IN (SELECT %s FROM %s)", CTE_VALUE_COL, cteName);
+
+      return String.format(mainExpression, "", reference);
     }
 
     @Override
@@ -2118,14 +2460,22 @@ public class FilterEncoderSql {
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
+          // group selected by `IN (<one value>)` trivially has one distinct value); dropping it
+          // keeps the result identical but lets the planner estimate the grouped row count, which
+          // it cannot do across a count(distinct) HAVING filter
           String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
-                  secondExpression,
-                  aliases.get(0),
-                  mapping.getMainTable().getSortKey(),
-                  qualifiedColumn.first(),
-                  elementCount);
+              elementCount == 1
+                  ? String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s",
+                      secondExpression, aliases.get(0), mapping.getMainTable().getSortKey())
+                  : String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
+                      secondExpression,
+                      aliases.get(0),
+                      mapping.getMainTable().getSortKey(),
+                      qualifiedColumn.first(),
+                      elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_EQUALS) {
           String arrayQuery =
