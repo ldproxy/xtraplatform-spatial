@@ -98,150 +98,6 @@ public class FeatureStreamImpl implements FeatureStream {
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
-  static Map<String, PropertyTransformations> getMergedTransformations(
-      Map<String, FeatureSchema> featureSchemas,
-      Query query,
-      Map<String, PropertyTransformations> propertyTransformations) {
-    if (query instanceof FeatureQuery featureQuery) {
-      return ImmutableMap.of(
-          featureQuery.getType(),
-          getPropertyTransformations(
-              featureSchemas,
-              featureQuery,
-              Optional.ofNullable(propertyTransformations.get(featureQuery.getType()))));
-    }
-
-    if (query instanceof MultiFeatureQuery multiFeatureQuery) {
-      return multiFeatureQuery.getQueries().stream()
-          .map(
-              typeQuery ->
-                  new SimpleImmutableEntry<>(
-                      typeQuery.getType(),
-                      getPropertyTransformations(
-                          featureSchemas,
-                          typeQuery,
-                          Optional.ofNullable(propertyTransformations.get(typeQuery.getType())))))
-          .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-
-    return ImmutableMap.of();
-  }
-
-  static PropertyTransformations getPropertyTransformations(
-      Map<String, FeatureSchema> featureSchemas,
-      TypeQuery typeQuery,
-      Optional<PropertyTransformations> propertyTransformations) {
-    if (typeQuery instanceof FeatureQuery
-        && ((FeatureQuery) typeQuery).getSchemaScope() == SchemaBase.Scope.RECEIVABLE) {
-      return () ->
-          getProviderTransformations(
-              featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RECEIVABLE);
-    }
-
-    PropertyTransformations providerTransformations =
-        () ->
-            getProviderTransformations(
-                featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RETURNABLE);
-
-    PropertyTransformations merged =
-        propertyTransformations
-            .map(p -> p.mergeInto(providerTransformations))
-            .orElse(providerTransformations);
-
-    return applyRename(merged);
-  }
-
-  private static PropertyTransformations applyRename(
-      PropertyTransformations propertyTransformations) {
-    // Collect every rename keyed by its original full path.
-    Map<String, String> renames = new LinkedHashMap<>();
-    propertyTransformations
-        .getTransformations()
-        .forEach(
-            (key, value) ->
-                value.stream()
-                    .filter(pt -> pt.getRename().isPresent())
-                    .map(pt -> pt.getRename().get())
-                    .findFirst()
-                    .ifPresent(rename -> renames.put(key, rename)));
-
-    if (renames.isEmpty()) {
-      return propertyTransformations;
-    }
-
-    // Re-key every transformation by the cumulative renamed full path so that lookups
-    // by the renamed target path (e.g. "qualitaetsangaben.herkunft.gmd:processStep.gmd:dateTime")
-    // still find the right transformation (auto DATETIME formatter, value transformers,
-    // wrap transformers, ...).
-    Map<String, List<PropertyTransformation>> renamed = new LinkedHashMap<>();
-    propertyTransformations
-        .getTransformations()
-        .forEach(
-            (key, value) -> {
-              String newKey = renameFullPath(key, renames);
-              renamed.put(newKey, value);
-            });
-
-    return propertyTransformations.mergeInto(() -> renamed);
-  }
-
-  private static String renameFullPath(String path, Map<String, String> renames) {
-    String[] segments = path.split("\\.");
-    StringBuilder result = new StringBuilder();
-    StringBuilder running = new StringBuilder();
-    for (int i = 0; i < segments.length; i++) {
-      if (i > 0) {
-        running.append(".");
-      }
-      running.append(segments[i]);
-      String renamedSegment = renames.getOrDefault(running.toString(), segments[i]);
-      if (i > 0) {
-        result.append(".");
-      }
-      result.append(renamedSegment);
-    }
-    return result.toString();
-  }
-
-  private static Map<String, List<PropertyTransformation>> getProviderTransformations(
-      FeatureSchema featureSchema, SchemaBase.Scope scope) {
-    return featureSchema
-        .accept(
-            scope == SchemaBase.Scope.RECEIVABLE
-                ? AbstractFeatureProvider.WITH_SCOPE_RECEIVABLE
-                : AbstractFeatureProvider.WITH_SCOPE_RETURNABLE)
-        .accept(
-            (schema, visitedProperties) ->
-                java.util.stream.Stream.concat(
-                        getProviderTransformationsForProperty(schema, scope),
-                        visitedProperties.stream().flatMap(m -> m.entrySet().stream()))
-                    .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
-  }
-
-  private static java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
-      getProviderTransformationsForProperty(FeatureSchema schema, SchemaBase.Scope scope) {
-    if (schema.getTransformations().isEmpty()) {
-      if (schema.isTemporal() && schema.getType() == SchemaBase.Type.DATETIME) {
-        return java.util.stream.Stream.of(
-            Map.entry(
-                schema.getFullPathAsString(),
-                List.of(
-                    new ImmutablePropertyTransformation.Builder()
-                        .dateFormat(DATETIME_FORMAT)
-                        .build())));
-      }
-      return java.util.stream.Stream.empty();
-    }
-
-    return java.util.stream.Stream.of(
-        Map.entry(
-            schema.getFullPath().isEmpty() ? WILDCARD : schema.getFullPathAsString(),
-            schema.getTransformations().stream()
-                // TODO: mark transformations with scope?
-                .filter(pt -> scope != SchemaBase.Scope.RECEIVABLE || pt.getWrap().isPresent())
-                .toList()));
-  }
-
   @Override
   public CompletionStage<Result> runWith(
       Sink<Object> sink,
@@ -462,5 +318,149 @@ public class FeatureStreamImpl implements FeatureStream {
     }
 
     return tokenSourceTransformed;
+  }
+
+  static Map<String, PropertyTransformations> getMergedTransformations(
+      Map<String, FeatureSchema> featureSchemas,
+      Query query,
+      Map<String, PropertyTransformations> propertyTransformations) {
+    if (query instanceof FeatureQuery featureQuery) {
+      return ImmutableMap.of(
+          featureQuery.getType(),
+          getPropertyTransformations(
+              featureSchemas,
+              featureQuery,
+              Optional.ofNullable(propertyTransformations.get(featureQuery.getType()))));
+    }
+
+    if (query instanceof MultiFeatureQuery multiFeatureQuery) {
+      return multiFeatureQuery.getQueries().stream()
+          .map(
+              typeQuery ->
+                  new SimpleImmutableEntry<>(
+                      typeQuery.getType(),
+                      getPropertyTransformations(
+                          featureSchemas,
+                          typeQuery,
+                          Optional.ofNullable(propertyTransformations.get(typeQuery.getType())))))
+          .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    return ImmutableMap.of();
+  }
+
+  static PropertyTransformations getPropertyTransformations(
+      Map<String, FeatureSchema> featureSchemas,
+      TypeQuery typeQuery,
+      Optional<PropertyTransformations> propertyTransformations) {
+    if (typeQuery instanceof FeatureQuery
+        && ((FeatureQuery) typeQuery).getSchemaScope() == SchemaBase.Scope.RECEIVABLE) {
+      return () ->
+          getProviderTransformations(
+              featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RECEIVABLE);
+    }
+
+    PropertyTransformations providerTransformations =
+        () ->
+            getProviderTransformations(
+                featureSchemas.get(typeQuery.getType()), SchemaBase.Scope.RETURNABLE);
+
+    PropertyTransformations merged =
+        propertyTransformations
+            .map(p -> p.mergeInto(providerTransformations))
+            .orElse(providerTransformations);
+
+    return applyRename(merged);
+  }
+
+  private static PropertyTransformations applyRename(
+      PropertyTransformations propertyTransformations) {
+    // Collect every rename keyed by its original full path.
+    Map<String, String> renames = new LinkedHashMap<>();
+    propertyTransformations
+        .getTransformations()
+        .forEach(
+            (key, value) ->
+                value.stream()
+                    .filter(pt -> pt.getRename().isPresent())
+                    .map(pt -> pt.getRename().get())
+                    .findFirst()
+                    .ifPresent(rename -> renames.put(key, rename)));
+
+    if (renames.isEmpty()) {
+      return propertyTransformations;
+    }
+
+    // Re-key every transformation by the cumulative renamed full path so that lookups
+    // by the renamed target path (e.g. "qualitaetsangaben.herkunft.gmd:processStep.gmd:dateTime")
+    // still find the right transformation (auto DATETIME formatter, value transformers,
+    // wrap transformers, ...).
+    Map<String, List<PropertyTransformation>> renamed = new LinkedHashMap<>();
+    propertyTransformations
+        .getTransformations()
+        .forEach(
+            (key, value) -> {
+              String newKey = renameFullPath(key, renames);
+              renamed.put(newKey, value);
+            });
+
+    return propertyTransformations.mergeInto(() -> renamed);
+  }
+
+  private static String renameFullPath(String path, Map<String, String> renames) {
+    String[] segments = path.split("\\.");
+    StringBuilder result = new StringBuilder();
+    StringBuilder running = new StringBuilder();
+    for (int i = 0; i < segments.length; i++) {
+      if (i > 0) {
+        running.append(".");
+      }
+      running.append(segments[i]);
+      String renamedSegment = renames.getOrDefault(running.toString(), segments[i]);
+      if (i > 0) {
+        result.append(".");
+      }
+      result.append(renamedSegment);
+    }
+    return result.toString();
+  }
+
+  private static Map<String, List<PropertyTransformation>> getProviderTransformations(
+      FeatureSchema featureSchema, SchemaBase.Scope scope) {
+    return featureSchema
+        .accept(
+            scope == SchemaBase.Scope.RECEIVABLE
+                ? AbstractFeatureProvider.WITH_SCOPE_RECEIVABLE
+                : AbstractFeatureProvider.WITH_SCOPE_RETURNABLE)
+        .accept(
+            (schema, visitedProperties) ->
+                java.util.stream.Stream.concat(
+                        getProviderTransformationsForProperty(schema, scope),
+                        visitedProperties.stream().flatMap(m -> m.entrySet().stream()))
+                    .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
+  }
+
+  private static java.util.stream.Stream<Map.Entry<String, List<PropertyTransformation>>>
+      getProviderTransformationsForProperty(FeatureSchema schema, SchemaBase.Scope scope) {
+    if (schema.getTransformations().isEmpty()) {
+      if (schema.isTemporal() && schema.getType() == SchemaBase.Type.DATETIME) {
+        return java.util.stream.Stream.of(
+            Map.entry(
+                schema.getFullPathAsString(),
+                List.of(
+                    new ImmutablePropertyTransformation.Builder()
+                        .dateFormat(DATETIME_FORMAT)
+                        .build())));
+      }
+      return java.util.stream.Stream.empty();
+    }
+
+    return java.util.stream.Stream.of(
+        Map.entry(
+            schema.getFullPath().isEmpty() ? WILDCARD : schema.getFullPathAsString(),
+            schema.getTransformations().stream()
+                // TODO: mark transformations with scope?
+                .filter(pt -> scope != SchemaBase.Scope.RECEIVABLE || pt.getWrap().isPresent())
+                .toList()));
   }
 }
