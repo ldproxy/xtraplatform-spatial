@@ -74,15 +74,6 @@ public interface FeatureSchema
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
 
-  static FeatureSchema apply(
-      FeatureSchema schema, Consumer<ImmutableFeatureSchema.Builder> changes) {
-    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder().from(schema);
-
-    changes.accept(builder);
-
-    return builder.build();
-  }
-
   /**
    * @langEn For a property of `properties`, this can be set to `true`/`false` to explicitly
    *     include/exclude the property in the audit log. If set to `true` for `type`, all properties
@@ -355,8 +346,6 @@ public interface FeatureSchema
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
 
-  // returnable() is unchanged, no need to override
-
   @Override
   @JsonIgnore
   @Value.Derived
@@ -370,6 +359,8 @@ public interface FeatureSchema
         && !Objects.equals(getType(), Type.UNKNOWN)
         && !getExcludedScopes().contains(Scope.SORTABLE);
   }
+
+  // returnable() is unchanged, no need to override
 
   @Override
   @JsonIgnore
@@ -519,6 +510,51 @@ public interface FeatureSchema
    * @default []
    */
   List<FeatureSchema> getConcat();
+
+  abstract class Builder
+      extends PropertiesSchema.Builder<FeatureSchema, ImmutableFeatureSchema.Builder, FeatureSchema>
+      implements PropertiesSchema.BuilderWithName<FeatureSchema, ImmutableFeatureSchema.Builder> {
+
+    public abstract ImmutableFeatureSchema.Builder desiredType(
+        @Nullable SchemaBase.Type desiredType);
+
+    @JsonIgnore
+    public ImmutableFeatureSchema.Builder type(SchemaBase.Type type) {
+      return desiredType(type);
+    }
+
+    @JsonIgnore
+    public abstract ImmutableFeatureSchema.Builder concat(
+        Iterable<? extends FeatureSchema> elements);
+
+    public abstract ImmutableFeatureSchema.Builder addAllConcatBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements);
+
+    @JsonProperty("concat")
+    public ImmutableFeatureSchema.Builder concatBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements) {
+      for (ImmutableFeatureSchema.Builder element : elements) {
+        element.name(CONCAT_ELEMENT);
+      }
+      return addAllConcatBuilders(elements);
+    }
+
+    @JsonIgnore
+    public abstract ImmutableFeatureSchema.Builder coalesce(
+        Iterable<? extends FeatureSchema> elements);
+
+    public abstract ImmutableFeatureSchema.Builder addAllCoalesceBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements);
+
+    @JsonProperty("coalesce")
+    public ImmutableFeatureSchema.Builder coalesceBuilders(
+        Iterable<ImmutableFeatureSchema.Builder> elements) {
+      for (ImmutableFeatureSchema.Builder element : elements) {
+        element.name(COALESCE_ELEMENT);
+      }
+      return addAllCoalesceBuilders(elements);
+    }
+  }
 
   @Override
   default ImmutableFeatureSchema.Builder getBuilder() {
@@ -1172,48 +1208,12 @@ public interface FeatureSchema
     return builder.build();
   }
 
-  abstract class Builder
-      extends PropertiesSchema.Builder<FeatureSchema, ImmutableFeatureSchema.Builder, FeatureSchema>
-      implements PropertiesSchema.BuilderWithName<FeatureSchema, ImmutableFeatureSchema.Builder> {
+  static FeatureSchema apply(
+      FeatureSchema schema, Consumer<ImmutableFeatureSchema.Builder> changes) {
+    ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder().from(schema);
 
-    public abstract ImmutableFeatureSchema.Builder desiredType(
-        @Nullable SchemaBase.Type desiredType);
+    changes.accept(builder);
 
-    @JsonIgnore
-    public ImmutableFeatureSchema.Builder type(SchemaBase.Type type) {
-      return desiredType(type);
-    }
-
-    @JsonIgnore
-    public abstract ImmutableFeatureSchema.Builder concat(
-        Iterable<? extends FeatureSchema> elements);
-
-    public abstract ImmutableFeatureSchema.Builder addAllConcatBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements);
-
-    @JsonProperty("concat")
-    public ImmutableFeatureSchema.Builder concatBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements) {
-      for (ImmutableFeatureSchema.Builder element : elements) {
-        element.name(CONCAT_ELEMENT);
-      }
-      return addAllConcatBuilders(elements);
-    }
-
-    @JsonIgnore
-    public abstract ImmutableFeatureSchema.Builder coalesce(
-        Iterable<? extends FeatureSchema> elements);
-
-    public abstract ImmutableFeatureSchema.Builder addAllCoalesceBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements);
-
-    @JsonProperty("coalesce")
-    public ImmutableFeatureSchema.Builder coalesceBuilders(
-        Iterable<ImmutableFeatureSchema.Builder> elements) {
-      for (ImmutableFeatureSchema.Builder element : elements) {
-        element.name(COALESCE_ELEMENT);
-      }
-      return addAllCoalesceBuilders(elements);
-    }
+    return builder.build();
   }
 }
