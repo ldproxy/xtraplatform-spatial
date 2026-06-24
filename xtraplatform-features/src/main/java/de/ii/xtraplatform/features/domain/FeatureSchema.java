@@ -76,15 +76,16 @@ public interface FeatureSchema
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
 
   /**
-   * @langEn For a property of `properties`, this can be set to `true`/`false` to explicitly
-   *     include/exclude the property in the audit log. If set to `true` for `type`, all properties
-   *     of it are included in the audit log except for those explicitly excluded. Geometries are
-   *     always excluded.
-   * @langDe Für eine Property aus `properties` kann dies auf `true`/`false` gesetzt werden, um
-   *     diese Property explizit in das Audit-Log ein- oder auszuschließen. Falls für `type` auf
-   *     `true` gesetzt, werden alle Properties dessen in das Audit-Log aufgenommen, außer die, die
-   *     explizit ausgeschlossen sind. Geometrien sind immer ausgeschlossen.
+   * @langEn If set to `true` for properties of type `VALUE`/`VALUE_ARRAY`, these will be included
+   *     in the audit log. If set to `true` for a feature type, all of its properties will be
+   *     included in the audit log except for those explicitly excluded. Geometries are always
+   *     excluded.
+   * @langDe Wenn für Eigenschaften vom Typ `VALUE`/`VALUE_ARRAY` auf `true` gesetzt, werden diese
+   *     in das Audit-Log aufgenommen. Wenn für einen Feature-Type auf `true` gesetzt, werden alle
+   *     seine Eigenschaften in das Audit-Log aufgenommen, außer diejenigen, die explizit
+   *     ausgeschlossen sind. Geometrien sind immer ausgeschlossen.
    * @default false
+   * @since v4.8
    */
   Optional<Boolean> getAudit();
 
