@@ -13,7 +13,7 @@
     },
     {
       "matchPackageNames": ["com.github.davidmoten:rxjava3-jdbc"],
-      "allowedVersions": "!= 0.1.4"
+      "allowedVersions": "!/^0\\.1\\.4$/"
     }
   ]
 }
