@@ -104,6 +104,7 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGenera
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
@@ -490,6 +491,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     this(
         crsTransformerFactory,
@@ -504,6 +506,7 @@ public class FeatureProviderSql
         volatileRegistry,
         cache,
         scheduler,
+        auditLog,
         data,
         decoderFactories.getConnectorDecoders());
   }
@@ -521,6 +524,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLog auditLog,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
     super(
@@ -530,6 +534,7 @@ public class FeatureProviderSql
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLog,
         data,
         volatileRegistry);
 
@@ -965,11 +970,7 @@ public class FeatureProviderSql
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
       return false;
     }
-    if (!getData().getDatasetChanges().isModeCrud()) {
-      return false;
-    }
-
-    return true;
+    return getData().getDatasetChanges().isModeCrud();
   }
 
   @Override
@@ -1367,7 +1368,7 @@ public class FeatureProviderSql
                     crsTransformerFactory,
                     getData().getNativeTimeZone(),
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            .via(Transformer.map(feature -> (FeatureDataSql) feature));
+            .via(Transformer.map(feature -> feature));
 
     if (partial) {
       featureSqlSource =
@@ -1492,7 +1493,8 @@ public class FeatureProviderSql
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        !query.hitsOnly());
+        !query.hitsOnly(),
+        auditLog);
   }
 
   @Override
