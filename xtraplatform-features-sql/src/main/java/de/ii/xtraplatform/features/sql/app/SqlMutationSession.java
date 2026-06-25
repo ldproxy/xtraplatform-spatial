@@ -1519,6 +1519,11 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   }
 
   @Override
+  public List<String> execute(List<String> statements) {
+    return sqlSession.execute(statements);
+  }
+
+  @Override
   public void commit() {
     sqlSession.commit();
   }
