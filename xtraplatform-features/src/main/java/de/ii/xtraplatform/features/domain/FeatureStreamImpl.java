@@ -19,6 +19,7 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
@@ -50,6 +51,9 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
+  private final boolean stepAudit;
+
+  private final AuditLog auditLog;
   private final boolean hasPropertyLinks;
   private final boolean deduplicate;
   private final boolean idsArePerType;
@@ -61,7 +65,8 @@ public class FeatureStreamImpl implements FeatureStream {
       boolean nativeCrsIs3d,
       Map<String, Codelist> codelists,
       QueryRunner runner,
-      boolean doTransform) {
+      boolean doTransform,
+      AuditLog auditLog) {
     this.query = query;
     this.data = data;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -69,6 +74,7 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
+    this.auditLog = auditLog;
 
     this.stepMappingSchema =
         !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
@@ -89,6 +95,10 @@ public class FeatureStreamImpl implements FeatureStream {
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepAudit =
+        auditLog.isEnabled()
+            && !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
     this.hasPropertyLinks = hasPropertyLinks(query, data);
     this.deduplicate =
@@ -121,7 +131,8 @@ public class FeatureStreamImpl implements FeatureStream {
   public CompletionStage<Result> runWith(
       Sink<Object> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
@@ -175,6 +186,18 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
+          FeatureTokenTransformerAudit auditTransformer = null;
+          if (stepAudit) {
+            if (requestId.isEmpty()) {
+              LOGGER.error("Audit logging not possible, no request-id provided!");
+            } else if (auditLog.logIsAvailable(requestId.get())) {
+              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+              source = source.via(auditTransformer);
+            }
+          }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
@@ -191,13 +214,16 @@ public class FeatureStreamImpl implements FeatureStream {
                     if (strongETag && x instanceof byte[]) {
                       eTag.put((byte[]) x);
                     }
-                    return builder.isEmpty(x instanceof byte[] ? ((byte[]) x).length <= 0 : false);
+                    return builder.isEmpty(x instanceof byte[] && ((byte[]) x).length <= 0);
                   })
               .handleEnd(
                   (ImmutableResult.Builder builder1) -> {
+                    finishAuditLog.run();
+
                     if (strongETag) {
                       builder1.eTag(eTag.build(ETag.Type.STRONG));
                     }
+
                     return builder1.build();
                   });
         };
@@ -209,7 +235,8 @@ public class FeatureStreamImpl implements FeatureStream {
   public <X> CompletionStage<ResultReduced<X>> runWith(
       SinkReduced<Object, X> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
@@ -262,6 +289,18 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
           }
 
+          FeatureTokenTransformerAudit auditTransformer = null;
+          if (stepAudit) {
+            if (requestId.isEmpty()) {
+              LOGGER.error("Audit logging not possible, no request-id provided!");
+            } else if (auditLog.logIsAvailable(requestId.get())) {
+              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
+              source = source.via(auditTransformer);
+            }
+          }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
@@ -284,6 +323,8 @@ public class FeatureStreamImpl implements FeatureStream {
                   })
               .handleEnd(
                   (ImmutableResultReduced.Builder<X> xBuilder) -> {
+                    finishAuditLog.run();
+
                     if (strongETag) {
                       xBuilder.eTag(eTag.build(ETag.Type.STRONG));
                     }

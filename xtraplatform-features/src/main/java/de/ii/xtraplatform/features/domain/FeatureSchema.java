@@ -75,6 +75,20 @@ public interface FeatureSchema
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
 
+  /**
+   * @langEn If set to `true` for properties of type `VALUE`/`VALUE_ARRAY`, these will be included
+   *     in the audit log. If set to `true` for a feature type, all of its properties will be
+   *     included in the audit log except for those explicitly excluded. Geometries are always
+   *     excluded.
+   * @langDe Wenn für Eigenschaften vom Typ `VALUE`/`VALUE_ARRAY` auf `true` gesetzt, werden diese
+   *     in das Audit-Log aufgenommen. Wenn für einen Feature-Type auf `true` gesetzt, werden alle
+   *     seine Eigenschaften in das Audit-Log aufgenommen, außer diejenigen, die explizit
+   *     ausgeschlossen sind. Geometrien sind immer ausgeschlossen.
+   * @default false
+   * @since v4.8
+   */
+  Optional<Boolean> getAudit();
+
   @JsonIgnore
   @Override
   String getName();
@@ -1244,8 +1258,7 @@ public interface FeatureSchema
                               .map(
                                   entry ->
                                       new SimpleEntry<>(
-                                          entry.getKey(),
-                                          (FeatureSchema) visit.apply(entry.getValue())))
+                                          entry.getKey(), visit.apply(entry.getValue())))
                               .collect(
                                   ImmutableMap.toImmutableMap(
                                       Map.Entry::getKey, Map.Entry::getValue)))
