@@ -220,6 +220,25 @@ public class FeatureEventBuffer<
 
       i = j;
     }
+
+    // Positions without tokens (an absent property, or a nested position whose tokens were accrued
+    // to its enclosing) keep length 0, but still need a valid buffer offset as their start:
+    // getSlice
+    // hands out buffer.subList(start, end) and replaceSlice inserts at start, and the incremental
+    // plus() shift after a slice shrinks moves every later position - including these - by the same
+    // delta. Left at 0, an empty position after a shrunk slice is driven negative and subList
+    // throws.
+    // The buffer is in schema-position order here, so a forward scan yields monotonic, non-negative
+    // starts; only top-level (enclosing) positions carry a non-zero length, so nextStart advances
+    // exactly across the buffer.
+    int nextStart = 0;
+    for (int pos = 0; pos < events.length / 2; pos++) {
+      if (length(pos) == 0) {
+        events[pos * 2] = nextStart;
+      } else {
+        nextStart = end(pos);
+      }
+    }
   }
 
   /**

@@ -42,6 +42,41 @@ class FeatureEventBufferSliceSpec extends Specification {
             FeatureTokenType.ARRAY_END, ["arrA"]
     ]
 
+    // a schema with a present property followed by an absent one. Shrinking the present property's
+    // slice shifts every later position by the (negative) size delta; an absent position left at
+    // start 0 would be driven negative and a subsequent getSlice would throw fromIndex < 0.
+    static FeatureSchema SCHEMA_ABSENT = new ImmutableFeatureSchema.Builder()
+            .name("t").sourcePath("/t").type(Type.OBJECT)
+            .putProperties2("id", new ImmutableFeatureSchema.Builder().sourcePath("objid").type(Type.STRING).role(SchemaBase.Role.ID))
+            .putProperties2("a", new ImmutableFeatureSchema.Builder().sourcePath("a").type(Type.STRING))
+            .putProperties2("b", new ImmutableFeatureSchema.Builder().sourcePath("b").type(Type.STRING))
+            .build()
+
+    def "getSlice on an absent position after a shrunk slice does not go negative"() {
+        given:
+        FeatureEventBuffer buffer = Util.createBuffer(SCHEMA_ABSENT, [])
+        buffer.reset("test")
+        // id and a are present, b is absent
+        [
+                FeatureTokenType.VALUE, ["id"], "x", Type.STRING,
+                FeatureTokenType.VALUE, ["a"], "longvalue", Type.STRING
+        ].forEach(token -> buffer.push(token))
+        def mapping = SchemaMapping.of(SCHEMA_ABSENT)
+        int posA = mapping.getPositionsForTargetPath(["a"]).get(0)
+        int posB = mapping.getPositionsForTargetPath(["b"]).get(0)
+
+        when:
+        // read then shrink a's slice (delta < 0), which shifts every later position
+        buffer.getSlice(posA)
+        buffer.replaceSlice(posA, [])
+        // b is absent; its slice must still resolve to an empty, in-range range
+        List<Object> sliceB = buffer.getSlice(posB)
+
+        then:
+        noExceptionThrown()
+        sliceB.isEmpty()
+    }
+
     def "a slice spans only its own property when its fragments are split around another"() {
         given:
         FeatureEventBuffer buffer = Util.createBuffer(SCHEMA, [])
