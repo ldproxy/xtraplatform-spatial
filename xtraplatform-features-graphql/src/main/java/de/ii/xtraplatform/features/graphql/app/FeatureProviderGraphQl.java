@@ -49,6 +49,7 @@ import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.graphql.domain.FeatureProviderGraphQlData;
 import de.ii.xtraplatform.features.graphql.domain.GraphQlConnector;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
@@ -197,6 +198,7 @@ public class FeatureProviderGraphQl
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      AuditLog auditLog,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
     super(
@@ -206,6 +208,7 @@ public class FeatureProviderGraphQl
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLog,
         data,
         volatileRegistry);
 
@@ -271,10 +274,9 @@ public class FeatureProviderGraphQl
   protected FeatureTokenDecoder<
           byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings) {
-    if (!(query instanceof FeatureQuery)) {
+    if (!(query instanceof FeatureQuery featureQuery)) {
       throw new IllegalArgumentException();
     }
-    FeatureQuery featureQuery = (FeatureQuery) query;
     FeatureSchema featureSchema = getSourceSchemas().get(featureQuery.getType()).get(0);
     String name =
         featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);

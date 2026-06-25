@@ -38,6 +38,7 @@ public interface FeatureStream {
     CLEAN,
     ETAG,
     METADATA,
+    AUDIT,
     ALL
   }
 
@@ -153,23 +154,39 @@ public interface FeatureStream {
 
   default CompletionStage<Result> runWith(
       Sink<Object> sink, Map<String, PropertyTransformations> propertyTransformations) {
-    return runWith(sink, propertyTransformations, new CompletableFuture<>());
+    return runWith(sink, propertyTransformations, new CompletableFuture<>(), Optional.empty());
+  }
+
+  default CompletionStage<Result> runWith(
+      Sink<Object> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+    return runWith(sink, propertyTransformations, onCollectionMetadata, Optional.empty());
   }
 
   CompletionStage<Result> runWith(
       Sink<Object> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata);
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId);
 
   default <X> CompletionStage<ResultReduced<X>> runWith(
       SinkReduced<Object, X> sink, Map<String, PropertyTransformations> propertyTransformations) {
-    return runWith(sink, propertyTransformations, new CompletableFuture<>());
+    return runWith(sink, propertyTransformations, new CompletableFuture<>(), Optional.empty());
+  }
+
+  default <X> CompletionStage<ResultReduced<X>> runWith(
+      SinkReduced<Object, X> sink,
+      Map<String, PropertyTransformations> propertyTransformations,
+      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+    return runWith(sink, propertyTransformations, onCollectionMetadata, Optional.empty());
   }
 
   <X> CompletionStage<ResultReduced<X>> runWith(
       SinkReduced<Object, X> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata);
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> requestId);
 
   // CompletionStage<Result> runWith(SinkTransformed<Object, byte[]> sink,
   // Optional<PropertyTransformations> propertyTransformations);
