@@ -1040,6 +1040,11 @@ public class FeatureProviderSql
       return Optional.empty();
     }
 
+    Optional<BoundingBox> configured = getConfiguredSpatialExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
+    }
+
     String[] cacheKey = {typeName, "stats", "spatial"};
     String cacheValidator = getData().getStableHash();
 
@@ -1095,24 +1100,18 @@ public class FeatureProviderSql
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
-        .flatMap(
-            boundingBox ->
-                crsTransformerFactory
-                    .getTransformer(getNativeCrs(), crs, false)
-                    .flatMap(
-                        crsTransformer -> {
-                          try {
-                            return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
-                          } catch (Exception e) {
-                            return Optional.empty();
-                          }
-                        }));
+        .flatMap(boundingBox -> transformSpatialExtent(boundingBox, crs));
   }
 
   @Override
   public Optional<Interval> getTemporalExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
+    }
+
+    Optional<Interval> configured = getConfiguredTemporalExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
     }
 
     String[] cacheKey = {typeName, "stats", "temporal"};
