@@ -283,6 +283,26 @@ public interface FeatureTransactions {
           "Clone-and-patch is not supported by this feature provider session");
     }
 
+    /**
+     * Executes raw native statements in order against this session's open transaction and returns
+     * the non-fatal warnings they produced (e.g. PostgreSQL {@code RAISE WARNING} / {@code RAISE
+     * NOTICE}). A statement that fails throws a {@link FeatureMutationHookException} (carrying any
+     * warnings collected before the failing statement), leaving the transaction open for rollback.
+     * Used by transaction-lifecycle hooks (session setup, pre-commit checks). The default
+     * implementation accepts an empty list as a no-op and otherwise throws {@link
+     * UnsupportedOperationException} for providers that cannot run native statements.
+     *
+     * @param statements the statements to execute, in order
+     * @return the collected warning messages across all statements, in execution order
+     */
+    default List<String> execute(List<String> statements) {
+      if (!statements.isEmpty()) {
+        throw new UnsupportedOperationException(
+            "Raw statement execution is not supported by this feature provider session");
+      }
+      return List.of();
+    }
+
     /** Commits all mutations performed against this session. Throws if already finalised. */
     void commit();
 
