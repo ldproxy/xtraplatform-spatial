@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.sql.domain;
 import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
@@ -56,7 +55,6 @@ import de.ii.xtraplatform.features.domain.FeatureStream;
 import de.ii.xtraplatform.features.domain.FeatureStreamImpl;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
 import de.ii.xtraplatform.features.domain.FeatureTokenSource;
-import de.ii.xtraplatform.features.domain.FeatureTokenTransformer;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Builder;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Type;
@@ -939,11 +937,6 @@ public class FeatureProviderSql
 
   protected WkbDialect getWkbDialect() {
     return WkbDialect.SQL_MM;
-  }
-
-  @Override
-  protected List<FeatureTokenTransformer> getDecoderTransformers() {
-    return ImmutableList.of(); // new FeatureTokenTransformerSorting());
   }
 
   @Override
