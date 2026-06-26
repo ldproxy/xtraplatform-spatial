@@ -164,14 +164,15 @@ public interface FeatureTokenDecoderGmlInputProfile {
   Map<String, List<String>> getValueWrap();
 
   /**
-   * Reverse of {@code GmlConfiguration#objectTypeSuffixedProperties}: the name (or alias, when
-   * {@link #getUseAlias()}) of each FEATURE_REF property whose GML element on the wire is the base
-   * property name plus a {@code _<ObjectType>} suffix naming the referenced feature type (e.g. base
-   * {@code gehoertZuBauwerk} → {@code gehoertZuBauwerk_AX_Turm}). For these properties the decoder
-   * accepts an element whose local name is the base name optionally followed by a {@code
-   * _<segment>} suffix and maps it to the base property. The suffix is ignored: the referenced
-   * object type is carried independently through the FEATURE_REF join, so it need not be captured
-   * from the wire.
+   * Reverse of {@code GmlConfiguration#objectTypeSuffixedProperties}: the property id (technical
+   * full path) of each FEATURE_REF property whose GML element on the wire is the base property
+   * name/alias plus a {@code _<ObjectType>} suffix naming the referenced feature type (e.g. base
+   * element {@code gehoertZuBauwerk} → {@code gehoertZuBauwerk_AX_Turm}). Membership is tested
+   * against the property's technical full path, not its on-the-wire name/alias. For these
+   * properties the decoder accepts an element whose local name is the base name/alias optionally
+   * followed by a {@code _<segment>} suffix and maps it to the property. The suffix is ignored: the
+   * referenced object type is carried independently through the FEATURE_REF join, so it need not be
+   * captured from the wire.
    */
   Set<String> getObjectTypeSuffixedProperties();
 

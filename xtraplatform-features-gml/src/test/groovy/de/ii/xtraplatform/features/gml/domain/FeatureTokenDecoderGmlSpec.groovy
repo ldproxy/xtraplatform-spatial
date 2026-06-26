@@ -520,14 +520,15 @@ class FeatureTokenDecoderGmlSpec extends Specification {
             ImmutableFeatureTokenDecoderGmlInputProfile.builder()
                     .useAlias(true)
                     .featureRefTemplate("urn:adv:oid:{{value}}")
-                    .addObjectTypeSuffixedProperties("istGebucht")
+                    // Declared by property id "11001-21008", not the on-the-wire alias istGebucht.
+                    .addObjectTypeSuffixedProperties("11001-21008")
                     .build()
 
     def 'objectTypeSuffixedProperties: a _<ObjectType>-suffixed element maps to the base feature-ref property'() {
         given:
-        // ALKIS NAS names this element adv:gehoertZuBauwerk_AX_Turm; istGebucht stands in here as a
-        // declared suffixed property. The _AX_Turm suffix is ignored and the href is reduced as for
-        // the plain element.
+        // ALKIS NAS names this element adv:gehoertZuBauwerk_AX_Turm; property "11001-21008" (alias
+        // istGebucht) stands in here as a declared suffixed property. The _AX_Turm suffix is ignored
+        // and the href is reduced as for the plain element.
         def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES_SUFFIXED)
         def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
                 xmlns:gml="http://www.opengis.net/gml/3.2"
