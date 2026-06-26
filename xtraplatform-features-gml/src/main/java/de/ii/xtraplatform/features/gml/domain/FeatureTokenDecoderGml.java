@@ -1030,7 +1030,11 @@ public class FeatureTokenDecoderGml
     for (FeatureSchema p : parent.getProperties()) {
       String key = propertyKey(p, useAlias);
       String base = stripPrefix(key);
-      boolean suffixed = inputProfile.getObjectTypeSuffixedProperties().contains(base);
+      // The configured set holds property ids (technical full paths), not the on-the-wire
+      // name/alias, so membership is tested against the property's full path; the wire element
+      // base for the suffix match stays the name/alias the encoder emits.
+      boolean suffixed =
+          inputProfile.getObjectTypeSuffixedProperties().contains(p.getFullPathAsString());
       if (!(wireLocalName.equals(base) || (suffixed && wireLocalName.startsWith(base + "_")))) {
         continue;
       }
