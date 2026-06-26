@@ -45,6 +45,17 @@ public interface SqlSession extends AutoCloseable {
    */
   List<String> runReturning(String sql);
 
+  /**
+   * Executes raw statements in order on this session's connection, ignoring any result sets, and
+   * returns the non-fatal SQL warnings they produced (e.g. PostgreSQL {@code RAISE WARNING} /
+   * {@code RAISE NOTICE}). A statement that fails throws and leaves the transaction open for
+   * rollback. Intended for transaction-lifecycle hooks (session setup, pre-commit checks).
+   *
+   * @param statements the statements to execute, in order
+   * @return the collected warning messages across all statements, in execution order
+   */
+  List<String> execute(List<String> statements);
+
   /** Commits all mutations performed against this session. */
   void commit();
 
