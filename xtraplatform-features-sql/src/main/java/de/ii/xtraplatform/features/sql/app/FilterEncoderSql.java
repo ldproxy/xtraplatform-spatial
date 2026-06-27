@@ -768,6 +768,20 @@ public class FilterEncoderSql {
               FilterEncoderSql.this);
       if (!join.isEmpty()) join += " ";
 
+      // When the predicate needs no sub-table join, its operand is a column reachable directly from
+      // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
+      // self-semi-join (A.id IN (SELECT A.id FROM <main> WHERE ...)): that subquery scans the whole
+      // main table and the planner does not flatten it, so it is O(table) per predicate regardless
+      // of how few rows are selected. The semi-join form is kept whenever a join, junction, or
+      // array
+      // traversal is genuinely required (join non-empty) — there it is load-bearing for
+      // cardinality.
+      if (join.isEmpty() && !Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))) {
+        return String.format(
+            "%%1$s%1$s%%2$s",
+            getQualifiedColumn(table, propertyName, "A", allowColumnFallback).first());
+      }
+
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
           rootSchema.getName(),
@@ -832,7 +846,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
@@ -844,7 +859,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + end
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
@@ -856,7 +872,8 @@ public class FilterEncoderSql {
             + start
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + end.substring(end.indexOf("%2$s") + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -1776,6 +1793,23 @@ public class FilterEncoderSql {
               FilterEncoderSql.this);
       if (!join.isEmpty()) join += " ";
 
+      // When the predicate needs no sub-table join, its operand is a column reachable directly from
+      // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
+      // self-semi-join (A.id IN (SELECT A.id FROM <main> WHERE ...)): that subquery scans the whole
+      // main table and the planner does not flatten it, so it is O(table) per predicate regardless
+      // of how few rows are selected. The semi-join form is kept whenever a join, junction, or
+      // array
+      // traversal is genuinely required (join non-empty) — there it is load-bearing for
+      // cardinality.
+      if (join.isEmpty()
+          && !Objects.equals(table.first().getParentPath(), ImmutableList.of("_route_"))) {
+        return String.format(
+            "%%1$s%1$s%%2$s",
+            getQualifiedColumn(
+                    table.first(), table.second(), propertyName, "A", allowColumnFallback)
+                .first());
+      }
+
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
           mapping.getMainTable().getName(),
@@ -1840,7 +1874,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
@@ -1852,7 +1887,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + end
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
@@ -1864,7 +1900,8 @@ public class FilterEncoderSql {
             + start
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + end.substring(end.indexOf("%2$s") + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
