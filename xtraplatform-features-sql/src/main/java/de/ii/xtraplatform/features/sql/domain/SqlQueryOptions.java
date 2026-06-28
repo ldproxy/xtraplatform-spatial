@@ -79,6 +79,16 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
     return 1000;
   }
 
+  /**
+   * JDBC fetch size for the result set. When greater than 0, the query is executed inside a
+   * transaction so the database driver can use a server-side cursor and stream rows instead of
+   * buffering the whole result set in memory. Used for single-shot (unpaged) queries.
+   */
+  @Value.Default
+  default int getFetchSize() {
+    return 0;
+  }
+
   @Value.Default
   default boolean isGeometryWkb() {
     return false;

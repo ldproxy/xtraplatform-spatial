@@ -145,10 +145,14 @@ public class FeatureDecoderSql
 
   private void handleMetaRow(SqlRowMeta sqlRow) {
 
-    context
-        .metadata()
-        .numberReturned(
-            context.metadata().getNumberReturned().orElse(0) + sqlRow.getNumberReturned());
+    // a negative numberReturned marks it as not computed (single-shot/unpaged); leave it unset so
+    // the encoder omits numberReturned instead of reporting 0
+    if (sqlRow.getNumberReturned() >= 0) {
+      context
+          .metadata()
+          .numberReturned(
+              context.metadata().getNumberReturned().orElse(0) + sqlRow.getNumberReturned());
+    }
     if (sqlRow.getNumberMatched().isPresent()) {
       context
           .metadata()
