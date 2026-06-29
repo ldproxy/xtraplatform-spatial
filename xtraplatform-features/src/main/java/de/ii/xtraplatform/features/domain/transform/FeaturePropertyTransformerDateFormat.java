@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.util.List;
 import org.immutables.value.Value;
@@ -30,6 +31,9 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
   ZoneId UTC = ZoneId.of("UTC");
   String DATETIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZZZZZ";
   String DATE_FORMAT = "yyyy-MM-dd";
+  // built once; rebuilding per value (and parseBest's throwing query fallbacks) showed up in
+  // profiling
+  DateTimeFormatter PARSER = DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]");
 
   @Override
   default String getType() {
@@ -43,15 +47,19 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
 
   ZoneId getDefaultTimeZone();
 
+  // cached per transformer instance instead of rebuilt for every value
+  @Value.Lazy
+  default DateTimeFormatter formatter() {
+    return DateTimeFormatter.ofPattern(getParameter());
+  }
+
   @Override
   default String transform(String currentPropertyPath, String input) {
     // TODO: variable fractions
     try {
-      DateTimeFormatter formatter = DateTimeFormatter.ofPattern(getParameter());
-
       ZonedDateTime zdt = parse(input, getDefaultTimeZone());
 
-      return formatter.format(zdt);
+      return formatter().format(zdt);
     } catch (Throwable e) {
       LOGGER.warn(
           "{} transformation for property '{}' with value '{}' failed: {}",
@@ -65,21 +73,17 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
   }
 
   static ZonedDateTime parse(String input, ZoneId defaultTimeZone) {
-    DateTimeFormatter parser =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]");
+    // Parse once and branch on the resolved fields. parseBest instead tries OffsetDateTime/
+    // LocalDateTime/LocalDate via queries that throw — filling in a stack trace — for every value
+    // without an offset, which is costly when applied per feature.
+    TemporalAccessor ta = PARSER.parse(input);
 
-    TemporalAccessor ta =
-        parser.parseBest(input, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
-
-    if (ta instanceof OffsetDateTime) {
-      return ((OffsetDateTime) ta).atZoneSameInstant(UTC);
-    } else if (ta instanceof LocalDateTime) {
-      return ((LocalDateTime) ta).atZone(defaultTimeZone).withZoneSameInstant(UTC);
-    } else if (ta instanceof LocalDate) {
-      return ((LocalDate) ta).atStartOfDay(UTC);
+    if (ta.isSupported(ChronoField.OFFSET_SECONDS)) {
+      return OffsetDateTime.from(ta).atZoneSameInstant(UTC);
     }
-
-    throw new IllegalArgumentException(
-        String.format("Input '%s' could not be parsed as a date/time value", input));
+    if (ta.isSupported(ChronoField.HOUR_OF_DAY)) {
+      return LocalDateTime.from(ta).atZone(defaultTimeZone).withZoneSameInstant(UTC);
+    }
+    return LocalDate.from(ta).atStartOfDay(UTC);
   }
 }
