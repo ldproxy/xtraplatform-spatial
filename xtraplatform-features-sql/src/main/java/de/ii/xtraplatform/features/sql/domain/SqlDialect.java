@@ -95,6 +95,30 @@ public interface SqlDialect {
     return name + " AS (" + query + ")";
   }
 
+  /**
+   * Whether result sets that exceed the materialization cap can be materialized into a (temporary)
+   * table that consumers join, instead of being re-derived inline in every consumer. Dialects that
+   * return {@code false} keep the inline re-evaluation fallback.
+   */
+  default boolean supportsResultSetTables() {
+    return false;
+  }
+
+  /** DDL to materialize a result-set producer into a session-independent table once. */
+  default String createResultSetTable(String name, String producerSelect) {
+    throw new UnsupportedOperationException();
+  }
+
+  /** DDL to index the value column of a materialized result-set table. */
+  default String createResultSetTableIndex(String name, String valueColumn) {
+    throw new UnsupportedOperationException();
+  }
+
+  /** DDL to drop a materialized result-set table if it exists. */
+  default String dropResultSetTable(String name) {
+    throw new UnsupportedOperationException();
+  }
+
   String castToBigInt(int value);
 
   Optional<BoundingBox> parseExtent(String extent, EpsgCrs crs);

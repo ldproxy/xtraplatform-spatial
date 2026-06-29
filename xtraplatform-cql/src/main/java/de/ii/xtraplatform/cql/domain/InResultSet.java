@@ -63,6 +63,15 @@ public interface InResultSet extends BinaryScalarOperation {
   @JsonIgnore
   Optional<List<Object>> getMaterializedValues();
 
+  /**
+   * Name of a table the service has materialized the result set into (one column of member values).
+   * Used for sets that are too large to inline as a literal list: the predicate is encoded as
+   * {@code IN (SELECT <value column> FROM <table>)} against the pre-materialized, indexed table, so
+   * the producing query runs once instead of being re-derived in every consumer.
+   */
+  @JsonIgnore
+  Optional<String> getMaterializedTable();
+
   @JsonIgnore
   @Value.Lazy
   default String getSetName() {
