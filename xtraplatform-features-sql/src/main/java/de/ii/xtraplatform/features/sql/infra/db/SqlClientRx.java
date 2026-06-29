@@ -21,6 +21,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -157,6 +158,15 @@ public class SqlClientRx implements SqlClient {
                   LOGGER.debug(MARKER.SQL_RESULT, values);
                 }
               });
+    }
+
+    // The blocking connection provider runs connect+execute+read on the subscribing thread, so
+    // without this the whole stream is single-threaded. Subscribing on a worker thread lets several
+    // parallel-flagged queries (e.g. the concurrent single-shot value phase) run at once, each on
+    // its
+    // own connection.
+    if (options.isParallel()) {
+      flowable = flowable.subscribeOn(Schedulers.io());
     }
 
     return Reactive.Source.publisher(flowable);

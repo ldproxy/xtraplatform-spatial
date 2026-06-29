@@ -89,6 +89,16 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
     return 0;
   }
 
+  /**
+   * When enabled, the query is subscribed on a worker thread so that several such queries can
+   * execute concurrently (the blocking JDBC connection provider otherwise runs every query on the
+   * single subscribing thread). Used for the concurrent single-shot value phase.
+   */
+  @Value.Default
+  default boolean isParallel() {
+    return false;
+  }
+
   @Value.Default
   default boolean isGeometryWkb() {
     return false;
