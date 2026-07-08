@@ -10,6 +10,7 @@ package de.ii.xtraplatform.tiles.domain;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax.Builder;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -36,4 +37,10 @@ public interface TilesetMbTilesDefaults extends TilesetCommonDefaults {
   default String getTileMatrixSet() {
     return "WebMercatorQuad";
   }
+
+  /**
+   * @langEn Optional fixed spatial extent for this tileset in native CRS.
+   * @langDe Optionaler fester räumlicher Extent für dieses Tileset im nativen CRS.
+   */
+  Optional<SpatialExtent> getExtent();
 }

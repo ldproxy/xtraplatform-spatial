@@ -35,4 +35,12 @@ public interface FeatureTypeConfiguration {
    * @default ""
    */
   Optional<String> getDescription();
+
+  /**
+   * @langEn Optional spatial and temporal extent for this type. If set, disables automatic
+   *     calculation for this type.
+   * @langDe Optionaler räumlicher und zeitlicher Extent für diesen Type. Wenn gesetzt, wird keine
+   *     automatische Berechnung für diesen Type durchgeführt.
+   */
+  Optional<FeatureTypeExtent> getExtent();
 }
