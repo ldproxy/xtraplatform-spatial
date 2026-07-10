@@ -218,7 +218,7 @@ class ResultSetMaterializerSpec extends Specification {
         def s1 = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
         def s2 = resolved("s2", "simple", s1)
         def sqlClient = Mock(SqlClient)
-        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000, new SqlDialectPgis())
 
         when:
         def result = materializer.materialize(query(s2))
@@ -235,7 +235,7 @@ class ResultSetMaterializerSpec extends Specification {
         def s1 = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
         def s2 = resolved("s2", "simple", s1)
         def sqlClient = Mock(SqlClient)
-        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000, new SqlDialectPgis())
 
         when:
         def result = materializer.materialize(query(s2))
@@ -255,7 +255,7 @@ class ResultSetMaterializerSpec extends Specification {
         def s2 = resolved("s2", "simple",
                 Or.of([s1, Eq.of(Property.of("id"), ScalarLiteral.of("bar"))] as List<Cql2Expression>))
         def sqlClient = Mock(SqlClient)
-        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000, new SqlDialectPgis())
 
         when:
         def result = materializer.materialize(query(s2))

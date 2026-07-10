@@ -393,69 +393,6 @@ public class ResultSetMaterializer {
     return Truth.UNKNOWN;
   }
 
-  /**
-   * True if the filter can only ever be false given the result sets materialized so far, i.e. it
-   * references a set that materialized to no members in a boolean position that forces the whole
-   * filter false. Conservative: any leaf whose value is not pinned by an empty set is treated as
-   * indeterminate, so a producer is skipped only when boolean algebra guarantees an empty result.
-   */
-  private static boolean isProvablyEmpty(
-      Cql2Expression filter, Map<String, List<Object>> materialized) {
-    return truth(filter, materialized) == Truth.FALSE;
-  }
-
-  private enum Truth {
-    TRUE,
-    FALSE,
-    UNKNOWN
-  }
-
-  private static Truth truth(CqlNode node, Map<String, List<Object>> materialized) {
-    if (node instanceof InResultSet) {
-      List<Object> values = materialized.get(((InResultSet) node).getSetName());
-      // a materialized-empty set makes the IN / A_OVERLAPS predicate always false; a non-empty or
-      // not-yet-materialized (oversized) set is indeterminate at the query level
-      return values != null && values.isEmpty() ? Truth.FALSE : Truth.UNKNOWN;
-    }
-    if (node instanceof And) {
-      Truth result = Truth.TRUE;
-      for (Cql2Expression child : ((And) node).getArgs()) {
-        Truth childTruth = truth(child, materialized);
-        if (childTruth == Truth.FALSE) {
-          return Truth.FALSE;
-        }
-        if (childTruth == Truth.UNKNOWN) {
-          result = Truth.UNKNOWN;
-        }
-      }
-      return result;
-    }
-    if (node instanceof Or) {
-      Truth result = Truth.FALSE;
-      for (Cql2Expression child : ((Or) node).getArgs()) {
-        Truth childTruth = truth(child, materialized);
-        if (childTruth == Truth.TRUE) {
-          return Truth.TRUE;
-        }
-        if (childTruth == Truth.UNKNOWN) {
-          result = Truth.UNKNOWN;
-        }
-      }
-      return result;
-    }
-    if (node instanceof Not) {
-      Truth child = truth(((Not) node).getArgs().get(0), materialized);
-      if (child == Truth.TRUE) {
-        return Truth.FALSE;
-      }
-      if (child == Truth.FALSE) {
-        return Truth.TRUE;
-      }
-      return Truth.UNKNOWN;
-    }
-    return Truth.UNKNOWN;
-  }
-
   private static Object coerce(Object value, SchemaBase.Type type) {
     if (!(value instanceof String)) {
       return value;
