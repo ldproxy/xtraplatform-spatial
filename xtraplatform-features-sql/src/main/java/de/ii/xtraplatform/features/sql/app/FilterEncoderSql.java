@@ -268,7 +268,10 @@ public class FilterEncoderSql {
 
   // output column alias of every result-set CTE; consumers reference it as `SELECT <col> FROM
   // <cte>`
-  private static final String CTE_VALUE_COL = "rs_value";
+  /** Stable name of the single value column projected by a result-set producer. */
+  public static final String RESULT_SET_VALUE_COLUMN = "rs_value";
+
+  private static final String CTE_VALUE_COL = RESULT_SET_VALUE_COLUMN;
 
   /**
    * Collects the result-set subqueries of one top-level {@code inResultSet} predicate as named,
@@ -393,6 +396,15 @@ public class FilterEncoderSql {
    */
   public String encodeResultSetProducer(InResultSet inResultSet) {
     return resultSetProducerSelect(inResultSet, false, null);
+  }
+
+  /**
+   * Producer SELECT of a result set for materialization into a table: the value column is aliased
+   * to {@link #RESULT_SET_VALUE_COLUMN} so the resulting table has a stable column name to index
+   * and to reference from the consuming filters.
+   */
+  public String encodeResultSetProducerAliased(InResultSet inResultSet) {
+    return resultSetProducerSelect(inResultSet, true, null);
   }
 
   /**
@@ -768,6 +780,20 @@ public class FilterEncoderSql {
               FilterEncoderSql.this);
       if (!join.isEmpty()) join += " ";
 
+      // When the predicate needs no sub-table join, its operand is a column reachable directly from
+      // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
+      // self-semi-join (A.id IN (SELECT A.id FROM <main> WHERE ...)): that subquery scans the whole
+      // main table and the planner does not flatten it, so it is O(table) per predicate regardless
+      // of how few rows are selected. The semi-join form is kept whenever a join, junction, or
+      // array
+      // traversal is genuinely required (join non-empty) — there it is load-bearing for
+      // cardinality.
+      if (join.isEmpty() && !Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))) {
+        return String.format(
+            "%%1$s%1$s%%2$s",
+            getQualifiedColumn(table, propertyName, "A", allowColumnFallback).first());
+      }
+
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
           rootSchema.getName(),
@@ -832,7 +858,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
@@ -844,7 +871,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + end
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
@@ -856,7 +884,8 @@ public class FilterEncoderSql {
             + start
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + end.substring(end.indexOf("%2$s") + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -1776,6 +1805,23 @@ public class FilterEncoderSql {
               FilterEncoderSql.this);
       if (!join.isEmpty()) join += " ";
 
+      // When the predicate needs no sub-table join, its operand is a column reachable directly from
+      // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
+      // self-semi-join (A.id IN (SELECT A.id FROM <main> WHERE ...)): that subquery scans the whole
+      // main table and the planner does not flatten it, so it is O(table) per predicate regardless
+      // of how few rows are selected. The semi-join form is kept whenever a join, junction, or
+      // array
+      // traversal is genuinely required (join non-empty) — there it is load-bearing for
+      // cardinality.
+      if (join.isEmpty()
+          && !Objects.equals(table.first().getParentPath(), ImmutableList.of("_route_"))) {
+        return String.format(
+            "%%1$s%1$s%%2$s",
+            getQualifiedColumn(
+                    table.first(), table.second(), propertyName, "A", allowColumnFallback)
+                .first());
+      }
+
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
           mapping.getMainTable().getName(),
@@ -1840,7 +1886,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
@@ -1852,7 +1899,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + end
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
@@ -1864,7 +1912,8 @@ public class FilterEncoderSql {
             + start
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + end.substring(end.indexOf("%2$s") + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -2083,6 +2132,17 @@ public class FilterEncoderSql {
               consumerProperty);
         }
         return "1 = 0";
+      }
+
+      // if the result set has been materialized into a table, reference it directly so the producer
+      // runs once and each consumer only scans the indexed table
+      if (inResultSet.getMaterializedTable().isPresent()) {
+        return String.format(
+            mainExpression,
+            "",
+            String.format(
+                " IN (SELECT %s FROM %s)",
+                CTE_VALUE_COL, inResultSet.getMaterializedTable().get()));
       }
 
       // if the result set has been materialized up front, inline its values as a literal IN list

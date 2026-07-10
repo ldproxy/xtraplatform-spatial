@@ -72,12 +72,14 @@ import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.ProviderExtensionRegistry;
 import de.ii.xtraplatform.features.domain.Query;
+import de.ii.xtraplatform.features.domain.QueryRunner;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
+import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
@@ -113,6 +115,7 @@ import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -122,6 +125,8 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -632,7 +637,8 @@ public class FeatureProviderSql
         new ResultSetMaterializer(
             this::getSqlClient,
             filterEncoder,
-            getData().getQueryGeneration().getResultSetMaterializationMaxSize());
+            getData().getQueryGeneration().getResultSetMaterializationMaxSize(),
+            sqlDialect);
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
@@ -1398,7 +1404,13 @@ public class FeatureProviderSql
     return mutationStream.run().toCompletableFuture().join();
   }
 
+  @Override
   protected Query preprocessQuery(Query query) {
+    // result-set tables created here are discarded: callers that need to drop them use the overload
+    return preprocessQuery(query, new ArrayList<>());
+  }
+
+  protected Query preprocessQuery(Query query, List<String> resultSetTables) {
     if (query instanceof FeatureQuery
         && (((FeatureQuery) query).getFields().size() > 1
             || !"*".equals(((FeatureQuery) query).getFields().get(0)))) {
@@ -1462,7 +1474,7 @@ public class FeatureProviderSql
       // instead
       // of re-deriving each shared result set in every sub-query statement
       if (ResultSetMaterializer.hasResultSets(multiQuery)) {
-        multiQuery = resultSetMaterializer.materialize(multiQuery);
+        multiQuery = resultSetMaterializer.materialize(multiQuery, resultSetTables);
       }
 
       return multiQuery;
@@ -1475,9 +1487,28 @@ public class FeatureProviderSql
   public FeatureStream getFeatureStream(MultiFeatureQuery query) {
     validateQuery(query);
 
-    Query query2 = preprocessQuery(query);
+    List<String> resultSetTables = new ArrayList<>();
+    Query query2 = preprocessQuery(query, resultSetTables);
 
     boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
+
+    // drop any tables materialized for oversized result sets once the query's stream has completed
+    QueryRunner runner =
+        resultSetTables.isEmpty()
+            ? this::runQuery
+            : new QueryRunner() {
+              @Override
+              public <W extends FeatureStream.ResultBase> CompletionStage<W> runQuery(
+                  BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<W>> stream,
+                  Query runQuery,
+                  Map<String, PropertyTransformations> propertyTransformations,
+                  boolean passThrough) {
+                return FeatureProviderSql.this
+                    .runQuery(stream, runQuery, propertyTransformations, passThrough)
+                    .whenComplete(
+                        (result, error) -> resultSetMaterializer.dropTables(resultSetTables));
+              }
+            };
 
     return new FeatureStreamImpl(
         query2,
@@ -1485,7 +1516,7 @@ public class FeatureProviderSql
         crsTransformerFactory,
         nativeCrsIs3d,
         getCodelists(),
-        this::runQuery,
+        runner,
         !query.hitsOnly(),
         auditLog);
   }
