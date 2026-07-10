@@ -21,6 +21,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -98,21 +99,31 @@ public class SqlClientRx implements SqlClient {
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 
-    // TODO encapsulating the query in a transaction is a workaround for what appears to be a bug in
-    //      rxjava3-jdbc, see https://github.com/interactive-instruments/ldproxy/issues/1293
+    org.davidmoten.rxjava3.jdbc.ResultSetMapper<SqlRow> mapper =
+        resultSet -> {
+          SqlRow row = new SqlRowVals(collator).read(resultSet, options);
+
+          if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
+            logBuffer.add(row);
+          }
+
+          return row;
+        };
+
+    // A positive fetch size requires a transaction so the database driver uses a server-side cursor
+    // and streams rows instead of buffering the whole result set in memory (PostgreSQL ignores the
+    // fetch size with autoCommit=true).
+    // TODO encapsulating the query in a transaction is also a workaround for what appears to be a
+    //      bug in rxjava3-jdbc, see https://github.com/interactive-instruments/ldproxy/issues/1293
     Flowable<SqlRow> flowable =
-        session
-            .select(query)
-            .get(
-                resultSet -> {
-                  SqlRow row = new SqlRowVals(collator).read(resultSet, options);
-
-                  if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
-                    logBuffer.add(row);
-                  }
-
-                  return row;
-                });
+        options.getFetchSize() > 0
+            ? session
+                .select(query)
+                .transacted()
+                .fetchSize(options.getFetchSize())
+                .valuesOnly()
+                .get(mapper)
+            : session.select(query).get(mapper);
 
     // TODO: prettify, see
     // https://github.com/slick/slick/blob/main/slick/src/main/scala/slick/jdbc/StatementInvoker.scala
@@ -147,6 +158,15 @@ public class SqlClientRx implements SqlClient {
                   LOGGER.debug(MARKER.SQL_RESULT, values);
                 }
               });
+    }
+
+    // The blocking connection provider runs connect+execute+read on the subscribing thread, so
+    // without this the whole stream is single-threaded. Subscribing on a worker thread lets several
+    // parallel-flagged queries (e.g. the concurrent single-shot value phase) run at once, each on
+    // its
+    // own connection.
+    if (options.isParallel()) {
+      flowable = flowable.subscribeOn(Schedulers.io());
     }
 
     return Reactive.Source.publisher(flowable);

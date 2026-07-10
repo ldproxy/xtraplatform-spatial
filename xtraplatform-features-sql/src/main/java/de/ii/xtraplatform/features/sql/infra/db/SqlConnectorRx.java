@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.davidmoten.rxjava3.jdbc.Database;
@@ -72,6 +73,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   private final int maxConnections;
   private final int minConnections;
   private final int queueSize;
+  private final Semaphore connectionBudget;
   private final Path dataDir;
   private final String applicationName;
   private final String providerId;
@@ -105,6 +107,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
         connectionInfo.getPool().getMinConnections() >= 0
             ? connectionInfo.getPool().getMinConnections()
             : maxConnections;
+    this.connectionBudget = new Semaphore(Math.max(1, maxConnections), true);
 
     // int capacity = maxConnections / maxQueries;
     // TODO
@@ -136,6 +139,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   @Override
   public int getMaxConnections() {
     return maxConnections;
+  }
+
+  @Override
+  public Semaphore getConnectionBudget() {
+    return connectionBudget;
   }
 
   @Override

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -33,6 +34,12 @@ public interface SqlConnector
     extends FeatureProviderConnector<SqlRow, SqlQueryBatch, SqlQueryOptions>, Volatile2 {
 
   int getMaxConnections();
+
+  /**
+   * Shared budget of connection permits (sized to the connection pool) that bounds how many
+   * connections the concurrently running single-shot sub-queries hold at once, across all requests.
+   */
+  Semaphore getConnectionBudget();
 
   int getMinConnections();
 
@@ -57,11 +64,13 @@ public interface SqlConnector
     private long lastNumberReturned;
     private long lastNumberSkipped;
     private boolean noOffset;
+    private final boolean computeNumberMatched;
 
-    public Paging(long limit, long offset, long chunkSize) {
+    public Paging(long limit, long offset, long chunkSize, boolean computeNumberMatched) {
       this.limit = limit;
       this.offset = offset;
       this.chunkSize = chunkSize;
+      this.computeNumberMatched = computeNumberMatched;
 
       this.featureCountdown = limit;
       this.numberSkipped = 0L;
@@ -75,9 +84,14 @@ public interface SqlConnector
       long found = lastNumberReturned + lastNumberSkipped;
 
       // Once the limit is reached or the current collection is exhausted (its last chunk returned
-      // fewer rows than the chunk size), no further meta query is needed: there are no more rows to
-      // read and numberMatched was already computed on the collection's first chunk.
+      // fewer rows than the chunk size), no further rows need to be read. When numberMatched is
+      // computed, a not-yet-counted sub-query is still given a count-only meta query (maxLimit 0)
+      // so the reported total covers every sub-query, not only those contributing to the page; its
+      // value query is skipped downstream because the meta reports numberReturned 0.
       if (featureCountdown <= 0 || (Objects.equals(lastTable, currentTable) && found < chunkSize)) {
+        if (computeNumberMatched && !Objects.equals(lastTable, currentTable)) {
+          return Optional.of(Tuple.of(0L, 0L));
+        }
         return Optional.empty();
       }
 
@@ -104,12 +118,19 @@ public interface SqlConnector
     }
   }
 
+  // Per-sub-query row buffer for the concurrent single-shot value phase (see getSourceStream).
+  int UNPAGED_SUBQUERY_PREFETCH = 256;
+
   // TODO: simplify, class SqlQueryRunner, remove options, singleFeature
   @Override
   default Reactive.Source<SqlRow> getSourceStream(
       SqlQueryBatch queryBatch, SqlQueryOptions options) {
     Paging paging =
-        new Paging(queryBatch.getLimit(), queryBatch.getOffset(), queryBatch.getChunkSize());
+        new Paging(
+            queryBatch.getLimit(),
+            queryBatch.getOffset(),
+            queryBatch.getChunkSize(),
+            queryBatch.isComputeNumberMatched());
 
     Source<SqlRow> sqlRowSource1 =
         Source.iterable(queryBatch.getQuerySets())
@@ -196,62 +217,119 @@ public interface SqlConnector
             .via(
                 Transformer.flatMap(
                     plan -> {
-                      if (queryBatch.isSingleFeature()) {
+                      if (queryBatch.isSingleFeature() || queryBatch.isUnpaged()) {
+                        boolean unpaged = queryBatch.isUnpaged();
                         List<SqlQuerySet> querySets = queryBatch.getQuerySets();
+                        // a single-shot query computes neither count; -1 marks both as absent (the
+                        // decoder leaves numberReturned unset and numberMatched stays empty)
+                        // instead of reporting 0
                         ImmutableSqlRowMeta sqlRowMeta =
-                            getMetaQueryResult(0L, 0L, 0L, 0L, -1L).build();
+                            getMetaQueryResult(0L, 0L, unpaged ? -1L : 0L, unpaged ? -1L : 0L, -1L)
+                                .build();
+                        // a server-side cursor keeps memory bounded while streaming all rows
+                        int fetchSize = unpaged ? (int) queryBatch.getChunkSize() : 0;
+                        Function<Integer, Source<SqlRow>> valuePhase =
+                            index -> {
+                              int[] i = {0};
+                              Source<SqlRow>[] sqlRows =
+                                  querySets
+                                      .get(index)
+                                      .getValueQueries()
+                                      .apply(sqlRowMeta, 0L, 0L)
+                                      .map(
+                                          valueQuery ->
+                                              getSqlClient()
+                                                  .getSourceStream(
+                                                      valueQuery,
+                                                      new ImmutableSqlQueryOptions.Builder()
+                                                          .from(options)
+                                                          .tableSchema(
+                                                              querySets
+                                                                  .get(index)
+                                                                  .getTableSchemas()
+                                                                  .get(i[0]))
+                                                          .type(
+                                                              querySets
+                                                                  .get(index)
+                                                                  .getOptions()
+                                                                  .getType())
+                                                          .containerPriority(i[0]++)
+                                                          .queryIndex(
+                                                              querySets.get(index).getQueryIndex())
+                                                          .fetchSize(fetchSize)
+                                                          .isParallel(unpaged)
+                                                          .build()))
+                                      .toArray((IntFunction<Source<SqlRow>[]>) Source[]::new);
+
+                              Source<SqlRow> merged = mergeAndSort(sqlRows);
+
+                              if (!unpaged) {
+                                return merged;
+                              }
+
+                              // Bound the connections held by concurrently running sub-queries: a
+                              // sub-query needs all its table connections at once, so acquire them
+                              // as
+                              // a block before its rows are read and release them when it
+                              // terminates.
+                              // The semaphore is shared across requests, so concurrent searches can
+                              // never deadlock by each grabbing part of the pool.
+                              int tables = querySets.get(index).getTableSchemas().size();
+                              return Reactive.Source.guarded(
+                                  () -> getConnectionBudget().acquireUninterruptibly(tables),
+                                  () -> getConnectionBudget().release(tables),
+                                  merged);
+                            };
+
+                        // Single-shot multi-queries read every sub-query in one pass with no
+                        // cross-sub-query dependency (the result sets are already materialized), so
+                        // the sub-queries can run concurrently. Their rows are still emitted
+                        // strictly
+                        // in sub-query order, which the decoder requires; only the JDBC reads
+                        // overlap.
+                        // Concurrency is bounded so the sub-queries in flight never request more
+                        // than
+                        // the connection pool can serve. Single-feature reads keep the serial path.
+                        Transformer<Integer, SqlRow> valueTransformer;
+                        if (unpaged) {
+                          int maxTables =
+                              Math.max(
+                                  1,
+                                  querySets.stream()
+                                      .mapToInt(qs -> qs.getTableSchemas().size())
+                                      .max()
+                                      .orElse(1));
+                          int maxConcurrency =
+                              Math.max(
+                                  1,
+                                  Math.min(
+                                      querySets.size(), (getMaxConnections() - 1) / maxTables));
+                          valueTransformer =
+                              Transformer.flatMapConcurrent(
+                                  valuePhase, maxConcurrency, UNPAGED_SUBQUERY_PREFETCH);
+                        } else {
+                          valueTransformer = Transformer.flatMap(valuePhase);
+                        }
+
                         return Source.iterable(
                                 IntStream.range(0, querySets.size())
                                     .boxed()
                                     .collect(Collectors.toList()))
-                            .via(
-                                Transformer.flatMap(
-                                    index -> {
-                                      int[] i = {0};
-                                      Source<SqlRow>[] sqlRows =
-                                          querySets
-                                              .get(index)
-                                              .getValueQueries()
-                                              .apply(sqlRowMeta, 0L, 0L)
-                                              .map(
-                                                  valueQuery ->
-                                                      getSqlClient()
-                                                          .getSourceStream(
-                                                              valueQuery,
-                                                              new ImmutableSqlQueryOptions.Builder()
-                                                                  .from(options)
-                                                                  .tableSchema(
-                                                                      querySets
-                                                                          .get(index)
-                                                                          .getTableSchemas()
-                                                                          .get(i[0]))
-                                                                  .type(
-                                                                      querySets
-                                                                          .get(index)
-                                                                          .getOptions()
-                                                                          .getType())
-                                                                  .containerPriority(i[0]++)
-                                                                  .queryIndex(
-                                                                      querySets
-                                                                          .get(index)
-                                                                          .getQueryIndex())
-                                                                  .build()))
-                                              .toArray(
-                                                  (IntFunction<Source<SqlRow>[]>) Source[]::new);
-
-                                      return mergeAndSort(sqlRows);
-                                    }))
+                            .via(valueTransformer)
                             .prepend(Source.single(sqlRowMeta));
                       }
 
                       List<SqlQuerySet> querySets = plan.first();
                       SqlRowMeta aggregatedMetaResult = plan.second().get(0);
                       List<SqlRowMeta> metaResults = plan.second().subList(1, plan.second().size());
+                      // the value phase only reads window sub-queries; count-only ones are skipped
+                      // via the numberReturned<=0 guard below, so it needs no count-only handling
                       Paging paging2 =
                           new Paging(
                               queryBatch.getLimit(),
                               queryBatch.getOffset(),
-                              queryBatch.getChunkSize());
+                              queryBatch.getChunkSize(),
+                              false);
                       int[] i = {0};
 
                       if (options.isHitsOnly()) {
