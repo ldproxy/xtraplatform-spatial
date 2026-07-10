@@ -106,16 +106,11 @@ public interface FeatureEventHandler<
         return Optional.empty();
       }
 
-      List<String> path = path();
-
-      if (path.isEmpty()) {
+      if (isPathEmpty()) {
         return Optional.ofNullable(mapping().getTargetSchema());
       }
 
-      List<T> targetSchemas =
-          isUseTargetPaths()
-              ? mapping().getSchemasForTargetPath(path)
-              : mapping().getSchemasForSourcePath(path);
+      List<T> targetSchemas = schemasForPath();
 
       if (targetSchemas.isEmpty()) {
         // No mapping found for path
@@ -134,16 +129,11 @@ public interface FeatureEventHandler<
         return -1;
       }
 
-      List<String> path = path();
-
-      if (path.isEmpty()) {
+      if (isPathEmpty()) {
         return -1;
       }
 
-      List<Integer> positions =
-          isUseTargetPaths()
-              ? mapping().getPositionsForTargetPath(path)
-              : mapping().getPositionsForSourcePath(path);
+      List<Integer> positions = positionsForPath();
 
       int schemaIndex = schemaIndex() > -1 ? schemaIndex() : positions.size() - 1;
       if (positions.size() > schemaIndex) {
@@ -159,17 +149,12 @@ public interface FeatureEventHandler<
         return List.of();
       }
 
-      List<String> path = path();
-
-      if (path.isEmpty()) {
+      if (isPathEmpty()) {
         return List.of();
       }
 
       // TODO: by target path?
-      List<List<Integer>> positions =
-          isUseTargetPaths()
-              ? mapping().getParentPositionsForTargetPath(path)
-              : mapping().getParentPositionsForSourcePath(path);
+      List<List<Integer>> positions = parentPositionsForPath();
 
       int schemaIndex = schemaIndex() > -1 ? schemaIndex() : positions.size() - 1;
       if (positions.size() > schemaIndex) {
@@ -185,16 +170,11 @@ public interface FeatureEventHandler<
         return ImmutableList.of();
       }
 
-      List<String> path = path();
-
-      if (path.isEmpty()) {
+      if (isPathEmpty()) {
         return ImmutableList.of();
       }
 
-      List<List<T>> parentSchemas =
-          isUseTargetPaths()
-              ? mapping().getParentSchemasForTargetPath(path)
-              : mapping().getParentSchemasForSourcePath(path);
+      List<List<T>> parentSchemas = parentSchemasForPath();
 
       if (parentSchemas.isEmpty()) {
         return ImmutableList.of();
@@ -202,6 +182,39 @@ public interface FeatureEventHandler<
 
       int schemaIndex = schemaIndex() > -1 ? schemaIndex() : parentSchemas.size() - 1;
       return parentSchemas.get(schemaIndex);
+    }
+
+    // The lookups below back schema()/pos()/parentPos()/parentSchemas(). They are factored into
+    // their own methods so ModifiableContext can memoize them per tracked path: schema() etc. are
+    // @Value.Lazy, but @Value.Lazy is not cached on a @Value.Modifiable, so without memoization the
+    // same path is looked up again on every call. The defaults here are the unmemoized fallback.
+
+    default boolean isPathEmpty() {
+      return path().isEmpty();
+    }
+
+    default List<T> schemasForPath() {
+      return isUseTargetPaths()
+          ? mapping().getSchemasForTargetPath(path())
+          : mapping().getSchemasForSourcePath(path());
+    }
+
+    default List<Integer> positionsForPath() {
+      return isUseTargetPaths()
+          ? mapping().getPositionsForTargetPath(path())
+          : mapping().getPositionsForSourcePath(path());
+    }
+
+    default List<List<Integer>> parentPositionsForPath() {
+      return isUseTargetPaths()
+          ? mapping().getParentPositionsForTargetPath(path())
+          : mapping().getParentPositionsForSourcePath(path());
+    }
+
+    default List<List<T>> parentSchemasForPath() {
+      return isUseTargetPaths()
+          ? mapping().getParentSchemasForTargetPath(path())
+          : mapping().getParentSchemasForSourcePath(path());
     }
 
     @Value.Lazy
@@ -213,7 +226,8 @@ public interface FeatureEventHandler<
   interface ModifiableContext<T extends SchemaBase<T>, U extends SchemaMappingBase<T>>
       extends Context<T, U> {
 
-    // TODO: default values are not cached by Modifiable
+    // a @Value.Default is not cached on a Modifiable, so create the value, store it via the
+    // setter and reuse that instance on subsequent calls
     @Value.Default
     default ModifiableCollectionMetadata metadata() {
       ModifiableCollectionMetadata collectionMetadata = ModifiableCollectionMetadata.create();
@@ -223,7 +237,8 @@ public interface FeatureEventHandler<
       return collectionMetadata;
     }
 
-    // TODO: default values are not cached by Modifiable
+    // a @Value.Default is not cached on a Modifiable, so create the value, store it via the
+    // setter and reuse that instance on subsequent calls
     @Value.Default
     default FeaturePathTracker pathTracker() {
       // when tracking target paths, if present, use path separator from flatten transformation in
@@ -251,6 +266,91 @@ public interface FeatureEventHandler<
     @Override
     default String pathAsString() {
       return pathTracker().toStringWithDefaultSeparator();
+    }
+
+    // a @Value.Default is not cached on a Modifiable, so create the value, store it via the
+    // setter and reuse that instance on subsequent calls
+    @Value.Default
+    @Value.Auxiliary
+    default PathMemo<T> pathMemo() {
+      PathMemo<T> pathMemo = new PathMemo<>();
+
+      setPathMemo(pathMemo);
+
+      return pathMemo;
+    }
+
+    // Returns the path memo, resetting its cached lookups when the tracked path (or the
+    // target/source path mode) has changed since they were last computed.
+    private PathMemo<T> currentMemo() {
+      PathMemo<T> memo = pathMemo();
+      long version = pathTracker().version();
+      boolean useTargetPaths = isUseTargetPaths();
+
+      if (memo.version != version || memo.useTargetPaths != useTargetPaths) {
+        memo.version = version;
+        memo.useTargetPaths = useTargetPaths;
+        memo.path = pathTracker().asList();
+        memo.schemas = null;
+        memo.positions = null;
+        memo.parentSchemas = null;
+        memo.parentPositions = null;
+      }
+
+      return memo;
+    }
+
+    @Override
+    default boolean isPathEmpty() {
+      return pathTracker().isEmpty();
+    }
+
+    @Override
+    default List<T> schemasForPath() {
+      PathMemo<T> memo = currentMemo();
+      if (memo.schemas == null) {
+        memo.schemas =
+            memo.useTargetPaths
+                ? mapping().getSchemasForTargetPath(memo.path)
+                : mapping().getSchemasForSourcePath(memo.path);
+      }
+      return memo.schemas;
+    }
+
+    @Override
+    default List<Integer> positionsForPath() {
+      PathMemo<T> memo = currentMemo();
+      if (memo.positions == null) {
+        memo.positions =
+            memo.useTargetPaths
+                ? mapping().getPositionsForTargetPath(memo.path)
+                : mapping().getPositionsForSourcePath(memo.path);
+      }
+      return memo.positions;
+    }
+
+    @Override
+    default List<List<Integer>> parentPositionsForPath() {
+      PathMemo<T> memo = currentMemo();
+      if (memo.parentPositions == null) {
+        memo.parentPositions =
+            memo.useTargetPaths
+                ? mapping().getParentPositionsForTargetPath(memo.path)
+                : mapping().getParentPositionsForSourcePath(memo.path);
+      }
+      return memo.parentPositions;
+    }
+
+    @Override
+    default List<List<T>> parentSchemasForPath() {
+      PathMemo<T> memo = currentMemo();
+      if (memo.parentSchemas == null) {
+        memo.parentSchemas =
+            memo.useTargetPaths
+                ? mapping().getParentSchemasForTargetPath(memo.path)
+                : mapping().getParentSchemasForSourcePath(memo.path);
+      }
+      return memo.parentSchemas;
     }
 
     @Value.Lazy
@@ -304,6 +404,8 @@ public interface FeatureEventHandler<
 
     ModifiableContext<T, U> setPathTracker(FeaturePathTracker pathTracker);
 
+    ModifiableContext<T, U> setPathMemo(PathMemo<T> pathMemo);
+
     ModifiableContext<T, U> setValue(String value);
 
     ModifiableContext<T, U> setValueType(SchemaBase.Type valueType);
@@ -333,6 +435,23 @@ public interface FeatureEventHandler<
     ModifiableContext<T, U> setPropertyLinks(Iterable<? extends PropertyLink> propertyLinks);
 
     ModifiableContext<T, U> setCanonicalFeatureId(@Nullable String canonicalFeatureId);
+  }
+
+  /**
+   * Per-context cache for the path-keyed lookups behind {@link Context#schema()}, {@link
+   * Context#pos()}, {@link Context#parentPos()} and {@link Context#parentSchemas()}. The lookups
+   * are recomputed whenever {@link #version} (the {@link FeaturePathTracker} version) or {@link
+   * #useTargetPaths} no longer matches; otherwise the cached values are reused. Mutable, single-
+   * threaded scratch state owned by one context instance.
+   */
+  final class PathMemo<T extends SchemaBase<T>> {
+    long version = Long.MIN_VALUE;
+    boolean useTargetPaths;
+    List<String> path;
+    List<T> schemas;
+    List<Integer> positions;
+    List<List<T>> parentSchemas;
+    List<List<Integer>> parentPositions;
   }
 
   // T createContext();
