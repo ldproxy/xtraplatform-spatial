@@ -98,21 +98,31 @@ public class SqlClientRx implements SqlClient {
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 
-    // TODO encapsulating the query in a transaction is a workaround for what appears to be a bug in
-    //      rxjava3-jdbc, see https://github.com/interactive-instruments/ldproxy/issues/1293
+    org.davidmoten.rxjava3.jdbc.ResultSetMapper<SqlRow> mapper =
+        resultSet -> {
+          SqlRow row = new SqlRowVals(collator).read(resultSet, options);
+
+          if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
+            logBuffer.add(row);
+          }
+
+          return row;
+        };
+
+    // A positive fetch size requires a transaction so the database driver uses a server-side cursor
+    // and streams rows instead of buffering the whole result set in memory (PostgreSQL ignores the
+    // fetch size with autoCommit=true).
+    // TODO encapsulating the query in a transaction is also a workaround for what appears to be a
+    //      bug in rxjava3-jdbc, see https://github.com/interactive-instruments/ldproxy/issues/1293
     Flowable<SqlRow> flowable =
-        session
-            .select(query)
-            .get(
-                resultSet -> {
-                  SqlRow row = new SqlRowVals(collator).read(resultSet, options);
-
-                  if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
-                    logBuffer.add(row);
-                  }
-
-                  return row;
-                });
+        options.getFetchSize() > 0
+            ? session
+                .select(query)
+                .transacted()
+                .fetchSize(options.getFetchSize())
+                .valuesOnly()
+                .get(mapper)
+            : session.select(query).get(mapper);
 
     // TODO: prettify, see
     // https://github.com/slick/slick/blob/main/slick/src/main/scala/slick/jdbc/StatementInvoker.scala
