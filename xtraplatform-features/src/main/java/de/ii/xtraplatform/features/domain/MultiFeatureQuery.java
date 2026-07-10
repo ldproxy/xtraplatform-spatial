@@ -30,11 +30,22 @@ public interface MultiFeatureQuery extends Query {
   }
 
   /**
-   * If disabled, {@code numberMatched} is not computed. For a multi-query this avoids a count query
-   * per sub-query, each of which carries the full (possibly deeply nested) filter.
+   * If enabled (the default), the query is executed with paging support: {@code numberReturned} and
+   * {@code numberMatched} are computed and {@code limit}/{@code offset} select a page of the result
+   * set. If disabled, the query is executed single-shot: all matching features are returned in one
+   * pass, without meta queries and without {@code numberReturned}/{@code numberMatched}.
    */
   @Value.Default
-  default boolean getComputeNumberMatched() {
+  default boolean getSupportPaging() {
     return true;
+  }
+
+  /**
+   * In single-shot mode (paging disabled), an optional maximum number of features read per
+   * sub-query. {@code 0} means no limit.
+   */
+  @Value.Default
+  default int getMaxFeaturesPerSubQuery() {
+    return 0;
   }
 }
