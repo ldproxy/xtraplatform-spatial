@@ -213,6 +213,63 @@ class ResultSetMaterializerSpec extends Specification {
         node.getMaterializedValues().get() == ["b"]
     }
 
+    def 'a producer whose dependency materialized empty is short-circuited and not run'() {
+        given:
+        def s1 = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def s2 = resolved("s2", "simple", s1)
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000)
+
+        when:
+        def result = materializer.materialize(query(s2))
+
+        then:
+        // only the s1 producer runs; s2 is skipped because its dependency s1 is empty
+        1 * sqlClient.run(_, _) >> CompletableFuture.completedFuture([])
+        def node = (InResultSet) result.getQueries().get(0).getFilters().get(0)
+        node.getMaterializedValues().get() == []
+    }
+
+    def 'a producer whose dependency is non-empty is still run'() {
+        given:
+        def s1 = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def s2 = resolved("s2", "simple", s1)
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000)
+
+        when:
+        def result = materializer.materialize(query(s2))
+
+        then:
+        2 * sqlClient.run(_, _) >>> [
+                CompletableFuture.completedFuture([row("a")]),
+                CompletableFuture.completedFuture([row("b"), row("c")])
+        ]
+        def node = (InResultSet) result.getQueries().get(0).getFilters().get(0)
+        node.getMaterializedValues().get() == ["b", "c"]
+    }
+
+    def 'an empty dependency in an OR with another term does not short-circuit'() {
+        given:
+        def s1 = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def s2 = resolved("s2", "simple",
+                Or.of([s1, Eq.of(Property.of("id"), ScalarLiteral.of("bar"))] as List<Cql2Expression>))
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 100000)
+
+        when:
+        def result = materializer.materialize(query(s2))
+
+        then:
+        // s1 is empty but the OR's other term is indeterminate, so s2 must still run
+        2 * sqlClient.run(_, _) >>> [
+                CompletableFuture.completedFuture([]),
+                CompletableFuture.completedFuture([row("b")])
+        ]
+        def node = (InResultSet) result.getQueries().get(0).getFilters().get(0)
+        node.getMaterializedValues().get() == ["b"]
+    }
+
     def 'a query without result sets is returned unchanged'() {
         given:
         def filter = Eq.of(Property.of("id"), ScalarLiteral.of("foo"))

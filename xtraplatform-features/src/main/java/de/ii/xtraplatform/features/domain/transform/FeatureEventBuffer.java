@@ -413,21 +413,33 @@ public class FeatureEventBuffer<
   }
 
   private static int positionOf(Node node, SchemaMapping mapping) {
-    List<String> path = node.path();
-    if (path.isEmpty()) {
-      return Integer.MAX_VALUE;
+    if (node.position != Node.POSITION_UNCOMPUTED) {
+      return node.position;
     }
-    List<Integer> positions = mapping.getPositionsForTargetPath(path);
-    int position = positions.isEmpty() ? -1 : positions.get(0);
-    // keep paths without a known position at the end, in their original (stable) order
-    return position < 0 ? Integer.MAX_VALUE : position;
+    List<String> path = node.path();
+    int position;
+    if (path.isEmpty()) {
+      position = Integer.MAX_VALUE;
+    } else {
+      List<Integer> positions = mapping.getPositionsForTargetPath(path);
+      int p = positions.isEmpty() ? -1 : positions.get(0);
+      // keep paths without a known position at the end, in their original (stable) order
+      position = p < 0 ? Integer.MAX_VALUE : p;
+    }
+    node.position = position;
+    return position;
   }
 
   private static final class Node {
+    private static final int POSITION_UNCOMPUTED = Integer.MIN_VALUE;
+
     private final FeatureTokenType type;
     private final List<Object> open;
     private final List<Node> children = new ArrayList<>();
     private List<Object> close;
+    // schema position (positionOf), memoized for the duration of one ordering pass: the sort
+    // comparator and the coalesce pass would otherwise re-resolve the same path on every comparison
+    private int position = POSITION_UNCOMPUTED;
 
     private Node(FeatureTokenType type, List<Object> open) {
       this.type = type;

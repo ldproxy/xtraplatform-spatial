@@ -57,11 +57,13 @@ public interface SqlConnector
     private long lastNumberReturned;
     private long lastNumberSkipped;
     private boolean noOffset;
+    private final boolean computeNumberMatched;
 
-    public Paging(long limit, long offset, long chunkSize) {
+    public Paging(long limit, long offset, long chunkSize, boolean computeNumberMatched) {
       this.limit = limit;
       this.offset = offset;
       this.chunkSize = chunkSize;
+      this.computeNumberMatched = computeNumberMatched;
 
       this.featureCountdown = limit;
       this.numberSkipped = 0L;
@@ -75,9 +77,14 @@ public interface SqlConnector
       long found = lastNumberReturned + lastNumberSkipped;
 
       // Once the limit is reached or the current collection is exhausted (its last chunk returned
-      // fewer rows than the chunk size), no further meta query is needed: there are no more rows to
-      // read and numberMatched was already computed on the collection's first chunk.
+      // fewer rows than the chunk size), no further rows need to be read. When numberMatched is
+      // computed, a not-yet-counted sub-query is still given a count-only meta query (maxLimit 0)
+      // so the reported total covers every sub-query, not only those contributing to the page; its
+      // value query is skipped downstream because the meta reports numberReturned 0.
       if (featureCountdown <= 0 || (Objects.equals(lastTable, currentTable) && found < chunkSize)) {
+        if (computeNumberMatched && !Objects.equals(lastTable, currentTable)) {
+          return Optional.of(Tuple.of(0L, 0L));
+        }
         return Optional.empty();
       }
 
@@ -109,7 +116,11 @@ public interface SqlConnector
   default Reactive.Source<SqlRow> getSourceStream(
       SqlQueryBatch queryBatch, SqlQueryOptions options) {
     Paging paging =
-        new Paging(queryBatch.getLimit(), queryBatch.getOffset(), queryBatch.getChunkSize());
+        new Paging(
+            queryBatch.getLimit(),
+            queryBatch.getOffset(),
+            queryBatch.getChunkSize(),
+            queryBatch.isComputeNumberMatched());
 
     Source<SqlRow> sqlRowSource1 =
         Source.iterable(queryBatch.getQuerySets())
@@ -196,10 +207,17 @@ public interface SqlConnector
             .via(
                 Transformer.flatMap(
                     plan -> {
-                      if (queryBatch.isSingleFeature()) {
+                      if (queryBatch.isSingleFeature() || queryBatch.isUnpaged()) {
+                        boolean unpaged = queryBatch.isUnpaged();
                         List<SqlQuerySet> querySets = queryBatch.getQuerySets();
+                        // a single-shot query computes neither count; -1 marks both as absent (the
+                        // decoder leaves numberReturned unset and numberMatched stays empty)
+                        // instead of reporting 0
                         ImmutableSqlRowMeta sqlRowMeta =
-                            getMetaQueryResult(0L, 0L, 0L, 0L, -1L).build();
+                            getMetaQueryResult(0L, 0L, unpaged ? -1L : 0L, unpaged ? -1L : 0L, -1L)
+                                .build();
+                        // a server-side cursor keeps memory bounded while streaming all rows
+                        int fetchSize = unpaged ? (int) queryBatch.getChunkSize() : 0;
                         return Source.iterable(
                                 IntStream.range(0, querySets.size())
                                     .boxed()
@@ -235,6 +253,7 @@ public interface SqlConnector
                                                                       querySets
                                                                           .get(index)
                                                                           .getQueryIndex())
+                                                                  .fetchSize(fetchSize)
                                                                   .build()))
                                               .toArray(
                                                   (IntFunction<Source<SqlRow>[]>) Source[]::new);
@@ -247,11 +266,14 @@ public interface SqlConnector
                       List<SqlQuerySet> querySets = plan.first();
                       SqlRowMeta aggregatedMetaResult = plan.second().get(0);
                       List<SqlRowMeta> metaResults = plan.second().subList(1, plan.second().size());
+                      // the value phase only reads window sub-queries; count-only ones are skipped
+                      // via the numberReturned<=0 guard below, so it needs no count-only handling
                       Paging paging2 =
                           new Paging(
                               queryBatch.getLimit(),
                               queryBatch.getOffset(),
-                              queryBatch.getChunkSize());
+                              queryBatch.getChunkSize(),
+                              false);
                       int[] i = {0};
 
                       if (options.isHitsOnly()) {
