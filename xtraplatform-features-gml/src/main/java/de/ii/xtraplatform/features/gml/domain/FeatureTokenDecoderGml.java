@@ -474,7 +474,9 @@ public class FeatureTokenDecoderGml
       return false;
     }
 
-    rejectXsiType();
+    if (!isValueWrapChainElement()) {
+      rejectXsiType();
+    }
 
     if (!inFeature && depth < featureRootDepth) {
       String expected = wrapperElementNames.get(depth);
@@ -581,11 +583,7 @@ public class FeatureTokenDecoderGml
       // (ISO 19115) carry text directly and routinely appear inside a property element — treat
       // them as value wrappers without requiring an explicit valueWrap entry. Once inside a
       // VALUE_WRAPPER, the chain continues regardless of the inner element's namespace.
-      boolean inValueWrapChain =
-          parent.kind == FrameKind.VALUE_WRAPPER
-              || (parent.kind == FrameKind.VALUE_PROPERTY
-                  && (parent.valueWrapped || isExternalContentNamespace(parser.getNamespaceURI())));
-      frames.push(inValueWrapChain ? Frame.valueWrapper() : Frame.unknown());
+      frames.push(isValueWrapChainElement() ? Frame.valueWrapper() : Frame.unknown());
       depth++;
       return false;
     }
@@ -1252,10 +1250,31 @@ public class FeatureTokenDecoderGml
   }
 
   /**
+   * Whether the current START_ELEMENT is part of a value-wrap chain: its parent frame is a {@link
+   * FrameKind#VALUE_WRAPPER}, or a {@link FrameKind#VALUE_PROPERTY} whose path is listed in {@code
+   * valueWrap} or whose child lives in an ISO 19115 content namespace ({@code gmd}/{@code gco}).
+   * Such elements carry no schema meaning — they only wrap the property's scalar text — so they are
+   * pushed as {@link Frame#valueWrapper()} and exempt from {@link #rejectXsiType()}: ISO 19139
+   * requires typed values like {@code <gco:Record xsi:type="gml:doubleList">} inside {@code
+   * DQ_QuantitativeResult}, where {@code xsi:type} declares the content type of an anyType element
+   * rather than substituting a schema type.
+   */
+  private boolean isValueWrapChainElement() {
+    Frame parent = frames.peek();
+    return parent != null
+        && (parent.kind == FrameKind.VALUE_WRAPPER
+            || (parent.kind == FrameKind.VALUE_PROPERTY
+                && (parent.valueWrapped || isExternalContentNamespace(parser.getNamespaceURI()))));
+  }
+
+  /**
    * {@code xsi:type} substitution is not supported by this decoder — schema lookup is by element
    * name only, so a substituted type carries no extra information into the token stream and is
    * almost certainly user error. Reject early with a clear message naming the element on which it
-   * appeared.
+   * appeared. Elements inside a value-wrap chain (see {@link #isValueWrapChainElement()}) are
+   * exempt: there {@code xsi:type} types the content of an anyType value element (ISO 19139 {@code
+   * gco:Record}) and is dropped on input; the encoder regenerates it from the attributes declared
+   * on the {@code valueWrap} chain entry.
    */
   private void rejectXsiType() {
     for (int i = 0; i < parser.getAttributeCount(); i++) {

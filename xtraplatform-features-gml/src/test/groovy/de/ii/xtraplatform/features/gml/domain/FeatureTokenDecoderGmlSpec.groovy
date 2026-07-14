@@ -1867,7 +1867,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
     /**
      * AX_PunktortAU slice with the full {@code qualitaetsangaben} (qag) tree from the AdV NAS
      * schema: qag(AX_DQPunktort) → {dpl(LI_Lineage) → prs(LI_ProcessStep, OBJECT_ARRAY) → {des,
-     * dat, pro(CI_ResponsibleParty)→{org, ind, rol}, src(LI_Source)→des}, gst}. Every nested
+     * dat, pro(CI_ResponsibleParty)→{org, ind, rol}, src(LI_Source)→des}, gwt, gst}. Every nested
      * OBJECT is transparent (no {@code sourcePath}), so each leaf emits at the feature-root
      * path with its {@code qag__*} SQL column name.
      */
@@ -1929,6 +1929,10 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                                                         .sourcePath("qag__dpl_prs_src")
                                                         .type(SchemaBase.Type.STRING)
                                                         .alias("description")))))
+                        .putProperties2("gwt", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("qag__gwt")
+                                .type(SchemaBase.Type.STRING)
+                                .alias("genauigkeitswert"))
                         .putProperties2("gst", new ImmutableFeatureSchema.Builder()
                                 .sourcePath("qag__gst")
                                 .type(SchemaBase.Type.STRING)
@@ -2222,6 +2226,48 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         def e = thrown(Exception)
         rootCauseMessage(e).contains("xsi:type")
         rootCauseMessage(e).contains("AX_Flurstueck")
+    }
+
+    def 'xsi:type inside an ISO 19139 value-wrap chain is tolerated and the scalar value is extracted'() {
+        given:
+        // The ISO 19139 quantitative-result pattern types the anyType gco:Record via
+        // xsi:type="gml:doubleList" and requires an empty gmd:valueUnit sibling before gmd:value
+        // (NAS AX_PunktortAU genauigkeitswert). Neither may disturb extraction of the scalar
+        // accuracy value; xsi:type on schema-mapped elements stays rejected (see the two
+        // rejection tests above).
+        def decoder = newPunktortAuDecoder(nasNamespaceProfile())
+        def xml = """<adv:AX_PunktortAU xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:gmd="${GMD_NS}"
+                xmlns:gco="http://www.isotc211.org/2005/gco"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                gml:id="DENW36AL10000XYZ">
+              <adv:qualitaetsangaben>
+                <adv:AX_DQPunktort>
+                  <adv:genauigkeitswert>
+                    <gmd:DQ_RelativeInternalPositionalAccuracy>
+                      <gmd:result>
+                        <gmd:DQ_QuantitativeResult>
+                          <gmd:valueUnit xlink:href="urn:adv:uom:m"></gmd:valueUnit>
+                          <gmd:value>
+                            <gco:Record xsi:type="gml:doubleList">0.0074721</gco:Record>
+                          </gmd:value>
+                        </gmd:DQ_QuantitativeResult>
+                      </gmd:result>
+                    </gmd:DQ_RelativeInternalPositionalAccuracy>
+                  </adv:genauigkeitswert>
+                  <adv:genauigkeitsstufe>1200</adv:genauigkeitsstufe>
+                </adv:AX_DQPunktort>
+              </adv:qualitaetsangaben>
+            </adv:AX_PunktortAU>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["qag", "gwt"]) == "0.0074721"
+        valueAtPath(tokens, ["qag", "gst"]) == "1200"
     }
 
     def 'nilReason on a property element is silently dropped'() {
