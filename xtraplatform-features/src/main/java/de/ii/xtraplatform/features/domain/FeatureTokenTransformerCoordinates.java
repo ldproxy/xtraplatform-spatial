@@ -31,6 +31,15 @@ public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer 
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     Geometry<?> geometry = context.geometry();
     if (geometry != null) {
+      // A geometry property with its own storage CRS (schema option `crs`) carries a position
+      // as-is in a non-native CRS — possibly 1D/3D or a CRS the query pipeline cannot transform.
+      // It is passed through untouched; formats either reproduce it verbatim (GML position
+      // variants) or suppress it.
+      if (context.schema().flatMap(SchemaBase::getCrs).isPresent()) {
+        getDownstream().onGeometry(context);
+        return;
+      }
+
       CoordinatesTransformation next = null;
 
       // A SECONDARY_GEOMETRY is always forced to WGS84 longitude/latitude, not the target CRS

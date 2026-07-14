@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,7 +53,9 @@ public class FeatureEncoderSql
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureEncoderSql.class);
 
   private final SqlQueryMapping mapping;
+  private final EpsgCrs inputCrs;
   private final EpsgCrs nativeCrs;
+  private final CrsTransformerFactory crsTransformerFactory;
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<ZoneId> timeZone;
   private final Optional<String> nullValue;
@@ -78,6 +81,8 @@ public class FeatureEncoderSql
       Optional<ZoneId> timeZone,
       Optional<String> nullValue) {
     this.mapping = mapping;
+    this.inputCrs = inputCrs;
+    this.crsTransformerFactory = crsTransformerFactory;
     this.crsTransformer = crsTransformerFactory.getTransformer(inputCrs, nativeCrs);
     this.nativeCrs = nativeCrs;
     this.timeZone = timeZone;
@@ -258,34 +263,66 @@ public class FeatureEncoderSql
       LOGGER.trace("geometry: {} {}", context.pathAsString(), geometry);
     }
 
-    mapping
-        .getColumnForPrimaryGeometry()
+    // A geometry property that is mapped to its own writable column under its property path
+    // (e.g. a per-CRS position variant) takes precedence over the primary geometry. The column's
+    // storage CRS — the WKT/WKB operation parameter, set from the schema's `crs` option —
+    // determines the transformation target and the SRID of the literal; without the option this
+    // is the provider's nativeCrs, preserving the previous behavior.
+    Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> columnForPath =
+        mapping
+            .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+            .filter(
+                c ->
+                    c.second().hasOperation(SqlQueryColumn.Operation.WKT)
+                        || c.second().hasOperation(SqlQueryColumn.Operation.WKB));
+
+    columnForPath
+        .or(
+            () ->
+                mapping
+                    .getColumnForPrimaryGeometry()
+                    .filter(c -> mapping.getSchemaForPrimaryGeometry().isPresent()))
         .ifPresentOrElse(
             column -> {
-              mapping
-                  .getSchemaForPrimaryGeometry()
-                  .ifPresentOrElse(
-                      schema -> {
-                        String value = toWkt(geometry, crsTransformer, nativeCrs);
+              EpsgCrs storageCrs = storageCrs(column.second());
+              String value = toWkt(geometry, transformerFor(geometry, storageCrs), storageCrs);
 
-                        currentFeature.addColumn(column.first(), column.second(), value);
+              currentFeature.addColumn(column.first(), column.second(), value);
 
-                        if (trace) {
-                          LOGGER.trace("onGeometry: {} {}", context.pathAsString(), value);
-                        }
-                      },
-                      () -> {
-                        if (trace) {
-                          LOGGER.warn(
-                              "onGeometry: {} not found in mapping", context.pathAsString());
-                        }
-                      });
+              if (trace) {
+                LOGGER.trace("onGeometry: {} {}", context.pathAsString(), value);
+              }
             },
             () -> {
               if (trace) {
                 LOGGER.warn("onGeometry: {} not found in mapping", context.pathAsString());
               }
             });
+  }
+
+  private EpsgCrs storageCrs(SqlQueryColumn column) {
+    SqlQueryColumn.Operation op =
+        column.hasOperation(SqlQueryColumn.Operation.WKB)
+            ? SqlQueryColumn.Operation.WKB
+            : SqlQueryColumn.Operation.WKT;
+    List<String> parameters = column.getOperationParameters(op);
+    if (parameters.isEmpty()) {
+      return nativeCrs;
+    }
+    return EpsgCrs.of(
+        Integer.parseInt(parameters.get(0)),
+        parameters.size() > 1 ? EpsgCrs.Force.valueOf(parameters.get(1)) : EpsgCrs.Force.NONE);
+  }
+
+  // The transformation source is the CRS the geometry actually arrived in (set by the format
+  // decoder from srsName or the request CRS), falling back to the request CRS for decoders that
+  // do not tag geometries.
+  private Optional<CrsTransformer> transformerFor(Geometry<?> geometry, EpsgCrs storageCrs) {
+    EpsgCrs sourceCrs = geometry.getCrs().orElse(inputCrs);
+    if (Objects.equals(sourceCrs, storageCrs)) {
+      return Optional.empty();
+    }
+    return crsTransformerFactory.getTransformer(sourceCrs, storageCrs);
   }
 
   @Override
@@ -399,7 +436,7 @@ public class FeatureEncoderSql
   }
 
   private static String toWkt(
-      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs nativeCrs) {
+      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs storageCrs) {
 
     if (crsTransformer.isPresent()) {
       geometry =
@@ -416,7 +453,7 @@ public class FeatureEncoderSql
     }
 
     // TODO: functions from Dialect
-    String result = String.format("ST_GeomFromText('%s',%s)", wkt, nativeCrs.getCode());
+    String result = String.format("ST_GeomFromText('%s',%s)", wkt, storageCrs.getCode());
 
     if (geometry.getType() == GeometryType.POLYGON
         || geometry.getType() == GeometryType.MULTI_POLYGON) {

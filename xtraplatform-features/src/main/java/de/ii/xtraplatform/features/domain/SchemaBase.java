@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocFile;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
@@ -181,6 +182,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   Optional<GeometryType> getGeometryType();
 
   List<GeometryType> getGeometryTypes();
+
+  Optional<EpsgCrs> getCrs();
 
   Optional<String> getFormat();
 

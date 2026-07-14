@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
   "valueType",
   "geometryType",
   "geometryTypes",
+  "crs",
   "objectType",
   "label",
   "alias",
@@ -234,6 +236,22 @@ public interface FeatureSchema
    */
   @Override
   List<GeometryType> getGeometryTypes();
+
+  /**
+   * @langEn The storage CRS of this geometry property, overriding the provider's `nativeCrs`. Only
+   *     relevant for properties with `type: GEOMETRY` in SQL feature providers, when a feature type
+   *     stores positions in more than one CRS in separate geometry columns. Geometries are read
+   *     from and written to the column in this CRS.
+   * @langDe Das Koordinatenreferenzsystem, in dem diese Geometrieeigenschaft gespeichert ist,
+   *     abweichend vom `nativeCrs` des Providers. Nur relevant für Eigenschaften mit `type:
+   *     GEOMETRY` in SQL-Feature-Providern, wenn eine Objektart Positionen in mehreren
+   *     Koordinatenreferenzsystemen in separaten Geometriespalten speichert. Geometrien werden in
+   *     diesem CRS aus der Spalte gelesen und in die Spalte geschrieben.
+   * @default null
+   * @since v4.8
+   */
+  @Override
+  Optional<EpsgCrs> getCrs();
 
   /**
    * @langEn Optional name for an object type, used for example in JSON Schema.

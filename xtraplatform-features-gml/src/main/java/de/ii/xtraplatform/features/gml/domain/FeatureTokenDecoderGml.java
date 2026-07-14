@@ -259,6 +259,14 @@ public class FeatureTokenDecoderGml
     boolean valueWrapped;
 
     /**
+     * For GEOMETRY_PROPERTY: the position-variant routing configured for this property in {@link
+     * FeatureTokenDecoderGmlInputProfile#getGeometryVariants()}, or {@code null} when none is
+     * configured. Consulted by {@code emitGeometryOrVertical} together with the raw srsName the
+     * geometry decoder captured.
+     */
+    GmlGeometryVariants geometryVariants;
+
+    /**
      * For OBJECT_ELEMENT: the {@link FeatureSchema#getName() name} of the array property currently
      * open as a direct child of this object element, or {@code null} when no array is open at this
      * level. The feature-root level uses the enclosing decoder's {@code currentArrayPath} field for
@@ -323,7 +331,12 @@ public class FeatureTokenDecoderGml
     this.defaultCrs = headerCrs.isPresent() ? headerCrs : Optional.of(storageCrs);
     this.nullValue = nullValue;
     this.inputProfile = inputProfile;
-    this.geometryDecoder = new GeometryDecoderGml(inputProfile.getSrsNameMappings());
+    this.geometryDecoder =
+        new GeometryDecoderGml(
+            inputProfile.getSrsNameMappings(),
+            inputProfile.getGeometryVariants().values().stream()
+                .flatMap(variants -> variants.getVerticalBySrsName().keySet().stream())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet()));
     this.buffer = new StringBuilder();
 
     List<String> wrappers = new ArrayList<>(2);
@@ -468,8 +481,8 @@ public class FeatureTokenDecoderGml
     if (geometryDecoder.isWaitingForInput()) {
       Optional<Geometry<?>> optGeometry =
           geometryDecoder.continueDecoding(parser, crs, srsDimension, parser.getLocalName(), null);
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
+      if (!geometryDecoder.isWaitingForInput()) {
+        emitGeometryOrVertical(optGeometry);
       }
       return false;
     }
@@ -645,17 +658,19 @@ public class FeatureTokenDecoderGml
     if (prop.isSpatial()) {
       // Geometry properties decode the full GML geometry subtree via {@link GeometryDecoderGml}
       // regardless of nesting depth; the path tracker is already set to the property's segment
-      // path so {@code emitGeometry} routes the resulting Geometry to the right downstream slot.
+      // path so {@code emitGeometryOrVertical} routes the resulting Geometry (or 1D position) to
+      // the right downstream slot.
+      Frame frame = Frame.geometryProperty(prop, segment, segmentPathDepth);
+      frame.geometryVariants = geometryVariantsFor(prop);
+      frames.push(frame);
       Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser, crs, srsDimension);
-      frames.push(Frame.geometryProperty(prop, segment, segmentPathDepth));
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
-        depth++;
-        return false;
+      boolean waiting = geometryDecoder.isWaitingForInput();
+      if (!waiting) {
+        emitGeometryOrVertical(optGeometry);
       }
-      // geometry needs more input; the next push will continue via continueDecoding
+      // when waiting, the geometry needs more input; the next push continues via continueDecoding
       depth++;
-      return true;
+      return waiting;
     } else if (prop.isValue()) {
       Frame frame = Frame.valueProperty(prop, segment, segmentPathDepth);
       frame.nilOnCurrent = readXsiNil();
@@ -728,8 +743,8 @@ public class FeatureTokenDecoderGml
       Optional<Geometry<?>> optGeometry =
           geometryDecoder.continueDecoding(
               parser, crs, srsDimension, parser.getLocalName(), pending);
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
+      if (!geometryDecoder.isWaitingForInput()) {
+        emitGeometryOrVertical(optGeometry);
       }
       return;
     }
@@ -1286,6 +1301,104 @@ public class FeatureTokenDecoderGml
                 + "> is not supported by this decoder.");
       }
     }
+  }
+
+  /**
+   * Mirrors {@link #isValueWrapped}: the configuration is keyed by the property's technical full
+   * path, but a YAML config keyed by the alias-form path is recognised as well.
+   */
+  private GmlGeometryVariants geometryVariantsFor(FeatureSchema prop) {
+    Map<String, GmlGeometryVariants> geometryVariants = inputProfile.getGeometryVariants();
+    if (geometryVariants.isEmpty()) {
+      return null;
+    }
+    String path = prop.getFullPathAsString();
+    GmlGeometryVariants variants = geometryVariants.get(path);
+    if (variants != null) {
+      return variants;
+    }
+    String aliasPath = aliasFormPathByPropertyPath.get(path);
+    return aliasPath != null ? geometryVariants.get(aliasPath) : null;
+  }
+
+  /**
+   * Emits the completed result of a geometry decode. Without position-variant routing this is the
+   * decoded {@link Geometry} at the geometry property's own path. With routing (see {@link
+   * GmlGeometryVariants}), a geometry whose verbatim wire srsName maps to a variant property is
+   * emitted at that property's path instead, a 1D position (empty {@code optGeometry} although no
+   * further input is needed) is emitted as a scalar value at the configured vertical property, and
+   * in both cases the verbatim srsName is emitted at the configured srsName property. The path
+   * tracker is restored to the geometry property's own segment afterwards.
+   */
+  private void emitGeometryOrVertical(Optional<Geometry<?>> optGeometry) {
+    Frame frame = frames.peek();
+    GmlGeometryVariants variants =
+        frame != null && frame.kind == FrameKind.GEOMETRY_PROPERTY ? frame.geometryVariants : null;
+    String rawSrsName = geometryDecoder.getRawSrsName().orElse(null);
+
+    // Coordinates whose srsName declares a false-easting difference (e.g. Gauss-Krüger without
+    // the zone prefix) are shifted so the emitted geometry conforms to the mapped CRS.
+    if (optGeometry.isPresent() && rawSrsName != null) {
+      Double falseEastingDifference =
+          inputProfile.getSrsNameFalseEastingDifferences().get(rawSrsName);
+      if (falseEastingDifference != null && falseEastingDifference != 0) {
+        optGeometry =
+            Optional.of(
+                optGeometry
+                    .get()
+                    .accept(
+                        new de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer(
+                            de.ii.xtraplatform.geometries.domain.transform.ImmutableEastingShift.of(
+                                Optional.empty(), falseEastingDifference))));
+      }
+    }
+
+    if (optGeometry.isPresent()) {
+      String variantProperty =
+          variants != null && rawSrsName != null ? variants.getBySrsName().get(rawSrsName) : null;
+      if (variantProperty != null) {
+        context.pathTracker().track(variantProperty, frame.pathDepth);
+        emitGeometry(optGeometry.get());
+        emitSrsName(variants, rawSrsName, frame.pathDepth);
+        context.pathTracker().track(frame.segment, frame.pathDepth);
+      } else {
+        emitGeometry(optGeometry.get());
+      }
+      return;
+    }
+
+    Optional<String> verticalValue = geometryDecoder.getVerticalValue();
+    if (verticalValue.isEmpty()) {
+      return;
+    }
+    String verticalProperty =
+        variants != null && rawSrsName != null
+            ? variants.getVerticalBySrsName().get(rawSrsName)
+            : null;
+    if (verticalProperty == null) {
+      throw new IllegalArgumentException(
+          "1D position with srsName '"
+              + rawSrsName
+              + "' is not supported for this geometry property.");
+    }
+    context.pathTracker().track(verticalProperty, frame.pathDepth);
+    context.setValue(verticalValue.get());
+    context.setValueType(Type.STRING);
+    downstream.onValue(context);
+    emitSrsName(variants, rawSrsName, frame.pathDepth);
+    context.pathTracker().track(frame.segment, frame.pathDepth);
+  }
+
+  private void emitSrsName(GmlGeometryVariants variants, String rawSrsName, int pathDepth) {
+    variants
+        .getSrsNameProperty()
+        .ifPresent(
+            srsNameProperty -> {
+              context.pathTracker().track(srsNameProperty, pathDepth);
+              context.setValue(rawSrsName);
+              context.setValueType(Type.STRING);
+              downstream.onValue(context);
+            });
   }
 
   private void emitGeometry(Geometry<?> geom) {
