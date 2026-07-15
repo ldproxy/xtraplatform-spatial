@@ -376,7 +376,8 @@ public class FeatureStreamImpl implements FeatureStream {
                           data.getNativeCrs().orElse(OgcCrs.CRS84),
                           nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
       FeatureTokenTransformerCoordinates coordinatesMapper =
-          new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
+          new FeatureTokenTransformerCoordinates(
+              crsTransformer, crsTransformerWgs84, crsTransformerFactory);
       tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
     }
     if (stepClean) {

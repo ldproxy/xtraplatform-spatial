@@ -238,20 +238,105 @@ public interface FeatureSchema
   List<GeometryType> getGeometryTypes();
 
   /**
-   * @langEn The storage CRS of this geometry property, overriding the provider's `nativeCrs`. Only
-   *     relevant for properties with `type: GEOMETRY` in SQL feature providers, when a feature type
-   *     stores positions in more than one CRS in separate geometry columns. Geometries are read
-   *     from and written to the column in this CRS.
-   * @langDe Das Koordinatenreferenzsystem, in dem diese Geometrieeigenschaft gespeichert ist,
-   *     abweichend vom `nativeCrs` des Providers. Nur relevant für Eigenschaften mit `type:
-   *     GEOMETRY` in SQL-Feature-Providern, wenn eine Objektart Positionen in mehreren
+   * @langEn The CRS in which this geometry property is stored in the provider, overriding the
+   *     provider's `nativeCrs`. Only relevant for properties with `type: GEOMETRY` in SQL feature
+   *     providers, when a feature type stores positions in more than one CRS in separate geometry
+   *     columns. Geometries are read from and written to the column in this CRS. Note that in
+   *     PostGIS the axis order of stored coordinates always follows the GIS convention (longitude
+   *     or easting first), so the CRS of a stored geographic position is typically the `LON_LAT`
+   *     variant (e.g. `{code: 4937, forceAxisOrder: LON_LAT}`).
+   * @langDe Das Koordinatenreferenzsystem, in dem diese Geometrieeigenschaft im Provider
+   *     gespeichert ist, abweichend vom `nativeCrs` des Providers. Nur relevant für Eigenschaften
+   *     mit `type: GEOMETRY` in SQL-Feature-Providern, wenn eine Objektart Positionen in mehreren
    *     Koordinatenreferenzsystemen in separaten Geometriespalten speichert. Geometrien werden in
-   *     diesem CRS aus der Spalte gelesen und in die Spalte geschrieben.
+   *     diesem CRS aus der Spalte gelesen und in die Spalte geschrieben. In PostGIS folgt die
+   *     Achsenreihenfolge gespeicherter Koordinaten immer der GIS-Konvention (Länge bzw. Rechtswert
+   *     zuerst), das CRS einer gespeicherten geographischen Position ist daher typischerweise die
+   *     `LON_LAT`-Variante (z.B. `{code: 4937, forceAxisOrder: LON_LAT}`).
    * @default null
    * @since v4.8
    */
   @Override
-  Optional<EpsgCrs> getCrs();
+  Optional<EpsgCrs> getNativeCrs();
+
+  /**
+   * @langEn The CRS of the recorded positions that the `originalCrsIdentifiers` of this property
+   *     denote, if it differs from `nativeCrs`. Only relevant for properties with the role
+   *     `ORIGINAL_GEOMETRY`. Positions are transformed between `originalCrs` and `nativeCrs` when
+   *     they are written to and read from the provider; feature encodings that represent the
+   *     original positions (e.g. GML or JSON-FG with the `crs-original` profile) receive them in
+   *     this CRS. Example: positions recorded in `urn:adv:crs:ETRS89_Lat-Lon-h` (EPSG:4937,
+   *     latitude first) that are stored in the `LON_LAT` variant of EPSG:4937.
+   * @langDe Das Koordinatenreferenzsystem der erfassten Positionen, die die
+   *     `originalCrsIdentifiers` dieser Eigenschaft bezeichnen, sofern es vom `nativeCrs` abweicht.
+   *     Nur relevant für Eigenschaften mit der Rolle `ORIGINAL_GEOMETRY`. Positionen werden beim
+   *     Schreiben in den und Lesen aus dem Provider zwischen `originalCrs` und `nativeCrs`
+   *     transformiert; Feature-Kodierungen, die die ursprünglichen Positionen darstellen (z.B. GML
+   *     oder JSON-FG mit dem Profil `crs-original`), erhalten sie in diesem CRS. Beispiel: in
+   *     `urn:adv:crs:ETRS89_Lat-Lon-h` (EPSG:4937, Breite zuerst) erfasste Positionen, die in der
+   *     `LON_LAT`-Variante von EPSG:4937 gespeichert sind.
+   * @default nativeCrs
+   * @since v4.8
+   */
+  Optional<EpsgCrs> getOriginalCrs();
+
+  /**
+   * @langEn Declares sibling properties that store the position of this geometry property in other
+   *     reference systems, for feature types that store the same logical position in one of several
+   *     CRSs — including CRSs that cannot be expressed as a storage CRS (realizations that map to
+   *     the same coordinate reference system, or 1D vertical reference systems). Only relevant for
+   *     properties with `type: GEOMETRY` in SQL feature providers. All referenced properties are
+   *     implicitly `internal`. See [Position Variants](#position-variants).
+   * @langDe Deklariert Nachbareigenschaften, die die Position dieser Geometrieeigenschaft in
+   *     anderen Referenzsystemen speichern, für Objektarten, die dieselbe logische Position in
+   *     einem von mehreren Koordinatenreferenzsystemen speichern — einschließlich Systemen, die
+   *     nicht als Speicher-CRS ausgedrückt werden können (Realisierungen, die auf dasselbe
+   *     Koordinatenreferenzsystem abgebildet werden, oder eindimensionale Höhenreferenzsysteme).
+   *     Nur relevant für Eigenschaften mit `type: GEOMETRY` in SQL-Feature-Providern. Alle
+   *     referenzierten Eigenschaften sind implizit `internal`. Siehe
+   *     [Positionsvarianten](#position-variants).
+   * @default null
+   * @since v4.8
+   */
+  Optional<SchemaVariants> getVariants();
+
+  /**
+   * @langEn The verbatim identifiers of the reference systems that are stored in this property.
+   *     Only relevant for properties with the role `ORIGINAL_GEOMETRY` (2D/3D position variants;
+   *     positions carrying one of these identifiers are routed to this property) or
+   *     `ORIGINAL_HEIGHT` (1D position variants; the identifiers of the vertical reference
+   *     systems).
+   * @langDe Die unveränderten Kennungen der Referenzsysteme, die in dieser Eigenschaft gespeichert
+   *     werden. Nur relevant für Eigenschaften mit der Rolle `ORIGINAL_GEOMETRY`
+   *     (2D/3D-Positionsvarianten; Positionen mit einer dieser Kennungen werden dieser Eigenschaft
+   *     zugeordnet) oder `ORIGINAL_HEIGHT` (1D-Positionsvarianten; die Kennungen der
+   *     Höhenreferenzsysteme).
+   * @default []
+   * @since v4.8
+   */
+  List<String> getOriginalCrsIdentifiers();
+
+  /**
+   * @langEn The difference between the false easting of the CRS the positions are stored in
+   *     (`nativeCrs`) and the false easting used by coordinates carrying one of the
+   *     `originalCrsIdentifiers` of this property. Only relevant for properties with the role
+   *     `ORIGINAL_GEOMETRY`. When non-zero, the difference is added to the easting (the first
+   *     ordinate) on input and subtracted on output, so the stored coordinates conform to
+   *     `nativeCrs`. Example: German Gauss-Krüger coordinates written without the zone prefix use a
+   *     false easting of 500000, while EPSG:5677 (zone 3, E-N) defines 3500000 — the difference is
+   *     3000000.
+   * @langDe Die Differenz zwischen dem False Easting des Speicher-CRS (`nativeCrs`) und dem False
+   *     Easting der Koordinaten, die eine der `originalCrsIdentifiers` dieser Eigenschaft
+   *     verwenden. Nur relevant für Eigenschaften mit der Rolle `ORIGINAL_GEOMETRY`. Bei einem Wert
+   *     ungleich 0 wird die Differenz beim Einlesen zum Rechtswert (der ersten Ordinate) addiert
+   *     und bei der Ausgabe subtrahiert, sodass die gespeicherten Koordinaten dem Speicher-CRS
+   *     entsprechen. Beispiel: Gauß-Krüger-Koordinaten ohne Zonenkennzahl verwenden ein False
+   *     Easting von 500000, EPSG:5677 (Zone 3, E-N) definiert 3500000 — die Differenz beträgt
+   *     3000000.
+   * @default null
+   * @since v4.8
+   */
+  Optional<Double> getFalseEastingDifference();
 
   /**
    * @langEn Optional name for an object type, used for example in JSON Schema.
@@ -345,6 +430,26 @@ public interface FeatureSchema
   Set<Scope> getExcludedScopes();
 
   /**
+   * Whether the property is internal: read from the data source and available to feature encodings
+   * with special handling for the property, but not part of any public schema (returnables,
+   * receivables, queryables, sortables) and not encoded as a regular property in feature
+   * representations. Derived from the role: the members of a position-variants group ({@code
+   * ORIGINAL_GEOMETRY}, {@code ORIGINAL_HEIGHT}, {@code ORIGINAL_CRS_IDENTIFIER}) are internal.
+   */
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isInternal() {
+    return getRole()
+        .filter(
+            role ->
+                role == Role.ORIGINAL_GEOMETRY
+                    || role == Role.ORIGINAL_HEIGHT
+                    || role == Role.ORIGINAL_CRS_IDENTIFIER)
+        .isPresent();
+  }
+
+  /**
    * @langEn For a property of type `FEATURE_REF` or `FEATURE_REF_ARRAY` where the target is always
    *     a feature of another type in the same provider, declare the feature type identifier in
    *     `refType`. For details see [Feature References](#feature-references).
@@ -399,6 +504,7 @@ public interface FeatureSchema
   default boolean queryable() {
     return !isObject()
         && !isMultiSource()
+        && !isInternal()
         && !Objects.equals(getType(), Type.UNKNOWN)
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
@@ -412,6 +518,7 @@ public interface FeatureSchema
         && !isObject()
         && !isArray()
         && !isMultiSource()
+        && !isInternal()
         && !Objects.equals(getType(), Type.BOOLEAN)
         && !Objects.equals(getType(), Type.UNKNOWN)
         && !getExcludedScopes().contains(Scope.SORTABLE);

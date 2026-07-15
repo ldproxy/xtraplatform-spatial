@@ -528,7 +528,7 @@ public class SqlMappingDeriver {
       // the write path (SRID of the geometry literal and transformation target).
       String[] storageCrs =
           propertySchema
-              .flatMap(FeatureSchema::getCrs)
+              .flatMap(FeatureSchema::getNativeCrs)
               .map(
                   crs ->
                       new String[] {String.valueOf(crs.getCode()), crs.getForceAxisOrder().name()})

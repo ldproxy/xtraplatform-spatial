@@ -20,8 +20,11 @@ import org.immutables.value.Value;
  * its own schema property; the verbatim srsName is stored alongside so the encoder can reproduce
  * it.
  *
- * <p>All property values name sibling properties of the geometry property this instance is
- * configured for (same parent object, usually the feature type itself).
+ * <p>All property values name sibling properties of the geometry property this instance was built
+ * for (same parent object, usually the feature type itself). Instances are derived at decode time
+ * from the {@code variants} declaration on the geometry property in the {@code FeatureSchema} and
+ * the {@code originalCrsIdentifiers} / {@code falseEastingDifference} of the referenced sibling
+ * properties.
  */
 @Value.Immutable
 public interface GmlGeometryVariants {
@@ -32,6 +35,13 @@ public interface GmlGeometryVariants {
    * resolved CRS (via {@code srsNameMappings}) tags the geometry for the storage transformation.
    */
   Map<String, String> getBySrsName();
+
+  /**
+   * Wire {@code srsName} → the {@code falseEastingDifference} of the variant property it routes to.
+   * Added to the easting of the decoded position so the emitted geometry conforms to the storage
+   * CRS. Only srsNames with a non-zero difference are present.
+   */
+  Map<String, Double> getShiftBySrsName();
 
   /**
    * Wire {@code srsName} → scalar (FLOAT) property for 1D positions. The single coordinate value is

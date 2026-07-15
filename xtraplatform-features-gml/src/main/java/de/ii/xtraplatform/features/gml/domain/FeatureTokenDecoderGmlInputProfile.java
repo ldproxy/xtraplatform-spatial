@@ -23,21 +23,14 @@ import org.immutables.value.Value;
 public interface FeatureTokenDecoderGmlInputProfile {
 
   /**
-   * Reverse-mapping from the {@code srsName} value seen on a geometry to the resolved {@link
-   * EpsgCrs}. Required for input shaped after ALKIS NAS, which uses ADV URN forms such as {@code
-   * urn:adv:crs:DE_DHDN_3GK2_NW101} that the built-in EPSG / OGC URN parser cannot resolve.
+   * Reverse-mapping from the {@code srsName} value seen on an ordinary geometry to the resolved
+   * {@link EpsgCrs} — the {@code alternativeUri} declarations of the requestable CRSs (CRS building
+   * block). Required for input shaped after ALKIS NAS, which uses AdV URN forms such as {@code
+   * urn:adv:crs:ETRS89_UTM32} that the built-in EPSG / OGC URN parser cannot resolve. The
+   * identifiers of position variants are not part of this map; they are declared in the {@code
+   * FeatureSchema} ({@code originalCrsIdentifiers}).
    */
   Map<String, EpsgCrs> getSrsNameMappings();
-
-  /**
-   * Per wire {@code srsName}, the difference between the false easting of the mapped CRS and the
-   * false easting used by coordinates carrying that srsName (e.g. 3000000 for German Gauss-Krüger
-   * coordinates written without the zone prefix, mapped to a zone-prefixed EPSG CRS). Added to the
-   * easting (first ordinate) of every decoded position so the emitted coordinates conform to the
-   * mapped CRS; the encoder subtracts it on output. Only srsNames with a non-zero difference are
-   * present.
-   */
-  Map<String, Double> getSrsNameFalseEastingDifferences();
 
   /**
    * Optional prefix stripped from the value of {@code gml:id} before it is emitted as the feature
@@ -185,14 +178,6 @@ public interface FeatureTokenDecoderGmlInputProfile {
    * captured from the wire.
    */
   Set<String> getObjectTypeSuffixedProperties();
-
-  /**
-   * Reverse of {@code GmlConfiguration#positionVariants}: per geometry property — keyed by the
-   * property's technical full path; the alias-form path is honored as well, mirroring {@link
-   * #getValueWrap()} — the routing of positions in non-native CRSs to CRS-specific sibling
-   * properties. See {@link GmlGeometryVariants}.
-   */
-  Map<String, GmlGeometryVariants> getGeometryVariants();
 
   static FeatureTokenDecoderGmlInputProfile empty() {
     return ImmutableFeatureTokenDecoderGmlInputProfile.builder().build();

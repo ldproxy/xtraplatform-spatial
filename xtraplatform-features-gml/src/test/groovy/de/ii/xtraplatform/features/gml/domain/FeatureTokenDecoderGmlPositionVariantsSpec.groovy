@@ -13,6 +13,7 @@ import de.ii.xtraplatform.features.domain.FeatureTokenType
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
 import de.ii.xtraplatform.features.domain.ImmutableSchemaMapping
+import de.ii.xtraplatform.features.domain.ImmutableSchemaVariants
 import de.ii.xtraplatform.features.domain.SchemaBase
 import de.ii.xtraplatform.features.domain.SchemaMapping
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple
@@ -25,10 +26,11 @@ import spock.lang.Specification
 import javax.xml.namespace.QName
 
 /**
- * Position-variant routing (see {@link GmlGeometryVariants}): positions in a foreign CRS are
- * routed by their verbatim srsName to a variant property (with the configured false-easting
- * difference applied), 1D positions to a scalar property, and the srsName itself to a companion
- * property. Positions without a routed srsName take the normal path.
+ * Position-variant routing (see {@link GmlGeometryVariants}), driven entirely by the schema:
+ * positions are routed by their verbatim srsName to the variant property that lists the srsName in
+ * its originalCrsIdentifiers (with the property's falseEastingDifference applied), 1D positions to
+ * the vertical property, and the srsName itself to the crsProperty. Positions without a routed
+ * srsName take the normal path.
  */
 class FeatureTokenDecoderGmlPositionVariantsSpec extends Specification {
 
@@ -57,28 +59,30 @@ class FeatureTokenDecoderGmlPositionVariantsSpec extends Specification {
                 .putProperties2("pos_gk3", new ImmutableFeatureSchema.Builder()
                         .sourcePath("position_gk3")
                         .type(SchemaBase.Type.GEOMETRY)
-                        .geometryType(GeometryType.POINT))
+                        .geometryType(GeometryType.POINT)
+                        .nativeCrs(EpsgCrs.of(5677))
+                        .addOriginalCrsIdentifiers(GK3_HE100)
+                        .falseEastingDifference(3000000d))
                 .putProperties2("pos_h", new ImmutableFeatureSchema.Builder()
                         .sourcePath("position_h")
-                        .type(SchemaBase.Type.FLOAT))
+                        .type(SchemaBase.Type.FLOAT)
+                        .addOriginalCrsIdentifiers(DHHN92))
                 .putProperties2("geo", new ImmutableFeatureSchema.Builder()
                         .sourcePath("position")
                         .type(SchemaBase.Type.GEOMETRY)
                         .geometryType(GeometryType.POINT)
-                        .alias("position"))
+                        .alias("position")
+                        .variants(new ImmutableSchemaVariants.Builder()
+                                .crsProperty("pos_srs")
+                                .verticalProperty("pos_h")
+                                .addGeometryProperties("pos_gk3")
+                                .build()))
                 .build()
     }
 
     static FeatureTokenDecoderGmlInputProfile profile() {
         ImmutableFeatureTokenDecoderGmlInputProfile.builder()
                 .useAlias(true)
-                .putSrsNameMappings(GK3_HE100, EpsgCrs.of(5677))
-                .putSrsNameFalseEastingDifferences(GK3_HE100, 3000000d)
-                .putGeometryVariants("geo", ImmutableGmlGeometryVariants.builder()
-                        .putBySrsName(GK3_HE100, "pos_gk3")
-                        .putVerticalBySrsName(DHHN92, "pos_h")
-                        .srsNameProperty("pos_srs")
-                        .build())
                 .build()
     }
 

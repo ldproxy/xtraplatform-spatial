@@ -8,6 +8,8 @@
 package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
+import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.geometries.domain.Geometry;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformation;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
@@ -19,23 +21,40 @@ public class FeatureTokenTransformerCoordinates extends FeatureTokenTransformer 
 
   private final Optional<CrsTransformer> crsTransformerTargetCrs;
   private final Optional<CrsTransformer> crsTransformerWgs84;
+  private final CrsTransformerFactory crsTransformerFactory;
 
   public FeatureTokenTransformerCoordinates(
       Optional<CrsTransformer> crsTransformerTargetCrs,
-      Optional<CrsTransformer> crsTransformerWgs84) {
+      Optional<CrsTransformer> crsTransformerWgs84,
+      CrsTransformerFactory crsTransformerFactory) {
     this.crsTransformerTargetCrs = crsTransformerTargetCrs;
     this.crsTransformerWgs84 = crsTransformerWgs84;
+    this.crsTransformerFactory = crsTransformerFactory;
   }
 
   @Override
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     Geometry<?> geometry = context.geometry();
     if (geometry != null) {
-      // A geometry property with its own storage CRS (schema option `crs`) carries a position
-      // as-is in a non-native CRS — possibly 1D/3D or a CRS the query pipeline cannot transform.
-      // It is passed through untouched; formats either reproduce it verbatim (GML position
-      // variants) or suppress it.
-      if (context.schema().flatMap(SchemaBase::getCrs).isPresent()) {
+      // A geometry property that is stored in its own CRS (schema option `nativeCrs`) carries a
+      // position as-is in a non-native CRS — possibly 1D/3D or a CRS the query pipeline cannot
+      // transform. It is not transformed to the target CRS; when the property declares an
+      // `originalCrs` (the CRS of the recorded positions, e.g. the authority axis order of a
+      // geographic CRS whose stored coordinates follow the GIS axis order), the position is
+      // transformed back to it, so downstream formats reproduce the recorded position verbatim.
+      Optional<EpsgCrs> propertyCrs = context.schema().flatMap(SchemaBase::getNativeCrs);
+      if (propertyCrs.isPresent()) {
+        Optional<EpsgCrs> originalCrs = context.schema().flatMap(FeatureSchema::getOriginalCrs);
+        if (originalCrs.isPresent() && !originalCrs.get().equals(propertyCrs.get())) {
+          Optional<CrsTransformer> toOriginal =
+              crsTransformerFactory.getTransformer(propertyCrs.get(), originalCrs.get());
+          if (toOriginal.isPresent()) {
+            context.setGeometry(
+                geometry.accept(
+                    new CoordinatesTransformer(
+                        ImmutableCrsTransform.of(Optional.empty(), toOriginal.get()))));
+          }
+        }
         getDownstream().onGeometry(context);
         return;
       }

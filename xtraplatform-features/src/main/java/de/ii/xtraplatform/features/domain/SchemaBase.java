@@ -50,7 +50,27 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     SECONDARY_GEOMETRY,
     FILTER_GEOMETRY,
     EMBEDDED_FEATURE,
-    FEATURE_REF;
+    FEATURE_REF,
+    /**
+     * A 2D/3D position variant of a geometry property with a {@code variants} declaration: the
+     * position as recorded, in a reference system other than the CRS of the main geometry property.
+     * The property declares the CRS it is stored in in {@code nativeCrs}, optionally the CRS of the
+     * recorded positions in {@code originalCrs}, and the reference-system identifiers that route to
+     * it in {@code originalCrsIdentifiers}. Implicitly {@code internal}.
+     */
+    ORIGINAL_GEOMETRY,
+    /**
+     * The single coordinate of a position variant in a 1D vertical reference system (see the {@code
+     * verticalProperty} of a {@code variants} declaration). The property declares the identifiers
+     * of the vertical reference systems that route to it in {@code originalCrsIdentifiers}.
+     * Implicitly {@code internal}.
+     */
+    ORIGINAL_HEIGHT,
+    /**
+     * The verbatim identifier of the reference system of a position variant (see the {@code
+     * crsProperty} of a {@code variants} declaration). Implicitly {@code internal}.
+     */
+    ORIGINAL_CRS_IDENTIFIER;
 
     private final String linkRelation;
 
@@ -183,7 +203,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
 
   List<GeometryType> getGeometryTypes();
 
-  Optional<EpsgCrs> getCrs();
+  Optional<EpsgCrs> getNativeCrs();
 
   Optional<String> getFormat();
 

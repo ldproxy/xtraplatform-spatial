@@ -17,6 +17,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.SchemaVariants;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -25,12 +26,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.namespace.QName;
@@ -148,6 +152,12 @@ public class FeatureTokenDecoderGml
    */
   private final Map<String, String> aliasFormPathByPropertyPath;
 
+  /**
+   * Per geometry property (keyed by its technical full path), the srsName routing built from the
+   * schema's {@code variants} declaration by {@link #buildGeometryVariants}.
+   */
+  private final Map<String, GmlGeometryVariants> geometryVariantsCache = new HashMap<>();
+
   private int depth = 0;
   private boolean inFeature = false;
   private boolean featureProcessed = false;
@@ -259,10 +269,10 @@ public class FeatureTokenDecoderGml
     boolean valueWrapped;
 
     /**
-     * For GEOMETRY_PROPERTY: the position-variant routing configured for this property in {@link
-     * FeatureTokenDecoderGmlInputProfile#getGeometryVariants()}, or {@code null} when none is
-     * configured. Consulted by {@code emitGeometryOrVertical} together with the raw srsName the
-     * geometry decoder captured.
+     * For GEOMETRY_PROPERTY: the position-variant routing derived from the property's {@code
+     * variants} declaration in the schema (see {@code buildGeometryVariants}), or {@code null} when
+     * none is declared. Consulted by {@code emitGeometryOrVertical} together with the raw srsName
+     * the geometry decoder captured.
      */
     GmlGeometryVariants geometryVariants;
 
@@ -331,12 +341,14 @@ public class FeatureTokenDecoderGml
     this.defaultCrs = headerCrs.isPresent() ? headerCrs : Optional.of(storageCrs);
     this.nullValue = nullValue;
     this.inputProfile = inputProfile;
-    this.geometryDecoder =
-        new GeometryDecoderGml(
-            inputProfile.getSrsNameMappings(),
-            inputProfile.getGeometryVariants().values().stream()
-                .flatMap(variants -> variants.getVerticalBySrsName().keySet().stream())
-                .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+    // The reference systems of position variants are declared in the schema: each variant
+    // property lists its verbatim identifiers in originalCrsIdentifiers and the CRS they denote in
+    // originalCrs (defaulting to nativeCrs, the CRS the positions are stored in). The input
+    // profile only contributes the alternative URIs of the requestable CRSs (ordinary geometries).
+    Map<String, EpsgCrs> srsNameMappings = new LinkedHashMap<>(inputProfile.getSrsNameMappings());
+    Set<String> verticalSrsNames = new HashSet<>();
+    collectVariantReferenceSystems(featureSchema, srsNameMappings, verticalSrsNames);
+    this.geometryDecoder = new GeometryDecoderGml(srsNameMappings, verticalSrsNames);
     this.buffer = new StringBuilder();
 
     List<String> wrappers = new ArrayList<>(2);
@@ -661,7 +673,7 @@ public class FeatureTokenDecoderGml
       // path so {@code emitGeometryOrVertical} routes the resulting Geometry (or 1D position) to
       // the right downstream slot.
       Frame frame = Frame.geometryProperty(prop, segment, segmentPathDepth);
-      frame.geometryVariants = geometryVariantsFor(prop);
+      frame.geometryVariants = geometryVariantsFor(prop, lookupOwner);
       frames.push(frame);
       Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser, crs, srsDimension);
       boolean waiting = geometryDecoder.isWaitingForInput();
@@ -1304,21 +1316,107 @@ public class FeatureTokenDecoderGml
   }
 
   /**
-   * Mirrors {@link #isValueWrapped}: the configuration is keyed by the property's technical full
-   * path, but a YAML config keyed by the alias-form path is recognised as well.
+   * Builds the srsName-keyed routing for a geometry property from its schema-level {@code variants}
+   * declaration: every {@code originalCrsIdentifiers} entry of a variant sibling routes to that
+   * sibling (together with the sibling's {@code falseEastingDifference}); every identifier of the
+   * vertical sibling routes to the vertical property. Cached per geometry property.
    */
-  private GmlGeometryVariants geometryVariantsFor(FeatureSchema prop) {
-    Map<String, GmlGeometryVariants> geometryVariants = inputProfile.getGeometryVariants();
-    if (geometryVariants.isEmpty()) {
+  private GmlGeometryVariants geometryVariantsFor(FeatureSchema prop, FeatureSchema lookupOwner) {
+    if (prop.getVariants().isEmpty()) {
       return null;
     }
-    String path = prop.getFullPathAsString();
-    GmlGeometryVariants variants = geometryVariants.get(path);
-    if (variants != null) {
-      return variants;
+    return geometryVariantsCache.computeIfAbsent(
+        prop.getFullPathAsString(), ignore -> buildGeometryVariants(prop, lookupOwner));
+  }
+
+  private GmlGeometryVariants buildGeometryVariants(FeatureSchema prop, FeatureSchema lookupOwner) {
+    SchemaVariants variants = prop.getVariants().get();
+    Map<String, String> bySrsName = new LinkedHashMap<>();
+
+    Map<String, Double> shiftBySrsName = new LinkedHashMap<>();
+    variants.getGeometryProperties().stream()
+        .map(name -> siblingProperty(lookupOwner, name))
+        .filter(Objects::nonNull)
+        .forEach(
+            sibling ->
+                sibling
+                    .getOriginalCrsIdentifiers()
+                    .forEach(
+                        identifier -> {
+                          bySrsName.put(identifier, sibling.getName());
+                          sibling
+                              .getFalseEastingDifference()
+                              .filter(difference -> difference != 0)
+                              .ifPresent(difference -> shiftBySrsName.put(identifier, difference));
+                        }));
+
+    Map<String, String> verticalBySrsName = new LinkedHashMap<>();
+    variants
+        .getVerticalProperty()
+        .ifPresent(
+            verticalProperty -> {
+              FeatureSchema sibling = siblingProperty(lookupOwner, verticalProperty);
+              if (sibling != null) {
+                sibling
+                    .getOriginalCrsIdentifiers()
+                    .forEach(identifier -> verticalBySrsName.put(identifier, verticalProperty));
+              }
+            });
+
+    return ImmutableGmlGeometryVariants.builder()
+        .bySrsName(bySrsName)
+        .shiftBySrsName(shiftBySrsName)
+        .verticalBySrsName(verticalBySrsName)
+        .srsNameProperty(variants.getCrsProperty())
+        .build();
+  }
+
+  private FeatureSchema siblingProperty(FeatureSchema owner, String name) {
+    return owner == null
+        ? null
+        : owner.getProperties().stream()
+            .filter(prop -> prop.getName().equals(name))
+            .findFirst()
+            .orElse(null);
+  }
+
+  private static void collectVariantReferenceSystems(
+      FeatureSchema schema, Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
+    for (FeatureSchema child : schema.getProperties()) {
+      child
+          .getVariants()
+          .ifPresent(
+              variants -> {
+                variants
+                    .getGeometryProperties()
+                    .forEach(
+                        name -> {
+                          FeatureSchema sibling =
+                              schema.getProperties().stream()
+                                  .filter(prop -> prop.getName().equals(name))
+                                  .findFirst()
+                                  .orElse(null);
+                          if (sibling != null && sibling.getNativeCrs().isPresent()) {
+                            EpsgCrs wireCrs =
+                                sibling.getOriginalCrs().orElse(sibling.getNativeCrs().get());
+                            sibling
+                                .getOriginalCrsIdentifiers()
+                                .forEach(
+                                    identifier -> srsNameMappings.putIfAbsent(identifier, wireCrs));
+                          }
+                        });
+                variants
+                    .getVerticalProperty()
+                    .flatMap(
+                        name ->
+                            schema.getProperties().stream()
+                                .filter(prop -> prop.getName().equals(name))
+                                .findFirst())
+                    .ifPresent(
+                        sibling -> verticalSrsNames.addAll(sibling.getOriginalCrsIdentifiers()));
+              });
+      collectVariantReferenceSystems(child, srsNameMappings, verticalSrsNames);
     }
-    String aliasPath = aliasFormPathByPropertyPath.get(path);
-    return aliasPath != null ? geometryVariants.get(aliasPath) : null;
   }
 
   /**
@@ -1338,9 +1436,8 @@ public class FeatureTokenDecoderGml
 
     // Coordinates whose srsName declares a false-easting difference (e.g. Gauss-Krüger without
     // the zone prefix) are shifted so the emitted geometry conforms to the mapped CRS.
-    if (optGeometry.isPresent() && rawSrsName != null) {
-      Double falseEastingDifference =
-          inputProfile.getSrsNameFalseEastingDifferences().get(rawSrsName);
+    if (optGeometry.isPresent() && rawSrsName != null && variants != null) {
+      Double falseEastingDifference = variants.getShiftBySrsName().get(rawSrsName);
       if (falseEastingDifference != null && falseEastingDifference != 0) {
         optGeometry =
             Optional.of(
