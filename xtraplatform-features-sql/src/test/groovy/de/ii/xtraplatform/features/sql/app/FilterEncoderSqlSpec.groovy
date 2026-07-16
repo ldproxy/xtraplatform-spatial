@@ -19,6 +19,7 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.app.CqlFilterExamples
 import de.ii.xtraplatform.cql.app.CqlImpl
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
+import de.ii.xtraplatform.cql.domain.IsNull
 import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
@@ -335,7 +336,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_16)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE NOT ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326)))"
+        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -544,6 +545,23 @@ class FilterEncoderSqlSpec extends Specification {
 
     }
 
+    def 'is Null test, joined property'() {
+
+        given: 'a feature without any related row has no value, so it must match'
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = IsNull.of("location")
+
+        when:
+        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL))"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
+
+    }
+
     def 'not in list test'() {
 
         given:
@@ -738,7 +756,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_AContains_ValidFor_JOINED_GEOMETRY)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE NOT AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2)"
+        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
