@@ -57,7 +57,6 @@ import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
-import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileProviderData;
 import de.ii.xtraplatform.tiles.domain.TileProviderFeaturesData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
@@ -108,8 +107,15 @@ import org.threeten.extra.AmountFormats;
           value = TileProviderFeaturesData.PROVIDER_SUBTYPE)
     },
     data = TileProviderFeaturesData.class)
+@SuppressWarnings({
+  "PMD.CouplingBetweenObjects",
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods",
+  "PMD.CognitiveComplexity"
+})
 public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeaturesData>
-    implements TileProvider, TileAccess, TileSeeding, DatasetChangeListener, FeatureChangeListener {
+    implements TileSeeding, DatasetChangeListener, FeatureChangeListener {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderFeatures.class);
   static final String TILES_DIR_NAME = "tiles";
@@ -144,7 +150,12 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       JobQueue jobQueue,
       TileMatrixSetRepository tileMatrixSetRepository,
       @Assisted TileProviderFeaturesData data) {
-    super(volatileRegistry, data, "access", "generation", "seeding");
+    super(
+        volatileRegistry,
+        data,
+        TileAccess.CAPABILITY,
+        TileGenerator.CAPABILITY,
+        TileSeeding.CAPABILITY);
 
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
     this.tileMatrixSetRepository = Optional.of(tileMatrixSetRepository);
@@ -177,9 +188,10 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   protected boolean onStartup() throws InterruptedException {
     onVolatileStart();
 
-    addSubcomponent(tilesStore, true, "access", "generation", "seeding");
-    addSubcomponent(tileGenerator, true, "generation", "seeding");
-    addSubcomponent(tileWalker, "seeding");
+    addSubcomponent(
+        tilesStore, true, TileAccess.CAPABILITY, TileGenerator.CAPABILITY, TileSeeding.CAPABILITY);
+    addSubcomponent(tileGenerator, true, TileGenerator.CAPABILITY, TileSeeding.CAPABILITY);
+    addSubcomponent(tileWalker, TileSeeding.CAPABILITY);
 
     if (!asyncStartup) {
       init();
@@ -196,6 +208,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
     return super.volatileInit();
   }
 
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   private void init() {
     ChainedTileProvider current = tileGenerator;
 
@@ -601,7 +614,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       try {
         cache.delete(tileset, tileMatrixSet, limits, false);
       } catch (IOException e) {
-
+        // ignore, continue deleting from other caches
       }
     }
 
@@ -695,62 +708,24 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       TileSubMatrix subMatrix,
       String vectorTileset,
       TileSubMatrix vectorSubMatrix) {
-    Map<String, String> result = new LinkedHashMap<>();
-
-    for (TileCache cache : generatorCaches) {
-      if (cache.isSeeded()) {
-        Optional<String> vectorStorage =
-            cache
-                .getStorageInfo(vectorTileset, tileMatrixSet, vectorSubMatrix.toLimits())
-                .map(
-                    path -> {
-                      if (cache.getStorageType() == Storage.PER_JOB) {
-                        String fileName = Path.of(path).getFileName().toString();
-                        String ext = Files.getFileExtension(fileName);
-                        return path.replace(fileName, "{partition}." + ext);
-                      }
-                      return path;
-                    });
-        Optional<String> rasterStorage =
-            cache
-                .getStorageInfo(rasterTileset, tileMatrixSet, subMatrix.toLimits())
-                .map(path -> path.replaceAll("\\.mvt", ".png"));
-
-        result.put("type", cache.getStorageType().name());
-        result.put("jobSize", String.valueOf(getOptions().getEffectiveJobSize()));
-        vectorStorage.ifPresent(s -> result.put("vector", s.replace(dataDir + "/", "")));
-        rasterStorage.ifPresent(s -> result.put("raster", s.replace(dataDir + "/", "")));
-        break;
-      }
-    }
-    if (result.isEmpty()) {
-      for (TileCache cache : combinerCaches) {
-        if (cache.isSeeded()) {
-          Optional<String> vectorStorage =
-              cache
-                  .getStorageInfo(vectorTileset, tileMatrixSet, vectorSubMatrix.toLimits())
-                  .map(
-                      path -> {
-                        if (cache.getStorageType() == Storage.PER_JOB) {
-                          String fileName = Path.of(path).getFileName().toString();
-                          String ext = Files.getFileExtension(fileName);
-                          return path.replace(fileName, "{partition}." + ext);
-                        }
-                        return path;
-                      });
-          Optional<String> rasterStorage =
-              cache
-                  .getStorageInfo(rasterTileset, tileMatrixSet, subMatrix.toLimits())
-                  .map(path -> path.replaceAll("\\.mvt", ".png"));
-
-          result.put("type", cache.getStorageType().name());
-          result.put("jobSize", String.valueOf(getOptions().getEffectiveJobSize()));
-          vectorStorage.ifPresent(s -> result.put("vector", s.replace(dataDir + "/", "")));
-          rasterStorage.ifPresent(s -> result.put("raster", s.replace(dataDir + "/", "")));
-          break;
-        }
-      }
-    }
+    Map<String, String> result =
+        findRasterStorageInfo(
+                generatorCaches,
+                rasterTileset,
+                tileMatrixSet,
+                subMatrix,
+                vectorTileset,
+                vectorSubMatrix)
+            .or(
+                () ->
+                    findRasterStorageInfo(
+                        combinerCaches,
+                        rasterTileset,
+                        tileMatrixSet,
+                        subMatrix,
+                        vectorTileset,
+                        vectorSubMatrix))
+            .orElseGet(LinkedHashMap::new);
 
     // TODO: get style from api/values
     getStyleId(vectorTileset, rasterTileset)
@@ -775,6 +750,46 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             });
 
     return result;
+  }
+
+  private Optional<Map<String, String>> findRasterStorageInfo(
+      List<TileCache> caches,
+      String rasterTileset,
+      String tileMatrixSet,
+      TileSubMatrix subMatrix,
+      String vectorTileset,
+      TileSubMatrix vectorSubMatrix) {
+    for (TileCache cache : caches) {
+      if (!cache.isSeeded()) {
+        continue;
+      }
+
+      Optional<String> vectorStorage =
+          cache
+              .getStorageInfo(vectorTileset, tileMatrixSet, vectorSubMatrix.toLimits())
+              .map(path -> toPartitionedPath(cache, path));
+      Optional<String> rasterStorage =
+          cache
+              .getStorageInfo(rasterTileset, tileMatrixSet, subMatrix.toLimits())
+              .map(path -> path.replaceAll("\\.mvt", ".png"));
+
+      Map<String, String> result = new LinkedHashMap<>();
+      result.put("type", cache.getStorageType().name());
+      result.put("jobSize", String.valueOf(getOptions().getEffectiveJobSize()));
+      vectorStorage.ifPresent(s -> result.put("vector", s.replace(dataDir + "/", "")));
+      rasterStorage.ifPresent(s -> result.put("raster", s.replace(dataDir + "/", "")));
+      return Optional.of(result);
+    }
+    return Optional.empty();
+  }
+
+  private static String toPartitionedPath(TileCache cache, String path) {
+    if (cache.getStorageType() != Storage.PER_JOB) {
+      return path;
+    }
+    String fileName = Path.of(path).getFileName().toString();
+    String ext = Files.getFileExtension(fileName);
+    return path.replace(fileName, "{partition}." + ext);
   }
 
   @Override
@@ -829,7 +844,9 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   @Override
   public void runSeeding(TileSeedingJob job, Consumer<Integer> updateProgress) throws IOException {
     if (!metadata.containsKey(job.getTileSet())) {
-      LOGGER.warn("Tileset with name '{}' not found", job.getTileSet());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn("Tileset with name '{}' not found", job.getTileSet());
+      }
       return;
     }
 
@@ -906,7 +923,9 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
                 return false;
               }
               if (!getData().getTilesets().containsKey(entry.getKey())) {
-                LOGGER.warn("Tileset with name '{}' not found", entry.getKey());
+                if (LOGGER.isWarnEnabled()) {
+                  LOGGER.warn("Tileset with name '{}' not found", entry.getKey());
+                }
                 return false;
               }
               return true;
@@ -1122,6 +1141,6 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   }
 
   private String getFeatureProviderId(TilesetFeatures tileset) {
-    return tileset.getFeatureProvider().orElse(TileProviderFeatures.clean(getData().getId()));
+    return tileset.getFeatureProvider().orElse(clean(getData().getId()));
   }
 }

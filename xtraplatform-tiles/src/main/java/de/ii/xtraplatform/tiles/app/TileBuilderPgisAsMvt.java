@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 @AutoBind
-@SuppressWarnings("PMD.CouplingBetweenObjects")
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class TileBuilderPgisAsMvt
     implements FeatureQueriesExtension, TileBuilder, DropwizardPlugin {
 
@@ -318,8 +318,8 @@ public class TileBuilderPgisAsMvt
 
   // Densify the edges a little so the envelope can be safely converted to other coordinate systems.
   private String envelopeToSql(BoundingBox bounds) {
-    double density_factor = 4.0;
-    double segSize = (bounds.getXmax() - bounds.getXmin()) / density_factor;
+    double densityFactor = 4.0;
+    double segSize = (bounds.getXmax() - bounds.getXmin()) / densityFactor;
     return String.format(
         "ST_Segmentize(ST_MakeEnvelope(%s, %s, %s, %s, %s),%s)",
         bounds.getXmin(),
@@ -352,6 +352,7 @@ public class TileBuilderPgisAsMvt
         .findFirst();
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private static boolean isFeasible(FeatureProviderDataV2 data) {
     UnsupportedMode unsupportedMode =
         getConfiguration(data.getExtensions()).get().getUnsupportedProperties();
