@@ -16,8 +16,6 @@ import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
-import de.ii.xtraplatform.tiles.domain.TileAccess;
-import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileProviderData;
 import de.ii.xtraplatform.tiles.domain.TileProviderHttpData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
@@ -44,8 +42,7 @@ import org.slf4j.LoggerFactory;
           value = TileProviderHttpData.PROVIDER_SUBTYPE)
     },
     data = TileProviderHttpData.class)
-public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
-    implements TileProvider, TileAccess {
+public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderHttp.class);
   private final ChainedTileProvider providerChain;
