@@ -279,14 +279,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   }
 
   private static String formatRoleOverrideValue(SqlQueryColumn column, Object value) {
-    SchemaBase.Type type = column.getType();
-    String raw = value.toString();
-    if (type == SchemaBase.Type.STRING
-        || type == SchemaBase.Type.DATETIME
-        || type == SchemaBase.Type.DATE) {
-      return "'" + raw.replace("'", "''") + "'";
-    }
-    return raw;
+    return SqlLiterals.forType(column.getType(), value.toString());
   }
 
   @Override
@@ -1422,21 +1415,9 @@ public class SqlMutationSession implements FeatureTransactions.Session {
         || column.hasOperation(SqlQueryColumn.Operation.WKB)) {
       return encodeGeometryLiteral(column, value, crs);
     }
-    SchemaBase.Type type = column.getType();
-    if (type == SchemaBase.Type.STRING
-        || type == SchemaBase.Type.DATETIME
-        || type == SchemaBase.Type.DATE) {
-      return sqlString(value.asText());
-    }
-    if (type == SchemaBase.Type.BOOLEAN) {
-      return value.asBoolean() ? "TRUE" : "FALSE";
-    }
-    if (type == SchemaBase.Type.INTEGER || type == SchemaBase.Type.FLOAT) {
-      return value.asText();
-    }
-    // Fallback — treat as string. Avoids generating invalid SQL on niche column types we haven't
-    // wired up explicitly yet (FEATURE_REF, etc.).
-    return sqlString(value.asText());
+    // Numeric/boolean values are validated and re-rendered (never inlined as raw request text);
+    // everything else is quoted. See SqlLiterals.
+    return SqlLiterals.forType(column.getType(), value.asText());
   }
 
   private String encodeGeometryLiteral(

@@ -13,7 +13,6 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
-import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
@@ -313,17 +312,12 @@ public class FeatureEncoderSql
                 return;
               }
 
-              boolean needsQuotes =
-                  column.second().getType() == SchemaBase.Type.STRING
-                      || column.second().getType() == SchemaBase.Type.DATETIME
-                      || column.second().getType() == SchemaBase.Type.DATE;
-              /* (schemaSql.getType() == SchemaBase.Type.FEATURE_REF
-              && schemaSql.getValueType().orElse(SchemaBase.Type.STRING)
-              == SchemaBase.Type.STRING)*/
-
+              // Numeric/boolean values are validated and re-rendered (never inlined as raw request
+              // text); string/date values are quoted with quote-doubling. A null stays null so the
+              // downstream row renderer emits SQL NULL. See SqlLiterals.
               value =
-                  needsQuotes && Objects.nonNull(value)
-                      ? String.format("'%s'", value.replaceAll("'", "''"))
+                  Objects.nonNull(value)
+                      ? SqlLiterals.forType(column.second().getType(), value)
                       : value;
 
               boolean junctionElement =
