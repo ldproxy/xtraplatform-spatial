@@ -759,28 +759,42 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       TileSubMatrix subMatrix,
       String vectorTileset,
       TileSubMatrix vectorSubMatrix) {
-    for (TileCache cache : caches) {
-      if (!cache.isSeeded()) {
-        continue;
-      }
+    return caches.stream()
+        .filter(TileCache::isSeeded)
+        .findFirst()
+        .map(
+            cache ->
+                toRasterStorageInfo(
+                    cache,
+                    rasterTileset,
+                    tileMatrixSet,
+                    subMatrix,
+                    vectorTileset,
+                    vectorSubMatrix));
+  }
 
-      Optional<String> vectorStorage =
-          cache
-              .getStorageInfo(vectorTileset, tileMatrixSet, vectorSubMatrix.toLimits())
-              .map(path -> toPartitionedPath(cache, path));
-      Optional<String> rasterStorage =
-          cache
-              .getStorageInfo(rasterTileset, tileMatrixSet, subMatrix.toLimits())
-              .map(path -> path.replaceAll("\\.mvt", ".png"));
+  private Map<String, String> toRasterStorageInfo(
+      TileCache cache,
+      String rasterTileset,
+      String tileMatrixSet,
+      TileSubMatrix subMatrix,
+      String vectorTileset,
+      TileSubMatrix vectorSubMatrix) {
+    Optional<String> vectorStorage =
+        cache
+            .getStorageInfo(vectorTileset, tileMatrixSet, vectorSubMatrix.toLimits())
+            .map(path -> toPartitionedPath(cache, path));
+    Optional<String> rasterStorage =
+        cache
+            .getStorageInfo(rasterTileset, tileMatrixSet, subMatrix.toLimits())
+            .map(path -> path.replaceAll("\\.mvt", ".png"));
 
-      Map<String, String> result = new LinkedHashMap<>();
-      result.put("type", cache.getStorageType().name());
-      result.put("jobSize", String.valueOf(getOptions().getEffectiveJobSize()));
-      vectorStorage.ifPresent(s -> result.put("vector", s.replace(dataDir + "/", "")));
-      rasterStorage.ifPresent(s -> result.put("raster", s.replace(dataDir + "/", "")));
-      return Optional.of(result);
-    }
-    return Optional.empty();
+    Map<String, String> result = new LinkedHashMap<>();
+    result.put("type", cache.getStorageType().name());
+    result.put("jobSize", String.valueOf(getOptions().getEffectiveJobSize()));
+    vectorStorage.ifPresent(s -> result.put("vector", s.replace(dataDir + "/", "")));
+    rasterStorage.ifPresent(s -> result.put("raster", s.replace(dataDir + "/", "")));
+    return result;
   }
 
   private static String toPartitionedPath(TileCache cache, String path) {
