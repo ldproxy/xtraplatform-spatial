@@ -26,10 +26,8 @@ import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
 import de.ii.xtraplatform.tiles.domain.MbtilesMetadata;
 import de.ii.xtraplatform.tiles.domain.MbtilesTileset;
 import de.ii.xtraplatform.tiles.domain.MinMax;
-import de.ii.xtraplatform.tiles.domain.TileAccess;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSet;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
-import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileProviderData;
 import de.ii.xtraplatform.tiles.domain.TileProviderMbtilesData;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
@@ -43,6 +41,7 @@ import de.ii.xtraplatform.tiles.domain.WithCenter;
 import de.ii.xtraplatform.tiles.domain.WithCenter.LonLat;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,8 +61,7 @@ import org.slf4j.LoggerFactory;
           value = TileProviderMbtilesData.PROVIDER_SUBTYPE)
     },
     data = TileProviderMbtilesData.class)
-public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtilesData>
-    implements TileProvider, TileAccess {
+public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtilesData> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderMbTiles.class);
 
@@ -228,8 +226,8 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
           .bounds(bounds)
           .vectorSchemas(vectorSchemas)
           .build();
-    } catch (Exception e) {
-      throw new RuntimeException("Could not derive metadata from Mbtiles tile provider.", e);
+    } catch (SQLException | IOException e) {
+      throw new IllegalStateException("Could not derive metadata from Mbtiles tile provider.", e);
     }
   }
 

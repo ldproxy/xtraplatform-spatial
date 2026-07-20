@@ -132,6 +132,7 @@ public class TileProviderFeaturesFactory
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public EntityData hydrateData(EntityData entityData) {
     TileProviderFeaturesData data = (TileProviderFeaturesData) entityData;
 
