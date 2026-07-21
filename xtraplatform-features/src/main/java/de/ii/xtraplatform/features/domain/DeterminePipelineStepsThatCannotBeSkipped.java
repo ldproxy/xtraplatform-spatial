@@ -127,9 +127,13 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       // at property level: determine needed steps based on schema information
 
       // coordinate processing is needed if a target CRS differs from the native CRS or geometries
-      // are simplified
+      // are simplified; a geometry property stored in its own CRS (property-level `nativeCrs`)
+      // that declares a differing `originalCrs` needs it regardless of the target CRS — the
+      // COORDINATES step restores the recorded axis order of such positions (see
+      // FeatureTokenTransformerCoordinates)
       if (!targetCrs.equals(nativeCrs)
           || (simplifyGeometries)
+          || requiresOriginalCrsRestore(schema)
           || (!(OgcCrs.CRS84.equals(nativeCrs) || OgcCrs.CRS84h.equals(nativeCrs))
               && supportSecondaryGeometry
               && schema.isSecondaryGeometry())) {
@@ -179,5 +183,13 @@ public class DeterminePipelineStepsThatCannotBeSkipped
     }
 
     return steps.build();
+  }
+
+  private static boolean requiresOriginalCrsRestore(FeatureSchema schema) {
+    return schema.getNativeCrs().isPresent()
+        && schema
+            .getOriginalCrs()
+            .filter(originalCrs -> !originalCrs.equals(schema.getNativeCrs().get()))
+            .isPresent();
   }
 }

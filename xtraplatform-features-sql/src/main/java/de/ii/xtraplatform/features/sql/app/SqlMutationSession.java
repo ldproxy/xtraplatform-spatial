@@ -1441,8 +1441,24 @@ public class SqlMutationSession implements FeatureTransactions.Session {
               + e.getMessage(),
           e);
     }
-    if (crs != null && !Objects.equals(crs, nativeCrs)) {
-      Optional<CrsTransformer> transformer = crsTransformerFactory.getTransformer(crs, nativeCrs);
+    // The column's storage CRS (WKT/WKB operation parameters, set from the schema's `crs`
+    // option) determines the transformation target and the SRID; without the option this is the
+    // provider's nativeCrs, preserving the previous behavior.
+    List<String> storageCrsParameters =
+        column.getOperationParameters(
+            column.hasOperation(SqlQueryColumn.Operation.WKB)
+                ? SqlQueryColumn.Operation.WKB
+                : SqlQueryColumn.Operation.WKT);
+    EpsgCrs storageCrs =
+        storageCrsParameters.isEmpty()
+            ? nativeCrs
+            : EpsgCrs.of(
+                Integer.parseInt(storageCrsParameters.get(0)),
+                storageCrsParameters.size() > 1
+                    ? EpsgCrs.Force.valueOf(storageCrsParameters.get(1))
+                    : EpsgCrs.Force.NONE);
+    if (crs != null && !Objects.equals(crs, storageCrs)) {
+      Optional<CrsTransformer> transformer = crsTransformerFactory.getTransformer(crs, storageCrs);
       if (transformer.isPresent()) {
         geometry =
             geometry.accept(
@@ -1461,7 +1477,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
               + e.getMessage(),
           e);
     }
-    String result = String.format("ST_GeomFromText('%s',%s)", wkt, nativeCrs.getCode());
+    String result = String.format("ST_GeomFromText('%s',%s)", wkt, storageCrs.getCode());
     if (geometry.getType() == GeometryType.POLYGON
         || geometry.getType() == GeometryType.MULTI_POLYGON) {
       result = String.format("ST_ForcePolygonCW(%s)", result);

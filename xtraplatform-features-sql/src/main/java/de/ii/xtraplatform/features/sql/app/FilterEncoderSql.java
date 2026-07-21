@@ -1102,6 +1102,14 @@ public class FilterEncoderSql {
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
         mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+      } else if (mainExpression.contains("(SELECT")) {
+        // The property needs a join, so the operand is an EXISTS-style semi-join
+        // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
+        // column for NULL inside that subquery can never match: a feature without related rows
+        // contributes no subquery rows at all. "Property has no value" is the negation of
+        // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
+        // null, so the negation is exact.
+        return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -1503,6 +1511,16 @@ public class FilterEncoderSql {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
       String operation = children.get(0);
+      if (operation.contains("(SELECT")) {
+        // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
+        // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
+        // negation into the subquery, negating the inner predicate (exists a related row that
+        // does NOT match) instead of the whole predicate (NO related row matches): features
+        // without any related row are dropped by the INNER join and multi-valued properties get
+        // any- instead of all-semantics. Wrap instead — the outer operand (A.<sortKey>) is never
+        // null, so NOT (...) is the exact logical negation.
+        return String.format("%s (%s)", operator, operation);
+      }
       Integer pos = null;
       Cql2Expression arg = not.getArgs().get(0);
       if (arg instanceof In) {
@@ -2217,6 +2235,14 @@ public class FilterEncoderSql {
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
         mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+      } else if (mainExpression.contains("(SELECT")) {
+        // The property needs a join, so the operand is an EXISTS-style semi-join
+        // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
+        // column for NULL inside that subquery can never match: a feature without related rows
+        // contributes no subquery rows at all. "Property has no value" is the negation of
+        // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
+        // null, so the negation is exact.
+        return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -2620,6 +2646,16 @@ public class FilterEncoderSql {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
       String operation = children.get(0);
+      if (operation.contains("(SELECT")) {
+        // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
+        // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
+        // negation into the subquery, negating the inner predicate (exists a related row that
+        // does NOT match) instead of the whole predicate (NO related row matches): features
+        // without any related row are dropped by the INNER join and multi-valued properties get
+        // any- instead of all-semantics. Wrap instead — the outer operand (A.<sortKey>) is never
+        // null, so NOT (...) is the exact logical negation.
+        return String.format("%s (%s)", operator, operation);
+      }
       Integer pos = null;
       Cql2Expression arg = not.getArgs().get(0);
       if (arg instanceof In) {

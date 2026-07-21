@@ -11,6 +11,8 @@ import de.ii.xtraplatform.cql.app.CqlImpl
 import de.ii.xtraplatform.cql.domain.Eq
 import de.ii.xtraplatform.cql.domain.ImmutableInResultSet
 import de.ii.xtraplatform.cql.domain.InResultSet
+import de.ii.xtraplatform.cql.domain.IsNull
+import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
 import de.ii.xtraplatform.crs.domain.OgcCrs
@@ -103,6 +105,40 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
 
         then:
         sql == "A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id = 'foo') SELECT rs_value FROM _rs_0_s1))"
+    }
+
+    def 'negated consumer on a junction property negates the whole semi-join'() {
+        given: 'a feature without any value must match the negation, so the negation may not be pushed into the INNER-joined subquery'
+        def filter = resolved(InResultSet.of("externalprovidername", "s1"), "simple",
+                Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+
+        when:
+        def sql = filterEncoder.encode(Not.of(filter), mappings["value_array"])
+
+        then:
+        sql == "NOT (A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id = 'foo') SELECT rs_value FROM _rs_0_s1)))"
+    }
+
+    def 'negated consumer on the id queryable'() {
+        given:
+        def filter = resolved(InResultSet.of("id", "s1"), "simple", null)
+
+        when:
+        def sql = filterEncoder.encode(Not.of(filter), mappings["value_array"])
+
+        then:
+        sql == "NOT (A.id IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A) SELECT rs_value FROM _rs_0_s1))"
+    }
+
+    def 'isNull on a junction property matches features without any value'() {
+        given: 'the INNER-joined subquery has no rows for such features, so the encoding must be NOT EXISTS'
+        def filter = IsNull.of("externalprovidername")
+
+        when:
+        def sql = filterEncoder.encode(filter, mappings["value_array"])
+
+        then:
+        sql == "NOT (A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IS NOT NULL))"
     }
 
     def 'chained result sets nest recursively'() {

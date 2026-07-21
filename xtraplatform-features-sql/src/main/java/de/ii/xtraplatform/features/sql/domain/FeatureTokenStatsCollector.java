@@ -104,15 +104,19 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
 
   @Override
   public void onGeometry(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (Objects.nonNull(context.geometry())) {
+    // Only the primary geometry feeds the spatial extent: secondary geometry properties may
+    // store positions in a different CRS (position variants), which must not be interpreted in
+    // the native CRS. Mirrors the read side, where the extent is computed over the
+    // filter/primary geometry column.
+    if (Objects.nonNull(context.geometry()) && hasRole(context, Role.PRIMARY_GEOMETRY)) {
       Geometry<?> value = context.geometry();
 
       double[][] minMax = value.accept(new MinMaxDeriver());
       if (minMax.length > 1 && minMax[0].length >= dim && minMax[1].length >= dim) {
-        this.xmin = minMax[0][0];
-        this.xmax = minMax[1][0];
-        this.ymin = minMax[0][1];
-        this.ymax = minMax[1][1];
+        this.xmin = xmin == null ? minMax[0][0] : Math.min(xmin, minMax[0][0]);
+        this.xmax = xmax == null ? minMax[1][0] : Math.max(xmax, minMax[1][0]);
+        this.ymin = ymin == null ? minMax[0][1] : Math.min(ymin, minMax[0][1]);
+        this.ymax = ymax == null ? minMax[1][1] : Math.max(ymax, minMax[1][1]);
       }
     }
 

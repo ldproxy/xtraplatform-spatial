@@ -23,9 +23,12 @@ import org.immutables.value.Value;
 public interface FeatureTokenDecoderGmlInputProfile {
 
   /**
-   * Reverse-mapping from the {@code srsName} value seen on a geometry to the resolved {@link
-   * EpsgCrs}. Required for input shaped after ALKIS NAS, which uses ADV URN forms such as {@code
-   * urn:adv:crs:DE_DHDN_3GK2_NW101} that the built-in EPSG / OGC URN parser cannot resolve.
+   * Reverse-mapping from the {@code srsName} value seen on an ordinary geometry to the resolved
+   * {@link EpsgCrs} — the {@code alternativeUri} declarations of the requestable CRSs (CRS building
+   * block). Required for input shaped after ALKIS NAS, which uses AdV URN forms such as {@code
+   * urn:adv:crs:ETRS89_UTM32} that the built-in EPSG / OGC URN parser cannot resolve. The
+   * identifiers of position variants are not part of this map; they are declared in the {@code
+   * FeatureSchema} ({@code originalCrsIdentifiers}).
    */
   Map<String, EpsgCrs> getSrsNameMappings();
 
