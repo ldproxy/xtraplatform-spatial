@@ -17,6 +17,7 @@ import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
 import de.ii.xtraplatform.cql.domain.BinarySpatialOperation;
 import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
+import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
@@ -284,6 +285,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   @Override
   public Type visit(ArrayLiteral arrayLiteral, List<Type> children) {
     return Type.valueOf(arrayLiteral.getType().getSimpleName());
+  }
+
+  @Override
+  public Type visit(BooleanValue2 booleanValue, List<Type> children) {
+    return Type.Boolean;
   }
 
   private void checkOperation(CqlNode node, List<Type> types) {
