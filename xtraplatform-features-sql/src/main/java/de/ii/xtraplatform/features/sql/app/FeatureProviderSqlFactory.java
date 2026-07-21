@@ -28,12 +28,12 @@ import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
 import de.ii.xtraplatform.features.domain.SchemaReferenceResolver;
 import de.ii.xtraplatform.features.domain.TypesResolver;
+import de.ii.xtraplatform.features.domain.transform.CrsVariantsResolver;
 import de.ii.xtraplatform.features.domain.transform.DefaultRolesResolver;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefEmbedder;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
 import de.ii.xtraplatform.features.domain.transform.ImplicitMappingResolver;
 import de.ii.xtraplatform.features.domain.transform.LabelTemplateResolver;
-import de.ii.xtraplatform.features.domain.transform.VariantsResolver;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSql;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData;
@@ -199,7 +199,7 @@ public class FeatureProviderSqlFactory
               new FeatureRefEmbedder(data.getId()),
               new FeatureRefResolver(connectors),
               new ImplicitMappingResolver(),
-              new VariantsResolver(),
+              new CrsVariantsResolver(),
               new ConstantsResolver(),
               new LabelTemplateResolver(data.getLabelTemplate()),
               new DefaultRolesResolver(),

@@ -298,7 +298,7 @@ public interface FeatureSchema
    * @default null
    * @since v4.8
    */
-  Optional<SchemaVariants> getVariants();
+  Optional<CrsVariants> getCrsVariants();
 
   /**
    * @langEn The verbatim identifiers of the reference systems that are stored in this property.

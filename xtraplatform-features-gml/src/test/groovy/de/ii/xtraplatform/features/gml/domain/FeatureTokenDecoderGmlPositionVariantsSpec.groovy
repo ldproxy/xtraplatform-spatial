@@ -13,7 +13,7 @@ import de.ii.xtraplatform.features.domain.FeatureTokenType
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
 import de.ii.xtraplatform.features.domain.ImmutableSchemaMapping
-import de.ii.xtraplatform.features.domain.ImmutableSchemaVariants
+import de.ii.xtraplatform.features.domain.ImmutableCrsVariants
 import de.ii.xtraplatform.features.domain.SchemaBase
 import de.ii.xtraplatform.features.domain.SchemaMapping
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple
@@ -72,7 +72,7 @@ class FeatureTokenDecoderGmlPositionVariantsSpec extends Specification {
                         .type(SchemaBase.Type.GEOMETRY)
                         .geometryType(GeometryType.POINT)
                         .alias("position")
-                        .variants(new ImmutableSchemaVariants.Builder()
+                        .crsVariants(new ImmutableCrsVariants.Builder()
                                 .crsProperty("pos_srs")
                                 .verticalProperty("pos_h")
                                 .addGeometryProperties("pos_gk3")

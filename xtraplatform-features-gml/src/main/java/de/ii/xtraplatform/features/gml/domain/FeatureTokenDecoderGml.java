@@ -11,13 +11,13 @@ import com.fasterxml.aalto.AsyncByteArrayFeeder;
 import com.fasterxml.aalto.AsyncXMLStreamReader;
 import com.fasterxml.aalto.stax.InputFactoryImpl;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.features.domain.CrsVariants;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
-import de.ii.xtraplatform.features.domain.SchemaVariants;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -154,7 +154,7 @@ public class FeatureTokenDecoderGml
 
   /**
    * Per geometry property (keyed by its technical full path), the srsName routing built from the
-   * schema's {@code variants} declaration by {@link #buildGeometryVariants}.
+   * schema's {@code crsVariants} declaration by {@link #buildGeometryVariants}.
    */
   private final Map<String, GmlGeometryVariants> geometryVariantsCache = new HashMap<>();
 
@@ -1316,13 +1316,14 @@ public class FeatureTokenDecoderGml
   }
 
   /**
-   * Builds the srsName-keyed routing for a geometry property from its schema-level {@code variants}
-   * declaration: every {@code originalCrsIdentifiers} entry of a variant sibling routes to that
-   * sibling (together with the sibling's {@code falseEastingDifference}); every identifier of the
-   * vertical sibling routes to the vertical property. Cached per geometry property.
+   * Builds the srsName-keyed routing for a geometry property from its schema-level {@code
+   * crsVariants} declaration: every {@code originalCrsIdentifiers} entry of a variant sibling
+   * routes to that sibling (together with the sibling's {@code falseEastingDifference}); every
+   * identifier of the vertical sibling routes to the vertical property. Cached per geometry
+   * property.
    */
   private GmlGeometryVariants geometryVariantsFor(FeatureSchema prop, FeatureSchema lookupOwner) {
-    if (prop.getVariants().isEmpty()) {
+    if (prop.getCrsVariants().isEmpty()) {
       return null;
     }
     return geometryVariantsCache.computeIfAbsent(
@@ -1330,7 +1331,7 @@ public class FeatureTokenDecoderGml
   }
 
   private GmlGeometryVariants buildGeometryVariants(FeatureSchema prop, FeatureSchema lookupOwner) {
-    SchemaVariants variants = prop.getVariants().get();
+    CrsVariants variants = prop.getCrsVariants().get();
     Map<String, String> bySrsName = new LinkedHashMap<>();
 
     Map<String, Double> shiftBySrsName = new LinkedHashMap<>();
@@ -1384,7 +1385,7 @@ public class FeatureTokenDecoderGml
       FeatureSchema schema, Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
     for (FeatureSchema child : schema.getProperties()) {
       child
-          .getVariants()
+          .getCrsVariants()
           .ifPresent(
               variants -> {
                 variants

@@ -22,8 +22,8 @@ import org.immutables.value.Value;
  *
  * <p>All property values name sibling properties of the geometry property this instance was built
  * for (same parent object, usually the feature type itself). Instances are derived at decode time
- * from the {@code variants} declaration on the geometry property in the {@code FeatureSchema} and
- * the {@code originalCrsIdentifiers} / {@code falseEastingDifference} of the referenced sibling
+ * from the {@code crsVariants} declaration on the geometry property in the {@code FeatureSchema}
+ * and the {@code originalCrsIdentifiers} / {@code falseEastingDifference} of the referenced sibling
  * properties.
  */
 @Value.Immutable

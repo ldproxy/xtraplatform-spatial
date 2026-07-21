@@ -16,22 +16,22 @@ import org.immutables.value.Value;
  * @langEn Some feature types store the same logical position in one of several CRSs — including
  *     CRSs that cannot be expressed as the storage CRS of the property (realizations that map to
  *     the same coordinate reference system, or 1D vertical reference systems). Each variant is
- *     stored in its own property; `variants` on the main geometry property declares which sibling
- *     properties hold the variants. All referenced properties must be siblings of the geometry
- *     property (properties of the same object) and are implicitly `internal`.
+ *     stored in its own property; `crsVariants` on the main geometry property declares which
+ *     sibling properties hold the variants. All referenced properties must be siblings of the
+ *     geometry property (properties of the same object) and are implicitly `internal`.
  * @langDe Manche Objektarten speichern dieselbe logische Position in einem von mehreren
  *     Koordinatenreferenzsystemen — einschließlich Systemen, die nicht als Speicher-CRS der
  *     Eigenschaft ausgedrückt werden können (Realisierungen, die auf dasselbe
  *     Koordinatenreferenzsystem abgebildet werden, oder eindimensionale Höhenreferenzsysteme). Jede
- *     Variante wird in einer eigenen Eigenschaft gespeichert; `variants` an der
+ *     Variante wird in einer eigenen Eigenschaft gespeichert; `crsVariants` an der
  *     Haupt-Geometrieeigenschaft deklariert, welche Nachbareigenschaften die Varianten enthalten.
  *     Alle referenzierten Eigenschaften müssen Nachbareigenschaften der Geometrieeigenschaft sein
  *     (Eigenschaften desselben Objekts) und sind implizit `internal`.
  */
 @Value.Immutable
 @Value.Style(builder = "new", deepImmutablesDetection = true)
-@JsonDeserialize(builder = ImmutableSchemaVariants.Builder.class)
-public interface SchemaVariants {
+@JsonDeserialize(builder = ImmutableCrsVariants.Builder.class)
+public interface CrsVariants {
 
   /**
    * @langEn A `STRING` property that stores the URI of the reference system of the position,

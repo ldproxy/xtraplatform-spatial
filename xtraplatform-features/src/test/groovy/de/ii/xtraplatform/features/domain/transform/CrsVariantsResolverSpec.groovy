@@ -10,19 +10,19 @@ package de.ii.xtraplatform.features.domain.transform
 import de.ii.xtraplatform.crs.domain.EpsgCrs
 import de.ii.xtraplatform.features.domain.FeatureSchema
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
-import de.ii.xtraplatform.features.domain.ImmutableSchemaVariants
+import de.ii.xtraplatform.features.domain.ImmutableCrsVariants
 import de.ii.xtraplatform.features.domain.SchemaBase
 import spock.lang.Specification
 
 /**
- * {@link VariantsResolver}: properties referenced from a {@code variants} declaration are marked
+ * {@link CrsVariantsResolver}: properties referenced from a {@code crsVariants} declaration are marked
  * {@code internal} and receive their implied role; invalid declarations (missing sibling, wrong
  * type, geometry variant without a storage CRS or without identifiers) are rejected at provider
  * start.
  */
-class VariantsResolverSpec extends Specification {
+class CrsVariantsResolverSpec extends Specification {
 
-    def resolver = new VariantsResolver()
+    def resolver = new CrsVariantsResolver()
 
     static ImmutableFeatureSchema.Builder type(Map<String, ImmutableFeatureSchema.Builder> props) {
         def builder = new ImmutableFeatureSchema.Builder()
@@ -38,7 +38,7 @@ class VariantsResolverSpec extends Specification {
                 .sourcePath("position")
                 .type(SchemaBase.Type.GEOMETRY)
                 .role(SchemaBase.Role.PRIMARY_GEOMETRY)
-                .variants(new ImmutableSchemaVariants.Builder()
+                .crsVariants(new ImmutableCrsVariants.Builder()
                         .crsProperty("pos_srs")
                         .verticalProperty("pos_h")
                         .addGeometryProperties("pos_gk3")
@@ -111,7 +111,7 @@ class VariantsResolverSpec extends Specification {
         !resolvedType.getPropertyMap()["pos_h"].sortable()
     }
 
-    def 'a variants declaration referencing a missing sibling is rejected'() {
+    def 'a crsVariants declaration referencing a missing sibling is rejected'() {
         given:
         def props = validSiblings()
         props.remove("pos_gk3")
