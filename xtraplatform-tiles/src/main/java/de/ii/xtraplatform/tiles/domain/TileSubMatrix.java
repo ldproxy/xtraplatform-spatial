@@ -90,10 +90,12 @@ public interface TileSubMatrix extends Comparable<TileSubMatrix> {
     return getLevel() == other.getLevel()
         && ((getRowMin() <= other.getRowMax() + 1
                 && getRowMax() >= other.getRowMin() - 1
-                && (getColMin() == other.getColMin() && getColMax() == other.getColMax()))
+                && getColMin() == other.getColMin()
+                && getColMax() == other.getColMax())
             || (getColMin() <= other.getColMax() + 1
                 && getColMax() >= other.getColMin() - 1
-                && (getRowMin() == other.getRowMin() && getRowMax() == other.getRowMax())));
+                && getRowMin() == other.getRowMin()
+                && getRowMax() == other.getRowMax()));
   }
 
   default boolean intersects(TileSubMatrix other) {

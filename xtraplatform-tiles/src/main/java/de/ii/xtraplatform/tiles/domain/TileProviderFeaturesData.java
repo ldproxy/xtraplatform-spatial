@@ -15,10 +15,10 @@ import de.ii.xtraplatform.docs.DocTable;
 import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.docs.DocVar;
 import de.ii.xtraplatform.entities.domain.AutoEntity;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -197,7 +197,8 @@ import org.immutables.value.Value;
 public interface TileProviderFeaturesData extends TileProviderData, WithCaches, AutoEntity {
 
   String PROVIDER_SUBTYPE = "FEATURES";
-  String ENTITY_SUBTYPE = String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase();
+  String ENTITY_SUBTYPE =
+      String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase(Locale.ROOT);
 
   /**
    * @langEn Always `FEATURES`.
@@ -233,6 +234,7 @@ public interface TileProviderFeaturesData extends TileProviderData, WithCaches, 
    * @since v4.1
    * @default {}
    */
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<TilesetRaster, ImmutableTilesetRaster.Builder> getRasterTilesets();
 
   /**
@@ -253,8 +255,8 @@ public interface TileProviderFeaturesData extends TileProviderData, WithCaches, 
   @Override
   Optional<SeedingOptions> getSeeding();
 
-  abstract class Builder extends TileProviderData.Builder<ImmutableTileProviderFeaturesData.Builder>
-      implements EntityDataBuilder<TileProviderData> {
+  abstract class Builder
+      extends TileProviderData.Builder<ImmutableTileProviderFeaturesData.Builder> {
     @Override
     public ImmutableTileProviderFeaturesData.Builder fillRequiredFieldsWithPlaceholders() {
       return this.id(EntityDataDefaults.PLACEHOLDER)

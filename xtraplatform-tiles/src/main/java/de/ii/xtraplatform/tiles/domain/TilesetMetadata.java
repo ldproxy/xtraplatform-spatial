@@ -52,7 +52,7 @@ public interface TilesetMetadata extends WithTmsLevels {
   default boolean isRaster() {
     return getEncodings().contains(TilesFormat.JPEG)
         || getEncodings().contains(TilesFormat.PNG)
-        || getEncodings().contains(TilesFormat.WebP)
+        || getEncodings().contains(TilesFormat.WEBP)
         || getEncodings().contains(TilesFormat.TIFF);
   }
 

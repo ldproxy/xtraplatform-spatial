@@ -29,11 +29,13 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.locationtech.jts.geom.TopologyException;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.locationtech.jts.geom.util.GeometryFixer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureEncoderMVT.class);
@@ -52,8 +54,8 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
   private final List<String> groupBy;
   private final Set<MvtFeature> mergeFeatures;
 
-  private long mergeCount = 0;
-  private long featureCount = 0;
+  private long mergeCount;
+  private long featureCount;
   private boolean full = true;
 
   public FeatureEncoderMVT(TileGenerationContext encodingContext) {
@@ -63,10 +65,9 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
     this.tileEncoder = new VectorTileEncoder(tile.getTileMatrixSet().getTileExtent());
     this.affineTransformation = createTransformNativeToTile();
     this.tileset = encodingContext.getTileset();
-    this.tilePrecisionModel =
-        new PrecisionModel(
-            (double) tile.getTileMatrixSet().getTileExtent()
-                / (double) tile.getTileMatrixSet().getTileSize());
+    final double tileExtent = tile.getTileMatrixSet().getTileExtent();
+    final double tileSize = tile.getTileMatrixSet().getTileSize();
+    this.tilePrecisionModel = new PrecisionModel(tileExtent / tileSize);
     this.geometryFactoryTile = new GeometryFactory(tilePrecisionModel);
     this.geometryFactoryWorld = new GeometryFactory();
 
@@ -111,6 +112,13 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException",
+    "PMD.EmptyCatchBlock",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   public void onFeature(FeatureSfFlat feature) {
     long startFeature = System.nanoTime();
     featureCount++;
@@ -136,14 +144,15 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
       // in "full" tiles all features cover then whole tile
       try {
         full = full && tileGeometry.equals(clipGeometry);
-      } catch (Exception ignore) {
+      } catch (TopologyException ignore) {
       }
 
       // if polygons have to be merged, store them for now and process at the end
       if (Objects.nonNull(groupBy) && tileGeometry.getGeometryType().contains("Polygon")) {
+        mergeCount++;
         mergeFeatures.add(
             new ImmutableMvtFeature.Builder()
-                .id(++mergeCount)
+                .id(mergeCount)
                 .properties(feature.getPropertiesAsMap())
                 .geometry(tileGeometry)
                 .build());
@@ -154,7 +163,9 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
       // if that option is used
       if (!tileGeometry.isValid()) {
         tileGeometry = new GeometryFixer(tileGeometry).getResult();
-        if (!tileGeometry.isValid()) {
+      }
+      if (!tileGeometry.isValid()) {
+        if (LOGGER.isWarnEnabled()) {
           LOGGER.warn(
               "Feature {} in tileset {} has an invalid tile geometry in tile {}/{}/{}/{}. Size in pixels: {}.",
               feature.getIdValue(),
@@ -164,9 +175,9 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
               tile.getRow(),
               tile.getCol(),
               featureGeometry.get().getArea());
-          if (Boolean.TRUE.equals(parameters.getIgnoreInvalidGeometries())) {
-            return;
-          }
+        }
+        if (Boolean.TRUE.equals(parameters.getIgnoreInvalidGeometries())) {
+          return;
         }
       }
 
@@ -175,7 +186,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
       if (feature.getIdValue() != null) {
         try {
           id = Long.parseLong(feature.getIdValue());
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
           // nothing to do
         }
       }
@@ -206,6 +217,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void onEnd(ModifiableContext context) {
     long mergerStart = System.nanoTime();
     if (Objects.nonNull(groupBy) && mergeCount > 0) {
@@ -223,32 +235,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
                   tile.getLevel(),
                   tile.getRow(),
                   tile.getCol()));
-      merger
-          .merge(mergeFeatures)
-          .forEach(
-              mergedFeature -> {
-                Geometry geom = mergedFeature.getGeometry();
-                // Geometry is invalid? -> try to fix the geometry, otherwise log this information
-                // and skip it, if that option is used
-                if (!geom.isValid()) {
-                  geom = new GeometryFixer(geom).getResult();
-                  if (!geom.isValid()) {
-                    LOGGER.warn(
-                        "A merged feature in tileset {} has an invalid tile geometry in tile {}/{}/{}/{}. Properties: {}",
-                        tileset,
-                        tile.getTileMatrixSet().getId(),
-                        tile.getLevel(),
-                        tile.getRow(),
-                        tile.getCol(),
-                        mergedFeature.getProperties());
-                    if (Boolean.TRUE.equals(parameters.getIgnoreInvalidGeometries())) {
-                      return;
-                    }
-                  }
-                }
-                tileEncoder.addFeature(tileset, mergedFeature.getProperties(), geom);
-                written++;
-              });
+      merger.merge(mergeFeatures).forEach(this::writeMergedFeature);
     }
     long mergerDuration = (System.nanoTime() - mergerStart) / 1_000_000;
 
@@ -268,17 +255,15 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
             tile.getRow(),
             tile.getCol());
       }
-    } else if (featureCount == written && full) {
+    } else if (featureCount == written && full && LOGGER.isTraceEnabled()) {
       // TODO header/trailer/field "OATiles-hint: full", also include info in tile cache
-      if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace(
-            "Tileset {}, tile {}/{}/{}/{} is full.",
-            tileset,
-            tile.getTileMatrixSet().getId(),
-            tile.getLevel(),
-            tile.getRow(),
-            tile.getCol());
-      }
+      LOGGER.trace(
+          "Tileset {}, tile {}/{}/{}/{} is full.",
+          tileset,
+          tile.getTileMatrixSet().getId(),
+          tile.getLevel(),
+          tile.getRow(),
+          tile.getCol());
     }
 
     if (LOGGER.isDebugEnabled()) {
@@ -309,6 +294,31 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
         LOGGER.trace(text);
       }
     }
+  }
+
+  private void writeMergedFeature(MvtFeature mergedFeature) {
+    Geometry geom = mergedFeature.getGeometry();
+    // Geometry is invalid? -> try to fix the geometry, otherwise log this information
+    // and skip it, if that option is used
+    if (!geom.isValid()) {
+      geom = new GeometryFixer(geom).getResult();
+    }
+    boolean stillInvalid = !geom.isValid();
+    if (stillInvalid && LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "A merged feature in tileset {} has an invalid tile geometry in tile {}/{}/{}/{}. Properties: {}",
+          tileset,
+          tile.getTileMatrixSet().getId(),
+          tile.getLevel(),
+          tile.getRow(),
+          tile.getCol(),
+          mergedFeature.getProperties());
+    }
+    if (stillInvalid && Boolean.TRUE.equals(parameters.getIgnoreInvalidGeometries())) {
+      return;
+    }
+    tileEncoder.addFeature(tileset, mergedFeature.getProperties(), geom);
+    written++;
   }
 
   private AffineTransformation createTransformNativeToTile() {

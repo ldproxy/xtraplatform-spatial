@@ -9,6 +9,7 @@ package de.ii.xtraplatform.tiles.domain;
 
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface WithTmsLevelsMergeable extends WithTmsLevels {
   @Override
   BuildableMap<MinMax, ImmutableMinMax.Builder> getLevels();

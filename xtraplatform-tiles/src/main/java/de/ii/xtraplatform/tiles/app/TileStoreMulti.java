@@ -37,12 +37,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass", "PMD.CyclomaticComplexity"})
 public class TileStoreMulti implements TileStore, TileStore.Staging {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileStoreMulti.class);
@@ -57,7 +59,8 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   private final Map<String, Set<String>> tileMatrixSets;
   private final Optional<TileMatrixSetRepository> tileMatrixSetRepository;
   private final Optional<TileMatrixPartitions> partitions;
-  private Tuple<TileStore, ResourceStore> staging;
+  private final ReentrantLock lock = new ReentrantLock();
+  private Optional<Tuple<TileStore, ResourceStore>> staging = Optional.empty();
 
   public TileStoreMulti(
       ResourceStore cacheStore,
@@ -74,7 +77,6 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
     this.tileMatrixSets = tileMatrixSets;
     this.tileMatrixSetRepository = tileMatrixSetRepository;
     this.partitions = partitions;
-    this.staging = null;
     this.dirty = new ConcurrentHashMap<>();
     tileSchemas.keySet().forEach(tileset -> dirty.put(tileset, new ConcurrentHashMap<>()));
     this.active = getActive();
@@ -125,9 +127,9 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   }
 
   @Override
-  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
     for (Tuple<TileStore, ResourceStore> store : active) {
-      Optional<Boolean> result = store.first().isEmpty(tile);
+      Optional<Boolean> result = store.first().checkEmpty(tile);
       if (result.isPresent()) {
         return result;
       }
@@ -156,7 +158,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
     if (!inProgress()) {
       throw new IllegalStateException("Writing is only allowed during staging.");
     }
-    staging.first().put(tile, content);
+    staging.get().first().put(tile, content);
   }
 
   @Override
@@ -165,6 +167,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public void delete(
       String tileset, TileMatrixSetBase tileMatrixSet, TileMatrixSetLimits limits, boolean inverse)
       throws IOException {
@@ -198,7 +201,9 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
               }));
     } catch (RuntimeException e) {
       if (e.getCause() instanceof IOException) {
-        throw (IOException) e.getCause();
+        IOException cause = (IOException) e.getCause();
+        cause.addSuppressed(e);
+        throw cause;
       }
       throw e;
     }
@@ -222,7 +227,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
     List<String> paths = new ArrayList<>();
 
     if (inProgress()) {
-      staging.first().getStorageInfo(tileset, tileMatrixSet, limits).ifPresent(paths::add);
+      staging.get().first().getStorageInfo(tileset, tileMatrixSet, limits).ifPresent(paths::add);
     }
 
     for (Tuple<TileStore, ResourceStore> store : active) {
@@ -244,29 +249,39 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   }
 
   @Override
-  public synchronized boolean inProgress() {
-    return Objects.nonNull(staging);
+  public boolean inProgress() {
+    lock.lock();
+    try {
+      return staging.isPresent();
+    } finally {
+      lock.unlock();
+    }
   }
 
   @Override
-  public synchronized boolean init() throws IOException {
-    if (inProgress()) {
-      return false;
+  public boolean init() throws IOException {
+    lock.lock();
+    try {
+      if (inProgress()) {
+        return false;
+      }
+      ResourceStore stagingStore =
+          cacheStore.writableWith(String.format("%d", Instant.now().toEpochMilli()));
+
+      stagingStore.put(Path.of(".staging"), new ByteArrayInputStream(new byte[0]));
+
+      TileStore tileStore = getTileStore(stagingStore);
+
+      this.staging = Optional.of(Tuple.of(tileStore, stagingStore));
+
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Staging cache level {}", stagingStore.getPrefix());
+      }
+
+      return true;
+    } finally {
+      lock.unlock();
     }
-    ResourceStore stagingStore =
-        cacheStore.writableWith(String.format("%d", Instant.now().toEpochMilli()));
-
-    stagingStore.put(Path.of(".staging"), new ByteArrayInputStream(new byte[0]));
-
-    TileStore tileStore = getTileStore(stagingStore);
-
-    this.staging = Tuple.of(tileStore, stagingStore);
-
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Staging cache level {}", stagingStore.getPrefix());
-    }
-
-    return true;
   }
 
   // TODO
@@ -286,60 +301,78 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   }
 
   @Override
-  public synchronized void promote() throws IOException {
-    if (inProgress()) {
-      boolean empty = false;
-      try (Stream<Path> files = staging.second().walk(Path.of(""), 1, (p, a) -> true)) {
-        // only self and .staging
-        if (files.count() == 2) {
-          empty = true;
-        }
-      } catch (IOException e) {
-        // continue
+  public void promote() throws IOException {
+    lock.lock();
+    try {
+      if (inProgress()) {
+        promoteStaging(staging.get());
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void promoteStaging(Tuple<TileStore, ResourceStore> stagingLevel) throws IOException {
+    if (!isStagingEmpty(stagingLevel)) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Promoting cache level {}", stagingLevel.second().getPrefix());
       }
 
-      if (!empty) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Promoting cache level {}", staging.second().getPrefix());
-        }
+      stagingLevel.second().delete(Path.of(".staging"));
+      this.active.add(0, stagingLevel);
+    }
 
-        staging.second().delete(Path.of(".staging"));
-        this.active.add(0, staging);
-      }
+    this.staging = Optional.empty();
 
-      this.staging = null;
-
-      for (String tileset : dirty.keySet()) {
-        for (String tms : dirty.get(tileset).keySet()) {
-          dirty.get(tileset).get(tms).clear();
-        }
+    for (String tileset : dirty.keySet()) {
+      for (String tms : dirty.get(tileset).keySet()) {
+        dirty.get(tileset).get(tms).clear();
       }
     }
   }
 
-  @Override
-  public synchronized void abort() throws IOException {
-    if (inProgress()) {
-      this.staging = null;
+  private boolean isStagingEmpty(Tuple<TileStore, ResourceStore> stagingLevel) {
+    try (Stream<Path> files = stagingLevel.second().walk(Path.of(""), 1, (p, a) -> true)) {
+      // only self and .staging
+      return files.count() == 2;
+    } catch (IOException e) {
+      return false;
     }
   }
 
   @Override
-  public synchronized void cleanup() throws IOException {
-    if (inProgress()) {
-      throw new IllegalStateException("Cleanup is not allowed during staging.");
+  public void abort() throws IOException {
+    lock.lock();
+    try {
+      if (inProgress()) {
+        this.staging = Optional.empty();
+      }
+    } finally {
+      lock.unlock();
     }
+  }
 
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Cleaning up cache levels");
-    }
+  @Override
+  public void cleanup() throws IOException {
+    lock.lock();
+    try {
+      if (inProgress()) {
+        throw new IllegalStateException("Cleanup is not allowed during staging.");
+      }
 
-    cleanupStaging();
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Cleaning up cache levels");
+      }
 
-    cleanupDuplicates();
+      cleanupStaging();
 
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Cleaned up cache levels");
+      cleanupDuplicates();
+
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Cleaned up cache levels");
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -351,6 +384,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
     }
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private void cleanupDuplicates() {
     List<Tuple<TileStore, ResourceStore>> reverseLevels = Lists.reverse(active);
 
@@ -360,7 +394,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
           reverseLevels.subList(i + 1, reverseLevels.size());
 
       current.walk(
-          ((tileset, tms, level, row, col) -> {
+          (tileset, tms, level, row, col) -> {
             for (Tuple<TileStore, ResourceStore> other : others) {
               try {
                 if (other.first().has(tileset, tms, level, row, col)) {
@@ -383,7 +417,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
                 // ignore
               }
             }
-          }));
+          });
 
       boolean deleted = deleteCacheLevelIfEmpty(reverseLevels.get(i));
       if (deleted) {
@@ -419,7 +453,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
         return true;
       }
     } catch (IOException e) {
-
+      // ignore
     }
 
     return false;

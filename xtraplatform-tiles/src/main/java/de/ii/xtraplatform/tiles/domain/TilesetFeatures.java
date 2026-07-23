@@ -121,6 +121,7 @@ public interface TilesetFeatures
 
   abstract class Builder implements BuildableBuilder<TilesetFeatures> {}
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   default TilesetFeatures mergeDefaults(TilesetFeaturesDefaults defaults) {
     if (Objects.isNull(defaults)) {
       return this;

@@ -16,7 +16,6 @@ import de.ii.xtraplatform.entities.domain.AutoEntity;
 import de.ii.xtraplatform.entities.domain.AutoEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
@@ -52,9 +51,10 @@ import org.slf4j.LoggerFactory;
 @AutoBind
 public class TileProviderFeaturesFactory
     extends AbstractEntityFactory<TileProviderFeaturesData, TileProviderFeatures>
-    implements EntityFactory, AutoEntityFactory {
+    implements AutoEntityFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderFeaturesFactory.class);
+  private static final String WEB_MERCATOR_QUAD = "WebMercatorQuad";
 
   private final EntityRegistry entityRegistry;
   private final boolean skipHydration;
@@ -99,7 +99,7 @@ public class TileProviderFeaturesFactory
     return new ImmutableTileProviderFeaturesData.Builder()
         .tilesetDefaultsBuilder(
             new ImmutableTilesetFeaturesDefaults.Builder()
-                .putLevels("WebMercatorQuad", new ImmutableMinMax.Builder().min(0).max(23).build())
+                .putLevels(WEB_MERCATOR_QUAD, new ImmutableMinMax.Builder().min(0).max(23).build())
                 .featureLimit(100_000)
                 .minimumSizeInPixel(0.5)
                 .ignoreInvalidGeometries(false)
@@ -132,6 +132,7 @@ public class TileProviderFeaturesFactory
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public EntityData hydrateData(EntityData entityData) {
     TileProviderFeaturesData data = (TileProviderFeaturesData) entityData;
 
@@ -140,8 +141,10 @@ public class TileProviderFeaturesFactory
     }
 
     if (data.isAuto()) {
-      LOGGER.info(
-          "Provider with id '{}' is in auto mode, generating configuration ...", data.getId());
+      if (LOGGER.isInfoEnabled()) {
+        LOGGER.info(
+            "Provider with id '{}' is in auto mode, generating configuration ...", data.getId());
+      }
 
       try {
         data = generateDefaultsIfNecessary(generateTilesetsIfNecessary(data));
@@ -151,7 +154,7 @@ public class TileProviderFeaturesFactory
                 .from(data)
                 .auto(Optional.empty())
                 .build();
-      } catch (Throwable e) {
+      } catch (RuntimeException e) {
         if (LOGGER.isErrorEnabled()) {
           LogContext.error(LOGGER, e, "Provider with id '{}' could not be started", data.getId());
         }
@@ -174,7 +177,7 @@ public class TileProviderFeaturesFactory
                 .from(data.getTilesetDefaults())
                 .levels(
                     ImmutableMap.of(
-                        "WebMercatorQuad", new ImmutableMinMax.Builder().min(0).max(23).build()))
+                        WEB_MERCATOR_QUAD, new ImmutableMinMax.Builder().min(0).max(23).build()))
                 .build())
         .build();
   }
@@ -275,19 +278,20 @@ public class TileProviderFeaturesFactory
                     .storage(Storage.PER_JOB)
                     .seeded(true)
                     .putLevels(
-                        "WebMercatorQuad", new ImmutableMinMax.Builder().min(0).max(16).build())
+                        WEB_MERCATOR_QUAD, new ImmutableMinMax.Builder().min(0).max(16).build())
                     .build())
             .seeding(new ImmutableSeedingOptions.Builder().runOnStartup(false).purge(false).build())
             .tilesetDefaults(
                 new ImmutableTilesetFeaturesDefaults.Builder()
                     .putLevels(
-                        "WebMercatorQuad",
+                        WEB_MERCATOR_QUAD,
                         new ImmutableMinMax.Builder().min(0).max(16).getDefault(8).build())
                     .build())
             .build();
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface TileProviderFeaturesFactoryAssisted
       extends FactoryAssisted<TileProviderFeaturesData, TileProviderFeatures> {
     @Override

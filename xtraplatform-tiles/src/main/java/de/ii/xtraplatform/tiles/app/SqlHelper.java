@@ -14,13 +14,14 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class SqlHelper {
+public final class SqlHelper {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SqlHelper.class);
-  public static Properties READ_ONLY = getReadOnly();
+  private static final Properties READ_ONLY_PROPERTIES = getReadOnly();
+
+  private SqlHelper() {
+    // utility class
+  }
 
   public static Properties getReadOnly() {
     Properties properties = new Properties();
@@ -32,7 +33,7 @@ public class SqlHelper {
     try {
       Class.forName("org.sqlite.JDBC");
       return readOnly
-          ? DriverManager.getConnection("jdbc:sqlite:" + mbtilesFile, READ_ONLY)
+          ? DriverManager.getConnection("jdbc:sqlite:" + mbtilesFile, READ_ONLY_PROPERTIES)
           : DriverManager.getConnection("jdbc:sqlite:" + mbtilesFile);
     } catch (SQLException | ClassNotFoundException e) {
       throw new IllegalStateException(
@@ -50,12 +51,19 @@ public class SqlHelper {
     try (PreparedStatement statement =
         connection.prepareStatement("INSERT INTO metadata (name,value) VALUES(?,?)")) {
       statement.setString(1, name);
-      if (value instanceof String) statement.setString(2, (String) value);
-      else if (value instanceof Integer) statement.setInt(2, (int) value);
-      else if (value instanceof Long) statement.setLong(2, (long) value);
-      else if (value instanceof Float) statement.setFloat(2, (float) value);
-      else if (value instanceof Double) statement.setDouble(2, (double) value);
-      else statement.setString(2, value.toString());
+      if (value instanceof String) {
+        statement.setString(2, (String) value);
+      } else if (value instanceof Integer) {
+        statement.setInt(2, (int) value);
+      } else if (value instanceof Long) {
+        statement.setLong(2, (long) value);
+      } else if (value instanceof Float) {
+        statement.setFloat(2, (float) value);
+      } else if (value instanceof Double) {
+        statement.setDouble(2, (double) value);
+      } else {
+        statement.setString(2, value.toString());
+      }
       statement.execute();
     } catch (SQLException e) {
       throw new IllegalStateException(

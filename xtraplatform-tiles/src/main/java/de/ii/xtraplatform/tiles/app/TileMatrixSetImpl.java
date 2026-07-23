@@ -24,6 +24,8 @@ import java.util.Optional;
 
 public class TileMatrixSetImpl implements TileMatrixSet {
 
+  private static final String CORNER_TOP_LEFT = "topLeft";
+
   private final TileMatrixSetData data;
 
   public TileMatrixSetImpl(TileMatrixSetData data) {
@@ -60,7 +62,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
     EpsgCrs crs;
     try {
       crs = EpsgCrs.fromString(data.getCrs());
-    } catch (Throwable e) {
+    } catch (IllegalArgumentException e) {
       throw new IllegalStateException(
           String.format("The CRS URI '%s' is invalid: %s", data.getCrs(), e.getMessage()), e);
     }
@@ -149,13 +151,13 @@ public class TileMatrixSetImpl implements TileMatrixSet {
                 .epsgCrs(getCrs())
                 .xmin(
                     data.getTileMatrices().stream()
-                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
+                        .filter(tm -> CORNER_TOP_LEFT.equals(tm.getCornerOfOrigin()))
                         .mapToDouble(tm -> tm.getPointOfOrigin()[0].doubleValue())
                         .min()
                         .orElse(Double.NaN))
                 .ymin(
                     data.getTileMatrices().stream()
-                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
+                        .filter(tm -> CORNER_TOP_LEFT.equals(tm.getCornerOfOrigin()))
                         .mapToDouble(
                             tm ->
                                 tm.getPointOfOrigin()[1].doubleValue()
@@ -166,7 +168,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
                         .orElse(Double.NaN))
                 .xmax(
                     data.getTileMatrices().stream()
-                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
+                        .filter(tm -> CORNER_TOP_LEFT.equals(tm.getCornerOfOrigin()))
                         .mapToDouble(
                             tm ->
                                 tm.getPointOfOrigin()[0].doubleValue()
@@ -177,7 +179,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
                         .orElse(Double.NaN))
                 .ymax(
                     data.getTileMatrices().stream()
-                        .filter(tm -> "topLeft".equals(tm.getCornerOfOrigin()))
+                        .filter(tm -> CORNER_TOP_LEFT.equals(tm.getCornerOfOrigin()))
                         .mapToDouble(tm -> tm.getPointOfOrigin()[1].doubleValue())
                         .max()
                         .orElse(Double.NaN))
@@ -187,7 +189,9 @@ public class TileMatrixSetImpl implements TileMatrixSet {
   @Override
   public BoundingBox getBoundingBoxCrs84(CrsTransformerFactory crsTransformerFactory)
       throws CrsTransformationException {
-    if (OgcCrs.CRS84.equals(getCrs())) return getBoundingBox();
+    if (OgcCrs.CRS84.equals(getCrs())) {
+      return getBoundingBox();
+    }
     CrsTransformer crsTransformer =
         crsTransformerFactory
             .getTransformer(getCrs(), OgcCrs.CRS84, true)
