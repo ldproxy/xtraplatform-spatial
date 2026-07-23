@@ -12,6 +12,8 @@ import spock.lang.Specification
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
+import java.sql.SQLWarning
+import java.sql.Savepoint
 import java.sql.Statement
 import java.util.function.Consumer
 import java.util.function.Supplier
@@ -292,6 +294,152 @@ class JdbcSqlSessionSpec extends Specification {
 
         then:
         0 * connection.rollback()
+    }
+
+    def 'run collects SQL warnings from executed statements; drainWarnings returns and clears them'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        statement.execute('INSERT 1 RETURNING id') >> true
+        statement.getResultSet() >> resultSet
+        resultSet.next() >> true
+        resultSet.getString(1) >> 'gen-1'
+        statement.getWarnings() >> new SQLWarning('notice: derived data updated')
+
+        when:
+        session.run(
+                [{ 'INSERT 1 RETURNING id' } as Supplier<String>],
+                [{ String s -> } as Consumer<String>],
+                Optional.empty())
+
+        then:
+        session.drainWarnings() == ['notice: derived data updated']
+
+        and: 'a second drain is empty'
+        session.drainWarnings().isEmpty()
+    }
+
+    def 'runReturning flattens a chained SQL warning list in order'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        def chain = new SQLWarning('first')
+        chain.setNextWarning(new SQLWarning('second'))
+        statement.execute('INSERT INTO feat VALUES (1), (2) RETURNING id') >> false
+        statement.getWarnings() >> chain
+
+        when:
+        session.runReturning('INSERT INTO feat VALUES (1), (2) RETURNING id')
+
+        then:
+        session.drainWarnings() == ['first', 'second']
+    }
+
+    def 'savepoint marks a recoverable point on the connection'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+
+        when:
+        session.savepoint()
+
+        then:
+        1 * connection.setSavepoint() >> Mock(Savepoint)
+    }
+
+    def 'releaseSavepoint keeps the changes and consumes the savepoint'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        def sp = Mock(Savepoint)
+        connection.setSavepoint() >> sp
+        session.savepoint()
+
+        when:
+        session.releaseSavepoint()
+
+        then:
+        1 * connection.releaseSavepoint(sp)
+        0 * connection.rollback(_ as Savepoint)
+    }
+
+    def 'rollbackToSavepoint undoes the changes, then consumes the savepoint'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        def sp = Mock(Savepoint)
+        connection.setSavepoint() >> sp
+        session.savepoint()
+
+        when:
+        session.rollbackToSavepoint()
+
+        then:
+        1 * connection.rollback(sp)
+        1 * connection.releaseSavepoint(sp)
+    }
+
+    def 'a consumed savepoint allows a new one; a second active savepoint is rejected'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        connection.setSavepoint() >> Mock(Savepoint)
+        session.savepoint()
+
+        when: 'a second savepoint while one is active'
+        session.savepoint()
+
+        then:
+        thrown(IllegalStateException)
+
+        when: 'the active savepoint is consumed'
+        session.rollbackToSavepoint()
+        session.savepoint()
+
+        then:
+        noExceptionThrown()
+    }
+
+    def 'releaseSavepoint and rollbackToSavepoint without an active savepoint throw'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+
+        when:
+        session.releaseSavepoint()
+
+        then:
+        thrown(IllegalStateException)
+
+        when:
+        session.rollbackToSavepoint()
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def 'savepoint methods on a finalised session throw'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        session.commit()
+
+        when:
+        session.savepoint()
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def 'a failed rollbackToSavepoint clears the savepoint and surfaces the cause'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        def sp = Mock(Savepoint)
+        connection.setSavepoint() >> sp
+        connection.rollback(sp) >> { throw new SQLException('connection lost') }
+        session.savepoint()
+
+        when:
+        session.rollbackToSavepoint()
+
+        then:
+        def ex = thrown(IllegalStateException)
+        ex.message.contains('connection lost')
+
+        and: 'the savepoint is consumed, so a new one can be created'
+        session.savepoint()
     }
 
     def 'rollback swallows SQLException from connection.rollback (still finalises)'() {

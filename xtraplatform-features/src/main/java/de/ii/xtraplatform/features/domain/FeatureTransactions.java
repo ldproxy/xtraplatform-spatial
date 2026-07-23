@@ -303,6 +303,55 @@ public interface FeatureTransactions {
       return List.of();
     }
 
+    /**
+     * Returns the non-fatal warnings the data source has emitted for the mutator calls since the
+     * last drain (e.g. PostgreSQL {@code RAISE WARNING} / {@code RAISE NOTICE} from triggers or
+     * functions the statements invoked), and clears them. Warnings produced by {@link #execute} are
+     * returned by that method directly and do not show up here. The default implementation returns
+     * an empty list for providers that do not collect warnings.
+     */
+    default List<String> drainWarnings() {
+      return List.of();
+    }
+
+    /**
+     * Whether this session supports recoverable per-action scopes via {@link #savepoint()}. When
+     * {@code false} (the default), the savepoint methods throw {@link
+     * UnsupportedOperationException}.
+     */
+    default boolean supportsSavepoints() {
+      return false;
+    }
+
+    /**
+     * Marks a recoverable point in this session's open transaction. At most one savepoint may be
+     * active at a time; it is consumed by either {@link #releaseSavepoint()} or {@link
+     * #rollbackToSavepoint()}. The default implementation throws {@link
+     * UnsupportedOperationException} for providers that have not adopted the API.
+     */
+    default void savepoint() {
+      throw new UnsupportedOperationException(
+          "Savepoints are not supported by this feature provider session");
+    }
+
+    /**
+     * Releases the active savepoint, keeping all changes made since {@link #savepoint()} as part of
+     * the enclosing transaction. Throws when no savepoint is active.
+     */
+    default void releaseSavepoint() {
+      throw new UnsupportedOperationException(
+          "Savepoints are not supported by this feature provider session");
+    }
+
+    /**
+     * Undoes all changes made since {@link #savepoint()} and releases the savepoint, leaving the
+     * enclosing transaction usable for further mutations. Throws when no savepoint is active.
+     */
+    default void rollbackToSavepoint() {
+      throw new UnsupportedOperationException(
+          "Savepoints are not supported by this feature provider session");
+    }
+
     /** Commits all mutations performed against this session. Throws if already finalised. */
     void commit();
 
