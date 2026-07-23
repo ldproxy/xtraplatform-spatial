@@ -25,23 +25,18 @@ import org.immutables.value.Value;
 public interface TargetMapping<T extends Enum<T>> {
   String BASE_TYPE = "general";
 
-  // TODO
   @Nullable
   String getName();
 
-  // TODO
   @Nullable
   T getType();
 
-  // TODO
   @Nullable
   Boolean getEnabled();
 
-  // TODO
   @Nullable
   Integer getSortPriority();
 
-  // TODO
   @Nullable
   String getFormat();
 
@@ -50,30 +45,25 @@ public interface TargetMapping<T extends Enum<T>> {
     return this;
   }
 
-  // TODO
   @JsonIgnore
   boolean isSpatial();
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   default boolean isEnabled() {
     return getEnabled() == null || getEnabled();
   }
 
-  // TODO
   @JsonIgnore
   default boolean isReference() {
     return false;
   }
 
-  // TODO
   @JsonIgnore
   default boolean isReferenceEmbed() {
     return false;
   }
 
-  // TODO
   @JsonIgnore
   default TargetMapping getBaseMapping() {
     return null;

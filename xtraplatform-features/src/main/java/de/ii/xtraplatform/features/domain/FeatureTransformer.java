@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.features.domain.legacy.TargetMapping;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
+import java.io.IOException;
 import java.util.List;
 import java.util.OptionalLong;
 
@@ -18,29 +19,28 @@ import java.util.OptionalLong;
 public interface FeatureTransformer {
   String getTargetFormat();
 
-  void onStart(OptionalLong numberReturned, OptionalLong numberMatched) throws Exception;
+  void onStart(OptionalLong numberReturned, OptionalLong numberMatched) throws IOException;
 
-  void onEnd() throws Exception;
+  void onEnd() throws IOException;
 
-  void onFeatureStart(final TargetMapping mapping) throws Exception;
+  void onFeatureStart(TargetMapping mapping) throws IOException;
 
-  void onFeatureEnd() throws Exception;
+  void onFeatureEnd() throws IOException;
 
-  void onPropertyStart(final TargetMapping mapping, List<Integer> multiplicities) throws Exception;
+  void onPropertyStart(TargetMapping mapping, List<Integer> multiplicities) throws IOException;
 
-  void onPropertyText(final String text) throws Exception;
+  void onPropertyText(String text) throws IOException;
 
-  void onPropertyEnd() throws Exception;
+  void onPropertyEnd() throws IOException;
 
-  void onGeometryStart(
-      final TargetMapping mapping, final GeometryType type, final Integer dimension)
-      throws Exception;
+  void onGeometryStart(TargetMapping mapping, GeometryType type, Integer dimension)
+      throws IOException;
 
-  void onGeometryNestedStart() throws Exception;
+  void onGeometryNestedStart() throws IOException;
 
-  void onGeometryCoordinates(final String text) throws Exception;
+  void onGeometryCoordinates(String text) throws IOException;
 
-  void onGeometryNestedEnd() throws Exception;
+  void onGeometryNestedEnd() throws IOException;
 
-  void onGeometryEnd() throws Exception;
+  void onGeometryEnd() throws IOException;
 }

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,7 @@ public class ConnectorFactoryImpl implements ConnectorFactory {
 
   private final Lazy<Set<ConnectorFactory2<?, ?, ?>>> connectorFactories;
   private final Map<String, Set<Runnable>> disposeListeners;
+  private final ReentrantLock lock = new ReentrantLock();
 
   @Inject
   public ConnectorFactoryImpl(Lazy<Set<ConnectorFactory2<?, ?, ?>>> connectorFactories) {
@@ -44,45 +46,73 @@ public class ConnectorFactoryImpl implements ConnectorFactory {
   }
 
   @Override
-  public synchronized FeatureProviderConnector<?, ?, ?> createConnector(
+  public FeatureProviderConnector<?, ?, ?> createConnector(
       String providerType, String providerId, ConnectionInfo connectionInfo) {
-    final String connectorType = connectionInfo.getConnectorType();
+    lock.lock();
+    try {
+      final String connectorType = connectionInfo.getConnectorType();
 
-    if (getFactory(providerType, connectorType).isEmpty()) {
-      throw new IllegalStateException(
-          String.format(
-              "Connector with type %s for provider type %s is not supported.",
-              connectorType, providerType));
-    }
+      if (getFactory(providerType, connectorType).isEmpty()) {
+        throw new IllegalStateException(
+            String.format(
+                "Connector with type %s for provider type %s is not supported.",
+                connectorType, providerType));
+      }
 
-    ConnectorFactory2<?, ?, ?> connectorFactory2 = getFactory(providerType, connectorType).get();
+      ConnectorFactory2<?, ?, ?> connectorFactory2 = getFactory(providerType, connectorType).get();
 
-    if (connectionInfo.isShared()) {
-      Optional<? extends FeatureProviderConnector<?, ?, ?>> match =
-          connectorFactory2.instances().stream()
-              .filter(connector -> connector.canBeSharedWith(connectionInfo, false).first())
-              .findFirst();
+      if (connectionInfo.isShared()) {
+        Optional<FeatureProviderConnector<?, ?, ?>> shared =
+            findSharedConnector(connectorFactory2, connectionInfo);
 
-      if (match.isPresent()) {
-        Tuple<Boolean, String> fullMatch = match.get().canBeSharedWith(connectionInfo, true);
-
-        if (fullMatch.first()) {
-          LOGGER.debug("Joining shared pool.");
-          match
-              .get()
-              .getRefCounter()
-              .ifPresent(refs -> LOGGER.debug("Shared pool consumers: {}", refs.incrementAndGet()));
-
-          return match.get();
-        } else {
-          throw new IllegalStateException(
-              String.format(
-                  "Connection pool cannot be shared with provider %s: %s",
-                  match.get().getProviderId(), fullMatch.second()));
+        if (shared.isPresent()) {
+          return shared.get();
         }
       }
+
+      return createNewConnector(
+          connectorFactory2, providerId, connectorType, providerType, connectionInfo);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private Optional<FeatureProviderConnector<?, ?, ?>> findSharedConnector(
+      ConnectorFactory2<?, ?, ?> connectorFactory2, ConnectionInfo connectionInfo) {
+    Optional<? extends FeatureProviderConnector<?, ?, ?>> match =
+        connectorFactory2.instances().stream()
+            .filter(connector -> connector.canBeSharedWith(connectionInfo, false).first())
+            .findFirst();
+
+    if (match.isEmpty()) {
+      return Optional.empty();
     }
 
+    Tuple<Boolean, String> fullMatch = match.get().canBeSharedWith(connectionInfo, true);
+
+    if (!fullMatch.first()) {
+      throw new IllegalStateException(
+          String.format(
+              "Connection pool cannot be shared with provider %s: %s",
+              match.get().getProviderId(), fullMatch.second()));
+    }
+
+    LOGGER.debug("Joining shared pool.");
+    match
+        .get()
+        .getRefCounter()
+        .ifPresent(refs -> LOGGER.debug("Shared pool consumers: {}", refs.incrementAndGet()));
+
+    return Optional.of(match.get());
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private FeatureProviderConnector<?, ?, ?> createNewConnector(
+      ConnectorFactory2<?, ?, ?> connectorFactory2,
+      String providerId,
+      String connectorType,
+      String providerType,
+      ConnectionInfo connectionInfo) {
     try {
       LOGGER.debug("Creating new pool.");
       FeatureProviderConnector<?, ?, ?> connector =
@@ -96,7 +126,7 @@ public class ConnectorFactoryImpl implements ConnectorFactory {
 
       return connector;
 
-    } catch (Throwable e) {
+    } catch (Exception e) {
       throw new IllegalStateException(
           String.format(
               "Connector with type %s for provider type %s could not be created.",
@@ -106,35 +136,44 @@ public class ConnectorFactoryImpl implements ConnectorFactory {
   }
 
   @Override
-  public synchronized void disposeConnector(FeatureProviderConnector<?, ?, ?> connector) {
-    int refs = 0;
-    if (connector.getRefCounter().isPresent()) {
-      LOGGER.debug("Leaving shared pool.");
-      refs = connector.getRefCounter().get().decrementAndGet();
-      LOGGER.debug("Shared pool consumers: {}", refs);
-    }
-
-    if (refs == 0) {
-      boolean deleted =
-          getFactory(connector.getType()).get().deleteInstance(connector.getProviderId());
-      if (deleted && LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Deleted unused pool.");
+  public void disposeConnector(FeatureProviderConnector<?, ?, ?> connector) {
+    lock.lock();
+    try {
+      int refs = 0;
+      if (connector.getRefCounter().isPresent()) {
+        LOGGER.debug("Leaving shared pool.");
+        refs = connector.getRefCounter().get().decrementAndGet();
+        LOGGER.debug("Shared pool consumers: {}", refs);
       }
-    }
 
-    if (disposeListeners.containsKey(connector.getProviderId())) {
-      disposeListeners.get(connector.getProviderId()).forEach(Runnable::run);
-      disposeListeners.get(connector.getProviderId()).clear();
+      if (refs == 0) {
+        boolean deleted =
+            getFactory(connector.getType()).get().deleteInstance(connector.getProviderId());
+        if (deleted && LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Deleted unused pool.");
+        }
+      }
+
+      if (disposeListeners.containsKey(connector.getProviderId())) {
+        disposeListeners.get(connector.getProviderId()).forEach(Runnable::run);
+        disposeListeners.get(connector.getProviderId()).clear();
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
   @Override
-  public synchronized void onDispose(
-      FeatureProviderConnector<?, ?, ?> connector, Runnable runnable) {
-    if (!disposeListeners.containsKey(connector.getProviderId())) {
-      disposeListeners.put(connector.getProviderId(), new HashSet<>());
+  public void onDispose(FeatureProviderConnector<?, ?, ?> connector, Runnable runnable) {
+    lock.lock();
+    try {
+      if (!disposeListeners.containsKey(connector.getProviderId())) {
+        disposeListeners.put(connector.getProviderId(), new HashSet<>());
+      }
+      disposeListeners.get(connector.getProviderId()).add(runnable);
+    } finally {
+      lock.unlock();
     }
-    disposeListeners.get(connector.getProviderId()).add(runnable);
   }
 
   private Optional<ConnectorFactory2<?, ?, ?>> getFactory(String type, String subType) {

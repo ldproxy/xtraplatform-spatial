@@ -15,9 +15,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 public class FeatureTokenEncoderDebug
-    implements FeatureTokenEncoderGeneric<
-            FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>,
-        FeatureTokenEncoder<ModifiableContext<FeatureSchema, SchemaMapping>>,
+    implements FeatureTokenEncoder<ModifiableContext<FeatureSchema, SchemaMapping>>,
         FeatureTokenEmitter2<
             FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>> {
 

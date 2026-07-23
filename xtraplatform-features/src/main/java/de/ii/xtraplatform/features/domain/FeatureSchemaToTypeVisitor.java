@@ -46,7 +46,7 @@ public class FeatureSchemaToTypeVisitor implements SchemaVisitor<FeatureSchema, 
           .build();
     }
 
-    ImmutableMap<String, FeatureProperty> properties =
+    Map<String, FeatureProperty> properties =
         visitedProperties.stream()
             .flatMap(
                 types -> {

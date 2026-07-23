@@ -39,6 +39,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    * @langEn Always `FEATURE`.
    * @langDe Stets `FEATURE`.
    */
+  @Override
   String getProviderType();
 
   /**
@@ -190,6 +191,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    */
   @JsonMerge
   @JsonProperty("types")
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<FeatureSchema, ImmutableFeatureSchema.Builder> getTypes();
 
   /**
@@ -201,6 +203,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    * @default {}
    */
   @JsonMerge
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<FeatureSchema, ImmutableFeatureSchema.Builder> getFragments();
 
   @DocIgnore
@@ -222,7 +225,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
     @JsonIgnore
     public abstract Map<String, ImmutableFeatureSchema.Builder> getTypes();
 
-    @JsonProperty(value = "types")
+    @JsonProperty("types")
     public Map<String, ImmutableFeatureSchema.Builder> getTypes2() {
       Map<String, ImmutableFeatureSchema.Builder> types = getTypes();
 
@@ -231,7 +234,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
 
     public abstract T putTypes(String key, ImmutableFeatureSchema.Builder builder);
 
-    @JsonProperty(value = "types")
+    @JsonProperty("types")
     public T putTypes2(String key, ImmutableFeatureSchema.Builder builder) {
       return putTypes(key, builder.name(key));
     }
@@ -239,7 +242,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
     @JsonIgnore
     public abstract Map<String, ImmutableFeatureSchema.Builder> getFragments();
 
-    @JsonProperty(value = "fragments")
+    @JsonProperty("fragments")
     public Map<String, ImmutableFeatureSchema.Builder> getFragments2() {
       Map<String, ImmutableFeatureSchema.Builder> types = getFragments();
 
@@ -248,7 +251,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
 
     public abstract T putFragments(String key, ImmutableFeatureSchema.Builder builder);
 
-    @JsonProperty(value = "fragments")
+    @JsonProperty("fragments")
     public T putFragments2(String key, ImmutableFeatureSchema.Builder builder) {
       return putFragments(key, builder.name(key));
     }

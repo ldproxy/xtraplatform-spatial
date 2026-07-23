@@ -30,7 +30,8 @@ public interface PropertiesSchema<
   // behaves exactly like Map<String, FeaturePropertyV2>, but supports mergeable builder
   // deserialization
   // (immutables attributeBuilder does not work with maps yet)
-  @JsonProperty(value = "properties")
+  @JsonProperty("properties")
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<T, ? extends BuilderWithName<T, U>> getPropertyMap();
 
   interface BuilderWithName<T extends Buildable<T>, U extends BuilderWithName<T, U>>
@@ -48,7 +49,7 @@ public interface PropertiesSchema<
     public abstract Builder<T, U, V> putPropertyMap(String key, U builder);
 
     // @JsonMerge
-    @JsonProperty(value = "properties")
+    @JsonProperty("properties")
     public Builder<T, U, V> putProperties2(Map<String, U> builderMap) {
       Builder<T, U, V> builder1 = null;
       for (Map.Entry<String, U> entry : builderMap.entrySet()) {

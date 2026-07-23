@@ -31,7 +31,6 @@ public class SchemaToPathsVisitor<T extends SchemaBase<T>>
   private final BiFunction<String, Boolean, String> sourcePathTransformer;
   private final boolean useTargetPath;
   private int counter;
-  private int emptyCounter;
 
   SchemaToPathsVisitor(boolean useTargetPath) {
     this(useTargetPath, IDENTITY);
@@ -42,7 +41,6 @@ public class SchemaToPathsVisitor<T extends SchemaBase<T>>
     this.sourcePathTransformer = sourcePathTransformer;
     this.useTargetPath = useTargetPath;
     this.counter = 0;
-    this.emptyCounter = 0;
   }
 
   private static List<String> appendToLast(List<String> list, String suffix) {
@@ -56,13 +54,14 @@ public class SchemaToPathsVisitor<T extends SchemaBase<T>>
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public Multimap<List<String>, T> visit(
       T schema, List<Multimap<List<String>, T>> visitedProperties) {
     counter++;
 
     List<List<String>> paths =
         useTargetPath
-            ? ImmutableList.of(appendToLast(schema.getPath(), "{priority=" + (counter) + "}")) // )
+            ? ImmutableList.of(appendToLast(schema.getPath(), "{priority=" + counter + "}")) // )
             // TODO: static cleanup method in PathParser
             : schema.getEffectiveSourcePaths().stream()
                 .map(
@@ -84,7 +83,7 @@ public class SchemaToPathsVisitor<T extends SchemaBase<T>>
                                     .replaceAll("\\{sortKey=.*?\\}", "")
                                     .replaceAll("\\{primaryKey=.*?\\}", "")
                                 + "{priority="
-                                + (counter)
+                                + counter
                                 + "}");
                         return p.stream()
                             .flatMap(
@@ -97,7 +96,7 @@ public class SchemaToPathsVisitor<T extends SchemaBase<T>>
                             .collect(Collectors.toList());
                       }
 
-                      return SPLITTER.splitToList(sourcePath + "{priority=" + (counter) + "}");
+                      return SPLITTER.splitToList(sourcePath + "{priority=" + counter + "}");
                     })
                 .collect(Collectors.toList());
 

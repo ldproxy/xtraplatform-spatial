@@ -72,14 +72,15 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   // the time zone of the provider, applied to values without a time zone
   private final ZoneId defaultTimeZone;
   private Optional<EpsgCrs> crs;
-  private double[][] minMax = null;
+  private double[][] minMax;
   private String start = "";
   private String end = "";
-  private boolean isSingleFeature = false;
+  private boolean isSingleFeature;
   private String lastModified = "";
 
   public FeatureTokenTransformerMetadata(
       ImmutableResult.Builder resultBuilder, ZoneId defaultTimeZone) {
+    super();
     this.lastModifiedSetter = resultBuilder::lastModified;
     this.spatialExtentSetter = resultBuilder::spatialExtent;
     this.temporalExtentSetter = resultBuilder::temporalExtent;
@@ -88,6 +89,7 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
 
   public <X> FeatureTokenTransformerMetadata(
       ImmutableResultReduced.Builder<X> resultBuilder, ZoneId defaultTimeZone) {
+    super();
     this.lastModifiedSetter = resultBuilder::lastModified;
     this.spatialExtentSetter = resultBuilder::spatialExtent;
     this.temporalExtentSetter = resultBuilder::temporalExtent;
@@ -103,6 +105,7 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   }
 
   @Override
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     try {
       if (minMax != null) {
@@ -123,18 +126,23 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
                     minMax[1][2],
                     crs.orElse(OgcCrs.CRS84h)));
       }
-    } catch (Throwable ignore) {
+    } catch (Exception e) {
+      // ignore, spatial extent is best-effort
     }
 
     try {
-      if (!start.isEmpty() && !end.isEmpty()) {
+      boolean hasStart = !start.isEmpty();
+      boolean hasEnd = !end.isEmpty();
+
+      if (hasStart && hasEnd) {
         temporalExtentSetter.accept(Tuple.of(parseTemporal(start), parseTemporal(end)));
-      } else if (!start.isEmpty()) {
+      } else if (hasStart) {
         temporalExtentSetter.accept(Tuple.of(parseTemporal(start), null));
-      } else if (!end.isEmpty()) {
+      } else if (hasEnd) {
         temporalExtentSetter.accept(Tuple.of(null, parseTemporal(end)));
       }
-    } catch (Throwable ignore) {
+    } catch (Exception e) {
+      // ignore, temporal extent is best-effort
     }
 
     if (!lastModified.isEmpty()) {
@@ -143,7 +151,7 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
         // transformation (which is applied to every DATETIME property that has no other
         // transformation)
         lastModifiedSetter.accept(parseTemporal(lastModified));
-      } catch (Throwable e) {
+      } catch (Exception e) {
         // the last modification time is used for conditional requests, so a value that cannot be
         // parsed must not be ignored silently
         if (LOGGER.isWarnEnabled()) {
@@ -174,11 +182,11 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (context.schema().filter(SchemaBase::isPrimaryGeometry).isPresent()
         && Objects.nonNull(context.geometry())) {
-      double[][] minMax2 = null;
-      minMax2 = context.geometry().accept(new MinMaxDeriver());
+      double[][] minMax2 = context.geometry().accept(new MinMaxDeriver());
       if (minMax == null) {
         minMax = minMax2;
       } else {
@@ -202,20 +210,12 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
       String value = context.value();
 
       if (context.schema().filter(SchemaBase::isPrimaryInstant).isPresent()) {
-        if (start.isEmpty() || value.compareTo(start) < 0) {
-          this.start = value;
-        }
-        if (end.isEmpty() || value.compareTo(end) > 0) {
-          this.end = value;
-        }
+        updateStart(value);
+        updateEnd(value);
       } else if (context.schema().filter(SchemaBase::isPrimaryIntervalStart).isPresent()) {
-        if (start.isEmpty() || value.compareTo(start) < 0) {
-          this.start = value;
-        }
+        updateStart(value);
       } else if (context.schema().filter(SchemaBase::isPrimaryIntervalEnd).isPresent()) {
-        if (end.isEmpty() || value.compareTo(end) > 0) {
-          this.end = value;
-        }
+        updateEnd(value);
       }
 
       if (isSingleFeature && context.schema().map(SchemaBase::lastModified).orElse(false)) {
@@ -224,5 +224,17 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
     }
 
     super.onValue(context);
+  }
+
+  private void updateStart(String value) {
+    if (start.isEmpty() || value.compareTo(start) < 0) {
+      this.start = value;
+    }
+  }
+
+  private void updateEnd(String value) {
+    if (end.isEmpty() || value.compareTo(end) > 0) {
+      this.end = value;
+    }
   }
 }

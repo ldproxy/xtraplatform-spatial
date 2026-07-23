@@ -18,13 +18,8 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerMappingValuesOnly extends FeatureTokenTransformer {
-
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(FeatureTokenTransformerMappingValuesOnly.class);
 
   private final Map<String, PropertyTransformations> propertyTransformations;
   private final Map<String, Codelist> codelists;
@@ -37,14 +32,10 @@ public class FeatureTokenTransformerMappingValuesOnly extends FeatureTokenTransf
       Map<String, PropertyTransformations> propertyTransformations,
       Map<String, Codelist> codelists,
       ZoneId nativeTimeZone) {
+    super();
     this.propertyTransformations = propertyTransformations;
     this.codelists = codelists;
     this.nativeTimeZone = nativeTimeZone;
-  }
-
-  @Override
-  protected void init() {
-    super.init();
   }
 
   @Override

@@ -15,12 +15,12 @@ public abstract class FeatureTokenEncoderBase<
         T extends SchemaBase<T>, U extends SchemaMappingBase<T>, V extends ModifiableContext<T, U>>
     implements FeatureTokenEncoderGeneric<T, U, V> {
 
-  private final FeatureTokenReader tokenReader;
+  private final FeatureTokenReader<T, U, V> tokenReader;
   private Consumer<byte[]> downstream;
   private Runnable afterInit;
 
   protected FeatureTokenEncoderBase() {
-    this.tokenReader = new FeatureTokenReader(this, null);
+    this.tokenReader = new FeatureTokenReader<>(this, null);
   }
 
   @Override

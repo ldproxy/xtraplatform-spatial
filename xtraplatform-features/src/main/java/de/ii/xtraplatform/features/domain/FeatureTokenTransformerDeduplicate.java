@@ -56,6 +56,7 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   private String intervalStartValue;
 
   public FeatureTokenTransformerDeduplicate(boolean idsArePerType) {
+    super();
     this.seen = new PackedIdSet(MAX_FEATURES);
     this.idsArePerType = idsArePerType;
     this.typeHasPrimaryInterval = new HashMap<>();

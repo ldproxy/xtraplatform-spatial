@@ -131,7 +131,7 @@ public interface SchemaMappingBase<T extends SchemaBase<T>> {
                 Entry::getKey,
                 Entry::getValue,
                 (first, second) -> {
-                  ArrayList<T> schemas = new ArrayList<>(first);
+                  List<T> schemas = new ArrayList<>(first);
                   schemas.addAll(second);
                   return schemas;
                 }));
@@ -155,7 +155,7 @@ public interface SchemaMappingBase<T extends SchemaBase<T>> {
                   path.isEmpty()
                       ? ""
                       : path.get(path.size() - 1)
-                          .substring(path.get(path.size() - 1).lastIndexOf("=") + 1);
+                          .substring(path.get(path.size() - 1).lastIndexOf('=') + 1);
               if (!Objects.equals(prio, prevPrio[0])) {
                 i[0]++;
               }
@@ -170,7 +170,7 @@ public interface SchemaMappingBase<T extends SchemaBase<T>> {
                 Entry::getKey,
                 Entry::getValue,
                 (first, second) -> {
-                  ArrayList<Integer> positions = new ArrayList<>(first);
+                  List<Integer> positions = new ArrayList<>(first);
                   positions.addAll(second);
                   return positions;
                 }));

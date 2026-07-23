@@ -56,6 +56,7 @@ public interface FeatureProviderConnector<T, U, V extends FeatureProviderConnect
 
   String getDatasetIdentifier();
 
+  @SuppressWarnings("PMD.LinguisticNaming")
   default Tuple<Boolean, String> canBeSharedWith(
       ConnectionInfo connectionInfo, boolean checkAllParameters) {
     return Tuple.of(false, null);

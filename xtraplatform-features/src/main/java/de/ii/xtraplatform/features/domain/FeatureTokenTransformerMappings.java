@@ -51,14 +51,10 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
       Map<String, PropertyTransformations> propertyTransformations,
       Map<String, Codelist> codelists,
       ZoneId nativeTimeZone) {
+    super();
     this.propertyTransformations = propertyTransformations;
     this.codelists = codelists;
     this.nativeTimeZone = nativeTimeZone;
-  }
-
-  @Override
-  protected void init() {
-    super.init();
   }
 
   @Override
@@ -73,8 +69,8 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
                             .get(entry.getKey())
                             .getSchemaTransformations(
                                 entry.getValue(),
-                                (!(context.query() instanceof FeatureQuery)
-                                    || !((FeatureQuery) context.query()).returnsSingleFeature()))))
+                                !(context.query() instanceof FeatureQuery)
+                                    || !((FeatureQuery) context.query()).returnsSingleFeature())))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.sliceTransformerChains =

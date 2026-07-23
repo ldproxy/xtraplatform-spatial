@@ -24,7 +24,7 @@ public interface FeatureStoreRelatedContainer extends FeatureStoreAttributesCont
     return Stream.concat(
             Stream.of(
                 getInstanceContainerName()
-                    + (getInstanceConnection().get(0).getSourceFilter().orElse(""))),
+                    + getInstanceConnection().get(0).getSourceFilter().orElse("")),
             getInstanceConnection().stream()
                 .flatMap(
                     relation -> {
