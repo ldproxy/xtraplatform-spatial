@@ -11,6 +11,7 @@ import com.fasterxml.aalto.AsyncByteArrayFeeder;
 import com.fasterxml.aalto.AsyncXMLStreamReader;
 import com.fasterxml.aalto.stax.InputFactoryImpl;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.features.domain.CrsVariants;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase;
@@ -25,12 +26,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.namespace.QName;
@@ -83,8 +87,7 @@ import org.slf4j.LoggerFactory;
  * a {@code VALUE_PROPERTY} is treated as a {@code VALUE_WRAPPER} around the property's scalar text,
  * no explicit {@code valueWrap} entry required. Wrappers in other namespaces (e.g. {@code
  * <adv:AX_LI_ProcessStep_Punktort_Description>}) still need explicit {@code valueWrap}
- * configuration on the input profile. To be documented as a Phase 5 restriction of the GML building
- * block.
+ * configuration on the input profile. A known restriction of the GML building block.
  */
 public class FeatureTokenDecoderGml
     extends FeatureTokenDecoderSimple<
@@ -102,8 +105,8 @@ public class FeatureTokenDecoderGml
    * <gco:CharacterString>}, {@code <gmd:CI_RoleCode>}). When such an element appears as a child of
    * a scalar property element the decoder treats it as a value wrapper around the scalar text, even
    * without an explicit {@code valueWrap} entry. Any other external namespace that follows the same
-   * convention needs a similar entry here when the need arises — documented as a known restriction
-   * in Phase 5 of the GML building block.
+   * convention needs a similar entry here when the need arises — a known restriction of the GML
+   * building block.
    */
   private static final String GMD_NS = "http://www.isotc211.org/2005/gmd";
 
@@ -148,6 +151,12 @@ public class FeatureTokenDecoderGml
    * {@code useAlias} is off or no property carries an alias.
    */
   private final Map<String, String> aliasFormPathByPropertyPath;
+
+  /**
+   * Per geometry property (keyed by its technical full path), the srsName routing built from the
+   * schema's {@code crsVariants} declaration by {@link #buildGeometryVariants}.
+   */
+  private final Map<String, GmlGeometryVariants> geometryVariantsCache = new HashMap<>();
 
   private int depth = 0;
   private boolean inFeature = false;
@@ -260,6 +269,14 @@ public class FeatureTokenDecoderGml
     boolean valueWrapped;
 
     /**
+     * For GEOMETRY_PROPERTY: the position-variant routing derived from the property's {@code
+     * variants} declaration in the schema (see {@code buildGeometryVariants}), or {@code null} when
+     * none is declared. Consulted by {@code emitGeometryOrVertical} together with the raw srsName
+     * the geometry decoder captured.
+     */
+    GmlGeometryVariants geometryVariants;
+
+    /**
      * For OBJECT_ELEMENT: the {@link FeatureSchema#getName() name} of the array property currently
      * open as a direct child of this object element, or {@code null} when no array is open at this
      * level. The feature-root level uses the enclosing decoder's {@code currentArrayPath} field for
@@ -324,7 +341,14 @@ public class FeatureTokenDecoderGml
     this.defaultCrs = headerCrs.isPresent() ? headerCrs : Optional.of(storageCrs);
     this.nullValue = nullValue;
     this.inputProfile = inputProfile;
-    this.geometryDecoder = new GeometryDecoderGml(inputProfile.getSrsNameMappings());
+    // The reference systems of position variants are declared in the schema: each variant
+    // property lists its verbatim identifiers in originalCrsIdentifiers and the CRS they denote in
+    // originalCrs (defaulting to nativeCrs, the CRS the positions are stored in). The input
+    // profile only contributes the alternative URIs of the requestable CRSs (ordinary geometries).
+    Map<String, EpsgCrs> srsNameMappings = new LinkedHashMap<>(inputProfile.getSrsNameMappings());
+    Set<String> verticalSrsNames = new HashSet<>();
+    collectVariantReferenceSystems(featureSchema, srsNameMappings, verticalSrsNames);
+    this.geometryDecoder = new GeometryDecoderGml(srsNameMappings, verticalSrsNames);
     this.buffer = new StringBuilder();
 
     List<String> wrappers = new ArrayList<>(2);
@@ -469,13 +493,15 @@ public class FeatureTokenDecoderGml
     if (geometryDecoder.isWaitingForInput()) {
       Optional<Geometry<?>> optGeometry =
           geometryDecoder.continueDecoding(parser, crs, srsDimension, parser.getLocalName(), null);
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
+      if (!geometryDecoder.isWaitingForInput()) {
+        emitGeometryOrVertical(optGeometry);
       }
       return false;
     }
 
-    rejectXsiType();
+    if (!isValueWrapChainElement()) {
+      rejectXsiType();
+    }
 
     if (!inFeature && depth < featureRootDepth) {
       String expected = wrapperElementNames.get(depth);
@@ -582,11 +608,7 @@ public class FeatureTokenDecoderGml
       // (ISO 19115) carry text directly and routinely appear inside a property element — treat
       // them as value wrappers without requiring an explicit valueWrap entry. Once inside a
       // VALUE_WRAPPER, the chain continues regardless of the inner element's namespace.
-      boolean inValueWrapChain =
-          parent.kind == FrameKind.VALUE_WRAPPER
-              || (parent.kind == FrameKind.VALUE_PROPERTY
-                  && (parent.valueWrapped || isExternalContentNamespace(parser.getNamespaceURI())));
-      frames.push(inValueWrapChain ? Frame.valueWrapper() : Frame.unknown());
+      frames.push(isValueWrapChainElement() ? Frame.valueWrapper() : Frame.unknown());
       depth++;
       return false;
     }
@@ -648,17 +670,19 @@ public class FeatureTokenDecoderGml
     if (prop.isSpatial()) {
       // Geometry properties decode the full GML geometry subtree via {@link GeometryDecoderGml}
       // regardless of nesting depth; the path tracker is already set to the property's segment
-      // path so {@code emitGeometry} routes the resulting Geometry to the right downstream slot.
+      // path so {@code emitGeometryOrVertical} routes the resulting Geometry (or 1D position) to
+      // the right downstream slot.
+      Frame frame = Frame.geometryProperty(prop, segment, segmentPathDepth);
+      frame.geometryVariants = geometryVariantsFor(prop, lookupOwner);
+      frames.push(frame);
       Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser, crs, srsDimension);
-      frames.push(Frame.geometryProperty(prop, segment, segmentPathDepth));
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
-        depth++;
-        return false;
+      boolean waiting = geometryDecoder.isWaitingForInput();
+      if (!waiting) {
+        emitGeometryOrVertical(optGeometry);
       }
-      // geometry needs more input; the next push will continue via continueDecoding
+      // when waiting, the geometry needs more input; the next push continues via continueDecoding
       depth++;
-      return true;
+      return waiting;
     } else if (prop.isValue()) {
       Frame frame = Frame.valueProperty(prop, segment, segmentPathDepth);
       frame.nilOnCurrent = readXsiNil();
@@ -731,8 +755,8 @@ public class FeatureTokenDecoderGml
       Optional<Geometry<?>> optGeometry =
           geometryDecoder.continueDecoding(
               parser, crs, srsDimension, parser.getLocalName(), pending);
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
+      if (!geometryDecoder.isWaitingForInput()) {
+        emitGeometryOrVertical(optGeometry);
       }
       return;
     }
@@ -1030,10 +1054,16 @@ public class FeatureTokenDecoderGml
     String wireUri = wireNamespaceUri == null ? "" : wireNamespaceUri;
     for (FeatureSchema p : parent.getProperties()) {
       String key = propertyKey(p, useAlias);
-      if (!wireLocalName.equals(stripPrefix(key))) {
+      String base = stripPrefix(key);
+      // The configured set holds property ids (technical full paths), not the on-the-wire
+      // name/alias, so membership is tested against the property's full path; the wire element
+      // base for the suffix match stays the name/alias the encoder emits.
+      boolean suffixed =
+          inputProfile.getObjectTypeSuffixedProperties().contains(p.getFullPathAsString());
+      if (!(wireLocalName.equals(base) || (suffixed && wireLocalName.startsWith(base + "_")))) {
         continue;
       }
-      String expectedUri = expectedNamespaceUri(parent, key);
+      String expectedUri = expectedNamespaceUri(p, parent, key);
       if (expectedUri == null || expectedUri.equals(wireUri)) {
         return Optional.of(p);
       }
@@ -1062,15 +1092,24 @@ public class FeatureTokenDecoderGml
   }
 
   /**
-   * Resolves the XML namespace URI expected for a property of {@code parent} whose schema
-   * name/alias is {@code key}. Mirrors the encoder's qualification chain:
+   * Resolves the XML namespace URI expected for {@code property}, whose schema name/alias is {@code
+   * key}. Mirrors the encoder's qualification chain:
    *
    * <ol>
    *   <li>An explicit {@code prefix:name} in the schema name/alias takes precedence. The prefix is
    *       resolved against the constructor's namespace map (predefined + {@code
    *       applicationNamespaces}).
-   *   <li>Otherwise the parent's {@code objectType} is looked up in {@code objectTypeNamespaces};
-   *       its prefix resolves to the URI.
+   *   <li>Otherwise the property's {@code originObjectType} — the object type from the fragment
+   *       that originally listed this property — is looked up in {@code objectTypeNamespaces}; its
+   *       prefix resolves to the URI. The property's own origin always wins over the parent's
+   *       {@code objectType}; setting it deliberately falls through to the default namespace if the
+   *       type isn't mapped, suppressing the parent walk.
+   *   <li>Otherwise the parent's {@code objectType} is looked up in {@code objectTypeNamespaces} —
+   *       but only when the parent is a NESTED OBJECT, not the feature root. The feature root's
+   *       {@code objectType} pins the namespace of the feature element itself; it must not
+   *       propagate down to property children that inherited from a different schema fragment.
+   *       Nested OBJECTs (e.g. ISO 19115 {@code LI_Lineage}) do propagate, since their inline child
+   *       properties belong to the nested object's own namespace.
    *   <li>Otherwise the input profile's {@code defaultNamespace} prefix resolves to the URI.
    * </ol>
    *
@@ -1078,16 +1117,24 @@ public class FeatureTokenDecoderGml
    * then matches by local name only, preserving the decoder's behaviour when no namespace data is
    * provided in the input profile.
    */
-  private String expectedNamespaceUri(FeatureSchema parent, String key) {
+  private String expectedNamespaceUri(FeatureSchema property, FeatureSchema parent, String key) {
     int colon = key.indexOf(':');
     if (colon > 0) {
       return namespaceNormalizer.getNamespaceURI(key.substring(0, colon));
     }
-    Optional<String> parentObjectType = parent.getObjectType();
-    if (parentObjectType.isPresent()) {
-      String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
+    Optional<String> originObjectType = property.getOriginObjectType();
+    if (originObjectType.isPresent()) {
+      String prefix = inputProfile.getObjectTypeNamespaces().get(originObjectType.get());
       if (prefix != null) {
         return namespaceNormalizer.getNamespaceURI(prefix);
+      }
+    } else if (parent != featureSchema) {
+      Optional<String> parentObjectType = parent.getObjectType();
+      if (parentObjectType.isPresent()) {
+        String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
+        if (prefix != null) {
+          return namespaceNormalizer.getNamespaceURI(prefix);
+        }
       }
     }
     String defaultPrefix = inputProfile.getDefaultNamespace();
@@ -1230,10 +1277,31 @@ public class FeatureTokenDecoderGml
   }
 
   /**
+   * Whether the current START_ELEMENT is part of a value-wrap chain: its parent frame is a {@link
+   * FrameKind#VALUE_WRAPPER}, or a {@link FrameKind#VALUE_PROPERTY} whose path is listed in {@code
+   * valueWrap} or whose child lives in an ISO 19115 content namespace ({@code gmd}/{@code gco}).
+   * Such elements carry no schema meaning — they only wrap the property's scalar text — so they are
+   * pushed as {@link Frame#valueWrapper()} and exempt from {@link #rejectXsiType()}: ISO 19139
+   * requires typed values like {@code <gco:Record xsi:type="gml:doubleList">} inside {@code
+   * DQ_QuantitativeResult}, where {@code xsi:type} declares the content type of an anyType element
+   * rather than substituting a schema type.
+   */
+  private boolean isValueWrapChainElement() {
+    Frame parent = frames.peek();
+    return parent != null
+        && (parent.kind == FrameKind.VALUE_WRAPPER
+            || (parent.kind == FrameKind.VALUE_PROPERTY
+                && (parent.valueWrapped || isExternalContentNamespace(parser.getNamespaceURI()))));
+  }
+
+  /**
    * {@code xsi:type} substitution is not supported by this decoder — schema lookup is by element
    * name only, so a substituted type carries no extra information into the token stream and is
    * almost certainly user error. Reject early with a clear message naming the element on which it
-   * appeared.
+   * appeared. Elements inside a value-wrap chain (see {@link #isValueWrapChainElement()}) are
+   * exempt: there {@code xsi:type} types the content of an anyType value element (ISO 19139 {@code
+   * gco:Record}) and is dropped on input; the encoder regenerates it from the attributes declared
+   * on the {@code valueWrap} chain entry.
    */
   private void rejectXsiType() {
     for (int i = 0; i < parser.getAttributeCount(); i++) {
@@ -1245,6 +1313,190 @@ public class FeatureTokenDecoderGml
                 + "> is not supported by this decoder.");
       }
     }
+  }
+
+  /**
+   * Builds the srsName-keyed routing for a geometry property from its schema-level {@code
+   * crsVariants} declaration: every {@code originalCrsIdentifiers} entry of a variant sibling
+   * routes to that sibling (together with the sibling's {@code falseEastingDifference}); every
+   * identifier of the vertical sibling routes to the vertical property. Cached per geometry
+   * property.
+   */
+  private GmlGeometryVariants geometryVariantsFor(FeatureSchema prop, FeatureSchema lookupOwner) {
+    if (prop.getCrsVariants().isEmpty()) {
+      return null;
+    }
+    return geometryVariantsCache.computeIfAbsent(
+        prop.getFullPathAsString(), ignore -> buildGeometryVariants(prop, lookupOwner));
+  }
+
+  private GmlGeometryVariants buildGeometryVariants(FeatureSchema prop, FeatureSchema lookupOwner) {
+    CrsVariants variants = prop.getCrsVariants().get();
+    Map<String, String> bySrsName = new LinkedHashMap<>();
+
+    Map<String, Double> shiftBySrsName = new LinkedHashMap<>();
+    variants.getGeometryProperties().stream()
+        .map(name -> siblingProperty(lookupOwner, name))
+        .filter(Objects::nonNull)
+        .forEach(
+            sibling ->
+                sibling
+                    .getOriginalCrsIdentifiers()
+                    .forEach(
+                        identifier -> {
+                          bySrsName.put(identifier, sibling.getName());
+                          sibling
+                              .getFalseEastingDifference()
+                              .filter(difference -> difference != 0)
+                              .ifPresent(difference -> shiftBySrsName.put(identifier, difference));
+                        }));
+
+    Map<String, String> verticalBySrsName = new LinkedHashMap<>();
+    variants
+        .getVerticalProperty()
+        .ifPresent(
+            verticalProperty -> {
+              FeatureSchema sibling = siblingProperty(lookupOwner, verticalProperty);
+              if (sibling != null) {
+                sibling
+                    .getOriginalCrsIdentifiers()
+                    .forEach(identifier -> verticalBySrsName.put(identifier, verticalProperty));
+              }
+            });
+
+    return ImmutableGmlGeometryVariants.builder()
+        .bySrsName(bySrsName)
+        .shiftBySrsName(shiftBySrsName)
+        .verticalBySrsName(verticalBySrsName)
+        .srsNameProperty(variants.getCrsProperty())
+        .build();
+  }
+
+  private FeatureSchema siblingProperty(FeatureSchema owner, String name) {
+    return owner == null
+        ? null
+        : owner.getProperties().stream()
+            .filter(prop -> prop.getName().equals(name))
+            .findFirst()
+            .orElse(null);
+  }
+
+  private static void collectVariantReferenceSystems(
+      FeatureSchema schema, Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
+    for (FeatureSchema child : schema.getProperties()) {
+      child
+          .getCrsVariants()
+          .ifPresent(
+              variants -> {
+                variants
+                    .getGeometryProperties()
+                    .forEach(
+                        name -> {
+                          FeatureSchema sibling =
+                              schema.getProperties().stream()
+                                  .filter(prop -> prop.getName().equals(name))
+                                  .findFirst()
+                                  .orElse(null);
+                          if (sibling != null && sibling.getNativeCrs().isPresent()) {
+                            EpsgCrs wireCrs =
+                                sibling.getOriginalCrs().orElse(sibling.getNativeCrs().get());
+                            sibling
+                                .getOriginalCrsIdentifiers()
+                                .forEach(
+                                    identifier -> srsNameMappings.putIfAbsent(identifier, wireCrs));
+                          }
+                        });
+                variants
+                    .getVerticalProperty()
+                    .flatMap(
+                        name ->
+                            schema.getProperties().stream()
+                                .filter(prop -> prop.getName().equals(name))
+                                .findFirst())
+                    .ifPresent(
+                        sibling -> verticalSrsNames.addAll(sibling.getOriginalCrsIdentifiers()));
+              });
+      collectVariantReferenceSystems(child, srsNameMappings, verticalSrsNames);
+    }
+  }
+
+  /**
+   * Emits the completed result of a geometry decode. Without position-variant routing this is the
+   * decoded {@link Geometry} at the geometry property's own path. With routing (see {@link
+   * GmlGeometryVariants}), a geometry whose verbatim wire srsName maps to a variant property is
+   * emitted at that property's path instead, a 1D position (empty {@code optGeometry} although no
+   * further input is needed) is emitted as a scalar value at the configured vertical property, and
+   * in both cases the verbatim srsName is emitted at the configured srsName property. The path
+   * tracker is restored to the geometry property's own segment afterwards.
+   */
+  private void emitGeometryOrVertical(Optional<Geometry<?>> optGeometry) {
+    Frame frame = frames.peek();
+    GmlGeometryVariants variants =
+        frame != null && frame.kind == FrameKind.GEOMETRY_PROPERTY ? frame.geometryVariants : null;
+    String rawSrsName = geometryDecoder.getRawSrsName().orElse(null);
+
+    // Coordinates whose srsName declares a false-easting difference (e.g. Gauss-Krüger without
+    // the zone prefix) are shifted so the emitted geometry conforms to the mapped CRS.
+    if (optGeometry.isPresent() && rawSrsName != null && variants != null) {
+      Double falseEastingDifference = variants.getShiftBySrsName().get(rawSrsName);
+      if (falseEastingDifference != null && falseEastingDifference != 0) {
+        optGeometry =
+            Optional.of(
+                optGeometry
+                    .get()
+                    .accept(
+                        new de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer(
+                            de.ii.xtraplatform.geometries.domain.transform.ImmutableEastingShift.of(
+                                Optional.empty(), falseEastingDifference))));
+      }
+    }
+
+    if (optGeometry.isPresent()) {
+      String variantProperty =
+          variants != null && rawSrsName != null ? variants.getBySrsName().get(rawSrsName) : null;
+      if (variantProperty != null) {
+        context.pathTracker().track(variantProperty, frame.pathDepth);
+        emitGeometry(optGeometry.get());
+        emitSrsName(variants, rawSrsName, frame.pathDepth);
+        context.pathTracker().track(frame.segment, frame.pathDepth);
+      } else {
+        emitGeometry(optGeometry.get());
+      }
+      return;
+    }
+
+    Optional<String> verticalValue = geometryDecoder.getVerticalValue();
+    if (verticalValue.isEmpty()) {
+      return;
+    }
+    String verticalProperty =
+        variants != null && rawSrsName != null
+            ? variants.getVerticalBySrsName().get(rawSrsName)
+            : null;
+    if (verticalProperty == null) {
+      throw new IllegalArgumentException(
+          "1D position with srsName '"
+              + rawSrsName
+              + "' is not supported for this geometry property.");
+    }
+    context.pathTracker().track(verticalProperty, frame.pathDepth);
+    context.setValue(verticalValue.get());
+    context.setValueType(Type.STRING);
+    downstream.onValue(context);
+    emitSrsName(variants, rawSrsName, frame.pathDepth);
+    context.pathTracker().track(frame.segment, frame.pathDepth);
+  }
+
+  private void emitSrsName(GmlGeometryVariants variants, String rawSrsName, int pathDepth) {
+    variants
+        .getSrsNameProperty()
+        .ifPresent(
+            srsNameProperty -> {
+              context.pathTracker().track(srsNameProperty, pathDepth);
+              context.setValue(rawSrsName);
+              context.setValueType(Type.STRING);
+              downstream.onValue(context);
+            });
   }
 
   private void emitGeometry(Geometry<?> geom) {

@@ -28,6 +28,7 @@ import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
 import de.ii.xtraplatform.features.domain.SchemaReferenceResolver;
 import de.ii.xtraplatform.features.domain.TypesResolver;
+import de.ii.xtraplatform.features.domain.transform.CrsVariantsResolver;
 import de.ii.xtraplatform.features.domain.transform.DefaultRolesResolver;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefEmbedder;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
@@ -198,6 +199,7 @@ public class FeatureProviderSqlFactory
               new FeatureRefEmbedder(data.getId()),
               new FeatureRefResolver(connectors),
               new ImplicitMappingResolver(),
+              new CrsVariantsResolver(),
               new ConstantsResolver(),
               new LabelTemplateResolver(data.getLabelTemplate()),
               new DefaultRolesResolver(),

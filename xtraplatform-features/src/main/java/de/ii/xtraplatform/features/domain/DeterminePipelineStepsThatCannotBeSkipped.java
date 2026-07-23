@@ -127,9 +127,13 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       // at property level: determine needed steps based on schema information
 
       // coordinate processing is needed if a target CRS differs from the native CRS or geometries
-      // are simplified
+      // are simplified; a geometry property stored in its own CRS (property-level `nativeCrs`)
+      // that declares a differing `originalCrs` needs it regardless of the target CRS — the
+      // COORDINATES step restores the recorded axis order of such positions (see
+      // FeatureTokenTransformerCoordinates)
       if (!targetCrs.equals(nativeCrs)
           || (simplifyGeometries)
+          || requiresOriginalCrsRestore(schema)
           || (!(OgcCrs.CRS84.equals(nativeCrs) || OgcCrs.CRS84h.equals(nativeCrs))
               && supportSecondaryGeometry
               && schema.isSecondaryGeometry())) {
@@ -164,8 +168,28 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       if (schema.getConstraints().filter(SchemaConstraints::isRequired).isEmpty()) {
         steps.add(PipelineSteps.CLEAN);
       }
+
+      // Keep value mappings so the default DATETIME_FORMAT transformer runs and the captured
+      // timestamps are ISO 8601 before reaching the FeatureTokenTransformerPropertyLinks /
+      // FeatureTokenTransformerCompositeId / Memento-Datetime header construction. Without this
+      // the raw PostgreSQL text (or whatever the SQL provider emits) would flow through, and the
+      // link headers / composite-id rewrite would have to do their own parsing.
+      if (schema.isId()
+          || schema.isPrimaryIntervalStart()
+          || schema.isPrimaryIntervalEnd()
+          || schema.getEffectiveLink().isPresent()) {
+        steps.add(PipelineSteps.MAPPING_VALUES);
+      }
     }
 
     return steps.build();
+  }
+
+  private static boolean requiresOriginalCrsRestore(FeatureSchema schema) {
+    return schema.getNativeCrs().isPresent()
+        && schema
+            .getOriginalCrs()
+            .filter(originalCrs -> !originalCrs.equals(schema.getNativeCrs().get()))
+            .isPresent();
   }
 }

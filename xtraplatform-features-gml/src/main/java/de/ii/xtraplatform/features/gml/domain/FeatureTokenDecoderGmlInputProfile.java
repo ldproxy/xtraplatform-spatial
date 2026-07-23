@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.domain;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.immutables.value.Value;
 
 /**
@@ -22,9 +23,12 @@ import org.immutables.value.Value;
 public interface FeatureTokenDecoderGmlInputProfile {
 
   /**
-   * Reverse-mapping from the {@code srsName} value seen on a geometry to the resolved {@link
-   * EpsgCrs}. Required for input shaped after ALKIS NAS, which uses ADV URN forms such as {@code
-   * urn:adv:crs:DE_DHDN_3GK2_NW101} that the built-in EPSG / OGC URN parser cannot resolve.
+   * Reverse-mapping from the {@code srsName} value seen on an ordinary geometry to the resolved
+   * {@link EpsgCrs} — the {@code alternativeUri} declarations of the requestable CRSs (CRS building
+   * block). Required for input shaped after ALKIS NAS, which uses AdV URN forms such as {@code
+   * urn:adv:crs:ETRS89_UTM32} that the built-in EPSG / OGC URN parser cannot resolve. The
+   * identifiers of position variants are not part of this map; they are declared in the {@code
+   * FeatureSchema} ({@code originalCrsIdentifiers}).
    */
   Map<String, EpsgCrs> getSrsNameMappings();
 
@@ -161,6 +165,19 @@ public interface FeatureTokenDecoderGmlInputProfile {
   List<String> getXmlAttributes();
 
   Map<String, List<String>> getValueWrap();
+
+  /**
+   * Reverse of {@code GmlConfiguration#objectTypeSuffixedProperties}: the property id (technical
+   * full path) of each FEATURE_REF property whose GML element on the wire is the base property
+   * name/alias plus a {@code _<ObjectType>} suffix naming the referenced feature type (e.g. base
+   * element {@code gehoertZuBauwerk} → {@code gehoertZuBauwerk_AX_Turm}). Membership is tested
+   * against the property's technical full path, not its on-the-wire name/alias. For these
+   * properties the decoder accepts an element whose local name is the base name/alias optionally
+   * followed by a {@code _<segment>} suffix and maps it to the property. The suffix is ignored: the
+   * referenced object type is carried independently through the FEATURE_REF join, so it need not be
+   * captured from the wire.
+   */
+  Set<String> getObjectTypeSuffixedProperties();
 
   static FeatureTokenDecoderGmlInputProfile empty() {
     return ImmutableFeatureTokenDecoderGmlInputProfile.builder().build();

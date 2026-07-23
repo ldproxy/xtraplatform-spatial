@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain.pipeline;
 import de.ii.xtraplatform.features.domain.FeaturePathTracker;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ModifiableCollectionMetadata;
+import de.ii.xtraplatform.features.domain.PropertyLink;
 import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
@@ -91,6 +92,8 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
     }
 
     Map<String, String> additionalInfo();
+
+    List<PropertyLink> propertyLinks();
   }
 
   interface ModifiableContext<T, U> extends Context<T, U> {
@@ -164,6 +167,8 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
     ModifiableContext<T, U> setIsUseTargetPaths(boolean isUseTargetPaths);
 
     ModifiableContext<T, U> putAdditionalInfo(String key, String value);
+
+    ModifiableContext<T, U> setPropertyLinks(Iterable<? extends PropertyLink> propertyLinks);
   }
 
   @Modifiable

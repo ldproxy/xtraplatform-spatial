@@ -96,7 +96,8 @@ public class SqlQueryTemplatesDeriver {
         virtualTables,
         withNumberSkipped,
         withNumberReturned,
-        forceNumberMatched) -> {
+        forceNumberMatched,
+        withNumberMatched) -> {
       String limitAndOffsetSql = sqlDialect.applyToLimitAndOffset(limit, offset);
       String skipOffsetSql = skipOffset > 0 ? sqlDialect.applyToOffset(skipOffset) : "";
       String asIds = sqlDialect.applyToAsIds();
@@ -130,7 +131,7 @@ public class SqlQueryTemplatesDeriver {
                       sqlDialect.castToBigInt(0)));
 
       String numberMatched =
-          computeNumberMatched || forceNumberMatched
+          (computeNumberMatched || forceNumberMatched) && withNumberMatched
               ? String.format(
                   "SELECT count(*) AS numberMatched FROM (SELECT A.%2$s AS %4$s FROM %1$s A%3$s ORDER BY 1)%5$s",
                   tableName, schema.getSortKey(), where, SKEY, asIds)
@@ -165,11 +166,7 @@ public class SqlQueryTemplatesDeriver {
         forceSimpleFeatures,
         minMaxKeys,
         virtualTables) -> {
-      boolean isIdFilter =
-          filter
-              .filter(
-                  cql2Predicate -> cql2Predicate instanceof In && ((In) cql2Predicate).isIdFilter())
-              .isPresent();
+      boolean isIdFilter = filter.filter(SqlQueryTemplatesDeriver::containsIdFilter).isPresent();
       List<String> aliases = AliasGenerator.getAliases(schema);
 
       SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
@@ -283,6 +280,24 @@ public class SqlQueryTemplatesDeriver {
     return String.format(
         "SELECT %s FROM %s%s%s%s ORDER BY %s%s",
         columns, mainTable, join.isEmpty() ? "" : " ", join, where, orderBy, paging);
+  }
+
+  /**
+   * Recognises an id-bounded filter even when it is buried inside conjunctions, e.g. {@code
+   * In(_ID_, [...])} on its own or {@code And(In(_ID_, [...]), <other>)} — both treat the row-set
+   * as constrained by the id list and let the SQL generator skip the surrogate-key range guard.
+   */
+  private static boolean containsIdFilter(Cql2Expression expr) {
+    if (expr instanceof In && ((In) expr).isIdFilter()) {
+      return true;
+    }
+    if (expr instanceof And) {
+      return ((And) expr)
+          .getArgs().stream()
+              .anyMatch(
+                  arg -> arg instanceof Cql2Expression && containsIdFilter((Cql2Expression) arg));
+    }
+    return false;
   }
 
   private Optional<String> toWhereClause(

@@ -89,6 +89,30 @@ public interface EpsgCrs {
     return Force.NONE;
   }
 
+  /**
+   * Optional CRS identifier (URI) used to reference this CRS, e.g., the alias
+   * "http://www.opengis.net/def/crs/OGC/0/CRS84" for CRS84. If present, {@code toUriString()}
+   * returns this value so that responses echo the identifier used in the request. Auxiliary, i.e.,
+   * excluded from {@code equals()}/{@code hashCode()}: instances differing only in this attribute
+   * represent the same CRS.
+   */
+  @JsonIgnore
+  @Value.Auxiliary
+  Optional<String> getUriOverride();
+
+  /**
+   * An alternative identifier under which this CRS is known in a community (e.g. the AdV identifier
+   * {@code urn:adv:crs:ETRS89_UTM32} for EPSG:25832), declared on the entries of the {@code
+   * additionalCrs} option of the CRS building block. Unlike {@link #getUriOverride()} — which
+   * echoes the identifier a request used — the alternative URI is only used when a feature encoding
+   * renders CRS identifiers on the wire (e.g. the GML {@code srsName} with {@code srsNameStyle:
+   * TEMPLATE}) and when decoding such identifiers on input. Auxiliary, i.e., excluded from {@code
+   * equals()}/{@code hashCode()}: instances differing only in this attribute represent the same
+   * CRS.
+   */
+  @Value.Auxiliary
+  Optional<String> getAlternativeUri();
+
   @JsonIgnore
   @Value.Lazy
   default boolean isCompoundCrs() {
@@ -130,6 +154,9 @@ public interface EpsgCrs {
   @JsonIgnore
   @Value.Lazy
   default String toUriString() {
+    if (getUriOverride().isPresent()) {
+      return getUriOverride().get();
+    }
     if (Objects.equals(this, OgcCrs.CRS84)) {
       return OgcCrs.CRS84_URI;
     }
@@ -139,12 +166,18 @@ public interface EpsgCrs {
     return String.format("http://www.opengis.net/def/crs/EPSG/0/%d", getCode());
   }
 
+  /**
+   * Returns all registered URIs of this CRS: the canonical URI plus, in the case of CRS84, the
+   * "OGC/0/CRS84" alias URI. Unlike {@code toUriStrings()}, the list does not decompose a compound
+   * CRS into its components, it lists the identifiers of this CRS.
+   */
   @JsonIgnore
   @Value.Lazy
-  default Optional<String> toAlternativeUriString() {
-    return Objects.equals(this, OgcCrs.CRS84)
-        ? Optional.of(OgcCrs.CRS84_URI_NEW)
-        : Optional.empty();
+  default List<String> allUris() {
+    if (Objects.equals(this, OgcCrs.CRS84)) {
+      return List.of(OgcCrs.CRS84_URI, OgcCrs.CRS84_URI_NEW);
+    }
+    return List.of(toUriString());
   }
 
   @JsonIgnore

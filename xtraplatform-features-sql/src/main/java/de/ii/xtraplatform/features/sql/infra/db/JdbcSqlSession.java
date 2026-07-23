@@ -8,10 +8,12 @@
 package de.ii.xtraplatform.features.sql.infra.db;
 
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
+import de.ii.xtraplatform.features.domain.FeatureMutationHookException;
 import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -156,6 +158,31 @@ class JdbcSqlSession implements SqlSession {
       throw new IllegalStateException(
           "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
     }
+  }
+
+  @Override
+  public List<String> execute(List<String> statements) {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    List<String> warnings = new ArrayList<>();
+    for (String sql : statements) {
+      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
+        LOGGER.debug(MARKER.SQL, "Executing hook statement: {}", sql);
+      }
+      try (Statement statement = connection.createStatement()) {
+        statement.execute(sql);
+        for (SQLWarning w = statement.getWarnings(); w != null; w = w.getNextWarning()) {
+          warnings.add(w.getMessage());
+        }
+      } catch (SQLException e) {
+        // Expected, configuration-driven failure (e.g. a check function RAISE EXCEPTION) — carry
+        // the warnings collected so far so they survive the failure path.
+        throw new FeatureMutationHookException(
+            "Hook statement failed: " + e.getMessage() + " — statement: " + sql, e, warnings);
+      }
+    }
+    return warnings;
   }
 
   // Generators emit "RETURNING null" for child / junction / FK-update statements — these have

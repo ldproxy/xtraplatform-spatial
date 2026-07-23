@@ -130,8 +130,28 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   private final Deque<Frame> stack = new ArrayDeque<>();
   private final Map<String, EpsgCrs> srsNameMappings;
+  private final Set<String> verticalSrsNames;
   private boolean waitingForInput = false;
   private Geometry<?> result;
+
+  /**
+   * The verbatim {@code srsName} attribute of the outermost geometry element of the current decode,
+   * or {@code null} when none was present. Unlike the resolved {@link EpsgCrs} this distinguishes
+   * application-profile forms that map to the same EPSG code (e.g. the AdV realizations {@code
+   * urn:adv:crs:DE_DHDN_3GK3_HE100} and {@code …HE120}).
+   */
+  private String rawSrsName;
+
+  /**
+   * Set when {@link #rawSrsName} is one of {@link #verticalSrsNames}: the "geometry" is a 1D
+   * position (a single number in {@code gml:pos}, e.g. a height in a German height reference
+   * system), which has no representation in the geometry model. The coordinate text is captured
+   * verbatim in {@link #verticalValue} and no {@link Geometry} is built; {@code decode} returns
+   * empty with {@code waitingForInput == false} once the subtree is consumed.
+   */
+  private boolean verticalMode;
+
+  private String verticalValue;
 
   public GeometryDecoderGml() {
     this(Map.of());
@@ -144,7 +164,31 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
    *     the built-in parsers cannot handle.
    */
   public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings) {
+    this(srsNameMappings, Set.of());
+  }
+
+  /**
+   * @param verticalSrsNames {@code srsName} URI/URN forms of 1D (vertical) reference systems; a
+   *     geometry whose outermost element carries one of these is captured as a scalar value (see
+   *     {@link #getVerticalValue()}) instead of being decoded into a {@link Geometry}.
+   */
+  public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
     this.srsNameMappings = srsNameMappings == null ? Map.of() : srsNameMappings;
+    this.verticalSrsNames = verticalSrsNames == null ? Set.of() : verticalSrsNames;
+  }
+
+  /** The verbatim srsName of the outermost geometry element of the last completed decode. */
+  public Optional<String> getRawSrsName() {
+    return Optional.ofNullable(rawSrsName);
+  }
+
+  /**
+   * The verbatim coordinate text of a 1D position, present when the last decode consumed a geometry
+   * in a vertical reference system (see {@link #GeometryDecoderGml(Map, Set)}); in that case {@code
+   * decode} returned empty although no further input is needed.
+   */
+  public Optional<String> getVerticalValue() {
+    return Optional.ofNullable(verticalValue);
   }
 
   public Optional<Geometry<?>> decode(
@@ -152,6 +196,11 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       Optional<EpsgCrs> crs,
       OptionalInt srsDimension)
       throws XMLStreamException, IOException {
+    // fresh decode of a new geometry property — the 4-arg overload is also used to continue a
+    // paused decode and must not clear the per-geometry state
+    this.rawSrsName = null;
+    this.verticalMode = false;
+    this.verticalValue = null;
     return decode(parser, crs, srsDimension, false);
   }
 
@@ -192,6 +241,12 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
             waitingForInput = false;
             return Optional.of(r);
           }
+          if (verticalMode && stack.isEmpty()) {
+            // 1D position fully consumed — no Geometry to return; the caller reads the captured
+            // scalar via getVerticalValue()
+            waitingForInput = false;
+            return Optional.empty();
+          }
           break;
 
         default:
@@ -213,6 +268,11 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       if (top.kind == coordinateKind(localName)) {
         if (bufferedText != null) {
           top.textBuffer.append(bufferedText);
+        }
+        if (verticalMode) {
+          this.verticalValue = top.textBuffer.toString().trim();
+          stack.pop();
+          return decode(parser, defaultCrs, srsDimension, false);
         }
         finalizeCoordinates(top);
         stack.pop();
@@ -287,6 +347,12 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     f.elementName = localName;
 
     if (isObject(kind)) {
+      if (stack.isEmpty()) {
+        // outermost geometry element of this decode — keep the verbatim srsName for callers that
+        // need the original form, and detect 1D positions in vertical reference systems
+        this.rawSrsName = parser.getAttributeValue(null, "srsName");
+        this.verticalMode = rawSrsName != null && verticalSrsNames.contains(rawSrsName);
+      }
       Optional<EpsgCrs> explicitCrs = parseSrsName(parser, srsNameMappings);
       f.crs = explicitCrs.or(() -> defaultCrs).or(this::inheritedCrs);
       OptionalInt dim = parseSrsDimension(parser);
@@ -314,6 +380,11 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     stack.pop();
 
     if (top.kind == Kind.UNKNOWN) {
+      return;
+    }
+
+    if (verticalMode) {
+      // a 1D position builds no Geometry; the scalar was captured in verticalValue
       return;
     }
 
@@ -530,6 +601,13 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
           break;
         case XMLStreamConstants.END_ELEMENT:
           if (coordFrame.elementName.equals(parser.getLocalName())) {
+            if (verticalMode) {
+              // a 1D position is captured verbatim — a single number is not a valid coordinate
+              // tuple and must not reach the coordinate parser
+              this.verticalValue = coordFrame.textBuffer.toString().trim();
+              stack.pop();
+              return true;
+            }
             finalizeCoordinates(coordFrame);
             stack.pop();
             applyCoordinates(coordFrame);

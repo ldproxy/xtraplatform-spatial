@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.geometries.domain;
 
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -59,6 +60,21 @@ public enum GeometryType {
 
   public static boolean onlySimpleFeatureGeometries(Set<GeometryType> geometryTypes) {
     return geometryTypes.stream().allMatch(GeometryType::isSimpleFeature);
+  }
+
+  /**
+   * Collapses a list of admissible geometry types to a single effective type: empty -> {@code ANY};
+   * one entry -> that entry; more than one -> {@code ANY} when all entries are simple-feature
+   * types, otherwise {@code ANY_EXTENDED}.
+   */
+  public static GeometryType effectiveType(Collection<GeometryType> geometryTypes) {
+    if (geometryTypes.isEmpty()) {
+      return ANY;
+    }
+    if (geometryTypes.size() == 1) {
+      return geometryTypes.iterator().next();
+    }
+    return onlySimpleFeatureGeometries(Set.copyOf(geometryTypes)) ? ANY : ANY_EXTENDED;
   }
 
   public Optional<Integer> getGeometryDimension() {

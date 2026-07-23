@@ -57,6 +57,7 @@ import de.ii.xtraplatform.features.gml.domain.ConnectionInfoWfsHttp;
 import de.ii.xtraplatform.features.gml.domain.FeatureProviderWfsData;
 import de.ii.xtraplatform.features.gml.domain.WfsConnector;
 import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
@@ -142,6 +143,7 @@ public class FeatureProviderWfs
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      AuditLog auditLog,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
     super(
@@ -151,6 +153,7 @@ public class FeatureProviderWfs
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLog,
         data,
         volatileRegistry);
 
@@ -227,10 +230,9 @@ public class FeatureProviderWfs
   private FeatureTokenDecoder<
           byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings, boolean passThrough) {
-    if (!(query instanceof FeatureQuery)) {
+    if (!(query instanceof FeatureQuery featureQuery)) {
       throw new IllegalArgumentException();
     }
-    FeatureQuery featureQuery = (FeatureQuery) query;
     Map<String, String> namespaces = getData().getConnectionInfo().getNamespaces();
     XMLNamespaceNormalizer namespaceNormalizer = new XMLNamespaceNormalizer(namespaces);
     FeatureSchema featureSchema = getData().getTypes().get(featureQuery.getType());
@@ -376,6 +378,7 @@ public class FeatureProviderWfs
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        false);
+        false,
+        auditLog);
   }
 }

@@ -53,9 +53,9 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
   private final Map<String, List<SqlQueryTemplates>> allQueryTemplates;
   private final Map<String, List<SqlQueryTemplates>> allQueryTemplatesMutations;
   private final int chunkSize;
-  private final boolean skipRedundantMetaQueries;
   private final SqlDialect sqlDialect;
   private final boolean geometryAsWkb;
+  private final boolean computeNumberMatched;
 
   public FeatureQueryEncoderSql(
       Map<String, List<SqlQueryTemplates>> allQueryTemplates,
@@ -65,8 +65,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     this.allQueryTemplates = allQueryTemplates;
     this.allQueryTemplatesMutations = allQueryTemplatesMutations;
     this.chunkSize = queryGeneratorSettings.getChunkSize();
-    this.skipRedundantMetaQueries = !queryGeneratorSettings.getComputeNumberMatched();
     this.geometryAsWkb = queryGeneratorSettings.getGeometryAsWkb();
+    this.computeNumberMatched = queryGeneratorSettings.getComputeNumberMatched();
     this.sqlDialect = sqlDialect;
   }
 
@@ -115,7 +115,9 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                                     query,
                                     query,
                                     additionalQueryParameters,
-                                    query.returnsSingleFeature())))
+                                    query.returnsSingleFeature(),
+                                    false,
+                                    0)))
             .flatMap(s -> s)
             .collect(Collectors.toList());
 
@@ -126,19 +128,26 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .offset(query.getOffset())
         .chunkSize(chunkSize)
         .isSingleFeature(query.returnsSingleFeature())
-        .isAllowSkipMetaQueries(skipRedundantMetaQueries)
         .build()
         .withQuerySets(querySets);
   }
 
   private SqlQueryBatch encode(
       MultiFeatureQuery query, Map<String, String> additionalQueryParameters) {
-    int chunks = (query.getLimit() / chunkSize) + (query.getLimit() % chunkSize > 0 ? 1 : 0);
+    // A multi-query that does not support paging is executed single-shot: every matching row is
+    // read in one pass per (sub-query, table), with no meta query, chunking or key-range window.
+    // This drops numberReturned/numberMatched in exchange for far fewer statements and round-trips
+    // at large sizes (an optional per-sub-query maximum may still cap each sub-query).
+    boolean unpaged = !query.getSupportPaging() && !query.hitsOnly();
+    int chunks =
+        unpaged ? 1 : (query.getLimit() / chunkSize) + (query.getLimit() % chunkSize > 0 ? 1 : 0);
 
     List<SqlQuerySet> querySets =
-        query.getQueries().stream()
+        IntStream.range(0, query.getQueries().size())
+            .boxed()
             .flatMap(
-                typeQuery -> {
+                queryIndex -> {
+                  TypeQuery typeQuery = query.getQueries().get(queryIndex);
                   List<SqlQueryTemplates> queryTemplates =
                       allQueryTemplates.get(typeQuery.getType());
 
@@ -156,7 +165,9 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                                               typeQuery,
                                               query,
                                               additionalQueryParameters,
-                                              false)))
+                                              unpaged,
+                                              unpaged,
+                                              queryIndex)))
                       .flatMap(s -> s);
                 })
             .collect(Collectors.toList());
@@ -167,6 +178,9 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .limit(query.getLimit())
         .offset(query.getOffset())
         .chunkSize(chunkSize)
+        .isUnpaged(unpaged)
+        // when paging, count every sub-query so numberMatched is the full invariant total
+        .isComputeNumberMatched(query.getSupportPaging() && computeNumberMatched)
         .build()
         .withQuerySets(querySets);
   }
@@ -179,10 +193,15 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
       TypeQuery typeQuery,
       Query query,
       Map<String, String> additionalQueryParameters,
-      boolean skipMetaQuery) {
+      boolean skipMetaQuery,
+      boolean unpaged,
+      int queryIndex) {
     List<SortKey> sortKeys =
         transformSortKeys(typeQuery.getSortKeys(), queryTemplates.getMapping());
     boolean useMinMaxKeys = queryTemplates.getMapping().getMainTable().isSortKeyUnique();
+    // a paged multi-query computes numberMatched; a single-shot one (no paging) does not
+    boolean supportPaging =
+        !(query instanceof MultiFeatureQuery) || ((MultiFeatureQuery) query).getSupportPaging();
 
     BiFunction<Long, Long, Optional<String>> metaQuery =
         (maxLimit, skipped) ->
@@ -200,27 +219,45 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                             additionalQueryParameters,
                             query.getOffset() > 0,
                             maxLimit > 0 && !query.hitsOnly(),
-                            query.hitsOnly()));
+                            query.hitsOnly(),
+                            // numberMatched is invariant across chunks, so compute it only on the
+                            // first chunk of each collection; later chunks reuse that value
+                            chunk == 0 && supportPaging));
 
     TriFunction<SqlRowMeta, Long, Long, Stream<String>> valueQueries =
         (metaResult, maxLimit, skipped) ->
             queryTemplates.getValueQueryTemplates().stream()
                 .map(
                     valueQueryTemplate ->
-                        valueQueryTemplate.generateValueQuery(
-                            Math.min(limit, maxLimit),
-                            Math.max(0L, offset - skipped),
-                            sortKeys,
-                            typeQuery.getFilter(),
-                            typeQuery.forceSimpleFeatureGeometry(),
-                            (useMinMaxKeys
-                                    && ((Objects.nonNull(metaResult.getMinKey())
-                                            && Objects.nonNull(metaResult.getMaxKey()))
-                                        || metaResult.getNumberReturned() == 0))
-                                ? Optional.of(
-                                    Tuple.of(metaResult.getMinKey(), metaResult.getMaxKey()))
-                                : Optional.empty(),
-                            additionalQueryParameters));
+                        // single-shot reads matching rows in one pass: no offset and no key-range
+                        // window (which would otherwise constrain the result set to the meta
+                        // query's minKey/maxKey); an optional per-sub-query maximum caps each
+                        // sub-query (0 = no limit)
+                        unpaged
+                            ? valueQueryTemplate.generateValueQuery(
+                                query instanceof MultiFeatureQuery
+                                    ? ((MultiFeatureQuery) query).getMaxFeaturesPerSubQuery()
+                                    : 0L,
+                                0L,
+                                sortKeys,
+                                typeQuery.getFilter(),
+                                typeQuery.forceSimpleFeatureGeometry(),
+                                Optional.empty(),
+                                additionalQueryParameters)
+                            : valueQueryTemplate.generateValueQuery(
+                                Math.min(limit, maxLimit),
+                                Math.max(0L, offset - skipped),
+                                sortKeys,
+                                typeQuery.getFilter(),
+                                typeQuery.forceSimpleFeatureGeometry(),
+                                (useMinMaxKeys
+                                        && ((Objects.nonNull(metaResult.getMinKey())
+                                                && Objects.nonNull(metaResult.getMaxKey()))
+                                            || metaResult.getNumberReturned() == 0))
+                                    ? Optional.of(
+                                        Tuple.of(metaResult.getMinKey(), metaResult.getMaxKey()))
+                                    : Optional.empty(),
+                                additionalQueryParameters));
 
     // reuse SchemaSql instances instead of copying them; this is expensive and unnecessary, since
     // they are immutable
@@ -228,6 +265,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .metaQuery(metaQuery)
         .valueQueries(valueQueries)
         .options(getOptions(typeQuery, query))
+        .queryIndex(queryIndex)
         .build()
         .withTableSchemas(queryTemplates.getMapping().getTables());
   }

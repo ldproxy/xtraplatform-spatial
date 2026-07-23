@@ -44,6 +44,7 @@ class SqlRowVals implements SqlRow {
   private List<SortKey.Direction> sortKeyDirections;
   private final List<Object> values;
   private int priority;
+  private int queryIndex;
   private SqlQuerySchema tableSchema;
   private Optional<String> type;
   @Nullable private final Collator collator;
@@ -107,6 +108,11 @@ class SqlRowVals implements SqlRow {
   }
 
   @Override
+  public int getQueryIndex() {
+    return queryIndex;
+  }
+
+  @Override
   public List<List<String>> getColumnPaths() {
     if (Objects.nonNull(tableSchema)) {
       return tableSchema.getColumnPaths();
@@ -156,6 +162,7 @@ class SqlRowVals implements SqlRow {
   // TODO: use result.nextObject when column type info is supported
   SqlRow read(ResultSet result, SqlQueryOptions queryOptions) {
     this.priority = queryOptions.getContainerPriority();
+    this.queryIndex = queryOptions.getQueryIndex();
     List<Class<?>> columnTypes;
     int cursor = 1;
 

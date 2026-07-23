@@ -17,6 +17,7 @@ import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
 import de.ii.xtraplatform.cql.domain.BinarySpatialOperation;
 import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
+import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
@@ -36,11 +37,13 @@ import de.ii.xtraplatform.cql.domain.ImmutableLt;
 import de.ii.xtraplatform.cql.domain.ImmutableLte;
 import de.ii.xtraplatform.cql.domain.ImmutableNeq;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.Interval;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
+import de.ii.xtraplatform.cql.domain.Parameter;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -149,6 +152,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   @Override
   public Type visit(BinaryScalarOperation scalarOperation, List<Type> children) {
+    if (scalarOperation instanceof InResultSet) {
+      // the first argument may be of any queryable type, the second is always the
+      // name of a result set
+      return Type.Boolean;
+    }
     checkOperation(scalarOperation, children);
     return Type.Boolean;
   }
@@ -250,6 +258,13 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   }
 
   @Override
+  public Type visit(Parameter parameter, List<Type> children) {
+    // an unbound parameter (e.g. in a stored query validated before invocation) has no known type;
+    // treat it as a wildcard so the concrete operands are still checked
+    return Type.UNKNOWN;
+  }
+
+  @Override
   public Type visit(ScalarLiteral scalarLiteral, List<Type> children) {
     return Type.valueOf(scalarLiteral.getType().getSimpleName());
   }
@@ -270,6 +285,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   @Override
   public Type visit(ArrayLiteral arrayLiteral, List<Type> children) {
     return Type.valueOf(arrayLiteral.getType().getSimpleName());
+  }
+
+  @Override
+  public Type visit(BooleanValue2 booleanValue, List<Type> children) {
+    return Type.Boolean;
   }
 
   private void checkOperation(CqlNode node, List<Type> types) {

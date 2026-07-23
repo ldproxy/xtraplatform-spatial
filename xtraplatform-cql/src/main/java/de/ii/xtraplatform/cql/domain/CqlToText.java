@@ -203,6 +203,9 @@ public class CqlToText implements CqlVisitor<String> {
 
   @Override
   public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+    if (scalarOperation instanceof InResultSet) {
+      return String.format("INRESULTSET(%s, %s)", children.get(0), children.get(1));
+    }
     String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
     return String.format("%s %s %s", children.get(0), operator, children.get(1));
   }

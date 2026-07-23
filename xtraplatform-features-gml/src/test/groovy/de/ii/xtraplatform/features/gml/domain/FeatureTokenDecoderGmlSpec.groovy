@@ -516,6 +516,70 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         !tokens.contains("urn:adv:oid:DENW36AL00000AAA")
     }
 
+    static final FeatureTokenDecoderGmlInputProfile NAS_TEMPLATES_SUFFIXED =
+            ImmutableFeatureTokenDecoderGmlInputProfile.builder()
+                    .useAlias(true)
+                    .featureRefTemplate("urn:adv:oid:{{value}}")
+                    // Declared by property id "11001-21008", not the on-the-wire alias istGebucht.
+                    .addObjectTypeSuffixedProperties("11001-21008")
+                    .build()
+
+    def 'objectTypeSuffixedProperties: a _<ObjectType>-suffixed element maps to the base feature-ref property'() {
+        given:
+        // ALKIS NAS names this element adv:gehoertZuBauwerk_AX_Turm; property "11001-21008" (alias
+        // istGebucht) stands in here as a declared suffixed property. The _AX_Turm suffix is ignored
+        // and the href is reduced as for the plain element.
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES_SUFFIXED)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht_AX_Turm xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["11001-21008"]) == "DENW36ALl800005x"
+    }
+
+    def 'objectTypeSuffixedProperties: the unsuffixed element still matches a declared property'() {
+        given:
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES_SUFFIXED)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["11001-21008"]) == "DENW36ALl800005x"
+    }
+
+    def 'a suffixed element is not matched when the property is not declared in objectTypeSuffixedProperties'() {
+        given:
+        // Same element, but the default profile declares no suffixed properties: the suffix is not
+        // stripped, the element matches no property and is skipped (the FK is not emitted).
+        def decoder = newDecoder(axFlurstueckWithRefsSchema(), NAS_TEMPLATES)
+        def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                gml:id="DENW36AL10000XYZ">
+              <adv:istGebucht_AX_Turm xlink:href="urn:adv:oid:DENW36ALl800005x"/>
+            </adv:AX_Flurstueck>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["11001-21008"]) == null
+    }
+
     def 'xlink:href is emitted unchanged when no template is configured'() {
         given:
         def profile = ImmutableFeatureTokenDecoderGmlInputProfile.builder()
@@ -1803,7 +1867,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
     /**
      * AX_PunktortAU slice with the full {@code qualitaetsangaben} (qag) tree from the AdV NAS
      * schema: qag(AX_DQPunktort) → {dpl(LI_Lineage) → prs(LI_ProcessStep, OBJECT_ARRAY) → {des,
-     * dat, pro(CI_ResponsibleParty)→{org, ind, rol}, src(LI_Source)→des}, gst}. Every nested
+     * dat, pro(CI_ResponsibleParty)→{org, ind, rol}, src(LI_Source)→des}, gwt, gst}. Every nested
      * OBJECT is transparent (no {@code sourcePath}), so each leaf emits at the feature-root
      * path with its {@code qag__*} SQL column name.
      */
@@ -1853,7 +1917,10 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                                                 .putProperties2("rol", new ImmutableFeatureSchema.Builder()
                                                         .sourcePath("qag__dpl_prs_pro_resp_rol_cdv")
                                                         .type(SchemaBase.Type.STRING)
-                                                        .alias("role")))
+                                                        .alias("role")
+                                                        .constraints(new ImmutableSchemaConstraints.Builder()
+                                                                .codelist("CI_RoleCode")
+                                                                .build())))
                                         .putProperties2("src", new ImmutableFeatureSchema.Builder()
                                                 .type(SchemaBase.Type.OBJECT)
                                                 .objectType("LI_Source")
@@ -1862,6 +1929,10 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                                                         .sourcePath("qag__dpl_prs_src")
                                                         .type(SchemaBase.Type.STRING)
                                                         .alias("description")))))
+                        .putProperties2("gwt", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("qag__gwt")
+                                .type(SchemaBase.Type.STRING)
+                                .alias("genauigkeitswert"))
                         .putProperties2("gst", new ImmutableFeatureSchema.Builder()
                                 .sourcePath("qag__gst")
                                 .type(SchemaBase.Type.STRING)
@@ -1952,6 +2023,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         //   - dateTime wraps <gco:DateTime> — gmd/gco auto-detected
         //   - organisationName wraps <gco:CharacterString> — auto-detected
         //   - role wraps <gmd:CI_RoleCode codeListValue=…> — auto-detected; text content used
+        //     (rol has a codelist constraint, but the gmd text path wins; see the focused test below)
         //   - source/description wraps <adv:AX_Datenerhebung_Punktort> — explicit valueWrap
         // The sibling <adv:genauigkeitsstufe> at AX_DQPunktort level exercises a scalar that
         // sits next to the deep dpl subtree.
@@ -2010,6 +2082,48 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         valueAtPath(tokens, ["qag", "dpl", "prs", "pro", "rol"]) == "processor"
         valueAtPath(tokens, ["qag", "dpl", "prs", "src", "des"]) == "1000"
         valueAtPath(tokens, ["qag", "gst"]) == "2100"
+    }
+
+    def 'a codelist-constrained role still decodes from the gmd:CI_RoleCode text, not as an xlink:href'() {
+        given:
+        // Regression guard for the ISO 19139 codelist encoding (GmlConfiguration#codeListUriTemplateIso19139).
+        // The `rol` property carries a `codelist` constraint, which makes the decoder treat it as a
+        // codelist property eligible for xlink:href routing. The ISO 19139 wire, however, carries the
+        // value in the gmd:CI_RoleCode text content (and the codeListValue attribute), with no
+        // xlink:href on the property element — so the codelist routing finds no href and the gmd
+        // value-wrapper text is used. The codeList URI must not leak into the decoded value.
+        def decoder = newPunktortAuDecoder(nasNamespaceProfile())
+        def xml = """<adv:AX_PunktortAU xmlns:adv="${ADV_NS}"
+                xmlns:gmd="${GMD_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DENW31AL10000ABC">
+              <adv:qualitaetsangaben>
+                <adv:AX_DQPunktort>
+                  <adv:herkunft>
+                    <gmd:LI_Lineage>
+                      <gmd:processStep>
+                        <gmd:LI_ProcessStep>
+                          <gmd:processor>
+                            <gmd:CI_ResponsibleParty>
+                              <gmd:role>
+                                <gmd:CI_RoleCode codeList="https://schemas.isotc211.org/19139/resources/codelists/gmxCodelists.xml/gmxCodelists.xml#CI_RoleCode" codeListValue="processor">processor</gmd:CI_RoleCode>
+                              </gmd:role>
+                            </gmd:CI_ResponsibleParty>
+                          </gmd:processor>
+                        </gmd:LI_ProcessStep>
+                      </gmd:processStep>
+                    </gmd:LI_Lineage>
+                  </adv:herkunft>
+                </adv:AX_DQPunktort>
+              </adv:qualitaetsangaben>
+            </adv:AX_PunktortAU>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["qag", "dpl", "prs", "pro", "rol"]) == "processor"
+        !tokens.contains("https://schemas.isotc211.org/19139/resources/codelists/gmxCodelists.xml/gmxCodelists.xml#CI_RoleCode")
     }
 
     def 'LI_ProcessStep children written in the wrong namespace are skipped'() {
@@ -2112,6 +2226,48 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         def e = thrown(Exception)
         rootCauseMessage(e).contains("xsi:type")
         rootCauseMessage(e).contains("AX_Flurstueck")
+    }
+
+    def 'xsi:type inside an ISO 19139 value-wrap chain is tolerated and the scalar value is extracted'() {
+        given:
+        // The ISO 19139 quantitative-result pattern types the anyType gco:Record via
+        // xsi:type="gml:doubleList" and requires an empty gmd:valueUnit sibling before gmd:value
+        // (NAS AX_PunktortAU genauigkeitswert). Neither may disturb extraction of the scalar
+        // accuracy value; xsi:type on schema-mapped elements stays rejected (see the two
+        // rejection tests above).
+        def decoder = newPunktortAuDecoder(nasNamespaceProfile())
+        def xml = """<adv:AX_PunktortAU xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:gmd="${GMD_NS}"
+                xmlns:gco="http://www.isotc211.org/2005/gco"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                gml:id="DENW36AL10000XYZ">
+              <adv:qualitaetsangaben>
+                <adv:AX_DQPunktort>
+                  <adv:genauigkeitswert>
+                    <gmd:DQ_RelativeInternalPositionalAccuracy>
+                      <gmd:result>
+                        <gmd:DQ_QuantitativeResult>
+                          <gmd:valueUnit xlink:href="urn:adv:uom:m"></gmd:valueUnit>
+                          <gmd:value>
+                            <gco:Record xsi:type="gml:doubleList">0.0074721</gco:Record>
+                          </gmd:value>
+                        </gmd:DQ_QuantitativeResult>
+                      </gmd:result>
+                    </gmd:DQ_RelativeInternalPositionalAccuracy>
+                  </adv:genauigkeitswert>
+                  <adv:genauigkeitsstufe>1200</adv:genauigkeitsstufe>
+                </adv:AX_DQPunktort>
+              </adv:qualitaetsangaben>
+            </adv:AX_PunktortAU>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["qag", "gwt"]) == "0.0074721"
+        valueAtPath(tokens, ["qag", "gst"]) == "1200"
     }
 
     def 'nilReason on a property element is silently dropped'() {

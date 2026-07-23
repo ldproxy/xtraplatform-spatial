@@ -214,7 +214,7 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         xCoordinate     |    yCoordinate     |      spatialLiteral                                                              |       ex
         (double) 8.00   |    (double) 5      |     LineString.of(new double[]{xCoordinate, yCoordinate, xCoordinate, yCoordinate}) |       IllegalArgumentException
-        (double) 0.50   |    (double) 1000   |     LineString.of(new double[]{xCoordinate, yCoordinate, xCoordinate, yCoordinate}) |       NullPointerException
+        (double) 0.50   |    (double) 1000   |     LineString.of(new double[]{xCoordinate, yCoordinate, xCoordinate, yCoordinate}) |       IllegalArgumentException
 
     }
 
@@ -241,7 +241,7 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         xCoordinate     |    yCoordinate     |      spatialLiteral                                                        |       ex
         (double) 11.00  |    (double) 56.00  |     MultiPoint.of(List.of(Point.of(xCoordinate, yCoordinate))) |       IllegalArgumentException
-        (double) 0.50   |    (double) 1000   |     MultiPoint.of(List.of(Point.of(xCoordinate, yCoordinate))) |       NullPointerException
+        (double) 0.50   |    (double) 1000   |     MultiPoint.of(List.of(Point.of(xCoordinate, yCoordinate))) |       IllegalArgumentException
 
     }
 
@@ -269,7 +269,7 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         xCoordinate1    |    yCoordinate1   |    xCoordinate2   |    yCoordinate2        |      spatialLiteral                                                                                                                                                |       ex
         (double) 8.00   |    (double) 5     |    (double) 4.40  |    (double) 51.00      |     MultiLineString.of(List.of(LineString.of(xCoordinate1, yCoordinate1, xCoordinate2, yCoordinate2))) |       IllegalArgumentException
-        (double) 0.50   |    (double) 1000  |    (double) 0.03  |    (double) 1          |     MultiLineString.of(List.of(LineString.of(xCoordinate1, yCoordinate1, xCoordinate2, yCoordinate2))) |       NullPointerException
+        (double) 0.50   |    (double) 1000  |    (double) 0.03  |    (double) 1          |     MultiLineString.of(List.of(LineString.of(xCoordinate1, yCoordinate1, xCoordinate2, yCoordinate2))) |       IllegalArgumentException
 
     }
 
@@ -299,7 +299,7 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         xCoordinate1    |    yCoordinate1   |    xCoordinate2   |    yCoordinate2      |  xCoordinate3    |    yCoordinate3   |    xCoordinate4   |    yCoordinate4    |     ex
         (double) 8.00   |    (double) 5     |    (double) 4.40  |    (double) 51.00    |  (double) 8.00   |    (double) 5     |    (double) 4.40  |    (double) 51.00  |     IllegalArgumentException
-        (double) 0.50   |    (double) 1000  |    (double) 0.03  |    (double) 1        |  (double) 0.00  |    (double) 100000  |    (double) 0.03  |    (double) 1      |    NullPointerException
+        (double) 0.50   |    (double) 1000  |    (double) 0.03  |    (double) 1        |  (double) 0.00  |    (double) 100000  |    (double) 0.03  |    (double) 1      |    IllegalArgumentException
 
     }
 

@@ -523,7 +523,18 @@ public class SqlMappingDeriver {
               ? SqlQueryColumn.Operation.WKB
               : SqlQueryColumn.Operation.WKT;
 
-      operations.put(op, new String[] {});
+      // The storage CRS of the column (schema option `crs`) travels as the operation parameters
+      // (code and axis-order force); absent for columns in the provider's nativeCrs. Consumed by
+      // the write path (SRID of the geometry literal and transformation target).
+      String[] storageCrs =
+          propertySchema
+              .flatMap(FeatureSchema::getNativeCrs)
+              .map(
+                  crs ->
+                      new String[] {String.valueOf(crs.getCode()), crs.getForceAxisOrder().name()})
+              .orElse(new String[] {});
+
+      operations.put(op, storageCrs);
 
       if (propertySchema.isPresent() && propertySchema.get().isForcePolygonCCW()) {
         operations.put(SqlQueryColumn.Operation.FORCE_POLYGON_CCW, new String[] {});

@@ -40,6 +40,37 @@ public class SqlDialectPgis implements SqlDialect {
     return SqlDbmsPgis.ID;
   }
 
+  @Override
+  public String materializedCte(String name, String query) {
+    // PostgreSQL 12+ inlines a CTE that is referenced only once; MATERIALIZED forces a single
+    // evaluation, which is what lets a result set be computed once instead of re-evaluated per
+    // nesting level.
+    return name + " AS MATERIALIZED (" + query + ")";
+  }
+
+  @Override
+  public boolean supportsResultSetTables() {
+    return true;
+  }
+
+  @Override
+  public String createResultSetTable(String name, String producerSelect) {
+    // UNLOGGED: no WAL, much faster to populate; the table is request-scoped scratch data. It is a
+    // regular (not session-TEMP) table so it stays visible to the other pooled connections that run
+    // the consuming sub-queries concurrently.
+    return String.format("CREATE UNLOGGED TABLE %s AS (%s)", name, producerSelect);
+  }
+
+  @Override
+  public String createResultSetTableIndex(String name, String valueColumn) {
+    return String.format("CREATE INDEX ON %s (%s)", name, valueColumn);
+  }
+
+  @Override
+  public String dropResultSetTable(String name) {
+    return String.format("DROP TABLE IF EXISTS %s", name);
+  }
+
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
   private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =

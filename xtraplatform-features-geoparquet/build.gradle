@@ -16,5 +16,6 @@ dependencies {
     provided project(':xtraplatform-features-sql')
     provided project(':xtraplatform-geometries')
 
+    //NOPMD - TODO: very big, only include binary for current platform
     embedded(libs.duckdb)
 }

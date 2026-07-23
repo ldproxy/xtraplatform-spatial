@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
@@ -51,6 +52,8 @@ import org.slf4j.LoggerFactory;
   "role",
   "valueType",
   "geometryType",
+  "geometryTypes",
+  "crs",
   "objectType",
   "label",
   "alias",
@@ -73,6 +76,20 @@ public interface FeatureSchema
   String IS_PROPERTY = "IS_PROPERTY";
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
+
+  /**
+   * @langEn If set to `true` for properties of type `VALUE`/`VALUE_ARRAY`, these will be included
+   *     in the audit log. If set to `true` for a feature type, all of its properties will be
+   *     included in the audit log except for those explicitly excluded. Geometries are always
+   *     excluded.
+   * @langDe Wenn für Eigenschaften vom Typ `VALUE`/`VALUE_ARRAY` auf `true` gesetzt, werden diese
+   *     in das Audit-Log aufgenommen. Wenn für einen Feature-Type auf `true` gesetzt, werden alle
+   *     seine Eigenschaften in das Audit-Log aufgenommen, außer diejenigen, die explizit
+   *     ausgeschlossen sind. Geometrien sind immer ausgeschlossen.
+   * @default false
+   * @since v4.8
+   */
+  Optional<Boolean> getAudit();
 
   @JsonIgnore
   @Override
@@ -148,7 +165,11 @@ public interface FeatureSchema
    *     be used for `datetime` queries, provided that a time instant describes the temporal extent
    *     of the features. If, on the other hand, the temporal extent is a time interval, then
    *     `PRIMARY_INTERVAL_START` and `PRIMARY_INTERVAL_END` should be specified at the respective
-   *     temporal properties.
+   *     temporal properties. If the dataset contains multiple versions of the features,
+   *     `PREDECESSOR_INTERVAL_START` and `SUCCESSOR_INTERVAL_START` can be specified at the
+   *     temporal properties that contain the start of the primary interval of the previous and next
+   *     version of the feature. These properties are not represented as feature properties, but as
+   *     links with the link relation types `predecessor-version` and `successor-version`.
    * @langDe Kennzeichnet besondere Bedeutungen der Eigenschaft. `ID` ist bei der Eigenschaft eines
    *     Objekts anzugeben, die für die `featureId` in der API zu verwenden ist. Diese Eigenschaft
    *     ist typischerweise die erste Eigenschaft im `properties`-Objekt. Erlaubte Zeichen in diesen
@@ -163,7 +184,12 @@ public interface FeatureSchema
    *     angegeben werden, die für `datetime`-Abfragen verwendet werden soll, sofern ein Zeitpunkt
    *     die zeitliche Ausdehnung der Features beschreibt. Ist die zeitliche Ausdehnung hingegen ein
    *     Zeitintervall, dann sind `PRIMARY_INTERVAL_START` und `PRIMARY_INTERVAL_END` bei den
-   *     jeweiligen zeitlichen Eigenschaften anzugeben.
+   *     jeweiligen zeitlichen Eigenschaften anzugeben. Enthält der Datensatz mehrere Versionen der
+   *     Features, dann können `PREDECESSOR_INTERVAL_START` und `SUCCESSOR_INTERVAL_START` bei den
+   *     zeitlichen Eigenschaften angegeben werden, die den Beginn des primären Zeitintervalls der
+   *     vorherigen bzw. nächsten Version des Features enthalten. Diese Eigenschaften werden nicht
+   *     als Feature-Eigenschaften repräsentiert, sondern als Links mit den Linkrelationen
+   *     `predecessor-version` und `successor-version`.
    * @default null
    */
   @Override
@@ -199,15 +225,144 @@ public interface FeatureSchema
   Optional<GeometryType> getGeometryType();
 
   /**
-   * @langEn Optional name for an object type, used for example in JSON Schema. For properties that
-   *     should be mapped as links according to *RFC 8288*, use `Link`.
-   * @langDe Optional kann ein Name für den Typ spezifiziert werden. Der Name hat i.d.R. nur
-   *     informativen Charakter und wird z.B. bei der Erzeugung von JSON-Schemas verwendet. Bei
-   *     Eigenschaften, die als Web-Links nach RFC 8288 abgebildet werden sollen, ist immer "Link"
-   *     anzugeben.
-   * @default
+   * @langEn Multiple admissible geometry types for properties with `type: GEOMETRY`. Use this
+   *     instead of `geometryType` when more than one geometry type is allowed (e.g. `[POINT,
+   *     MULTI_POINT]`). Values are the same as for `geometryType`.
+   * @langDe Mehrere zulässige Geometrietypen für Eigenschaften mit `type: GEOMETRY`. Wird anstelle
+   *     von `geometryType` verwendet, wenn mehr als ein Geometrietyp erlaubt ist (z.B. `[POINT,
+   *     MULTI_POINT]`). Werte siehe `geometryType`.
+   * @default []
+   * @since v4.8
+   */
+  @Override
+  List<GeometryType> getGeometryTypes();
+
+  /**
+   * @langEn The CRS in which this geometry property is stored in the provider, overriding the
+   *     provider's `nativeCrs`. Only relevant for properties with `type: GEOMETRY` in SQL feature
+   *     providers, when a feature type stores positions in more than one CRS in separate geometry
+   *     columns. Geometries are read from and written to the column in this CRS. Note that in
+   *     PostGIS the axis order of stored coordinates always follows the GIS convention (longitude
+   *     or easting first), so the CRS of a stored geographic position is typically the `LON_LAT`
+   *     variant (e.g. `{code: 4937, forceAxisOrder: LON_LAT}`).
+   * @langDe Das Koordinatenreferenzsystem, in dem diese Geometrieeigenschaft im Provider
+   *     gespeichert ist, abweichend vom `nativeCrs` des Providers. Nur relevant für Eigenschaften
+   *     mit `type: GEOMETRY` in SQL-Feature-Providern, wenn eine Objektart Positionen in mehreren
+   *     Koordinatenreferenzsystemen in separaten Geometriespalten speichert. Geometrien werden in
+   *     diesem CRS aus der Spalte gelesen und in die Spalte geschrieben. In PostGIS folgt die
+   *     Achsenreihenfolge gespeicherter Koordinaten immer der GIS-Konvention (Länge bzw. Rechtswert
+   *     zuerst), das CRS einer gespeicherten geographischen Position ist daher typischerweise die
+   *     `LON_LAT`-Variante (z.B. `{code: 4937, forceAxisOrder: LON_LAT}`).
+   * @default null
+   * @since v4.8
+   */
+  @Override
+  Optional<EpsgCrs> getNativeCrs();
+
+  /**
+   * @langEn The CRS of the recorded positions that the `originalCrsIdentifiers` of this property
+   *     denote, if it differs from `nativeCrs`. Only relevant for properties with the role
+   *     `ORIGINAL_GEOMETRY`. Positions are transformed between `originalCrs` and `nativeCrs` when
+   *     they are written to and read from the provider; feature encodings that represent the
+   *     original positions (e.g. GML or JSON-FG with the `crs-original` profile) receive them in
+   *     this CRS. Example: positions recorded in `urn:adv:crs:ETRS89_Lat-Lon-h` (EPSG:4937,
+   *     latitude first) that are stored in the `LON_LAT` variant of EPSG:4937.
+   * @langDe Das Koordinatenreferenzsystem der erfassten Positionen, die die
+   *     `originalCrsIdentifiers` dieser Eigenschaft bezeichnen, sofern es vom `nativeCrs` abweicht.
+   *     Nur relevant für Eigenschaften mit der Rolle `ORIGINAL_GEOMETRY`. Positionen werden beim
+   *     Schreiben in den und Lesen aus dem Provider zwischen `originalCrs` und `nativeCrs`
+   *     transformiert; Feature-Kodierungen, die die ursprünglichen Positionen darstellen (z.B. GML
+   *     oder JSON-FG mit dem Profil `crs-original`), erhalten sie in diesem CRS. Beispiel: in
+   *     `urn:adv:crs:ETRS89_Lat-Lon-h` (EPSG:4937, Breite zuerst) erfasste Positionen, die in der
+   *     `LON_LAT`-Variante von EPSG:4937 gespeichert sind.
+   * @default nativeCrs
+   * @since v4.8
+   */
+  Optional<EpsgCrs> getOriginalCrs();
+
+  /**
+   * @langEn Declares sibling properties that store the position of this geometry property in other
+   *     reference systems, for feature types that store the same logical position in one of several
+   *     CRSs — including CRSs that cannot be expressed as a storage CRS (realizations that map to
+   *     the same coordinate reference system, or 1D vertical reference systems). Only relevant for
+   *     properties with `type: GEOMETRY` in SQL feature providers. All referenced properties are
+   *     implicitly `internal`. See [Position Variants](#position-variants).
+   * @langDe Deklariert Nachbareigenschaften, die die Position dieser Geometrieeigenschaft in
+   *     anderen Referenzsystemen speichern, für Objektarten, die dieselbe logische Position in
+   *     einem von mehreren Koordinatenreferenzsystemen speichern — einschließlich Systemen, die
+   *     nicht als Speicher-CRS ausgedrückt werden können (Realisierungen, die auf dasselbe
+   *     Koordinatenreferenzsystem abgebildet werden, oder eindimensionale Höhenreferenzsysteme).
+   *     Nur relevant für Eigenschaften mit `type: GEOMETRY` in SQL-Feature-Providern. Alle
+   *     referenzierten Eigenschaften sind implizit `internal`. Siehe
+   *     [Positionsvarianten](#position-variants).
+   * @default null
+   * @since v4.8
+   */
+  Optional<CrsVariants> getCrsVariants();
+
+  /**
+   * @langEn The verbatim identifiers of the reference systems that are stored in this property.
+   *     Only relevant for properties with the role `ORIGINAL_GEOMETRY` (2D/3D position variants;
+   *     positions carrying one of these identifiers are routed to this property) or
+   *     `ORIGINAL_HEIGHT` (1D position variants; the identifiers of the vertical reference
+   *     systems).
+   * @langDe Die unveränderten Kennungen der Referenzsysteme, die in dieser Eigenschaft gespeichert
+   *     werden. Nur relevant für Eigenschaften mit der Rolle `ORIGINAL_GEOMETRY`
+   *     (2D/3D-Positionsvarianten; Positionen mit einer dieser Kennungen werden dieser Eigenschaft
+   *     zugeordnet) oder `ORIGINAL_HEIGHT` (1D-Positionsvarianten; die Kennungen der
+   *     Höhenreferenzsysteme).
+   * @default []
+   * @since v4.8
+   */
+  List<String> getOriginalCrsIdentifiers();
+
+  /**
+   * @langEn The difference between the false easting of the CRS the positions are stored in
+   *     (`nativeCrs`) and the false easting used by coordinates carrying one of the
+   *     `originalCrsIdentifiers` of this property. Only relevant for properties with the role
+   *     `ORIGINAL_GEOMETRY`. When non-zero, the difference is added to the easting (the first
+   *     ordinate) on input and subtracted on output, so the stored coordinates conform to
+   *     `nativeCrs`. Example: German Gauss-Krüger coordinates written without the zone prefix use a
+   *     false easting of 500000, while EPSG:5677 (zone 3, E-N) defines 3500000 — the difference is
+   *     3000000.
+   * @langDe Die Differenz zwischen dem False Easting des Speicher-CRS (`nativeCrs`) und dem False
+   *     Easting der Koordinaten, die eine der `originalCrsIdentifiers` dieser Eigenschaft
+   *     verwenden. Nur relevant für Eigenschaften mit der Rolle `ORIGINAL_GEOMETRY`. Bei einem Wert
+   *     ungleich 0 wird die Differenz beim Einlesen zum Rechtswert (der ersten Ordinate) addiert
+   *     und bei der Ausgabe subtrahiert, sodass die gespeicherten Koordinaten dem Speicher-CRS
+   *     entsprechen. Beispiel: Gauß-Krüger-Koordinaten ohne Zonenkennzahl verwenden ein False
+   *     Easting von 500000, EPSG:5677 (Zone 3, E-N) definiert 3500000 — die Differenz beträgt
+   *     3000000.
+   * @default null
+   * @since v4.8
+   */
+  Optional<Double> getFalseEastingDifference();
+
+  /**
+   * @langEn Optional name for an object type, used for example in JSON Schema.
+   *     <p>For properties that should be mapped as links, the value `Link` can still be used. This
+   *     convention is deprecated an will be removed in the future. Use FEATURE_REF or
+   *     FEATURE_REF_ARRAY as the type of the property instead.
+   * @langDe Optional kann ein Name für den Typ spezifiziert werden, z.B. für die Erzeugung von
+   *     JSON-Schemas.
+   *     <p>Für Eigenschaften, die als Links abgebildet werden sollen, kann weiterhin der Wert
+   *     `Link` verwendet werden. Diese Konvention ist veraltet und wird in Zukunft entfernt.
+   *     Verwenden Sie stattdessen FEATURE_REF oder FEATURE_REF_ARRAY als Typ der Eigenschaft.
+   * @default null
    */
   Optional<String> getObjectType();
+
+  /**
+   * The object type whose schema fragment originally listed this property — set by the fragment
+   * resolver when a property is merged in from a fragment that declares {@code objectType}. Codecs
+   * that qualify property element names per object type (for example, XML with namespaces) use the
+   * origin's object type instead of the containing object's, so a property defined in a base
+   * fragment retains the base fragment's context even when nested under an object that declares a
+   * different {@code objectType}.
+   */
+  @JsonIgnore
+  @DocIgnore
+  Optional<String> getOriginObjectType();
 
   /**
    * @langEn Label for the schema object, used for example in HTML representations.
@@ -275,6 +430,26 @@ public interface FeatureSchema
   Set<Scope> getExcludedScopes();
 
   /**
+   * Whether the property is internal: read from the data source and available to feature encodings
+   * with special handling for the property, but not part of any public schema (returnables,
+   * receivables, queryables, sortables) and not encoded as a regular property in feature
+   * representations. Derived from the role: the members of a position-variants group ({@code
+   * ORIGINAL_GEOMETRY}, {@code ORIGINAL_HEIGHT}, {@code ORIGINAL_CRS_IDENTIFIER}) are internal.
+   */
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isInternal() {
+    return getRole()
+        .filter(
+            role ->
+                role == Role.ORIGINAL_GEOMETRY
+                    || role == Role.ORIGINAL_HEIGHT
+                    || role == Role.ORIGINAL_CRS_IDENTIFIER)
+        .isPresent();
+  }
+
+  /**
    * @langEn For a property of type `FEATURE_REF` or `FEATURE_REF_ARRAY` where the target is always
    *     a feature of another type in the same provider, declare the feature type identifier in
    *     `refType`. For details see [Feature References](#feature-references).
@@ -329,6 +504,7 @@ public interface FeatureSchema
   default boolean queryable() {
     return !isObject()
         && !isMultiSource()
+        && !isInternal()
         && !Objects.equals(getType(), Type.UNKNOWN)
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
@@ -342,6 +518,7 @@ public interface FeatureSchema
         && !isObject()
         && !isArray()
         && !isMultiSource()
+        && !isInternal()
         && !Objects.equals(getType(), Type.BOOLEAN)
         && !Objects.equals(getType(), Type.UNKNOWN)
         && !getExcludedScopes().contains(Scope.SORTABLE);
@@ -410,6 +587,33 @@ public interface FeatureSchema
    */
   @Override
   Optional<SchemaConstraints> getConstraints();
+
+  /**
+   * Option to represent the property as a web link instead of an inline value. Only meaningful for
+   * value properties. Internal: not part of the public provider configuration.
+   */
+  @JsonIgnore
+  @DocIgnore
+  Optional<SchemaLink> getLink();
+
+  /**
+   * The link of the property: the configured {@link #getLink() link}, or for properties whose
+   * {@link SchemaBase.Role role} declares a link relation (e.g. {@code
+   * PREDECESSOR_INTERVAL_START}), a default link to the feature version that starts at the property
+   * value.
+   */
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default Optional<SchemaLink> getEffectiveLink() {
+    if (getLink().isPresent()) {
+      return getLink();
+    }
+    return getRole()
+        .flatMap(SchemaBase.Role::getLinkRelation)
+        .filter(rel -> "predecessor-version".equals(rel) || "successor-version".equals(rel))
+        .map(rel -> SchemaLink.of(rel, SchemaLink.FEATURE_URI + "?datetime=" + SchemaLink.VALUE));
+  }
 
   /**
    * @langEn Option to disable enforcement of counter-clockwise orientation for exterior rings and a
@@ -806,6 +1010,21 @@ public interface FeatureSchema
   }
 
   @Value.Check
+  default void warnOnConflictingGeometryTypes() {
+    if (getGeometryType().isPresent() && !getGeometryTypes().isEmpty()) {
+      List<GeometryType> types = getGeometryTypes();
+      boolean consistent = types.size() == 1 && types.get(0) == getGeometryType().get();
+      if (!consistent) {
+        LOGGER.warn(
+            "Both 'geometryType' ({}) and 'geometryTypes' ({}) are set on property '{}'; 'geometryTypes' takes precedence.",
+            getGeometryType().get(),
+            types,
+            getFullPathAsString());
+      }
+    }
+  }
+
+  @Value.Check
   default void disallowFlattening() {
     Preconditions.checkState(
         getTransformations().isEmpty()
@@ -1164,8 +1383,7 @@ public interface FeatureSchema
                               .map(
                                   entry ->
                                       new SimpleEntry<>(
-                                          entry.getKey(),
-                                          (FeatureSchema) visit.apply(entry.getValue())))
+                                          entry.getKey(), visit.apply(entry.getValue())))
                               .collect(
                                   ImmutableMap.toImmutableMap(
                                       Map.Entry::getKey, Map.Entry::getValue)))
