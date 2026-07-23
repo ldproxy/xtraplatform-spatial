@@ -16,6 +16,19 @@ dependencies {
     provided project(':xtraplatform-features-sql')
     provided project(':xtraplatform-geometries')
 
-    //NOPMD - TODO: very big, only include binary for current platform
     embedded(libs.duckdb)
+}
+
+// since duckdb is pretty big, only include binary for current platform
+project.subprojects { Project subproject ->
+    if (subproject.name.endsWith("-tpl")) {
+        subproject.afterEvaluate {
+            subproject.tasks.named("jar") {
+                if (project.platform != "linux-amd64") exclude "libduckdb_java.so_linux_amd64"
+                if (project.platform != "linux-arm64") exclude "libduckdb_java.so_linux_arm64"
+                if (project.platform != "osx-arm64") exclude "libduckdb_java.so_osx_universal"
+                if (project.platform != "windows-amd64") exclude "libduckdb_java.so_windows_amd64"
+            }  
+        }
+    }
 }
