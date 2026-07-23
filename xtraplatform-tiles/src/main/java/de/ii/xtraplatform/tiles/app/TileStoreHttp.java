@@ -12,6 +12,7 @@ import de.ii.xtraplatform.strings.domain.StringTemplateFilters;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileStoreReadOnly;
+import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.core.MediaType;
@@ -21,23 +22,21 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TileStoreHttp implements TileStoreReadOnly {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileStoreHttp.class);
+  private static final String IMAGE = "image";
   private static final Map<MediaType, String> EXTENSIONS =
       ImmutableMap.of(
           new MediaType("application", "vnd.mapbox-vector-tile"),
           "pbf",
-          new MediaType("image", "jpeg"),
+          new MediaType(IMAGE, "jpeg"),
           "jpeg",
-          new MediaType("image", "png"),
+          new MediaType(IMAGE, "png"),
           "png",
-          new MediaType("image", "tiff"),
+          new MediaType(IMAGE, "tiff"),
           "tiff",
-          new MediaType("image", "webp"),
+          new MediaType(IMAGE, "webp"),
           "webp");
 
   private final Map<String, String> tilesetSources;
@@ -64,7 +63,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
 
   // we cannot determine this information
   @Override
-  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
     return Optional.empty();
   }
 
@@ -111,7 +110,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
                         StandardCharsets.UTF_8)
                     : ""));
       }
-    } catch (Throwable e) {
+    } catch (ProcessingException | IOException e) {
       return TileResult.error(e.getMessage());
     }
   }

@@ -97,7 +97,7 @@ public interface TileProviderData extends ProviderData {
     return getTilesets().entrySet().stream()
         .map(
             entry -> {
-              LinkedHashMap<String, Range<Integer>> ranges =
+              Map<String, Range<Integer>> ranges =
                   new LinkedHashMap<>(getTilesetDefaults().getTmsRanges());
               ranges.putAll(entry.getValue().getTmsRanges());
 

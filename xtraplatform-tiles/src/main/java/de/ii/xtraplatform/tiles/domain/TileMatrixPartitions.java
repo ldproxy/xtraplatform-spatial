@@ -129,10 +129,10 @@ public class TileMatrixPartitions {
   private TileSubMatrix getHigherLevelSubMatrix(TileSubMatrix subMatrix, int levelDelta) {
     return new ImmutableTileSubMatrix.Builder()
         .level(subMatrix.getLevel() + levelDelta)
-        .rowMin(subMatrix.getRowMin() * (2 * levelDelta))
-        .rowMax((subMatrix.getRowMax() * (2 * levelDelta)) + 1)
-        .colMin(subMatrix.getColMin() * (2 * levelDelta))
-        .colMax((subMatrix.getColMax() * (2 * levelDelta)) + 1)
+        .rowMin(subMatrix.getRowMin() * 2 * levelDelta)
+        .rowMax((subMatrix.getRowMax() * 2 * levelDelta) + 1)
+        .colMin(subMatrix.getColMin() * 2 * levelDelta)
+        .colMax((subMatrix.getColMax() * 2 * levelDelta) + 1)
         .build();
   }
 

@@ -35,7 +35,7 @@ class TileStorePlain implements TileStore {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileStorePlain.class);
 
-  private static Map<MediaType, String> EXTENSIONS =
+  private static final Map<MediaType, String> EXTENSIONS =
       ImmutableMap.of(FeatureEncoderMVT.FORMAT, "mvt", MediaType.valueOf("image/png"), "png");
 
   private final ResourceStore blobStore;
@@ -63,7 +63,7 @@ class TileStorePlain implements TileStore {
   }
 
   @Override
-  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
     long size = blobStore.size(path(tile));
 
     return size < 0 ? Optional.empty() : Optional.of(size == 0);
@@ -130,15 +130,13 @@ class TileStorePlain implements TileStore {
 
       try {
         matchingFiles.forEach(consumerMayThrow(blobStore::delete));
-      } catch (RuntimeException e) {
-        if (e instanceof UncheckedIOException && e.getCause() instanceof NoSuchFileException) {
-          // ignore
+      } catch (UncheckedIOException e) {
+        if (e.getCause() instanceof NoSuchFileException) {
           return;
         }
-        if (e.getCause() instanceof IOException) {
-          throw (IOException) e.getCause();
-        }
-        throw e;
+        IOException cause = e.getCause();
+        cause.addSuppressed(e);
+        throw cause;
       }
     }
   }

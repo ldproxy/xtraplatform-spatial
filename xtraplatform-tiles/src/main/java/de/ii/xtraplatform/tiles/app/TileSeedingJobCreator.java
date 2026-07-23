@@ -16,7 +16,6 @@ import de.ii.xtraplatform.jobs.domain.JobProcessor;
 import de.ii.xtraplatform.jobs.domain.JobQueueMin;
 import de.ii.xtraplatform.jobs.domain.JobResult;
 import de.ii.xtraplatform.jobs.domain.JobSet;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileProvider;
@@ -33,16 +32,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.AmountFormats;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJobSet> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileSeedingJobCreator.class);
@@ -73,6 +71,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
     TileSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
     boolean isCleanup = getDetails(job, jobQueue);
@@ -89,41 +88,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
       try {
 
         if (isCleanup) {
-          tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
-
-          long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
-          List<String> errors = jobSet.getErrors().get();
-
-          if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
-            LOGGER.warn(
-                MARKER.JOBS,
-                "{} had {} errors{}",
-                jobSet.getLabel(),
-                errors.size(),
-                jobSet.getDescription().orElse(""));
-
-            if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
-              for (String error : errors) {
-                LOGGER.debug(
-                    MARKER.JOBS,
-                    "{} error: {}{}",
-                    jobSet.getLabel(),
-                    error,
-                    jobSet.getDescription().orElse(""));
-              }
-            }
-          }
-
-          if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
-            LOGGER.info(
-                MARKER.JOBS,
-                "{} finished in {}{}",
-                jobSet.getLabel(),
-                pretty(duration),
-                jobSet.getDescription().orElse(""));
-          }
-
-          return JobResult.success(); // early return
+          return finishCleanup(tileProvider, seedingJobSet, jobSet); // early return
         }
 
         if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
@@ -141,32 +106,6 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
         TileMatrixPartitions tileStorePartitions =
             new TileMatrixPartitions(
                 tileProvider.seeding().get().getOptions().getEffectiveJobSize());
-
-        Map<String, List<String>> rasterForVector =
-            seedingJobSet.getTileSets().entrySet().stream()
-                .map(
-                    entry ->
-                        Map.entry(
-                            entry.getKey(),
-                            tileProvider.access().get().getMapStyles(entry.getKey()).stream()
-                                .map(
-                                    style ->
-                                        tileProvider
-                                            .access()
-                                            .get()
-                                            .getMapStyleTileset(entry.getKey(), style))
-                                .collect(Collectors.toList())))
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-
-        Map<String, TileGenerationParameters> rasterForVectorTilesets =
-            seedingJobSet.getTileSetParameters().entrySet().stream()
-                .flatMap(
-                    entry ->
-                        rasterForVector.get(entry.getKey()).stream()
-                            .map(rasterTileset -> Map.entry(rasterTileset, entry.getValue())))
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-        Map<String, Map<String, Set<TileMatrixSetLimits>>> rasterForVectorCoverage =
-            tileProvider.seeding().get().getRasterCoverage(rasterForVectorTilesets);
 
         tileProvider.seeding().get().setupSeeding(seedingJobSet);
 
@@ -190,21 +129,16 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
           tileMatrixSets.forEach(
               (tileMatrixSet, limits) -> {
-                Set<TileSubMatrix> subMatrices = new LinkedHashSet<>();
-
-                limits.forEach(
-                    (limit) -> {
-                      subMatrices.addAll(tileStorePartitions.getSubMatrices(limit));
-                    });
+                Set<TileSubMatrix> subMatrices = getSubMatrices(tileStorePartitions, limits);
+                TileSeedingJob.TileIdentifier tileIdentifier =
+                    createTileIdentifier(tileProvider, tileSet, tileMatrixSet);
 
                 for (TileSubMatrix subMatrix : subMatrices) {
                   Job job2 =
                       isRaster
                           ? TileSeedingJob.raster(
                               jobSet.getPriority(),
-                              tileProvider.getId(),
-                              tileSet,
-                              tileMatrixSet,
+                              tileIdentifier,
                               seedingJobSet.isReseed(),
                               Set.of(subMatrix),
                               jobSet.getId(),
@@ -214,9 +148,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
                                   .getRasterStorageInfo(tileSet, tileMatrixSet, subMatrix))
                           : TileSeedingJob.of(
                               jobSet.getPriority(),
-                              tileProvider.getId(),
-                              tileSet,
-                              tileMatrixSet,
+                              tileIdentifier,
                               seedingJobSet.isReseed(),
                               Set.of(subMatrix),
                               Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
@@ -288,6 +220,66 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
         TileSeedingJobSet.class,
         TileSeedingJobSet.TYPE_SETUP,
         Boolean.class);
+  }
+
+  private JobResult finishCleanup(
+      TileProvider tileProvider, TileSeedingJobSet seedingJobSet, JobSet jobSet)
+      throws IOException {
+    tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
+
+    long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
+    List<String> errors = jobSet.getErrors().get();
+
+    logErrors(jobSet, errors);
+
+    if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
+      LOGGER.info(
+          MARKER.JOBS,
+          "{} finished in {}{}",
+          jobSet.getLabel(),
+          pretty(duration),
+          jobSet.getDescription().orElse(""));
+    }
+
+    return JobResult.success();
+  }
+
+  private void logErrors(JobSet jobSet, List<String> errors) {
+    if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
+      LOGGER.warn(
+          MARKER.JOBS,
+          "{} had {} errors{}",
+          jobSet.getLabel(),
+          errors.size(),
+          jobSet.getDescription().orElse(""));
+
+      logErrorDetails(jobSet, errors);
+    }
+  }
+
+  private void logErrorDetails(JobSet jobSet, List<String> errors) {
+    if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
+      for (String error : errors) {
+        LOGGER.debug(
+            MARKER.JOBS,
+            "{} error: {}{}",
+            jobSet.getLabel(),
+            error,
+            jobSet.getDescription().orElse(""));
+      }
+    }
+  }
+
+  private Set<TileSubMatrix> getSubMatrices(
+      TileMatrixPartitions tileStorePartitions, Set<TileMatrixSetLimits> limits) {
+    Set<TileSubMatrix> subMatrices = new LinkedHashSet<>();
+    limits.forEach(limit -> subMatrices.addAll(tileStorePartitions.getSubMatrices(limit)));
+    return subMatrices;
+  }
+
+  private static TileSeedingJob.TileIdentifier createTileIdentifier(
+      TileProvider tileProvider, String tileSet, String tileMatrixSet) {
+    return new TileSeedingJob.TileIdentifier(tileProvider.getId(), tileSet, tileMatrixSet);
   }
 
   private Optional<TileProvider> getTileProvider(String id) {

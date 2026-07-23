@@ -9,6 +9,7 @@ package de.ii.xtraplatform.tiles.domain;
 
 import java.util.Map;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface WithEncodings {
   /**
    * @langEn Supported tile encodings. Keys have to be one of `MVT`, `PNG`, `WebP` and `JPEG`,
