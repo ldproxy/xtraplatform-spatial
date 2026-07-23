@@ -99,10 +99,6 @@ public interface TileStore extends TileStoreReadOnly {
 
     int col = Integer.parseInt(com.google.common.io.Files.getNameWithoutExtension(file));
 
-    if (col < tmsLimits.getMinTileCol() || col > tmsLimits.getMaxTileCol()) {
-      return inverse;
-    }
-
-    return !inverse;
+    return (col < tmsLimits.getMinTileCol() || col > tmsLimits.getMaxTileCol()) == inverse;
   }
 }

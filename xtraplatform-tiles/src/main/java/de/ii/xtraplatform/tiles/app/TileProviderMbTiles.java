@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
           value = TileProviderMbtilesData.PROVIDER_SUBTYPE)
     },
     data = TileProviderMbtilesData.class)
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtilesData> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderMbTiles.class);

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface WithTilesetTmsLevels {
   Map<String, Map<String, MinMax>> getTilesetLevels();
 

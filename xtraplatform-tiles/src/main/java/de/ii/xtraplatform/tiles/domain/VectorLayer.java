@@ -55,15 +55,12 @@ public interface VectorLayer {
   Map<String, Object> getAdditionalProperties();
 
   static VectorLayer of(FeatureSchema featureSchema, Optional<MinMax> minMax) {
-    String geometryType =
-        VectorLayer.getGeometryTypeAsString(featureSchema.getEffectiveGeometryType());
+    String geometryType = getGeometryTypeAsString(featureSchema.getEffectiveGeometryType());
 
     Map<String, String> properties =
         featureSchema.getProperties().stream()
             .filter(prop -> !prop.isSpatial())
-            .map(
-                prop ->
-                    new SimpleEntry<>(prop.getName(), VectorLayer.getTypeAsString(prop.getType())))
+            .map(prop -> new SimpleEntry<>(prop.getName(), getTypeAsString(prop.getType())))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue, (a, b) -> a));
 
     return ImmutableVectorLayer.builder()

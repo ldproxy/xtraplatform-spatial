@@ -16,49 +16,49 @@ public interface TileResult {
 
   enum Status {
     // Tile is available from the tile provider
-    Found,
-    // Like Found, but the tile is empty (no data) and tiles at more detailed zoom levels
+    FOUND,
+    // Like FOUND, but the tile is empty (no data) and tiles at more detailed zoom levels
     // are guaranteed to be empty, too
-    Empty,
-    // Like Found, but the tile has data and tiles at more detailed zoom levels are guaranteed
+    EMPTY,
+    // Like FOUND, but the tile has data and tiles at more detailed zoom levels are guaranteed
     // to be identical
-    Full,
+    FULL,
     // Tile is not available from the provider
-    NotFound,
+    NOT_FOUND,
     // Tile is outside the tile matrix set limits
-    OutsideLimits,
+    OUTSIDE_LIMITS,
     // Not a valid tile
-    Error
+    ERROR
   }
 
-  TileResult NOT_FOUND = new ImmutableTileResult.Builder().status(Status.NotFound).build();
+  TileResult NOT_FOUND = new ImmutableTileResult.Builder().status(Status.NOT_FOUND).build();
 
   static TileResult notFound() {
     return NOT_FOUND;
   }
 
   static TileResult notFound(byte[] content) {
-    return new ImmutableTileResult.Builder().status(Status.NotFound).content(content).build();
+    return new ImmutableTileResult.Builder().status(Status.NOT_FOUND).content(content).build();
   }
 
   static TileResult empty(byte[] content) {
-    return new ImmutableTileResult.Builder().status(Status.Empty).content(content).build();
+    return new ImmutableTileResult.Builder().status(Status.EMPTY).content(content).build();
   }
 
   static TileResult full(byte[] content) {
-    return new ImmutableTileResult.Builder().status(Status.Full).content(content).build();
+    return new ImmutableTileResult.Builder().status(Status.FULL).content(content).build();
   }
 
   static TileResult found(byte[] content) {
-    return new ImmutableTileResult.Builder().status(Status.Found).content(content).build();
+    return new ImmutableTileResult.Builder().status(Status.FOUND).content(content).build();
   }
 
   static TileResult outsideLimits(String message) {
-    return new ImmutableTileResult.Builder().status(Status.OutsideLimits).error(message).build();
+    return new ImmutableTileResult.Builder().status(Status.OUTSIDE_LIMITS).error(message).build();
   }
 
   static TileResult error(String message) {
-    return new ImmutableTileResult.Builder().status(Status.Error).error(message).build();
+    return new ImmutableTileResult.Builder().status(Status.ERROR).error(message).build();
   }
 
   Status getStatus();
@@ -74,42 +74,42 @@ public interface TileResult {
 
   @Value.Derived
   default boolean isEmpty() {
-    return getStatus() == Status.Empty;
+    return getStatus() == Status.EMPTY;
   }
 
   @Value.Derived
   default boolean isFull() {
-    return getStatus() == Status.Full;
+    return getStatus() == Status.FULL;
   }
 
   @Value.Derived
   default boolean isNotFound() {
-    return getStatus() == Status.NotFound;
+    return getStatus() == Status.NOT_FOUND;
   }
 
   @Value.Derived
   default boolean isOutsideLimits() {
-    return getStatus() == Status.OutsideLimits;
+    return getStatus() == Status.OUTSIDE_LIMITS;
   }
 
   @Value.Derived
   default boolean isError() {
-    return getStatus() == Status.Error && getError().isPresent();
+    return getStatus() == Status.ERROR && getError().isPresent();
   }
 
   @Value.Check
   default void check() {
-    if (getStatus() == Status.Found) {
-      Preconditions.checkState(getContent().isPresent(), "content is required for status 'Found'");
-    } else if (getStatus() == Status.Empty) {
-      Preconditions.checkState(getContent().isPresent(), "content is required for status 'Empty'");
-    } else if (getStatus() == Status.Full) {
-      Preconditions.checkState(getContent().isPresent(), "content is required for status 'Full'");
-    } else if (getStatus() == Status.OutsideLimits) {
+    if (getStatus() == Status.FOUND) {
+      Preconditions.checkState(getContent().isPresent(), "content is required for status 'FOUND'");
+    } else if (getStatus() == Status.EMPTY) {
+      Preconditions.checkState(getContent().isPresent(), "content is required for status 'EMPTY'");
+    } else if (getStatus() == Status.FULL) {
+      Preconditions.checkState(getContent().isPresent(), "content is required for status 'FULL'");
+    } else if (getStatus() == Status.OUTSIDE_LIMITS) {
       Preconditions.checkState(
-          getError().isPresent(), "error is required for status 'OutsideLimits'");
-    } else if (getStatus() == Status.Error) {
-      Preconditions.checkState(getError().isPresent(), "error is required for status 'Error'");
+          getError().isPresent(), "error is required for status 'OUTSIDE_LIMITS'");
+    } else if (getStatus() == Status.ERROR) {
+      Preconditions.checkState(getError().isPresent(), "error is required for status 'ERROR'");
     }
   }
 }

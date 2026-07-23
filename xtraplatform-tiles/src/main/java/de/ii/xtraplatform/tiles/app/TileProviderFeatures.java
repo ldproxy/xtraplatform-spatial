@@ -864,6 +864,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   }
 
   @Override
+  @SuppressWarnings("PMD.NPathComplexity")
   public void runSeeding(TileSeedingPartialJob job, Consumer<Integer> updateProgress)
       throws IOException {
     if (!metadata.containsKey(job.getTileSet())) {

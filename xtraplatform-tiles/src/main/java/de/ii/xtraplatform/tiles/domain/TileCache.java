@@ -94,7 +94,7 @@ public interface TileCache {
                 }*/
               }
 
-              if (result.isError()) {
+              if (result.isError() && LOGGER.isWarnEnabled()) {
                 LOGGER.warn(
                     "{}: processing failed -> {}, {}/{}/{}/{}, {} | {}",
                     tileSourceLabel,
