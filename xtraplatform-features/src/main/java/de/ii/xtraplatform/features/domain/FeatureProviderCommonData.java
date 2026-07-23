@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEncodingEnabled;
 import javax.annotation.Nullable;
@@ -34,8 +33,7 @@ public interface FeatureProviderCommonData
   ConnectionInfo getConnectionInfo();
 
   abstract class Builder
-      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderCommonData.Builder>
-      implements EntityDataBuilder<FeatureProviderDataV2> {
+      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderCommonData.Builder> {
 
     @Override
     public Builder fillRequiredFieldsWithPlaceholders() {

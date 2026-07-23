@@ -11,6 +11,7 @@ import de.ii.xtraplatform.entities.domain.ValidationResult;
 import de.ii.xtraplatform.entities.domain.ValidationResult.MODE;
 import java.util.List;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface SourceSchemaValidator<T extends SchemaBase<T>> {
 
   ValidationResult validate(String typeName, List<T> sourceSchemas, MODE mode);

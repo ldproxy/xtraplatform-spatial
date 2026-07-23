@@ -35,6 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureStreamImpl implements FeatureStream {
 
   private final Query query;
@@ -76,34 +77,24 @@ public class FeatureStreamImpl implements FeatureStream {
     this.doTransform = doTransform;
     this.auditLog = auditLog;
 
-    this.stepMappingSchema =
-        !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepMappingSchema = isStepEnabled(query, PipelineSteps.MAPPING_SCHEMA);
     this.stepMappingValues =
         stepMappingSchema || !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_VALUES);
-    this.stepGeometry =
-        !query.skipPipelineSteps().contains(PipelineSteps.GEOMETRY)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-    this.stepCoordinates =
-        !query.skipPipelineSteps().contains(PipelineSteps.COORDINATES)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-    this.stepClean =
-        !query.skipPipelineSteps().contains(PipelineSteps.CLEAN)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-    this.stepEtag =
-        !query.skipPipelineSteps().contains(PipelineSteps.ETAG)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-    this.stepMetadata =
-        !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
-    this.stepAudit =
-        auditLog.isEnabled()
-            && !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
-            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepGeometry = isStepEnabled(query, PipelineSteps.GEOMETRY);
+    this.stepCoordinates = isStepEnabled(query, PipelineSteps.COORDINATES);
+    this.stepClean = isStepEnabled(query, PipelineSteps.CLEAN);
+    this.stepEtag = isStepEnabled(query, PipelineSteps.ETAG);
+    this.stepMetadata = isStepEnabled(query, PipelineSteps.METADATA);
+    this.stepAudit = auditLog.isEnabled() && isStepEnabled(query, PipelineSteps.AUDIT);
     this.hasPropertyLinks = hasPropertyLinks(query, data);
     this.deduplicate =
         query instanceof MultiFeatureQuery && ((MultiFeatureQuery) query).getDeduplicate();
     this.idsArePerType = !data.getGloballyUniqueFeatureIds();
+  }
+
+  private static boolean isStepEnabled(Query query, PipelineSteps step) {
+    return !query.skipPipelineSteps().contains(step)
+        && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
   }
 
   // For types without properties that are represented as links (an explicit `link` in the
@@ -128,6 +119,7 @@ public class FeatureStreamImpl implements FeatureStream {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public CompletionStage<Result> runWith(
       Sink<Object> sink,
       Map<String, PropertyTransformations> propertyTransformations,
@@ -232,6 +224,7 @@ public class FeatureStreamImpl implements FeatureStream {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public <X> CompletionStage<ResultReduced<X>> runWith(
       SinkReduced<Object, X> sink,
       Map<String, PropertyTransformations> propertyTransformations,
@@ -488,12 +481,12 @@ public class FeatureStreamImpl implements FeatureStream {
     StringBuilder running = new StringBuilder();
     for (int i = 0; i < segments.length; i++) {
       if (i > 0) {
-        running.append(".");
+        running.append('.');
       }
       running.append(segments[i]);
       String renamedSegment = renames.getOrDefault(running.toString(), segments[i]);
       if (i > 0) {
-        result.append(".");
+        result.append('.');
       }
       result.append(renamedSegment);
     }

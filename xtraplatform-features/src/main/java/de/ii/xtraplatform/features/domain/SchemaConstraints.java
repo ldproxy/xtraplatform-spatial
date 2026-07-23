@@ -210,7 +210,7 @@ public interface SchemaConstraints {
    * @langDe Liste von erlaubten Werten für die Eigenschaft. Nur bei String- oder
    *     Integer-Eigenschaften sinnvoll.
    */
-  @JsonProperty(value = "enum")
+  @JsonProperty("enum")
   List<String> getEnumValues();
 
   /**

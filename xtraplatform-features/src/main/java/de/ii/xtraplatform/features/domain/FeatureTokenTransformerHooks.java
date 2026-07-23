@@ -14,21 +14,23 @@ import java.util.function.Consumer;
 public class FeatureTokenTransformerHooks extends FeatureTokenTransformer {
 
   private final CompletableFuture<CollectionMetadata> onCollectionMetadata;
-  private final Consumer<Boolean> hasFeaturesSetter;
+  private final Consumer<Boolean> setHasFeatures;
   private boolean done;
 
   public FeatureTokenTransformerHooks(
       Builder resultBuilder, CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+    super();
     this.onCollectionMetadata = onCollectionMetadata;
-    this.hasFeaturesSetter = resultBuilder::hasFeatures;
+    this.setHasFeatures = resultBuilder::hasFeatures;
     this.done = false;
   }
 
   public <X> FeatureTokenTransformerHooks(
       ImmutableResultReduced.Builder<X> resultBuilder,
       CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+    super();
     this.onCollectionMetadata = onCollectionMetadata;
-    this.hasFeaturesSetter = resultBuilder::hasFeatures;
+    this.setHasFeatures = resultBuilder::hasFeatures;
     this.done = false;
   }
 
@@ -42,7 +44,7 @@ public class FeatureTokenTransformerHooks extends FeatureTokenTransformer {
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (!done) {
-      hasFeaturesSetter.accept(true);
+      setHasFeatures.accept(true);
       this.done = true;
     }
 

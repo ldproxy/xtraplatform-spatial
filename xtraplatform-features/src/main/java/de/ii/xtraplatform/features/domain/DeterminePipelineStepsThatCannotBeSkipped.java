@@ -59,6 +59,7 @@ public class DeterminePipelineStepsThatCannotBeSkipped
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public Set<PipelineSteps> visit(
       FeatureSchema schema,
       List<FeatureSchema> parents,
@@ -98,29 +99,19 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       // already handled by including MAPPING for any objects or arrays);
       // if only value transformations are applied, and no other mapping is needed, just execute
       // the value transformations, but skip schema transformations and token slice transformers
-      if (!intermediateResult.contains(PipelineSteps.MAPPING_SCHEMA)) {
-        if (requiresPropertiesInSequence) {
+      if (intermediateResult.contains(PipelineSteps.MAPPING_SCHEMA)) {
+        steps.add(PipelineSteps.MAPPING_VALUES);
+      } else {
+        List<PropertyTransformation> transformations =
+            getSpecificTransformations(mergedTransformations);
+
+        if (requiresPropertiesInSequence
+            || transformations.stream().anyMatch(pt -> !pt.onlyValueTransformations())) {
           steps.add(PipelineSteps.MAPPING_SCHEMA);
           steps.add(PipelineSteps.MAPPING_VALUES);
-        } else {
-          List<PropertyTransformation> transformations =
-              mergedTransformations.getTransformations().entrySet().stream()
-                  .filter(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))
-                  .map(Entry::getValue)
-                  .flatMap(Collection::stream)
-                  .toList();
-          if (!transformations.isEmpty()) {
-            if (transformations.stream()
-                .allMatch(PropertyTransformation::onlyValueTransformations)) {
-              steps.add(PipelineSteps.MAPPING_VALUES);
-            } else {
-              steps.add(PipelineSteps.MAPPING_SCHEMA);
-              steps.add(PipelineSteps.MAPPING_VALUES);
-            }
-          }
+        } else if (!transformations.isEmpty()) {
+          steps.add(PipelineSteps.MAPPING_VALUES);
         }
-      } else {
-        steps.add(PipelineSteps.MAPPING_VALUES);
       }
 
     } else {
@@ -132,7 +123,7 @@ public class DeterminePipelineStepsThatCannotBeSkipped
       // COORDINATES step restores the recorded axis order of such positions (see
       // FeatureTokenTransformerCoordinates)
       if (!targetCrs.equals(nativeCrs)
-          || (simplifyGeometries)
+          || simplifyGeometries
           || requiresOriginalCrsRestore(schema)
           || (!(OgcCrs.CRS84.equals(nativeCrs) || OgcCrs.CRS84h.equals(nativeCrs))
               && supportSecondaryGeometry
@@ -191,5 +182,14 @@ public class DeterminePipelineStepsThatCannotBeSkipped
             .getOriginalCrs()
             .filter(originalCrs -> !originalCrs.equals(schema.getNativeCrs().get()))
             .isPresent();
+  }
+
+  private static List<PropertyTransformation> getSpecificTransformations(
+      PropertyTransformations mergedTransformations) {
+    return mergedTransformations.getTransformations().entrySet().stream()
+        .filter(entry -> !PropertyTransformations.WILDCARD.equals(entry.getKey()))
+        .map(Entry::getValue)
+        .flatMap(Collection::stream)
+        .toList();
   }
 }

@@ -11,6 +11,7 @@ import org.immutables.value.Value;
 import org.immutables.value.Value.Default;
 
 @Value.Immutable
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface SortKey {
 
   enum Direction {

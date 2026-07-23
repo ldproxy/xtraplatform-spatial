@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.TooManyMethods")
 public interface FeatureProviderMetadataConsumer {
 
   void analyzeStart();
@@ -88,6 +89,7 @@ public interface FeatureProviderMetadataConsumer {
 
   void analyzeFeatureTypeKeywords(String featureTypeName, String... keywords);
 
+  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   void analyzeFeatureTypeBoundingBox(
       String featureTypeName, String xmin, String ymin, String xmax, String ymax);
 

@@ -84,7 +84,7 @@ public class PropertyTransformationsCollector
   }
 
   @Override
-  public PropertyTransformations finalize(
+  public PropertyTransformations finalizeVisit(
       FeatureSchema schema, Map<String, List<PropertyTransformation>> transformations) {
     PropertyTransformations schemaTransformations = () -> transformations;
 

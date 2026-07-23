@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Queue;
 
 /**
@@ -39,9 +40,10 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
 
   private boolean buffering;
   private boolean dropping;
-  private String currentType;
+  private Optional<String> currentType;
 
   public FeatureTokenTransformerDeduplicate(boolean idsArePerType) {
+    super();
     this.seen = new PackedIdSet(MAX_FEATURES);
     this.idsArePerType = idsArePerType;
     this.tokenQueue = new LinkedList<>();
@@ -55,12 +57,15 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
     this.inObjectQueue = new LinkedList<>();
     this.buffering = false;
     this.dropping = false;
+    this.currentType = Optional.empty();
   }
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     this.currentType =
-        Objects.nonNull(context.mapping()) ? context.mapping().getTargetSchema().getName() : null;
+        Objects.nonNull(context.mapping())
+            ? Optional.of(context.mapping().getTargetSchema().getName())
+            : Optional.empty();
     this.buffering = true;
     this.dropping = false;
 
@@ -148,25 +153,29 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
     }
     if (buffering) {
       buffer(context, FeatureTokenType.VALUE);
-
-      if (context.schema().filter(SchemaBase::isId).isPresent()
-          && Objects.nonNull(context.value())) {
-        String key =
-            idsArePerType && Objects.nonNull(currentType)
-                ? currentType + ":" + context.value()
-                : context.value();
-
-        if (seen.add(key)) {
-          flush(context);
-        } else {
-          clear();
-          this.dropping = true;
-          this.buffering = false;
-        }
-      }
+      handleIdValue(context);
       return;
     }
     super.onValue(context);
+  }
+
+  private void handleIdValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    if (context.schema().filter(SchemaBase::isId).isEmpty() || Objects.isNull(context.value())) {
+      return;
+    }
+
+    String key =
+        idsArePerType && currentType.isPresent()
+            ? currentType.get() + ":" + context.value()
+            : context.value();
+
+    if (seen.add(key)) {
+      flush(context);
+    } else {
+      clear();
+      this.dropping = true;
+      this.buffering = false;
+    }
   }
 
   private void buffer(

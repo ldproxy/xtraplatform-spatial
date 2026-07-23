@@ -15,12 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MappingBuilder {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(MappingBuilder.class);
   private static final Joiner PATH_JOINER = Joiner.on('/').skipNulls();
 
   private final NestingTrackerBase<FeatureSchema.Builder> nestingTracker;
@@ -47,7 +44,7 @@ public class MappingBuilder {
         new ImmutableFeatureSchema.Builder()
             .name(name)
             .type(SchemaBase.Type.OBJECT)
-            .sourcePath(asSourcePath(path, true));
+            .sourcePath(asSourcePath(path, "/"));
 
     nestingTracker.openObject(List.of(), current);
 
@@ -128,10 +125,6 @@ public class MappingBuilder {
 
   private String asSourcePath(List<String> path) {
     return asSourcePath(path, "");
-  }
-
-  private String asSourcePath(List<String> path, boolean isRoot) {
-    return asSourcePath(path, "/");
   }
 
   private String asSourcePath(List<String> path, String prefix) {

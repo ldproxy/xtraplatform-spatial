@@ -22,6 +22,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.DoNotUseThreads")
 public class FeatureChangeHandlerImpl implements FeatureChanges {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureChangeHandlerImpl.class);
@@ -30,6 +31,7 @@ public class FeatureChangeHandlerImpl implements FeatureChanges {
   private final List<DatasetChangeListener> datasetListeners;
   private final List<FeatureChangeListener> featureListeners;
 
+  @SuppressWarnings("PMD.CloseResource")
   public FeatureChangeHandlerImpl() {
     ThreadPoolExecutor threadPoolExecutor =
         (ThreadPoolExecutor)

@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FeatureStoreQueryGenerator<T> {
 
   T getExtentQuery(

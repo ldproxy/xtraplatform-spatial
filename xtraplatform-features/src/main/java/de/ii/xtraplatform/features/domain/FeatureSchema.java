@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocIgnore;
-import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEncodingEnabled;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
@@ -66,9 +65,9 @@ import org.slf4j.LoggerFactory;
   "constraints",
   "properties"
 })
+@SuppressWarnings("PMD.ExcessivePublicCount")
 public interface FeatureSchema
     extends FeatureSchemaBase<FeatureSchema>,
-        Buildable<FeatureSchema>,
         PropertiesSchema<FeatureSchema, ImmutableFeatureSchema.Builder, FeatureSchema> {
 
   Logger LOGGER = LoggerFactory.getLogger(FeatureSchema.class);
@@ -76,6 +75,7 @@ public interface FeatureSchema
   String IS_PROPERTY = "IS_PROPERTY";
   String CONCAT_ELEMENT = "_CONCAT_ELEMENT_";
   String COALESCE_ELEMENT = "_COALESCE_ELEMENT_";
+  String QUOTED_LIST_SEPARATOR = "', '";
 
   /**
    * @langEn If set to `true` for properties of type `VALUE`/`VALUE_ARRAY`, these will be included
@@ -350,6 +350,7 @@ public interface FeatureSchema
    *     Verwenden Sie stattdessen FEATURE_REF oder FEATURE_REF_ARRAY als Typ der Eigenschaft.
    * @default null
    */
+  @Override
   Optional<String> getObjectType();
 
   /**
@@ -362,6 +363,7 @@ public interface FeatureSchema
    */
   @JsonIgnore
   @DocIgnore
+  @Override
   Optional<String> getOriginObjectType();
 
   /**
@@ -398,6 +400,7 @@ public interface FeatureSchema
    * @langEn The unit of measurement of the value, only relevant for numeric properties.
    * @langDe Die Maßeinheit des Wertes, nur relevant bei numerischen Eigenschaften.
    */
+  @Override
   Optional<String> getUnit();
 
   /**
@@ -417,6 +420,7 @@ public interface FeatureSchema
    *     Feature-Provider eine Eigenschaft mit einem festen Wert zu belegen.
    * @default `null`
    */
+  @Override
   Optional<String> getConstantValue();
 
   /**
@@ -505,7 +509,7 @@ public interface FeatureSchema
     return !isObject()
         && !isMultiSource()
         && !isInternal()
-        && !Objects.equals(getType(), Type.UNKNOWN)
+        && getType() != Type.UNKNOWN
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
 
@@ -519,8 +523,8 @@ public interface FeatureSchema
         && !isArray()
         && !isMultiSource()
         && !isInternal()
-        && !Objects.equals(getType(), Type.BOOLEAN)
-        && !Objects.equals(getType(), Type.UNKNOWN)
+        && getType() != Type.BOOLEAN
+        && getType() != Type.UNKNOWN
         && !getExcludedScopes().contains(Scope.SORTABLE);
   }
 
@@ -576,6 +580,7 @@ public interface FeatureSchema
    *     [Transformationen](../details/transformations.md).
    * @default []
    */
+  @Override
   List<PropertyTransformation> getTransformations();
 
   /**
@@ -801,8 +806,8 @@ public interface FeatureSchema
   @Override
   default boolean isFeature() {
     return isObject()
-        && (!getEffectiveSourcePaths().isEmpty()
-            && getEffectiveSourcePaths().get(0).startsWith("/"))
+        && !getEffectiveSourcePaths().isEmpty()
+        && getEffectiveSourcePaths().get(0).startsWith("/")
         && !getAdditionalInfo().containsKey(IS_PROPERTY);
   }
 
@@ -850,16 +855,16 @@ public interface FeatureSchema
                     getIdProperties().stream()
                         .map(FeatureSchema::getFullPathAsString)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
                 Preconditions.checkState(
-                    getIdProperties().stream().allMatch(p -> p.getType().equals(first.getType())),
+                    getIdProperties().stream().allMatch(p -> p.getType() == first.getType()),
                     "All ID properties of concatenated objects must have the same type, but found '%s' in type '%s'.",
                     getIdProperties().stream()
                         .map(FeatureSchema::getType)
                         .map(Enum::name)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
               });
 
@@ -882,7 +887,7 @@ public interface FeatureSchema
                     getPrimaryGeometries().stream()
                         .map(FeatureSchema::getFullPathAsString)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
                 Preconditions.checkState(
                     getPrimaryGeometries().stream().allMatch(SchemaBase::isSimpleFeatureGeometry),
@@ -909,17 +914,16 @@ public interface FeatureSchema
                     getPrimaryInstants().stream()
                         .map(FeatureSchema::getFullPathAsString)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
                 Preconditions.checkState(
-                    getPrimaryInstants().stream()
-                        .allMatch(p -> p.getType().equals(first.getType())),
+                    getPrimaryInstants().stream().allMatch(p -> p.getType() == first.getType()),
                     "All primary instants of concatenated objects must have the same type, but found '%s' in type '%s'.",
                     getPrimaryInstants().stream()
                         .map(FeatureSchema::getType)
                         .map(Enum::name)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
               });
 
@@ -944,7 +948,7 @@ public interface FeatureSchema
                         .map(Tuple::first)
                         .map(FeatureSchema::getFullPathAsString)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
                 Preconditions.checkState(
                     getPrimaryIntervals().stream()
@@ -958,29 +962,29 @@ public interface FeatureSchema
                         .map(Tuple::second)
                         .map(FeatureSchema::getFullPathAsString)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
                 Preconditions.checkState(
                     getPrimaryIntervals().stream()
-                        .allMatch(p -> p.first().getType().equals(first.first().getType())),
+                        .allMatch(p -> p.first().getType() == first.first().getType()),
                     "All primary interval starts of concatenated objects must have the same type, but found '%s' in type '%s'.",
                     getPrimaryIntervals().stream()
                         .map(Tuple::first)
                         .map(FeatureSchema::getType)
                         .map(Enum::name)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
                 Preconditions.checkState(
                     getPrimaryIntervals().stream()
-                        .allMatch(p -> p.second().getType().equals(first.second().getType())),
+                        .allMatch(p -> p.second().getType() == first.second().getType()),
                     "All primary interval ends of concatenated objects must have the same type, but found '%s' in type '%s'.",
                     getPrimaryIntervals().stream()
                         .map(Tuple::second)
                         .map(FeatureSchema::getType)
                         .map(Enum::name)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
               });
 
@@ -1003,7 +1007,7 @@ public interface FeatureSchema
                     getSecondaryGeometries().stream()
                         .map(FeatureSchema::getFullPathAsString)
                         .distinct()
-                        .collect(Collectors.joining("', '")),
+                        .collect(Collectors.joining(QUOTED_LIST_SEPARATOR)),
                     getName());
               });
     }
@@ -1014,7 +1018,7 @@ public interface FeatureSchema
     if (getGeometryType().isPresent() && !getGeometryTypes().isEmpty()) {
       List<GeometryType> types = getGeometryTypes();
       boolean consistent = types.size() == 1 && types.get(0) == getGeometryType().get();
-      if (!consistent) {
+      if (!consistent && LOGGER.isWarnEnabled()) {
         LOGGER.warn(
             "Both 'geometryType' ({}) and 'geometryTypes' ({}) are set on property '{}'; 'geometryTypes' takes precedence.",
             getGeometryType().get(),
@@ -1035,6 +1039,7 @@ public interface FeatureSchema
   }
 
   @Value.Check
+  @SuppressWarnings("PMD.NPathComplexity")
   default void checkMappingOperations() {
     Preconditions.checkState(
         getConcat().isEmpty() || isArray() || getFullPath().isEmpty(),
@@ -1197,7 +1202,7 @@ public interface FeatureSchema
   @Value.Check
   default void checkIsQueryable() {
     Preconditions.checkState(
-        !queryable() || (!isObject() && !Objects.equals(getType(), Type.UNKNOWN)),
+        !queryable() || (!isObject() && getType() != Type.UNKNOWN),
         "A queryable property must not be of type OBJECT, OBJECT_ARRAY or UNKNOWN. Found: %s. Path: %s.",
         getType(),
         getFullPathAsString());
@@ -1210,8 +1215,8 @@ public interface FeatureSchema
             || (!isSpatial()
                 && !isObject()
                 && !isArray()
-                && !Objects.equals(getType(), Type.BOOLEAN)
-                && !Objects.equals(getType(), Type.UNKNOWN)),
+                && getType() != Type.BOOLEAN
+                && getType() != Type.UNKNOWN),
         "A sortable property must be a string, a number or an instant. Found %s. Path: %s.",
         getType(),
         getFullPathAsString());

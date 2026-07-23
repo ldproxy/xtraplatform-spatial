@@ -51,18 +51,6 @@ public abstract class FeatureProviderCapabilities {
     ARITHMETIC
   }
 
-  @Value.Immutable
-  public interface Profile {
-
-    Level getLevel();
-
-    List<Operation> getQueryOps();
-
-    List<Cql2Operator> getCql2Operators();
-
-    List<Cql2Class> getCql2Classes();
-  }
-
   private static final Profile PROFILE_MINIMAL =
       ImmutableProfile.builder()
           .level(Level.MINIMAL)
@@ -95,6 +83,18 @@ public abstract class FeatureProviderCapabilities {
           Level.BASIC, PROFILE_BASIC,
           Level.DEFAULT, PROFILE_DEFAULT,
           Level.FULL, PROFILE_FULL);
+
+  @Value.Immutable
+  public interface Profile {
+
+    Level getLevel();
+
+    List<Operation> getQueryOps();
+
+    List<Cql2Operator> getCql2Operators();
+
+    List<Cql2Class> getCql2Classes();
+  }
 
   public abstract Level getLevel();
 

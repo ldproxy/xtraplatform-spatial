@@ -50,6 +50,7 @@ public interface FeatureStream {
    *
    * @param error the exception reported by xtraplatform
    */
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   static void processStreamError(Throwable error) {
     String errorMessage = error.getMessage();
     if (Objects.isNull(errorMessage)) {
@@ -131,8 +132,10 @@ public interface FeatureStream {
 
     abstract class Builder<T extends ResultBase, U extends Builder<T, U>> {
 
+      @SuppressWarnings("PMD.LinguisticNaming")
       public abstract U isEmpty(boolean isEmpty);
 
+      @SuppressWarnings("PMD.LinguisticNaming")
       public abstract U hasFeatures(boolean hasFeatures);
 
       public abstract U error(Throwable error);
