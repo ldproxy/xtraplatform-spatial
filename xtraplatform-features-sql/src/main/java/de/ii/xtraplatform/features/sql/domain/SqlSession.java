@@ -56,6 +56,44 @@ public interface SqlSession extends AutoCloseable {
    */
   List<String> execute(List<String> statements);
 
+  /**
+   * Returns the non-fatal SQL warnings (e.g. PostgreSQL {@code RAISE WARNING} / {@code RAISE
+   * NOTICE}) that mutation statements run via {@link #run} / {@link #runReturning} have produced
+   * since the last call, and clears them. Warnings produced by {@link #execute} are returned by
+   * that method directly and do not show up here. The default implementation returns an empty list
+   * for sessions that do not collect warnings.
+   */
+  default List<String> drainWarnings() {
+    return List.of();
+  }
+
+  /**
+   * Marks a recoverable point in this session's open transaction ({@code SAVEPOINT}). At most one
+   * savepoint may be active at a time; it is consumed by either {@link #releaseSavepoint()} or
+   * {@link #rollbackToSavepoint()}. The default implementation throws {@link
+   * UnsupportedOperationException} for sessions that have not adopted the API.
+   */
+  default void savepoint() {
+    throw new UnsupportedOperationException("Savepoints are not supported by this SQL session");
+  }
+
+  /**
+   * Releases the active savepoint ({@code RELEASE SAVEPOINT}), keeping all changes made since
+   * {@link #savepoint()} as part of the enclosing transaction. Throws when no savepoint is active.
+   */
+  default void releaseSavepoint() {
+    throw new UnsupportedOperationException("Savepoints are not supported by this SQL session");
+  }
+
+  /**
+   * Undoes all changes made since {@link #savepoint()} ({@code ROLLBACK TO SAVEPOINT}) and releases
+   * the savepoint, leaving the enclosing transaction usable for further statements. Throws when no
+   * savepoint is active.
+   */
+  default void rollbackToSavepoint() {
+    throw new UnsupportedOperationException("Savepoints are not supported by this SQL session");
+  }
+
   /** Commits all mutations performed against this session. */
   void commit();
 

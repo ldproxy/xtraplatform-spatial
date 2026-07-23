@@ -1521,6 +1521,31 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   }
 
   @Override
+  public List<String> drainWarnings() {
+    return sqlSession.drainWarnings();
+  }
+
+  @Override
+  public boolean supportsSavepoints() {
+    return true;
+  }
+
+  @Override
+  public void savepoint() {
+    sqlSession.savepoint();
+  }
+
+  @Override
+  public void releaseSavepoint() {
+    sqlSession.releaseSavepoint();
+  }
+
+  @Override
+  public void rollbackToSavepoint() {
+    sqlSession.rollbackToSavepoint();
+  }
+
+  @Override
   public void commit() {
     sqlSession.commit();
   }

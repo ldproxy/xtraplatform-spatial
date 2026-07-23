@@ -80,6 +80,24 @@ class SqlMutationSessionSpec extends Specification {
         0 * sqlSession.rollback()
     }
 
+    def 'savepoint lifecycle delegates to the underlying SqlSession and is advertised as supported'() {
+        given:
+        def session = buildSession()
+
+        expect:
+        session.supportsSavepoints()
+
+        when:
+        session.savepoint()
+        session.releaseSavepoint()
+        session.rollbackToSavepoint()
+
+        then:
+        1 * sqlSession.savepoint()
+        1 * sqlSession.releaseSavepoint()
+        1 * sqlSession.rollbackToSavepoint()
+    }
+
     def 'deleteFeature for an unknown feature type fails fast with IAE (no SQL is run)'() {
         given:
         def session = buildSession([:])  // empty mappings

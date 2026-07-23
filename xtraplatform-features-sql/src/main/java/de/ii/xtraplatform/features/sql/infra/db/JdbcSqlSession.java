@@ -14,6 +14,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
+import java.sql.Savepoint;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,10 @@ class JdbcSqlSession implements SqlSession {
 
   private final Connection connection;
   private boolean finalised;
+  private Savepoint activeSavepoint;
+  // Non-fatal SQL warnings (e.g. PostgreSQL RAISE WARNING / RAISE NOTICE) emitted by mutation
+  // statements, accumulated until the caller drains them.
+  private final List<String> pendingWarnings = new ArrayList<>();
 
   JdbcSqlSession(Connection connection) {
     this.connection = connection;
@@ -99,6 +104,7 @@ class JdbcSqlSession implements SqlSession {
         }
         try (Statement statement = connection.createStatement()) {
           boolean hasResultSet = statement.execute(sql);
+          harvestWarnings(statement);
           String returnedId = null;
           if (hasResultSet) {
             try (ResultSet rs = statement.getResultSet()) {
@@ -144,6 +150,7 @@ class JdbcSqlSession implements SqlSession {
     }
     try (Statement statement = connection.createStatement()) {
       boolean hasResultSet = statement.execute(sql);
+      harvestWarnings(statement);
       if (!hasResultSet) {
         return List.of();
       }
@@ -196,6 +203,32 @@ class JdbcSqlSession implements SqlSession {
     return trimmed.toLowerCase(Locale.ROOT).endsWith("returning null");
   }
 
+  /**
+   * Collects the non-fatal SQL warning chain of a just-executed statement into {@link
+   * #pendingWarnings} and clears it — the batch statement is reused across flushes, so its chain
+   * would otherwise be harvested again on the next flush.
+   */
+  private void harvestWarnings(Statement statement) {
+    try {
+      for (SQLWarning w = statement.getWarnings(); w != null; w = w.getNextWarning()) {
+        pendingWarnings.add(w.getMessage());
+      }
+      statement.clearWarnings();
+    } catch (SQLException e) {
+      LOGGER.debug("Reading SQL warnings failed: {}", e.getMessage());
+    }
+  }
+
+  @Override
+  public List<String> drainWarnings() {
+    if (pendingWarnings.isEmpty()) {
+      return List.of();
+    }
+    List<String> drained = List.copyOf(pendingWarnings);
+    pendingWarnings.clear();
+    return drained;
+  }
+
   private void flushBatch(
       Statement batchStmt, List<String> batchedSql, List<Consumer<String>> batchedConsumers) {
     if (batchedSql.isEmpty()) {
@@ -208,6 +241,7 @@ class JdbcSqlSession implements SqlSession {
     try {
       batchStmt.executeBatch();
       batchStmt.clearBatch();
+      harvestWarnings(batchStmt);
     } catch (SQLException e) {
       throw new IllegalStateException(
           "Batched mutation failed: " + e.getMessage() + " — first statement: " + batchedSql.get(0),
@@ -223,6 +257,56 @@ class JdbcSqlSession implements SqlSession {
     }
     batchedSql.clear();
     batchedConsumers.clear();
+  }
+
+  @Override
+  public void savepoint() {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    if (activeSavepoint != null) {
+      throw new IllegalStateException("A savepoint is already active on this SQL session");
+    }
+    try {
+      activeSavepoint = connection.setSavepoint();
+    } catch (SQLException e) {
+      throw new IllegalStateException("Savepoint failed: " + e.getMessage(), e);
+    }
+  }
+
+  @Override
+  public void releaseSavepoint() {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    if (activeSavepoint == null) {
+      throw new IllegalStateException("No savepoint is active on this SQL session");
+    }
+    try {
+      connection.releaseSavepoint(activeSavepoint);
+    } catch (SQLException e) {
+      throw new IllegalStateException("Savepoint release failed: " + e.getMessage(), e);
+    } finally {
+      activeSavepoint = null;
+    }
+  }
+
+  @Override
+  public void rollbackToSavepoint() {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    if (activeSavepoint == null) {
+      throw new IllegalStateException("No savepoint is active on this SQL session");
+    }
+    try {
+      connection.rollback(activeSavepoint);
+      connection.releaseSavepoint(activeSavepoint);
+    } catch (SQLException e) {
+      throw new IllegalStateException("Savepoint rollback failed: " + e.getMessage(), e);
+    } finally {
+      activeSavepoint = null;
+    }
   }
 
   @Override
