@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@FunctionalInterface
 public interface PropertyTransformations {
 
   Logger LOGGER = LoggerFactory.getLogger(PropertyTransformations.class);

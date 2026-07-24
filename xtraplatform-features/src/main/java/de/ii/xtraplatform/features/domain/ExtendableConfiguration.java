@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
 
+@FunctionalInterface
 public interface ExtendableConfiguration {
 
   List<ExtensionConfiguration> getExtensions();

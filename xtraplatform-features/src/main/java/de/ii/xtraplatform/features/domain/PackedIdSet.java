@@ -51,7 +51,7 @@ public class PackedIdSet {
     long lo;
 
     long[] packed = pack(id);
-    if (packed != null) {
+    if (packed.length > 0) {
       hi = packed[0];
       lo = packed[1];
     } else {
@@ -142,7 +142,7 @@ public class PackedIdSet {
   private static long[] pack(String id) {
     int length = id.length();
     if (length == 0 || length > MAX_PACKED_LENGTH) {
-      return null;
+      return new long[0];
     }
 
     long hi = 0;
@@ -150,7 +150,7 @@ public class PackedIdSet {
     for (int i = 0; i < length; i++) {
       int bits = toBits(id.charAt(i));
       if (bits < 0) {
-        return null;
+        return new long[0];
       }
       hi = (hi << 6) | (lo >>> 58);
       lo = (lo << 6) | bits;

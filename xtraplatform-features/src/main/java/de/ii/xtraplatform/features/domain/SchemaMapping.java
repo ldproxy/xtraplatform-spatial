@@ -45,17 +45,22 @@ public interface SchemaMapping extends SchemaMappingBase<FeatureSchema> {
         List<FeatureSchema> transformedSchemas =
             SchemaMappingBase.super.getSchemasForTargetPath(transformedPath);
 
-        for (DynamicTargetSchemaTransformer transformer : getDynamicTransformers()) {
-          if (transformer.isApplicableDynamic(path)) {
-            transformedSchemas = transformer.transformSchemaDynamic(transformedSchemas, path);
-          }
-        }
-
-        return transformedSchemas;
+        return applyDynamicTransformers(path, transformedSchemas);
       }
     }
 
     return SchemaMappingBase.super.getSchemasForTargetPath(path);
+  }
+
+  private List<FeatureSchema> applyDynamicTransformers(
+      List<String> path, List<FeatureSchema> transformedSchemas) {
+    List<FeatureSchema> result = transformedSchemas;
+    for (DynamicTargetSchemaTransformer transformer : getDynamicTransformers()) {
+      if (transformer.isApplicableDynamic(path)) {
+        result = transformer.transformSchemaDynamic(result, path);
+      }
+    }
+    return result;
   }
 
   static SchemaMapping of(FeatureSchema schema) {
@@ -70,39 +75,45 @@ public interface SchemaMapping extends SchemaMappingBase<FeatureSchema> {
             .anyMatch(
                 schema -> !schema.getCoalesce().isEmpty() && schema.getPropertyMap().isEmpty())) {
       return schemas.stream()
-          .map(
-              schema -> {
-                if (!schema.getCoalesce().isEmpty()) {
-                  for (FeatureSchema coalesce : schema.getCoalesce()) {
-                    if (coalesce.getSourcePath().isPresent()) {
-                      List<String> sourcePath =
-                          coalesce.getConstantValue().isPresent()
-                              ? List.of(coalesce.getSourcePath().get())
-                              : Splitter.on('/')
-                                  .omitEmptyStrings()
-                                  .splitToList(coalesce.getSourcePath().get());
-                      if (Objects.equals(
-                          sourcePath, path.subList(path.size() - sourcePath.size(), path.size()))) {
-                        ImmutableFeatureSchema build =
-                            new ImmutableFeatureSchema.Builder()
-                                .from(schema)
-                                .sourcePath(coalesce.getSourcePath())
-                                .valueType(coalesce.getValueType().orElse(coalesce.getType()))
-                                .sourcePaths(List.of())
-                                .coalesce(List.of())
-                                .build();
-                        return build;
-                      }
-                    }
-                  }
-                }
-
-                return schema;
-              })
+          .map(schema -> resolveCoalesceSourcePath(schema, path))
           .collect(Collectors.toList());
     }
 
     return schemas;
+  }
+
+  private static FeatureSchema resolveCoalesceSourcePath(FeatureSchema schema, List<String> path) {
+    if (schema.getCoalesce().isEmpty()) {
+      return schema;
+    }
+
+    for (FeatureSchema coalesce : schema.getCoalesce()) {
+      if (coalesce.getSourcePath().isEmpty()) {
+        continue;
+      }
+
+      List<String> sourcePath =
+          coalesce.getConstantValue().isPresent()
+              ? List.of(coalesce.getSourcePath().get())
+              : Splitter.on('/').omitEmptyStrings().splitToList(coalesce.getSourcePath().get());
+
+      if (Objects.equals(sourcePath, path.subList(path.size() - sourcePath.size(), path.size()))) {
+        return resolveCoalesceSourcePath(schema, coalesce);
+      }
+    }
+
+    return schema;
+  }
+
+  private static FeatureSchema resolveCoalesceSourcePath(
+      FeatureSchema schema, FeatureSchema coalesce) {
+    return new ImmutableFeatureSchema.Builder()
+        .from(schema)
+        .sourcePath(coalesce.getSourcePath())
+        .valueType(coalesce.getValueType().orElse(coalesce.getType()))
+        .sourcePaths(List.of())
+        .coalesce(List.of())
+        .build();
   }
 
   @Override

@@ -75,6 +75,7 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
   // deserialization
   // (immutables attributeBuilder does not work with maps yet)
   @JsonMerge
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<FeaturePropertyV2, ImmutableFeaturePropertyV2.Builder> getProperties();
 
   Map<String, String> getAdditionalInfo();
@@ -85,7 +86,7 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
     public abstract ImmutableFeaturePropertyV2.Builder putProperties(
         String key, ImmutableFeaturePropertyV2.Builder builder);
 
-    @JsonProperty(value = "properties")
+    @JsonProperty("properties")
     public ImmutableFeaturePropertyV2.Builder putProperties2(
         String key, ImmutableFeaturePropertyV2.Builder builder) {
       return putProperties(key, builder.name(key));
@@ -99,7 +100,7 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
 
     Optional<String> getCodelist();
 
-    @JsonProperty(value = "enum")
+    @JsonProperty("enum")
     List<String> getEnumValues();
 
     Optional<String> getRegex();

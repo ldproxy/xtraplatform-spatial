@@ -13,6 +13,7 @@ import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
 import java.util.OptionalLong;
 
+@FunctionalInterface
 public interface FeatureTokenEmitter2<
         T extends SchemaBase<T>, U extends SchemaMappingBase<T>, V extends ModifiableContext<T, U>>
     extends FeatureEventHandler<T, U, V> {
@@ -117,7 +118,6 @@ public interface FeatureTokenEmitter2<
   default void onGeometry(V context) {
     onGeometry(context.path(), context.geometry());
   }
-  ;
 
   default void onGeometry(List<String> path, Geometry<?> geometry) {
     push(FeatureTokenType.GEOMETRY);

@@ -33,6 +33,7 @@ public abstract class FeatureObjectTransformerBase<
   }
 
   protected FeatureObjectTransformerBase(Optional<String> nullValue) {
+    super();
     this.nullValue = nullValue;
   }
 
@@ -49,6 +50,7 @@ public abstract class FeatureObjectTransformerBase<
   public void onEnd(ModifiableContext<T, U> context) {}
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public final void onFeatureStart(ModifiableContext<T, U> context) {
     if (context.schema().isEmpty()) {
       return;
@@ -63,6 +65,7 @@ public abstract class FeatureObjectTransformerBase<
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public final void onFeatureEnd(ModifiableContext<T, U> context) {
     onFeature(currentFeature);
 

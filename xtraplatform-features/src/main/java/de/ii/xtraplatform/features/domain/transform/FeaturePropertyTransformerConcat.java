@@ -60,7 +60,7 @@ public abstract class FeaturePropertyTransformerConcat
       return slice;
     }
 
-    boolean isArray = slice.get(min) == FeatureTokenType.ARRAY;
+    boolean isArray = slice.get(min) == ARRAY;
     List<Object> transformed = new ArrayList<>();
 
     if (!isArray) {
@@ -85,11 +85,8 @@ public abstract class FeaturePropertyTransformerConcat
 
     for (int i = 0; i < slice.size(); i++) {
       if (isTypeWithPath(slice, i, ARRAY, schema.getFullPath())) {
-        if (!isArrayOpen) {
-          isArrayOpen = true;
-        } else {
-          skip = true;
-        }
+        skip = isArrayOpen;
+        isArrayOpen = true;
       } else if (isTypeWithPath(slice, i, ARRAY_END, schema.getFullPath())) {
         if (i < slice.size() - 2) {
           skip = true;

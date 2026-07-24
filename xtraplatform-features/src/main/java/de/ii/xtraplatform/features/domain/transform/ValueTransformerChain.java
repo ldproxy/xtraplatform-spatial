@@ -76,11 +76,7 @@ public class ValueTransformerChain
   @Nullable
   @Override
   public String transform(String path, String value) {
-    String transformed = value;
-
-    transformed = run(transformers, path, path, value);
-
-    return transformed;
+    return run(transformers, path, path, value);
   }
 
   @Override

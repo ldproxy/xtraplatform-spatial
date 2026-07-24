@@ -89,7 +89,7 @@ public class WithTransformationsApplied
             : additionalTransformations.mergeInto(schemaTransformations);
 
     List<PropertyTransformation> featureTransformations =
-        mergedTransformations.getTransformations().get(PropertyTransformations.WILDCARD);
+        mergedTransformations.getTransformations().get(WILDCARD);
 
     return Optional.ofNullable(featureTransformations)
         .filter(list -> !list.isEmpty())
@@ -114,11 +114,8 @@ public class WithTransformationsApplied
                         .collect(
                             ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
 
-    PropertyTransformations mergedTransformations =
-        preferSchemaTransformations
-            ? schemaTransformations.mergeInto(additionalTransformations)
-            : additionalTransformations.mergeInto(schemaTransformations);
-
-    return mergedTransformations;
+    return preferSchemaTransformations
+        ? schemaTransformations.mergeInto(additionalTransformations)
+        : additionalTransformations.mergeInto(schemaTransformations);
   }
 }

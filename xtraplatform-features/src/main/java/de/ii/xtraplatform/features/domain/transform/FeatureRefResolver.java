@@ -327,7 +327,7 @@ public class FeatureRefResolver implements TypesResolver {
         Optional<FeatureSchema> idProperty =
             property.getProperties().stream()
                 .filter(Objects::nonNull)
-                .filter(p -> Objects.equals(p.getName(), FeatureRefResolver.ID))
+                .filter(p -> Objects.equals(p.getName(), ID))
                 .findFirst();
         if (idProperty.isPresent()) {
           return Stream.of(
@@ -368,6 +368,7 @@ public class FeatureRefResolver implements TypesResolver {
         .collect(Collectors.toList());
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public FeatureSchema resolve(
       FeatureSchema schema,
       List<FeatureSchema> properties,
@@ -424,18 +425,8 @@ public class FeatureRefResolver implements TypesResolver {
                     .sourcePath(sourcePath)
                     .excludedScopes(excludedScopes));
 
-        if (schema.getRefUriTemplate().isPresent()) {
-          builder.addTransformations(
-              new ImmutablePropertyTransformation.Builder()
-                  .objectAddConstants(Map.of(URI_TEMPLATE, schema.getRefUriTemplate().get()))
-                  .build());
-        }
-        if (schema.getRefKeyTemplate().isPresent()) {
-          builder.addTransformations(
-              new ImmutablePropertyTransformation.Builder()
-                  .objectAddConstants(Map.of(KEY_TEMPLATE, schema.getRefKeyTemplate().get()))
-                  .build());
-        }
+        addConstantTransformation(builder, URI_TEMPLATE, schema.getRefUriTemplate());
+        addConstantTransformation(builder, KEY_TEMPLATE, schema.getRefKeyTemplate());
       } else {
         builder
             .putProperties2(
@@ -523,42 +514,20 @@ public class FeatureRefResolver implements TypesResolver {
                 .build());
       }
     }
-    if (schema.getRefUriTemplate().isPresent()) {
-      if (isConnected(schema.getSourcePath())) {
-        newTransformations.add(
-            new ImmutablePropertyTransformation.Builder()
-                .objectAddConstants(Map.of(URI_TEMPLATE, schema.getRefUriTemplate().get()))
-                .build());
-      } else {
-        newVisitedProperties.add(
-            new Builder()
-                .name(URI_TEMPLATE)
-                .type(Type.STRING)
-                .path(List.of(URI_TEMPLATE))
-                .parentPath(schema.getPath())
-                .constantValue(schema.getRefUriTemplate())
-                .excludedScopes(excludedScopes)
-                .build());
-      }
-    }
-    if (schema.getRefKeyTemplate().isPresent()) {
-      if (isConnected(schema.getSourcePath())) {
-        newTransformations.add(
-            new ImmutablePropertyTransformation.Builder()
-                .objectAddConstants(Map.of(KEY_TEMPLATE, schema.getRefKeyTemplate().get()))
-                .build());
-      } else {
-        newVisitedProperties.add(
-            new Builder()
-                .name(KEY_TEMPLATE)
-                .type(Type.STRING)
-                .path(List.of(KEY_TEMPLATE))
-                .parentPath(schema.getPath())
-                .constantValue(schema.getRefKeyTemplate())
-                .excludedScopes(excludedScopes)
-                .build());
-      }
-    }
+    addTemplatePropertyOrTransformation(
+        schema,
+        excludedScopes,
+        URI_TEMPLATE,
+        schema.getRefUriTemplate(),
+        newTransformations,
+        newVisitedProperties);
+    addTemplatePropertyOrTransformation(
+        schema,
+        excludedScopes,
+        KEY_TEMPLATE,
+        schema.getRefKeyTemplate(),
+        newTransformations,
+        newVisitedProperties);
 
     return new ImmutableFeatureSchema.Builder()
         .from(schema)
@@ -572,5 +541,45 @@ public class FeatureRefResolver implements TypesResolver {
 
   private static boolean isStatic(Optional<String> refType) {
     return refType.filter(refType2 -> !Objects.equals(refType2, REF_TYPE_DYNAMIC)).isPresent();
+  }
+
+  private static void addConstantTransformation(
+      Builder builder, String key, Optional<String> value) {
+    value.ifPresent(
+        template ->
+            builder.addTransformations(
+                new ImmutablePropertyTransformation.Builder()
+                    .objectAddConstants(Map.of(key, template))
+                    .build()));
+  }
+
+  private void addTemplatePropertyOrTransformation(
+      FeatureSchema schema,
+      List<Scope> excludedScopes,
+      String key,
+      Optional<String> value,
+      List<PropertyTransformation> transformations,
+      List<FeatureSchema> visitedProperties) {
+    if (value.isEmpty()) {
+      return;
+    }
+
+    if (isConnected(schema.getSourcePath())) {
+      transformations.add(
+          new ImmutablePropertyTransformation.Builder()
+              .objectAddConstants(Map.of(key, value.get()))
+              .build());
+      return;
+    }
+
+    visitedProperties.add(
+        new Builder()
+            .name(key)
+            .type(Type.STRING)
+            .path(List.of(key))
+            .parentPath(schema.getPath())
+            .constantValue(value)
+            .excludedScopes(excludedScopes)
+            .build());
   }
 }

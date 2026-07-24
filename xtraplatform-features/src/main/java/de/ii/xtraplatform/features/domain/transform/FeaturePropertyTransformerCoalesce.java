@@ -70,12 +70,12 @@ public abstract class FeaturePropertyTransformerCoalesce
     return transformed;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private List<Object> coalesceValues(List<Object> slice) {
     List<Object> transformed = new ArrayList<>();
     boolean skip = false;
     boolean found = false;
     int valueIndex = -1;
-    String value = null;
 
     for (int i = 0; i < slice.size(); i++) {
       if (isValueWithPath(slice, i, schema.getFullPath())) {
@@ -85,7 +85,7 @@ public abstract class FeaturePropertyTransformerCoalesce
           skip = true;
           valueIndex++;
 
-          value = (String) slice.get(i + 2);
+          String value = (String) slice.get(i + 2);
           for (FeaturePropertyValueTransformer transformer : valueTransformers().get(valueIndex)) {
             value = transformer.transform(getPropertyPath(), value);
           }

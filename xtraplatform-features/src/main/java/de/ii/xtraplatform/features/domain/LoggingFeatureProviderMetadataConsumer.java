@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.TooManyMethods")
 public class LoggingFeatureProviderMetadataConsumer implements FeatureProviderMetadataConsumer {
 
   private static final Logger LOGGER =
@@ -60,7 +61,9 @@ public class LoggingFeatureProviderMetadataConsumer implements FeatureProviderMe
 
   @Override
   public void analyzeKeywords(String... keywords) {
-    LOGGER.debug("analyzeKeywords {}", (Object) keywords);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("analyzeKeywords {}", (Object) keywords);
+    }
   }
 
   @Override
@@ -205,10 +208,13 @@ public class LoggingFeatureProviderMetadataConsumer implements FeatureProviderMe
 
   @Override
   public void analyzeFeatureTypeKeywords(String featureTypeName, String... keywords) {
-    LOGGER.debug("analyzeFeatureTypeKeywords {} {}", featureTypeName, (Object) keywords);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("analyzeFeatureTypeKeywords {} {}", featureTypeName, (Object) keywords);
+    }
   }
 
   @Override
+  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   public void analyzeFeatureTypeBoundingBox(
       String featureTypeName, String xmin, String ymin, String xmax, String ymax) {
     LOGGER.debug(

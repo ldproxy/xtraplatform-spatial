@@ -15,6 +15,7 @@ package de.ii.xtraplatform.features.domain;
  * before the per-format value-transformation step. This is the right slot for transformers that
  * need to see raw provider values (pre-format) and rewrite tokens in-place.
  */
+@FunctionalInterface
 public interface FeatureTokenTransformerExtension extends FeatureQueryExtension {
 
   FeatureTokenTransformer createTransformer();

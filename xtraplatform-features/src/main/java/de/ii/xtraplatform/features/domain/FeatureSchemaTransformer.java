@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FeatureSchemaTransformer {
 
   FeatureSchema visit(

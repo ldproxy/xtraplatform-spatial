@@ -11,6 +11,7 @@ import static de.ii.xtraplatform.features.domain.FeatureSchema.IS_PROPERTY;
 
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
+import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -411,6 +412,7 @@ public class MappingOperationResolver implements TypesResolver {
         .build();
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public static FeatureSchema resolveConcat(FeatureSchema schema) {
     if (schema.getType() == Type.VALUE_ARRAY) {
       String basePath = schema.getSourcePath().map(p -> p + "/").orElse("");
@@ -473,41 +475,14 @@ public class MappingOperationResolver implements TypesResolver {
                   .or(() -> prop.isObject() ? Optional.of(basePath2NoSlash) : Optional.empty());
 
           builder.putPropertyMap(
-              prefix + prop.getName(),
-              new ImmutableFeatureSchema.Builder()
-                  .from(prop)
-                  .sourcePath(newSourcePath)
-                  .path(List.of(i + "_" + prop.getName()))
-                  .transformations(
-                      prop.getTransformations().stream()
-                          .map(
-                              transformation -> {
-                                if (transformation.getRename().isPresent()) {
-                                  return new ImmutablePropertyTransformation.Builder()
-                                      .rename(transformation.getRename().get())
-                                      .renamePathOnly(prefix + transformation.getRename().get())
-                                      .build();
-                                }
-                                return transformation;
-                              })
-                          .collect(Collectors.toList()))
-                  .putAdditionalInfo(IS_PROPERTY, "true"));
+              prefix + prop.getName(), buildConcatProperty(prop, prefix, newSourcePath));
         }
       }
 
       if (schema.getConcat().stream().anyMatch(s -> Objects.isNull(s.getDesiredType()))) {
         builder.concat(
             schema.getConcat().stream()
-                .map(
-                    s -> {
-                      if (Objects.isNull(s.getDesiredType())) {
-                        return new ImmutableFeatureSchema.Builder()
-                            .from(s)
-                            .type(schema.getType())
-                            .build();
-                      }
-                      return s;
-                    })
+                .map(s -> withDesiredType(s, schema.getType()))
                 .collect(Collectors.toList()));
       }
 
@@ -517,6 +492,42 @@ public class MappingOperationResolver implements TypesResolver {
     return schema;
   }
 
+  private static ImmutableFeatureSchema.Builder buildConcatProperty(
+      FeatureSchema prop, String prefix, Optional<String> newSourcePath) {
+    return new ImmutableFeatureSchema.Builder()
+        .from(prop)
+        .sourcePath(newSourcePath)
+        .path(List.of(prefix + prop.getName()))
+        .transformations(renamedTransformations(prop, prefix))
+        .putAdditionalInfo(IS_PROPERTY, "true");
+  }
+
+  private static List<PropertyTransformation> renamedTransformations(
+      FeatureSchema prop, String prefix) {
+    return prop.getTransformations().stream()
+        .map(transformation -> renameWithPrefix(transformation, prefix))
+        .collect(Collectors.toList());
+  }
+
+  private static PropertyTransformation renameWithPrefix(
+      PropertyTransformation transformation, String prefix) {
+    if (transformation.getRename().isEmpty()) {
+      return transformation;
+    }
+    return new ImmutablePropertyTransformation.Builder()
+        .rename(transformation.getRename().get())
+        .renamePathOnly(prefix + transformation.getRename().get())
+        .build();
+  }
+
+  private static FeatureSchema withDesiredType(FeatureSchema s, Type fallbackType) {
+    if (Objects.nonNull(s.getDesiredType())) {
+      return s;
+    }
+    return new ImmutableFeatureSchema.Builder().from(s).type(fallbackType).build();
+  }
+
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public static FeatureSchema resolveCoalesce(FeatureSchema schema) {
     if (schema.isValue() && !schema.isFeatureRef() && !schema.isArray()) {
       String basePath = schema.getSourcePath().map(p -> p + "/").orElse("");
@@ -570,26 +581,14 @@ public class MappingOperationResolver implements TypesResolver {
         for (FeatureSchema prop : schema.getCoalesce().get(i).getProperties()) {
           builder.putPropertyMap(
               i + "_" + prop.getName(),
-              new ImmutableFeatureSchema.Builder()
-                  .from(prop)
-                  .sourcePath(basePath2 + prop.getSourcePath().orElse(""))
-                  .path(List.of(i + "_" + prop.getName())));
+              buildCoalesceProperty(prop, i, basePath2 + prop.getSourcePath().orElse("")));
         }
       }
 
       if (schema.getCoalesce().stream().anyMatch(s -> Objects.isNull(s.getDesiredType()))) {
         builder.coalesce(
             schema.getCoalesce().stream()
-                .map(
-                    s -> {
-                      if (Objects.isNull(s.getDesiredType())) {
-                        return new ImmutableFeatureSchema.Builder()
-                            .from(s)
-                            .type(schema.getType())
-                            .build();
-                      }
-                      return s;
-                    })
+                .map(s -> withDesiredType(s, schema.getType()))
                 .collect(Collectors.toList()));
       }
 
@@ -597,6 +596,14 @@ public class MappingOperationResolver implements TypesResolver {
     }
 
     return schema;
+  }
+
+  private static ImmutableFeatureSchema.Builder buildCoalesceProperty(
+      FeatureSchema prop, int index, String sourcePath) {
+    return new ImmutableFeatureSchema.Builder()
+        .from(prop)
+        .sourcePath(sourcePath)
+        .path(List.of(index + "_" + prop.getName()));
   }
 
   private static boolean hasMerge(FeatureSchema schema) {

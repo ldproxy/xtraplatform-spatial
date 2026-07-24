@@ -67,6 +67,7 @@ public class OnlyQueryables implements SchemaVisitorTopDown<FeatureSchema, Featu
 
   class OnlyQueryablesIncluder implements SchemaVisitorTopDown<FeatureSchema, FeatureSchema> {
     @Override
+    @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
     public FeatureSchema visit(
         FeatureSchema schema, List<FeatureSchema> parents, List<FeatureSchema> visitedProperties) {
 
@@ -86,15 +87,8 @@ public class OnlyQueryables implements SchemaVisitorTopDown<FeatureSchema, Featu
 
         // TODO: In the next major release move to FeatureSchema.queryable() and exclude
         //       incompatible properties.
-        if (!isCompatible(schema)) {
-          if (wildcard) {
-            return null;
-          }
-          if (LOGGER.isWarnEnabled()) {
-            LOGGER.warn(
-                "Property '{}' has a value transformation or is a constant value. The property should not be used as a queryable as filtering on the values may not work as expected.",
-                schema.getFullPathAsString(pathSeparator));
-          }
+        if (!isCompatible(schema) && shouldSkipIncompatibleQueryable(schema)) {
+          return null;
         }
       } else if (!schema.isObject()
           || (!parents.isEmpty() && visitedProperties.stream().noneMatch(Objects::nonNull))) {
@@ -158,13 +152,6 @@ public class OnlyQueryables implements SchemaVisitorTopDown<FeatureSchema, Featu
       return property;
     }
 
-    private String getKey(FeatureSchema property) {
-      return cleanupKeys
-          // TODO: separator
-          ? property.getFullPathAsString(pathSeparator).replaceAll("(^|\\.)([0-9]+)_", "$1")
-          : property.getFullPathAsString(pathSeparator);
-    }
-
     private FeatureSchema adjustType(List<FeatureSchema> parents, FeatureSchema property) {
       if (!property.queryable()) {
         // not a queryable, we have an object that has embedded queryables
@@ -194,11 +181,27 @@ public class OnlyQueryables implements SchemaVisitorTopDown<FeatureSchema, Featu
       return (parent.isMultiSource() && !parent.isFeature())
           || excludePathMatcher.test(parent.getSourcePath().orElse(""));
     }
+
+    private void logIncompatibleQueryable(FeatureSchema schema) {
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Property '{}' has a value transformation or is a constant value. The property should not be used as a queryable as filtering on the values may not work as expected.",
+            schema.getFullPathAsString(pathSeparator));
+      }
+    }
+
+    private boolean shouldSkipIncompatibleQueryable(FeatureSchema schema) {
+      if (!wildcard) {
+        logIncompatibleQueryable(schema);
+        return false;
+      }
+      return true;
+    }
   }
 
   static FeatureSchema cleanupPaths(FeatureSchema property) {
-    if ((property.getPath().stream().anyMatch(elem -> elem.matches("^([0-9]+)_.*"))
-        || property.getParentPath().stream().anyMatch(elem -> elem.matches("^([0-9]+)_.*")))) {
+    if (property.getPath().stream().anyMatch(elem -> elem.matches("^([0-9]+)_.*"))
+        || property.getParentPath().stream().anyMatch(elem -> elem.matches("^([0-9]+)_.*"))) {
       return new ImmutableFeatureSchema.Builder()
           .from(property)
           .path(
