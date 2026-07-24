@@ -99,6 +99,7 @@ public abstract class FeaturePropertyTransformerWrap
     return transformed;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private List<Object> wrapWithObjectArray(List<Object> slice) {
     List<Object> transformed = new ArrayList<>();
     boolean foundFirstObject = false;
@@ -166,21 +167,23 @@ public abstract class FeaturePropertyTransformerWrap
     return transformed;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private List<Object> wrapSingleValuesWithObject(List<Object> slice, boolean wrapEachValue) {
     List<Object> transformed = new ArrayList<>();
     boolean lastWasChildOfPath = false;
 
     for (int i = 0; i < slice.size(); i++) {
       if (isChildOfPath(slice, i, schema.getFullPath())) {
-        if (!lastWasChildOfPath) {
-          transformed.add(FeatureTokenType.OBJECT);
-          transformed.add(schema.getFullPath());
-          lastWasChildOfPath = true;
-        } else if (wrapEachValue) {
+        if (lastWasChildOfPath && wrapEachValue) {
           transformed.add(FeatureTokenType.OBJECT_END);
           transformed.add(schema.getFullPath());
           transformed.add(FeatureTokenType.OBJECT);
           transformed.add(schema.getFullPath());
+        }
+        if (!lastWasChildOfPath) {
+          transformed.add(FeatureTokenType.OBJECT);
+          transformed.add(schema.getFullPath());
+          lastWasChildOfPath = true;
         }
       } else if (slice.get(i) instanceof FeatureTokenType && lastWasChildOfPath) {
         transformed.add(FeatureTokenType.OBJECT_END);
@@ -198,6 +201,7 @@ public abstract class FeaturePropertyTransformerWrap
     return transformed;
   }
 
+  @Override
   public void transformObject(
       String currentPropertyPath,
       List<Object> slice,

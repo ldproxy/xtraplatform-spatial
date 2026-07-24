@@ -50,55 +50,56 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
 
   // Since properties must be "flat" (no arrays or objects), we map any arrays or objects to
   // a string using a JSON representation of arrays and objects.
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private Object getValue(PropertySfFlat property, boolean withQuotes) {
     switch (property.getType()) {
       case VALUE:
-        switch (property.getSchema().map(FeatureSchema::getType).orElse(Type.UNKNOWN)) {
-          case BOOLEAN:
-            return "t".equalsIgnoreCase(property.getValue())
-                || "true".equalsIgnoreCase(property.getValue())
-                || "1".equals(property.getValue());
+        return switch (property.getSchema().map(FeatureSchema::getType).orElse(Type.UNKNOWN)) {
+          case BOOLEAN ->
+              "t".equalsIgnoreCase(property.getValue())
+                  || "true".equalsIgnoreCase(property.getValue())
+                  || "1".equals(property.getValue());
 
-          case INTEGER:
+          case INTEGER -> {
             try {
-              return Long.parseLong(Objects.requireNonNull(property.getValue()));
-            } catch (Throwable e) {
+              yield Long.parseLong(property.getValue());
+            } catch (NumberFormatException e) {
               // ignore
-              return null;
+              yield null;
             }
+          }
 
-          case FLOAT:
+          case FLOAT -> {
             try {
-              return Double.parseDouble(Objects.requireNonNull(property.getValue()));
-            } catch (Throwable e) {
+              yield Double.parseDouble(property.getValue());
+            } catch (NumberFormatException e) {
               // ignore
-              return null;
+              yield null;
             }
+          }
 
-          case DATE:
-          case DATETIME:
-          case STRING:
-          case FEATURE_REF:
-          case UNKNOWN:
-            return withQuotes ? "'" + property.getValue() + "'" : property.getValue();
+          case DATE, DATETIME, STRING, FEATURE_REF, UNKNOWN ->
+              withQuotes ? "'" + property.getValue() + "'" : property.getValue();
 
-          case GEOMETRY:
-          // geometries are handled separately, ignore them in this map
-          default:
-            return null;
-        }
+          case GEOMETRY ->
+              // geometries are handled separately, ignore them in this map
+              null;
+
+          default -> null;
+        };
 
       case OBJECT:
-        return Type.GEOMETRY.equals(
-                property.getSchema().map(FeatureSchema::getType).orElse(Type.UNKNOWN))
+        return property.getSchema().map(FeatureSchema::getType).orElse(Type.UNKNOWN)
+                == Type.GEOMETRY
             ? null
             : getObjectAsString(property);
 
       case ARRAY:
         return getArrayAsString(property);
-    }
 
-    return null;
+      default:
+        return null;
+    }
   }
 
   private String getObjectAsString(PropertySfFlat property) {
@@ -107,12 +108,16 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
             .map(
                 p -> {
                   Object val = getValue(p, true);
-                  if (Objects.isNull(val)) return null;
+                  if (Objects.isNull(val)) {
+                    return null;
+                  }
                   return String.format("'%s': %s", p.getName(), val);
                 })
             .filter(Objects::nonNull)
             .collect(Collectors.joining(", "));
-    if (value.isBlank()) return null;
+    if (value.isBlank()) {
+      return null;
+    }
     return String.format("{ %s }", value);
   }
 
@@ -122,12 +127,16 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
             .map(
                 p -> {
                   Object val = getValue(p, true);
-                  if (Objects.isNull(val)) return null;
+                  if (Objects.isNull(val)) {
+                    return null;
+                  }
                   return val.toString();
                 })
             .filter(Objects::nonNull)
             .collect(Collectors.joining(", "));
-    if (value.isBlank()) return null;
+    if (value.isBlank()) {
+      return null;
+    }
     return String.format("[ %s ]", value);
   }
 

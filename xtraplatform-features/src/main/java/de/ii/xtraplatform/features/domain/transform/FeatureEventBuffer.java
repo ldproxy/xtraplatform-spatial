@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Vector;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +50,7 @@ import java.util.stream.Collectors;
  * are contiguous and a transformer's slice cannot swallow an unrelated property emitted between
  * them - and at the latest at flush when no transformer ran.
  */
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
 public class FeatureEventBuffer<
         U extends SchemaBase<U>, V extends SchemaMappingBase<U>, W extends ModifiableContext<U, V>>
     implements FeatureTokenEmitter2<U, V, W> {
@@ -61,7 +61,7 @@ public class FeatureEventBuffer<
   private final FeatureTokenReader<U, V, W> bufferOut;
 
   private final int[] events;
-  private final Vector<List<Integer>> enclosings;
+  private final List<List<Integer>> enclosings;
   private final Map<String, SchemaMapping> mappings;
   private boolean doBuffer;
   private boolean indexStale;
@@ -72,9 +72,8 @@ public class FeatureEventBuffer<
       FeatureEventHandler<U, V, W> downstream, W context, Map<String, SchemaMapping> mappings) {
     this.downstream = downstream;
     this.buffer = new ArrayList<>();
-    this.bufferIn = (FeatureTokenEmitter2<U, V, W>) (this::append);
+    this.bufferIn = this::append;
     this.bufferOut = new FeatureTokenReader<>(downstream, context);
-    this.enclosings = new Vector<>();
     this.mappings = mappings;
 
     this.doBuffer = false;
@@ -89,7 +88,7 @@ public class FeatureEventBuffer<
                 * 2
             + 2;
     this.events = new int[maxEvents];
-    enclosings.setSize(maxEvents);
+    this.enclosings = new ArrayList<>(Collections.nCopies(maxEvents, List.of()));
   }
 
   public FeatureTokenEmitter2<U, V, W> getBuffer() {
@@ -194,6 +193,7 @@ public class FeatureEventBuffer<
    * which is exactly the slice {@link #getSlice(int)} hands to a transformer. Runs only when a
    * slice is actually accessed, so features without slice transformers never pay for it.
    */
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void computeIndex() {
     Arrays.fill(events, 0);
     indexStale = false;
@@ -341,6 +341,11 @@ public class FeatureEventBuffer<
     return ordered;
   }
 
+  @SuppressWarnings({
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity"
+  })
   private static void buildTree(List<Object> tokens, Node root) {
     Deque<Node> stack = new ArrayDeque<>();
     stack.push(root);
@@ -628,6 +633,7 @@ public class FeatureEventBuffer<
     }
   }
 
+  @Override
   public String toString() {
     return sliceToString(buffer);
   }

@@ -20,7 +20,7 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import java.text.MessageFormat;
-import java.time.LocalDate;
+import java.time.DateTimeException;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
@@ -323,22 +323,21 @@ public interface PropertyTransformation
       String property,
       Collection<String> codelists) {
     final Optional<String> remove = getRemove();
-    if (remove.isPresent()) {
-      if (!FeaturePropertyTransformerRemove.CONDITION_VALUES.contains(remove.get())) {
-        builder.addStrictErrors(
-            MessageFormat.format(
-                "The remove transformation in collection ''{0}'' for property ''{1}'' is invalid. The value ''{2}'' is not one of the known values: {3}.",
-                collectionId,
-                property,
-                remove.get(),
-                FeaturePropertyTransformerRemove.CONDITION_VALUES));
-      }
+    if (remove.isPresent()
+        && !FeaturePropertyTransformerRemove.CONDITION_VALUES.contains(remove.get())) {
+      builder.addStrictErrors(
+          MessageFormat.format(
+              "The remove transformation in collection ''{0}'' for property ''{1}'' is invalid. The value ''{2}'' is not one of the known values: {3}.",
+              collectionId,
+              property,
+              remove.get(),
+              FeaturePropertyTransformerRemove.CONDITION_VALUES));
     }
     final Optional<String> dateFormat = getDateFormat();
     if (dateFormat.isPresent()) {
       try {
-        LocalDate.now().format(DateTimeFormatter.ofPattern(dateFormat.get()));
-      } catch (Exception e) {
+        DateTimeFormatter.ofPattern(dateFormat.get());
+      } catch (IllegalArgumentException | DateTimeException e) {
         builder.addWarnings(
             MessageFormat.format(
                 "The dateFormat transformation in collection ''{0}'' for property ''{1}'' with  value ''{2}'' is invalid, if used with a timestamp: {3}.",
@@ -346,13 +345,11 @@ public interface PropertyTransformation
       }
     }
     final Optional<String> codelist = getCodelist();
-    if (codelist.isPresent()) {
-      if (!codelists.contains(codelist.get())) {
-        builder.addStrictErrors(
-            MessageFormat.format(
-                "The codelist transformation in collection ''{0}'' for property ''{1}'' is invalid. The codelist ''{2}'' is not one of the known values: {3}.",
-                collectionId, property, codelist.get(), codelists));
-      }
+    if (codelist.isPresent() && !codelists.contains(codelist.get())) {
+      builder.addStrictErrors(
+          MessageFormat.format(
+              "The codelist transformation in collection ''{0}'' for property ''{1}'' is invalid. The codelist ''{2}'' is not one of the known values: {3}.",
+              collectionId, property, codelist.get(), codelists));
     }
 
     return builder;

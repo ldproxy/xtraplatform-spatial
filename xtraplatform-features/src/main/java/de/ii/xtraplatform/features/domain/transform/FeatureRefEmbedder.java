@@ -91,8 +91,8 @@ public class FeatureRefEmbedder implements TypesResolver {
   public FeatureRefEmbedder(String providerId) {
     this.providerId = providerId;
     this.withoutRoles = new WithoutRoles();
-    this.allTypes = null;
-    this.typesByRound = null;
+    this.allTypes = Map.of();
+    this.typesByRound = List.of();
     this.currentRound = -1;
   }
 
@@ -103,16 +103,12 @@ public class FeatureRefEmbedder implements TypesResolver {
 
   @Override
   public boolean needsResolving(Map<String, FeatureSchema> types) {
-    if (Objects.isNull(allTypes)) {
+    if (allTypes.isEmpty()) {
       this.allTypes = new LinkedHashMap<>(types);
       this.typesByRound = getTypesByRound(types, providerId);
     }
 
-    if (typesByRound.isEmpty()) {
-      return false;
-    }
-
-    return TypesResolver.super.needsResolving(types);
+    return !typesByRound.isEmpty() && TypesResolver.super.needsResolving(types);
   }
 
   @Override
@@ -180,6 +176,7 @@ public class FeatureRefEmbedder implements TypesResolver {
     return getBuilder(property, allTypes).map(b -> b.build().accept(withoutRoles)).orElse(null);
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private static Optional<Builder> getBuilder(
       FeatureSchema schema, Map<String, FeatureSchema> types) {
     String ref =
@@ -242,7 +239,7 @@ public class FeatureRefEmbedder implements TypesResolver {
     return Optional.of(builder);
   }
 
-  @SuppressWarnings("UnstableApiUsage")
+  @SuppressWarnings({"UnstableApiUsage", "PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private static List<List<String>> getTypesByRound(
       Map<String, FeatureSchema> types, String providerId) {
     // determine graph of feature refs
@@ -265,13 +262,12 @@ public class FeatureRefEmbedder implements TypesResolver {
       Map<String, Integer> map2 = Map.copyOf(map);
       types.forEach(
           (key, value) -> {
-            if (!map.containsKey(key)) {
-              if (!graph2.nodes().contains(key)
-                  || graph2.successors(key).stream()
-                      .filter(n -> !n.equals(key))
-                      .allMatch(map2::containsKey)) {
-                map.put(key, currentPrio);
-              }
+            if (!map.containsKey(key)
+                && (!graph2.nodes().contains(key)
+                    || graph2.successors(key).stream()
+                        .filter(n -> !n.equals(key))
+                        .allMatch(map2::containsKey))) {
+              map.put(key, currentPrio);
             }
           });
       prio++;
@@ -319,40 +315,48 @@ public class FeatureRefEmbedder implements TypesResolver {
                             (FeatureSchema featureSchema) ->
                                 featureSchema.getAllNestedProperties().stream()))
                 .filter(SchemaBase::isEmbed)
-                .forEach(
-                    p -> {
-                      if (!p.getConcat().isEmpty()) {
-                        p.getConcat().stream()
-                            .map(FeatureSchema::getRefType)
-                            .filter(Optional::isPresent)
-                            .map(Optional::get)
-                            .filter(ref -> !ref.equals(key))
-                            .forEach(ref -> builder.putEdge(key, ref));
-                      } else if (!p.getCoalesce().isEmpty()) {
-                        p.getCoalesce().stream()
-                            .map(FeatureSchema::getRefType)
-                            .filter(Optional::isPresent)
-                            .map(Optional::get)
-                            .filter(ref -> !ref.equals(key))
-                            .forEach(ref -> builder.putEdge(key, ref));
-                      } else {
-                        p.getRefType()
-                            .filter(
-                                ref -> {
-                                  if (ref.equals(key)) {
-                                    if (LOGGER.isWarnEnabled()) {
-                                      LOGGER.warn(
-                                          "Feature type with id '{}' has a feature reference that embeds itself at '{}'. The feature reference will not be embedded.",
-                                          key,
-                                          p.getFullPathAsString());
-                                    }
-                                    return false;
-                                  }
-                                  return true;
-                                })
-                            .ifPresent(ref -> builder.putEdge(key, ref));
-                      }
-                    }));
+                .forEach(p -> addEmbeddingEdges(builder, key, p)));
     return builder.build();
+  }
+
+  private static void addEmbeddingEdges(
+      ImmutableGraph.Builder<String> builder, String key, FeatureSchema property) {
+    if (property.getConcat().isEmpty()) {
+      if (property.getCoalesce().isEmpty()) {
+        property
+            .getRefType()
+            .filter(ref -> shouldEmbedRef(key, property, ref))
+            .ifPresent(ref -> builder.putEdge(key, ref));
+        return;
+      }
+
+      property.getCoalesce().stream()
+          .map(FeatureSchema::getRefType)
+          .filter(Optional::isPresent)
+          .map(Optional::get)
+          .filter(ref -> !ref.equals(key))
+          .forEach(ref -> builder.putEdge(key, ref));
+      return;
+    }
+
+    property.getConcat().stream()
+        .map(FeatureSchema::getRefType)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .filter(ref -> !ref.equals(key))
+        .forEach(ref -> builder.putEdge(key, ref));
+  }
+
+  private static boolean shouldEmbedRef(String key, FeatureSchema property, String ref) {
+    if (!ref.equals(key)) {
+      return true;
+    }
+    if (LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "Feature type with id '{}' has a feature reference that embeds itself at '{}'. The feature reference will not be embedded.",
+          key,
+          property.getFullPathAsString());
+    }
+    return false;
   }
 }

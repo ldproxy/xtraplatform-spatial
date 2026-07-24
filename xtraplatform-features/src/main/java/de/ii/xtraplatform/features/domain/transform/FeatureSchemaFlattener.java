@@ -81,7 +81,7 @@ public class FeatureSchemaFlattener implements SchemaVisitorTopDown<FeatureSchem
         .valueType(Optional.empty())
         .name(flatName(property, namePrefix))
         .label(flatLabel(property, labelPrefix))
-        .path(flatPath(property, namePrefix))
+        .path(flatPath(property))
         .concat(List.of())
         .coalesce(List.of())
         .build();
@@ -91,7 +91,7 @@ public class FeatureSchemaFlattener implements SchemaVisitorTopDown<FeatureSchem
     return prefix + property.getName() + (property.isArray() ? arraySuffix : "");
   }
 
-  private List<String> flatPath(FeatureSchema property, String prefix) {
+  private List<String> flatPath(FeatureSchema property) {
     return property.getFullPath();
   }
 

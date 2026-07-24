@@ -60,6 +60,7 @@ public class OnlySortables implements SchemaVisitorTopDown<FeatureSchema, Featur
   class OnlySortablesIncluder implements SchemaVisitorTopDown<FeatureSchema, FeatureSchema> {
 
     @Override
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     public FeatureSchema visit(
         FeatureSchema schema, List<FeatureSchema> parents, List<FeatureSchema> visitedProperties) {
 
@@ -85,15 +86,8 @@ public class OnlySortables implements SchemaVisitorTopDown<FeatureSchema, Featur
 
         // TODO: In the next major release move to FeatureSchema.sortable() and exclude
         //       incompatible properties.
-        if (!isCompatible(schema)) {
-          if (wildcard) {
-            return null;
-          }
-          if (LOGGER.isWarnEnabled()) {
-            LOGGER.warn(
-                "Property '{}' has a value transformation or is a constant value. The property should not be used as a sortable as sorting by the values may not work as expected.",
-                schema.getFullPathAsString(pathSeparator));
-          }
+        if (!isCompatible(schema) && shouldSkipIncompatibleSortable(schema)) {
+          return null;
         }
       } else if (!schema.isFeature()) {
         return null;
@@ -120,6 +114,22 @@ public class OnlySortables implements SchemaVisitorTopDown<FeatureSchema, Featur
           .propertyMap(visitedPropertiesMap)
           .concat(visitedConcat)
           .build();
+    }
+
+    private void logIncompatibleSortable(FeatureSchema schema) {
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Property '{}' has a value transformation or is a constant value. The property should not be used as a sortable as sorting by the values may not work as expected.",
+            schema.getFullPathAsString(pathSeparator));
+      }
+    }
+
+    private boolean shouldSkipIncompatibleSortable(FeatureSchema schema) {
+      if (!wildcard) {
+        logIncompatibleSortable(schema);
+        return false;
+      }
+      return true;
     }
   }
 
