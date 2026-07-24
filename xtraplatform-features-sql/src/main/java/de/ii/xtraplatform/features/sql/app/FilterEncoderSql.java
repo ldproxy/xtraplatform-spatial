@@ -93,12 +93,42 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings({
+  "PMD.CouplingBetweenObjects",
+  "PMD.TooManyStaticImports",
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity"
+})
 public class FilterEncoderSql {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterEncoderSql.class);
 
   static final String ROW_NUMBER = "row_number";
   static final Splitter ARRAY_SPLITTER = Splitter.on(",").trimResults().omitEmptyStrings();
+
+  // output column alias of every result-set CTE; consumers reference it as `SELECT <col> FROM
+  // <cte>`
+  /** Stable name of the single value column projected by a result-set producer. */
+  public static final String RESULT_SET_VALUE_COLUMN = "rs_value";
+
+  private static final String CTE_VALUE_COL = RESULT_SET_VALUE_COLUMN;
+  private static final String DYNAMIC_REF_TYPE = "DYNAMIC";
+
+  private static final String PLACEHOLDER_1 = "%1$s";
+  private static final String PLACEHOLDER_2 = "%2$s";
+  private static final String PLACEHOLDER_PAIR = "%%1$s%1$s%%2$s";
+  private static final String PLACEHOLDER_1_OPEN = "%1$s(";
+  private static final String PLACEHOLDER_2_CLOSE = ")%2$s";
+  private static final String SQL_WHERE = " WHERE ";
+  private static final String FORMAT_QUALIFIED_COLUMN = "%s.%s";
+  private static final String FORMAT_COALESCE = "COALESCE(%s,%s)";
+  private static final String FORMAT_COLLATE = "%s COLLATE \"%s\"";
+  private static final String ERROR_UNKNOWN_PROPERTY = "Filter is invalid. Unknown property: %s";
+  private static final String ERROR_ACCENTI_UNSUPPORTED = "ACCENTI() is not supported by this API.";
+  private static final String ROUTE_SEGMENT = "_route_";
+  private static final String JSON_SUB_DECODER = "JSON";
+  private static final String REGEX_STRIP_QUOTES = "^\"|\"$";
+  private static final String HALF_BOUNDED_MIN = "'..'";
 
   private final EpsgCrs nativeCrs;
   private final SqlDialect sqlDialect;
@@ -166,8 +196,8 @@ public class FilterEncoderSql {
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
   }
 
-  private Optional<String> renderCustomFunction(
-      de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  private Optional<String> renderCustomFunction(Function function, List<String> children) {
     CustomFunction customFunction =
         customFunctions.get(function.getName().toUpperCase(Locale.ROOT));
     if (Objects.isNull(customFunction)) {
@@ -217,7 +247,7 @@ public class FilterEncoderSql {
     String prefix = expression.substring(0, markerIndex);
     String suffix = expression.substring(markerIndex + marker.length());
 
-    String result = String.format(anchorExpression, "%1$s" + prefix, suffix + "%2$s");
+    String result = String.format(anchorExpression, PLACEHOLDER_1 + prefix, suffix + PLACEHOLDER_2);
 
     // BOOLEAN-returning functions are top-level predicates — finalize the subquery template
     // by replacing the remaining %1$s/%2$s placeholders with empty strings.
@@ -225,7 +255,7 @@ public class FilterEncoderSql {
     // fill in the placeholders itself.
     if (!customFunction.getReturns().isEmpty()
         && "BOOLEAN".equalsIgnoreCase(customFunction.getReturns().get(0))) {
-      result = result.replace("%1$s", "").replace("%2$s", "");
+      result = result.replace(PLACEHOLDER_1, "").replace(PLACEHOLDER_2, "");
     }
     return Optional.of(result);
   }
@@ -251,27 +281,20 @@ public class FilterEncoderSql {
   }
 
   private boolean operandHasSelectForTemplate(String expression) {
-    return expression.contains("%1$s") && expression.contains("%2$s");
+    return expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2);
   }
 
   private String reduceSelectToColumnForTemplate(String expression) {
     if (operandHasSelectForTemplate(expression)) {
       return String.format(
-          expression.contains(" WHERE ")
-              ? expression.substring(expression.indexOf(" WHERE ") + 7, expression.length() - 1)
+          expression.contains(SQL_WHERE)
+              ? expression.substring(expression.indexOf(SQL_WHERE) + 7, expression.length() - 1)
               : expression,
           "",
           "");
     }
     return expression;
   }
-
-  // output column alias of every result-set CTE; consumers reference it as `SELECT <col> FROM
-  // <cte>`
-  /** Stable name of the single value column projected by a result-set producer. */
-  public static final String RESULT_SET_VALUE_COLUMN = "rs_value";
-
-  private static final String CTE_VALUE_COL = RESULT_SET_VALUE_COLUMN;
 
   /**
    * Collects the result-set subqueries of one top-level {@code inResultSet} predicate as named,
@@ -281,7 +304,7 @@ public class FilterEncoderSql {
    * be referenced by the parent.
    */
   private static final class CteCollector {
-    private final LinkedHashMap<String, String> ctes = new LinkedHashMap<>();
+    private final Map<String, String> ctes = new LinkedHashMap<>();
     private final Map<String, String> namesBySet = new java.util.HashMap<>();
     private int counter;
 
@@ -290,7 +313,8 @@ public class FilterEncoderSql {
       if (existing != null) {
         return existing;
       }
-      String name = "_rs_" + (counter++) + "_" + setName.replaceAll("[^A-Za-z0-9_]", "_");
+      String name = "_rs_" + counter + "_" + setName.replaceAll("[^A-Za-z0-9_]", "_");
+      counter++;
       namesBySet.put(setName, name);
       // building the body registers any nested result sets first, preserving dependency order
       String body = bodySupplier.get();
@@ -364,7 +388,8 @@ public class FilterEncoderSql {
         valueTable.getRelations().isEmpty() ? valueTable : valueTable.getRelations().get(0);
     String join = JoinGenerator.getJoins(valueTable, aliases, this);
     String valueColumn =
-        String.format("%s.%s", aliases.get(aliases.size() - 1), setColumn.second().getName());
+        String.format(
+            FORMAT_QUALIFIED_COLUMN, aliases.get(aliases.size() - 1), setColumn.second().getName());
 
     Optional<Cql2Expression> tableFilter =
         producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
@@ -377,7 +402,7 @@ public class FilterEncoderSql {
         effectiveFilter
             .map(
                 filter ->
-                    " WHERE "
+                    SQL_WHERE
                         + prepareExpression(filter)
                             .accept(new CqlToSql2(producerMapping, collector)))
             .orElse("");
@@ -461,23 +486,26 @@ public class FilterEncoderSql {
   private Geometry<?> transformCoordinatesIfNecessary(
       Geometry<?> geometry, Optional<EpsgCrs> sourceCrs) {
 
-    if (sourceCrs.isPresent() && !Objects.equals(sourceCrs.get(), nativeCrs)) {
-      Optional<CrsTransformer> transformer =
-          crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
-      if (transformer.isPresent()) {
-        Geometry<?> transformed =
-            geometry.accept(
-                new CoordinatesTransformer(
-                    ImmutableCrsTransform.of(Optional.empty(), transformer.get())));
-        if (Objects.isNull(transformed)) {
-          throw new IllegalArgumentException(
-              String.format("Filter is invalid. Geometry cannot be transformed: %s", geometry));
-        }
-
-        return transformed;
-      }
+    if (sourceCrs.isEmpty() || Objects.equals(sourceCrs.get(), nativeCrs)) {
+      return geometry;
     }
-    return geometry;
+
+    Optional<CrsTransformer> transformer =
+        crsTransformerFactory.getTransformer(sourceCrs.get(), nativeCrs, true);
+    if (transformer.isEmpty()) {
+      return geometry;
+    }
+
+    Geometry<?> transformed =
+        geometry.accept(
+            new CoordinatesTransformer(
+                ImmutableCrsTransform.of(Optional.empty(), transformer.get())));
+    if (Objects.isNull(transformed)) {
+      throw new IllegalArgumentException(
+          String.format("Filter is invalid. Geometry cannot be transformed: %s", geometry));
+    }
+
+    return transformed;
   }
 
   public Optional<String> encodeRelationFilter(
@@ -545,8 +573,6 @@ public class FilterEncoderSql {
     return Optional.of(encodeNested(null, mergedFilter, table.get(), true));
   }
 
-  private static final String DYNAMIC_REF_TYPE = "DYNAMIC";
-
   /** The valid target types of a property in a mapping, or empty if they are not constrained. */
   private Optional<Set<String>> targetTypes(SqlQueryMapping mapping, String propertyName) {
     FeatureSchema schema =
@@ -563,15 +589,16 @@ public class FilterEncoderSql {
    * {@code type} sub-property (case 3). Empty when the target type is not constrained (case 4) or
    * any branch is open.
    */
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   Optional<Set<String>> validTargetTypes(FeatureSchema schema) {
     if (Objects.isNull(schema)) {
       return Optional.empty();
     }
 
     List<FeatureSchema> members =
-        !schema.getConcat().isEmpty()
-            ? schema.getConcat()
-            : !schema.getCoalesce().isEmpty() ? schema.getCoalesce() : List.of();
+        schema.getConcat().isEmpty()
+            ? (schema.getCoalesce().isEmpty() ? List.of() : schema.getCoalesce())
+            : schema.getConcat();
     if (!members.isEmpty()) {
       Set<String> types = new LinkedHashSet<>();
       for (FeatureSchema member : members) {
@@ -614,6 +641,7 @@ public class FilterEncoderSql {
                 && Objects.equals(propertyName, property.getSourcePath().get()));
   }
 
+  @SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
   private class CqlToSql extends CqlToText {
 
     private final SchemaSql rootSchema;
@@ -638,7 +666,7 @@ public class FilterEncoderSql {
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
-                        String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                        String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
       }
       return rootSchema.getAllObjects().stream()
           .filter(
@@ -655,19 +683,20 @@ public class FilterEncoderSql {
           .orElseThrow(
               () ->
                   new IllegalArgumentException(
-                      String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                      String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
     }
 
     protected Tuple<String, Optional<String>> getQualifiedColumn(
         SchemaSql table, String propertyName, String alias, boolean allowColumnFallback) {
       // TODO: support nested mapping filters
-      if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
+      if (Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))
           && "node".equals(propertyName)) {
-        return Tuple.of("_route_" + propertyName, Optional.<String>empty());
+        return Tuple.of(ROUTE_SEGMENT + propertyName, Optional.<String>empty());
       }
-      if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
+      if (Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))
           && "source".equals(propertyName)) {
-        return Tuple.of(String.format("%s.%s", alias, propertyName), Optional.<String>empty());
+        return Tuple.of(
+            String.format(FORMAT_QUALIFIED_COLUMN, alias, propertyName), Optional.<String>empty());
       }
       return table.getProperties().stream()
           .filter(getPropertyNameMatcher(propertyName, false))
@@ -678,12 +707,14 @@ public class FilterEncoderSql {
                   return Tuple.of(
                       mapToSubDecoder(alias, column, propertyName), column.getSubDecoder());
                 }
-                String qualifiedColumn = String.format("%s.%s", alias, column.getName());
+                String qualifiedColumn =
+                    String.format(FORMAT_QUALIFIED_COLUMN, alias, column.getName());
                 if (column.isTemporal()) {
-                  if (column.getType() == DATE)
+                  if (column.getType() == DATE) {
                     return Tuple.of(
                         sqlDialect.applyToDate(qualifiedColumn, column.getFormat()),
                         Optional.<String>empty());
+                  }
                   return Tuple.of(
                       sqlDialect.applyToDatetime(qualifiedColumn, column.getFormat()),
                       Optional.<String>empty());
@@ -702,14 +733,15 @@ public class FilterEncoderSql {
                       ? Optional.of(
                           Tuple.of(
                               String.format(
-                                  "%s.%s",
-                                  alias, propertyName.substring(propertyName.lastIndexOf('.') + 1)),
+                                  FORMAT_QUALIFIED_COLUMN,
+                                  alias,
+                                  propertyName.substring(propertyName.lastIndexOf('.') + 1)),
                               Optional.<String>empty()))
                       : Optional.empty())
           .orElseThrow(
               () ->
                   new IllegalArgumentException(
-                      String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                      String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
     }
 
     private Optional<SchemaSql> getPropertyFromSubDecoder(SchemaSql schema, String propertyName) {
@@ -719,7 +751,7 @@ public class FilterEncoderSql {
     }
 
     private String mapToSubDecoder(String alias, SchemaSql column, String propertyName) {
-      if (column.getSubDecoder().filter("JSON"::equals).isPresent()) {
+      if (column.getSubDecoder().filter(JSON_SUB_DECODER::equals).isPresent()) {
         PropertyTypeInfo typeInfo = column.getSubDecoderTypes().get(propertyName);
         return sqlDialect.applyToJsonValue(
             alias, column.getName(), column.getSubDecoderPaths().get(propertyName), typeInfo);
@@ -734,7 +766,7 @@ public class FilterEncoderSql {
     @Override
     public String visit(Property property, List<String> children) {
       // strip double quotes from the property name
-      String propertyName = property.getName().replaceAll("^\"|\"$", "");
+      String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
       boolean allowColumnFallback = !propertyName.contains(".");
       SchemaSql table = getTable(propertyName, false, allowColumnFallback);
 
@@ -753,7 +785,9 @@ public class FilterEncoderSql {
       boolean ignoreInstanceFilter = true;
       Optional<Cql2Expression> userFilter;
       Optional<SchemaSql> userFilterTable = Optional.empty();
-      if (!property.getNestedFilters().isEmpty()) {
+      if (property.getNestedFilters().isEmpty()) {
+        userFilter = Optional.empty();
+      } else {
         Optional<Entry<String, Cql2Expression>> nestedFilter =
             property.getNestedFilters().entrySet().stream().findFirst();
         userFilter = nestedFilter.map(Entry::getValue);
@@ -764,8 +798,6 @@ public class FilterEncoderSql {
         } else {
           userFilterTable = Optional.ofNullable(getTable(userFilterPropertyName, false, false));
         }
-      } else {
-        userFilter = Optional.empty();
       }
 
       String join =
@@ -778,7 +810,9 @@ public class FilterEncoderSql {
               ignoreInstanceFilter,
               true,
               FilterEncoderSql.this);
-      if (!join.isEmpty()) join += " ";
+      if (!join.isEmpty()) {
+        join += " ";
+      }
 
       // When the predicate needs no sub-table join, its operand is a column reachable directly from
       // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
@@ -788,9 +822,10 @@ public class FilterEncoderSql {
       // array
       // traversal is genuinely required (join non-empty) — there it is load-bearing for
       // cardinality.
-      if (join.isEmpty() && !Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))) {
+      if (join.isEmpty()
+          && !Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))) {
         return String.format(
-            "%%1$s%1$s%%2$s",
+            PLACEHOLDER_PAIR,
             getQualifiedColumn(table, propertyName, "A", allowColumnFallback).first());
       }
 
@@ -803,6 +838,7 @@ public class FilterEncoderSql {
           qualifiedColumn);
     }
 
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     private String getUserFilterPropertyName(Cql2Expression userFilter) {
       CqlNode nestedFilter = userFilter;
       Operand operand = null;
@@ -821,7 +857,7 @@ public class FilterEncoderSql {
       }
       if (operand instanceof Property) {
         return ((Property) operand).getName();
-      } else if (operand instanceof de.ii.xtraplatform.cql.domain.Function) {
+      } else if (operand instanceof Function) {
         return operand.accept(this);
       }
       throw new IllegalArgumentException("unsupported nested filter");
@@ -833,59 +869,66 @@ public class FilterEncoderSql {
       String end = children.get(1);
 
       // process special values for a half-bounded interval
-      if ("'..'".equals(start))
+      if (HALF_BOUNDED_MIN.equals(start)) {
         start = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      if ("'..'".equals(end))
+      }
+      if (HALF_BOUNDED_MIN.equals(end)) {
         end = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
+      }
 
       Operand arg1 = interval.getArgs().get(0);
       Operand arg2 = interval.getArgs().get(1);
       if (arg1 instanceof Property && arg2 instanceof Property) {
         String startColumn = reduceToColumn(start);
         String endColumn = reduceToColumn(end);
-        if (startColumn.equals(endColumn))
-          return String.format(start, "%1$s(", ", " + endColumn + ")%2$s");
+        if (startColumn.equals(endColumn)) {
+          return String.format(start, PLACEHOLDER_1_OPEN, ", " + endColumn + PLACEHOLDER_2_CLOSE);
+        }
         startColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                startColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
+                FORMAT_COALESCE,
+                startColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
         endColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                endColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
-        return start.substring(0, start.indexOf("%1$s"))
-            + "%1$s("
+                FORMAT_COALESCE,
+                endColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
+        return start.substring(0, start.indexOf(PLACEHOLDER_1))
+            + PLACEHOLDER_1_OPEN
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s"
-            + start.substring(start.indexOf("%2$s") + 4);
+            + PLACEHOLDER_2_CLOSE
+            + start.substring(start.indexOf(PLACEHOLDER_2) + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                startColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
-        return start.substring(0, start.indexOf("%1$s"))
-            + "%1$s("
+                FORMAT_COALESCE,
+                startColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
+        return start.substring(0, start.indexOf(PLACEHOLDER_1))
+            + PLACEHOLDER_1_OPEN
             + startColumn
             + ", "
             + end
-            + ")%2$s"
-            + start.substring(start.indexOf("%2$s") + 4);
+            + PLACEHOLDER_2_CLOSE
+            + start.substring(start.indexOf(PLACEHOLDER_2) + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                endColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
-        return end.substring(0, end.indexOf("%1$s"))
-            + "%1$s("
+                FORMAT_COALESCE,
+                endColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
+        return end.substring(0, end.indexOf(PLACEHOLDER_1))
+            + PLACEHOLDER_1_OPEN
             + start
             + ", "
             + endColumn
-            + ")%2$s"
-            + end.substring(end.indexOf("%2$s") + 4);
+            + PLACEHOLDER_2_CLOSE
+            + end.substring(end.indexOf(PLACEHOLDER_2) + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -893,10 +936,10 @@ public class FilterEncoderSql {
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Casei casei, List<String> children) {
       if (casei.getValue() instanceof ScalarLiteral) {
-        return children.get(0).toLowerCase();
+        return children.get(0).toLowerCase(Locale.ROOT);
       }
-      if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-        return String.format(children.get(0), "%1$sLOWER(", ")%2$s");
+      if (children.get(0).contains(PLACEHOLDER_1) && children.get(0).contains(PLACEHOLDER_2)) {
+        return String.format(children.get(0), "%1$sLOWER(", PLACEHOLDER_2_CLOSE);
       }
       return String.format("LOWER(%s)", children.get(0));
     }
@@ -904,21 +947,24 @@ public class FilterEncoderSql {
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Accenti accenti, List<String> children) {
       if (accenti.getValue() instanceof ScalarLiteral) {
-        if (Objects.nonNull(accentiCollation))
-          return String.format("%s COLLATE \"%s\"", children.get(0), accentiCollation);
-        throw new IllegalArgumentException("ACCENTI() is not supported by this API.");
+        if (Objects.nonNull(accentiCollation)) {
+          return String.format(FORMAT_COLLATE, children.get(0), accentiCollation);
+        }
+        throw new IllegalArgumentException(ERROR_ACCENTI_UNSUPPORTED);
       }
       if (Objects.nonNull(accentiCollation)) {
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return children.get(0).replace("%2$s", " COLLATE \"" + accentiCollation + "\"%2$s");
+        if (children.get(0).contains(PLACEHOLDER_1) && children.get(0).contains(PLACEHOLDER_2)) {
+          return children
+              .get(0)
+              .replace(PLACEHOLDER_2, " COLLATE \"" + accentiCollation + "\"" + PLACEHOLDER_2);
         }
-        return String.format("%s COLLATE \"%s\"", children.get(0), accentiCollation);
+        return String.format(FORMAT_COLLATE, children.get(0), accentiCollation);
       }
-      throw new IllegalArgumentException("ACCENTI() is not supported by this API.");
+      throw new IllegalArgumentException(ERROR_ACCENTI_UNSUPPORTED);
     }
 
     @Override
-    public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+    public String visit(Function function, List<String> children) {
       Optional<String> customExpression = renderCustomFunction(function, children);
       if (customExpression.isPresent()) {
         return customExpression.get();
@@ -928,14 +974,15 @@ public class FilterEncoderSql {
     }
 
     private String reduceToColumn(String expression) {
-      return expression.substring(expression.indexOf("%1$s") + 4, expression.indexOf("%2$s"));
+      return expression.substring(
+          expression.indexOf(PLACEHOLDER_1) + 4, expression.indexOf(PLACEHOLDER_2));
     }
 
     private String reduceSelectToColumn(String expression) {
-      if (expression.contains("%1$s") && expression.contains("%2$s"))
+      if (expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2))
         return String.format(
-            expression.contains(" WHERE ")
-                ? expression.substring(expression.indexOf(" WHERE ") + 7, expression.length() - 1)
+            expression.contains(SQL_WHERE)
+                ? expression.substring(expression.indexOf(SQL_WHERE) + 7, expression.length() - 1)
                 : expression,
             "",
             "");
@@ -944,19 +991,19 @@ public class FilterEncoderSql {
 
     private String replaceColumnWithLiteral(String expression, String column, String literal) {
       return expression.replace(
-          String.format("%%1$s%1$s%%2$s", column), String.format("%%1$s%1$s%%2$s", literal));
+          String.format(PLACEHOLDER_PAIR, column), String.format(PLACEHOLDER_PAIR, literal));
     }
 
     private String replaceColumnWithInterval(String expression, String column) {
       return expression.replace(
-          String.format("%%1$s%1$s%%2$s", column), String.format("%%1$s(%1$s,%1$s)%%2$s", column));
+          String.format(PLACEHOLDER_PAIR, column), String.format("%%1$s(%1$s,%1$s)%%2$s", column));
     }
 
     private boolean operandHasSelect(String expression) {
-      return expression.contains("%1$s");
+      return expression.contains(PLACEHOLDER_1);
     }
 
-    private List<String> processBinary(List<? extends Operand> operands, List<String> children) {
+    private List<String> processBinary(List<String> children) {
       // The two operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
       // be used as the basis (mainExpression). If the other operand is
@@ -977,7 +1024,7 @@ public class FilterEncoderSql {
           mainExpression =
               replaceColumnWithLiteral(children.get(1), secondExpression, children.get(0));
         } else {
-          mainExpression = String.format("%%1$s%1$s%%2$s", children.get(0));
+          mainExpression = String.format(PLACEHOLDER_PAIR, children.get(0));
         }
       }
 
@@ -1017,7 +1064,7 @@ public class FilterEncoderSql {
           thirdExpression = reduceSelectToColumn(children.get(2));
         } else if (!op2hasSelect && !op3hasSelect) {
           // special case of three literals, we need to build the SQL expression
-          mainExpression = String.format("%%1$s%1$s%%2$s", children.get(0));
+          mainExpression = String.format(PLACEHOLDER_PAIR, children.get(0));
         }
       }
 
@@ -1054,7 +1101,7 @@ public class FilterEncoderSql {
 
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
-      List<String> expressions = processBinary(scalarOperation.getArgs(), children);
+      List<String> expressions = processBinary(children);
 
       String operation = String.format(" %s %s", operator, expressions.get(1));
       return String.format(expressions.get(0), "", operation);
@@ -1064,7 +1111,7 @@ public class FilterEncoderSql {
     public String visit(Like like, List<String> children) {
       String operator = SCALAR_OPERATORS.get(like.getClass());
 
-      List<String> expressions = processBinary(like.getArgs(), children);
+      List<String> expressions = processBinary(children);
 
       // we may need to change the second expression
       String secondExpression = expressions.get(1);
@@ -1084,7 +1131,7 @@ public class FilterEncoderSql {
       String mainExpression = children.get(0);
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
-        mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+        mainExpression = String.format(PLACEHOLDER_PAIR, mainExpression);
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -1101,7 +1148,7 @@ public class FilterEncoderSql {
       String mainExpression = children.get(0);
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
-        mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+        mainExpression = String.format(PLACEHOLDER_PAIR, mainExpression);
       } else if (mainExpression.contains("(SELECT")) {
         // The property needs a join, so the operand is an EXISTS-style semi-join
         // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
@@ -1179,7 +1226,7 @@ public class FilterEncoderSql {
         // nothing to do here, this was handled in the interval() function
       }
 
-      List<String> expressions = processBinary(ImmutableList.of(op1, op2), children);
+      List<String> expressions = processBinary(children);
       return String.format(
           expressions.get(0), "", String.format(" %s %s", operator, expressions.get(1)));
     }
@@ -1258,7 +1305,7 @@ public class FilterEncoderSql {
 
       String match = sqlDialect.getSpatialOperatorMatch(spatialOperation.getSpatialOperator());
 
-      List<String> expressions = processBinary(spatialOperation.getArgs(), children);
+      List<String> expressions = processBinary(children);
 
       return String.format(
           expressions.get(0),
@@ -1301,7 +1348,7 @@ public class FilterEncoderSql {
         // here we do not know, if we are Instant.MIN (first argument) or
         // Instant.MAX (second argument); so, we use a placeholder that we
         // then process in the interval() function
-        return "'..'";
+        return HALF_BOUNDED_MIN;
       }
       throw new IllegalStateException("unsupported temporal SQL literal: " + temporalLiteral);
     }
@@ -1457,7 +1504,7 @@ public class FilterEncoderSql {
           return String.format(mainExpression, "", arrayQuery);
         }
       } else {
-        if (qualifiedColumn.second().filter("JSON"::equals).isPresent()) {
+        if (qualifiedColumn.second().filter(JSON_SUB_DECODER::equals).isPresent()) {
           String jsonValueArray =
               secondExpression.replaceAll("'", "\"").replace('(', '[').replace(')', ']');
           if (notInverse
@@ -1545,7 +1592,7 @@ public class FilterEncoderSql {
           || arg instanceof BinarySpatialOperation
           || arg instanceof BinaryTemporalOperation) {
         // replace last WHERE with WHERE NOT
-        pos = operation.lastIndexOf(" WHERE ");
+        pos = operation.lastIndexOf(SQL_WHERE);
         if (pos == -1) {
           pos = null;
         } else {
@@ -1594,7 +1641,7 @@ public class FilterEncoderSql {
     @Override
     public String visit(Property property, List<String> children) {
       // strip double quotes from the property name
-      String propertyName = property.getName().replaceAll("^\"|\"$", "");
+      String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
       boolean hasPrefix = propertyName.contains(".");
       String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf('.') + 1) : "";
       boolean hasAllowedPrefix = hasPrefix && allowedColumnPrefixes.contains(prefix);
@@ -1609,11 +1656,11 @@ public class FilterEncoderSql {
               .first();
 
       // TODO: support nested mapping filters
-      if (qualifiedColumn.startsWith("_route_")) {
-        qualifiedColumn = "A." + qualifiedColumn.replace("_route_", "");
+      if (qualifiedColumn.startsWith(ROUTE_SEGMENT)) {
+        qualifiedColumn = "A." + qualifiedColumn.replace(ROUTE_SEGMENT, "");
       }
 
-      return String.format("%%1$s%1$s%%2$s", qualifiedColumn);
+      return String.format(PLACEHOLDER_PAIR, qualifiedColumn);
     }
   }
 
@@ -1643,7 +1690,7 @@ public class FilterEncoderSql {
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
-                        String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                        String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
       }
       return mapping
           .getSchemaForValue(propertyName)
@@ -1651,7 +1698,7 @@ public class FilterEncoderSql {
           .orElseThrow(
               () ->
                   new IllegalArgumentException(
-                      String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                      String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
     }
 
     protected de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>
@@ -1665,7 +1712,7 @@ public class FilterEncoderSql {
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
-                        String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                        String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
       }
       return mapping
           .getColumnForValue(propertyName)
@@ -1680,7 +1727,7 @@ public class FilterEncoderSql {
           .orElseThrow(
               () ->
                   new IllegalArgumentException(
-                      String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                      String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
     }
 
     // TODO: move to SqlQueryMapping?
@@ -1692,13 +1739,14 @@ public class FilterEncoderSql {
         boolean allowColumnFallback) {
       // TODO: why is this needed? what would a clean solution look like? (original: support nested
       // mapping filters)
-      if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
+      if (Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))
           && "node".equals(propertyName)) {
-        return Tuple.of("_route_" + propertyName, Optional.<String>empty());
+        return Tuple.of(ROUTE_SEGMENT + propertyName, Optional.<String>empty());
       }
-      if (Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))
+      if (Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))
           && "source".equals(propertyName)) {
-        return Tuple.of(String.format("%s.%s", alias, propertyName), Optional.<String>empty());
+        return Tuple.of(
+            String.format(FORMAT_QUALIFIED_COLUMN, alias, propertyName), Optional.<String>empty());
       }
       return Optional.ofNullable(column)
           .map(
@@ -1708,7 +1756,8 @@ public class FilterEncoderSql {
                       mapToSubDecoder(alias, col, propertyName, table.getColumnPath(col)),
                       col.getOperationParameter(Operation.CONNECTOR));
                 }
-                String qualifiedColumn = String.format("%s.%s", alias, col.getName());
+                String qualifiedColumn =
+                    String.format(FORMAT_QUALIFIED_COLUMN, alias, col.getName());
                 if (col.getType() == DATE) {
                   return Tuple.of(
                       sqlDialect.applyToDate(
@@ -1729,19 +1778,23 @@ public class FilterEncoderSql {
                       ? Optional.of(
                           Tuple.of(
                               String.format(
-                                  "%s.%s",
-                                  alias, propertyName.substring(propertyName.lastIndexOf('.') + 1)),
+                                  FORMAT_QUALIFIED_COLUMN,
+                                  alias,
+                                  propertyName.substring(propertyName.lastIndexOf('.') + 1)),
                               Optional.<String>empty()))
                       : Optional.empty())
           .orElseThrow(
               () ->
                   new IllegalArgumentException(
-                      String.format("Filter is invalid. Unknown property: %s", propertyName)));
+                      String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
     }
 
     private String mapToSubDecoder(
         String alias, SqlQueryColumn column, String propertyName, List<String> columnPath) {
-      if (column.getOperationParameter(Operation.CONNECTOR).filter("JSON"::equals).isPresent()) {
+      if (column
+          .getOperationParameter(Operation.CONNECTOR)
+          .filter(JSON_SUB_DECODER::equals)
+          .isPresent()) {
         FeatureSchema schema = mapping.getSchemaForValue(propertyName).orElseThrow();
         String path = mapping.getPathInConnector(schema);
         boolean inArray = mapping.isInConnectedArray(schema);
@@ -1771,7 +1824,7 @@ public class FilterEncoderSql {
     @Override
     public String visit(Property property, List<String> children) {
       // strip double quotes from the property name
-      String propertyName = property.getName().replaceAll("^\"|\"$", "");
+      String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
       boolean allowColumnFallback = !propertyName.contains(".");
       de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> table =
           getTableColumn(propertyName, false, allowColumnFallback);
@@ -1832,9 +1885,9 @@ public class FilterEncoderSql {
       // traversal is genuinely required (join non-empty) — there it is load-bearing for
       // cardinality.
       if (join.isEmpty()
-          && !Objects.equals(table.first().getParentPath(), ImmutableList.of("_route_"))) {
+          && !Objects.equals(table.first().getParentPath(), ImmutableList.of(ROUTE_SEGMENT))) {
         return String.format(
-            "%%1$s%1$s%%2$s",
+            PLACEHOLDER_PAIR,
             getQualifiedColumn(
                     table.first(), table.second(), propertyName, "A", allowColumnFallback)
                 .first());
@@ -1879,9 +1932,9 @@ public class FilterEncoderSql {
       String end = children.get(1);
 
       // process special values for a half-bounded interval
-      if ("'..'".equals(start))
+      if (HALF_BOUNDED_MIN.equals(start))
         start = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      if ("'..'".equals(end))
+      if (HALF_BOUNDED_MIN.equals(end))
         end = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
 
       Operand arg1 = interval.getArgs().get(0);
@@ -1890,48 +1943,52 @@ public class FilterEncoderSql {
         String startColumn = reduceToColumn(start);
         String endColumn = reduceToColumn(end);
         if (startColumn.equals(endColumn))
-          return String.format(start, "%1$s(", ", " + endColumn + ")%2$s");
+          return String.format(start, PLACEHOLDER_1_OPEN, ", " + endColumn + PLACEHOLDER_2_CLOSE);
         startColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                startColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
+                FORMAT_COALESCE,
+                startColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
         endColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                endColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
-        return start.substring(0, start.indexOf("%1$s"))
-            + "%1$s("
+                FORMAT_COALESCE,
+                endColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
+        return start.substring(0, start.indexOf(PLACEHOLDER_1))
+            + PLACEHOLDER_1_OPEN
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s"
-            + start.substring(start.indexOf("%2$s") + 4);
+            + PLACEHOLDER_2_CLOSE
+            + start.substring(start.indexOf(PLACEHOLDER_2) + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                startColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
-        return start.substring(0, start.indexOf("%1$s"))
-            + "%1$s("
+                FORMAT_COALESCE,
+                startColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin()));
+        return start.substring(0, start.indexOf(PLACEHOLDER_1))
+            + PLACEHOLDER_1_OPEN
             + startColumn
             + ", "
             + end
-            + ")%2$s"
-            + start.substring(start.indexOf("%2$s") + 4);
+            + PLACEHOLDER_2_CLOSE
+            + start.substring(start.indexOf(PLACEHOLDER_2) + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
             String.format(
-                "COALESCE(%s,%s)",
-                endColumn, sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
-        return end.substring(0, end.indexOf("%1$s"))
-            + "%1$s("
+                FORMAT_COALESCE,
+                endColumn,
+                sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax()));
+        return end.substring(0, end.indexOf(PLACEHOLDER_1))
+            + PLACEHOLDER_1_OPEN
             + start
             + ", "
             + endColumn
-            + ")%2$s"
-            + end.substring(end.indexOf("%2$s") + 4);
+            + PLACEHOLDER_2_CLOSE
+            + end.substring(end.indexOf(PLACEHOLDER_2) + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -1941,8 +1998,8 @@ public class FilterEncoderSql {
       if (casei.getValue() instanceof ScalarLiteral) {
         return children.get(0).toLowerCase();
       }
-      if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-        return String.format(children.get(0), "%1$sLOWER(", ")%2$s");
+      if (children.get(0).contains(PLACEHOLDER_1) && children.get(0).contains(PLACEHOLDER_2)) {
+        return String.format(children.get(0), "%1$sLOWER(", PLACEHOLDER_2_CLOSE);
       }
       return String.format("LOWER(%s)", children.get(0));
     }
@@ -1951,16 +2008,18 @@ public class FilterEncoderSql {
     public String visit(de.ii.xtraplatform.cql.domain.Accenti accenti, List<String> children) {
       if (accenti.getValue() instanceof ScalarLiteral) {
         if (Objects.nonNull(accentiCollation))
-          return String.format("%s COLLATE \"%s\"", children.get(0), accentiCollation);
-        throw new IllegalArgumentException("ACCENTI() is not supported by this API.");
+          return String.format(FORMAT_COLLATE, children.get(0), accentiCollation);
+        throw new IllegalArgumentException(ERROR_ACCENTI_UNSUPPORTED);
       }
       if (Objects.nonNull(accentiCollation)) {
-        if (children.get(0).contains("%1$s") && children.get(0).contains("%2$s")) {
-          return children.get(0).replace("%2$s", " COLLATE \"" + accentiCollation + "\"%2$s");
+        if (children.get(0).contains(PLACEHOLDER_1) && children.get(0).contains(PLACEHOLDER_2)) {
+          return children
+              .get(0)
+              .replace(PLACEHOLDER_2, " COLLATE \"" + accentiCollation + "\"" + PLACEHOLDER_2);
         }
-        return String.format("%s COLLATE \"%s\"", children.get(0), accentiCollation);
+        return String.format(FORMAT_COLLATE, children.get(0), accentiCollation);
       }
-      throw new IllegalArgumentException("ACCENTI() is not supported by this API.");
+      throw new IllegalArgumentException(ERROR_ACCENTI_UNSUPPORTED);
     }
 
     @Override
@@ -1974,14 +2033,15 @@ public class FilterEncoderSql {
     }
 
     private String reduceToColumn(String expression) {
-      return expression.substring(expression.indexOf("%1$s") + 4, expression.indexOf("%2$s"));
+      return expression.substring(
+          expression.indexOf(PLACEHOLDER_1) + 4, expression.indexOf(PLACEHOLDER_2));
     }
 
     private String reduceSelectToColumn(String expression) {
-      if (expression.contains("%1$s") && expression.contains("%2$s"))
+      if (expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2))
         return String.format(
-            expression.contains(" WHERE ")
-                ? expression.substring(expression.indexOf(" WHERE ") + 7, expression.length() - 1)
+            expression.contains(SQL_WHERE)
+                ? expression.substring(expression.indexOf(SQL_WHERE) + 7, expression.length() - 1)
                 : expression,
             "",
             "");
@@ -1990,16 +2050,16 @@ public class FilterEncoderSql {
 
     private String replaceColumnWithLiteral(String expression, String column, String literal) {
       return expression.replace(
-          String.format("%%1$s%1$s%%2$s", column), String.format("%%1$s%1$s%%2$s", literal));
+          String.format(PLACEHOLDER_PAIR, column), String.format(PLACEHOLDER_PAIR, literal));
     }
 
     private String replaceColumnWithInterval(String expression, String column) {
       return expression.replace(
-          String.format("%%1$s%1$s%%2$s", column), String.format("%%1$s(%1$s,%1$s)%%2$s", column));
+          String.format(PLACEHOLDER_PAIR, column), String.format("%%1$s(%1$s,%1$s)%%2$s", column));
     }
 
     private boolean operandHasSelect(String expression) {
-      return expression.contains("%1$s");
+      return expression.contains(PLACEHOLDER_1);
     }
 
     private List<String> processBinary(List<? extends Operand> operands, List<String> children) {
@@ -2023,7 +2083,7 @@ public class FilterEncoderSql {
           mainExpression =
               replaceColumnWithLiteral(children.get(1), secondExpression, children.get(0));
         } else {
-          mainExpression = String.format("%%1$s%1$s%%2$s", children.get(0));
+          mainExpression = String.format(PLACEHOLDER_PAIR, children.get(0));
         }
       }
 
@@ -2063,7 +2123,7 @@ public class FilterEncoderSql {
           thirdExpression = reduceSelectToColumn(children.get(2));
         } else if (!op2hasSelect && !op3hasSelect) {
           // special case of three literals, we need to build the SQL expression
-          mainExpression = String.format("%%1$s%1$s%%2$s", children.get(0));
+          mainExpression = String.format(PLACEHOLDER_PAIR, children.get(0));
         }
       }
 
@@ -2131,7 +2191,7 @@ public class FilterEncoderSql {
       // concat/coalesce, or a type sub-property with a constant or enum; otherwise they are
       // unconstrained and the check is skipped (no false negatives).
       String consumerProperty =
-          ((Property) inResultSet.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+          ((Property) inResultSet.getArgs().get(0)).getName().replaceAll(REGEX_STRIP_QUOTES, "");
       Optional<Set<String>> consumerTargets = targetTypes(mapping, consumerProperty);
       Optional<Set<String>> setTypes =
           inResultSet.getProducerValues().isPresent()
@@ -2217,7 +2277,7 @@ public class FilterEncoderSql {
       String mainExpression = children.get(0);
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
-        mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+        mainExpression = String.format(PLACEHOLDER_PAIR, mainExpression);
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -2234,7 +2294,7 @@ public class FilterEncoderSql {
       String mainExpression = children.get(0);
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
-        mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+        mainExpression = String.format(PLACEHOLDER_PAIR, mainExpression);
       } else if (mainExpression.contains("(SELECT")) {
         // The property needs a join, so the operand is an EXISTS-style semi-join
         // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
@@ -2434,7 +2494,7 @@ public class FilterEncoderSql {
         // here we do not know, if we are Instant.MIN (first argument) or
         // Instant.MAX (second argument); so, we use a placeholder that we
         // then process in the interval() function
-        return "'..'";
+        return HALF_BOUNDED_MIN;
       }
       throw new IllegalStateException("unsupported temporal SQL literal: " + temporalLiteral);
     }
@@ -2592,7 +2652,7 @@ public class FilterEncoderSql {
           return String.format(mainExpression, "", arrayQuery);
         }
       } else {
-        if (qualifiedColumn.second().filter("JSON"::equals).isPresent()) {
+        if (qualifiedColumn.second().filter(JSON_SUB_DECODER::equals).isPresent()) {
           String jsonValueArray =
               secondExpression.replaceAll("'", "\"").replace('(', '[').replace(')', ']');
           if (notInverse
@@ -2680,7 +2740,7 @@ public class FilterEncoderSql {
           || arg instanceof BinarySpatialOperation
           || arg instanceof BinaryTemporalOperation) {
         // replace last WHERE with WHERE NOT
-        pos = operation.lastIndexOf(" WHERE ");
+        pos = operation.lastIndexOf(SQL_WHERE);
         if (pos == -1) {
           pos = null;
         } else {
@@ -2728,7 +2788,7 @@ public class FilterEncoderSql {
     @Override
     public String visit(Property property, List<String> children) {
       // strip double quotes from the property name
-      String propertyName = property.getName().replaceAll("^\"|\"$", "");
+      String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
       /*boolean hasPrefix = propertyName.contains(".");
       String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf(".") + 1) : "";
       boolean hasAllowedPrefix = hasPrefix && allowedColumnPrefixes.contains(prefix);
@@ -2756,11 +2816,11 @@ public class FilterEncoderSql {
       String qualifiedColumn = getQualifiedColumn(propertyName);
 
       // TODO: support nested mapping filters
-      if (qualifiedColumn.startsWith("_route_")) {
-        qualifiedColumn = "A." + qualifiedColumn.replace("_route_", "");
+      if (qualifiedColumn.startsWith(ROUTE_SEGMENT)) {
+        qualifiedColumn = "A." + qualifiedColumn.replace(ROUTE_SEGMENT, "");
       }
 
-      return String.format("%%1$s%1$s%%2$s", qualifiedColumn);
+      return String.format(PLACEHOLDER_PAIR, qualifiedColumn);
     }
 
     // TODO: columns do not have to be defined in the mapping
@@ -2798,7 +2858,7 @@ public class FilterEncoderSql {
               ? aliases.get(allowedColumnPrefixes.indexOf(prefix))
               : aliases.get(aliases.size() - 1);
 
-      return String.format("%s.%s", alias, column);
+      return String.format(FORMAT_QUALIFIED_COLUMN, alias, column);
     }
   }
 }

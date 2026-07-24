@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.SqlRelation;
 import java.util.List;
@@ -17,9 +16,11 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-class AliasGenerator {
+final class AliasGenerator {
 
-  public static List<String> getAliases(List<SchemaSql> parents, SchemaSql schema) {
+  private AliasGenerator() {}
+
+  static List<String> getAliases(List<SchemaSql> parents, SchemaSql schema) {
     char alias = 'A';
 
     if (parents.isEmpty() && schema.getRelation().isEmpty()) {
@@ -35,18 +36,20 @@ class AliasGenerator {
             .collect(Collectors.toList());
 
     for (SqlRelation relation : relations) {
-      aliases.add(String.valueOf(alias++));
+      aliases.add(String.valueOf(alias));
+      alias++;
       if (relation.isM2N()) {
-        aliases.add(String.valueOf(alias++));
+        aliases.add(String.valueOf(alias));
+        alias++;
       }
     }
 
-    aliases.add(String.valueOf(alias++));
+    aliases.add(String.valueOf(alias));
 
     return aliases.build();
   }
 
-  public static List<String> getAliases(SchemaSql schema) {
+  static List<String> getAliases(SchemaSql schema) {
     char alias = 'A';
 
     if (schema.getParentPath().isEmpty()) {
@@ -55,16 +58,17 @@ class AliasGenerator {
 
     ImmutableList.Builder<String> aliases = new ImmutableList.Builder<>();
 
-    for (String relation : schema.getParentPath()) {
-      aliases.add(String.valueOf(alias++));
+    for (int i = 0; i < schema.getParentPath().size(); i++) {
+      aliases.add(String.valueOf(alias));
+      alias++;
     }
 
-    aliases.add(String.valueOf(alias++));
+    aliases.add(String.valueOf(alias));
 
     return aliases.build();
   }
 
-  public static List<String> getAliases(SqlQuerySchema schema) {
+  static List<String> getAliases(SqlQuerySchema schema) {
     char alias = 'A';
 
     if (schema.getRelations().isEmpty()) {
@@ -73,28 +77,26 @@ class AliasGenerator {
 
     ImmutableList.Builder<String> aliases = new ImmutableList.Builder<>();
 
-    for (SqlQueryJoin relation : schema.getRelations()) {
-      aliases.add(String.valueOf(alias++));
+    for (int i = 0; i < schema.getRelations().size(); i++) {
+      aliases.add(String.valueOf(alias));
+      alias++;
     }
 
-    aliases.add(String.valueOf(alias++));
+    aliases.add(String.valueOf(alias));
 
     return aliases.build();
   }
 
-  public static List<String> getAliases(List<?> tablePath) {
-    char alias = 'A';
-
+  static List<String> getAliases(List<?> tablePath) {
     ImmutableList.Builder<String> aliases = new ImmutableList.Builder<>();
 
-    for (Object table : tablePath) {
-      aliases.add(String.valueOf(alias++));
-    }
+    IntStream.range(0, tablePath.size())
+        .forEach(i -> aliases.add(String.valueOf((char) ('A' + i))));
 
     return aliases.build();
   }
 
-  public static List<String> getAliases(SchemaSql schema, int level) {
+  static List<String> getAliases(SchemaSql schema, int level) {
     if (level > 0) {
       String prefix = IntStream.range(0, level).mapToObj(i -> "A").collect(Collectors.joining());
 
@@ -104,7 +106,7 @@ class AliasGenerator {
     return getAliases(schema);
   }
 
-  public static List<String> getAliases(SqlQuerySchema schema, int level) {
+  static List<String> getAliases(SqlQuerySchema schema, int level) {
     if (level > 0) {
       String prefix = IntStream.range(0, level).mapToObj(i -> "A").collect(Collectors.joining());
 
@@ -114,7 +116,7 @@ class AliasGenerator {
     return getAliases(schema);
   }
 
-  public static List<String> getAliases(List<?> tablePath, int level) {
+  static List<String> getAliases(List<?> tablePath, int level) {
     if (level > 0) {
       String prefix = IntStream.range(0, level).mapToObj(i -> "A").collect(Collectors.joining());
 
@@ -124,7 +126,7 @@ class AliasGenerator {
     return getAliases(tablePath);
   }
 
-  public static List<String> getAliases(List<SchemaSql> parents, SchemaSql schema, int level) {
+  static List<String> getAliases(List<SchemaSql> parents, SchemaSql schema, int level) {
     if (level > 0) {
       String prefix = IntStream.range(0, level).mapToObj(i -> "A").collect(Collectors.joining());
 

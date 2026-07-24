@@ -12,7 +12,6 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
-import de.ii.xtraplatform.features.sql.domain.SqlPathDefaults;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
@@ -27,24 +26,15 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureMutationsSql {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureMutationsSql.class);
-
   private final Supplier<SqlClient> sqlClient;
   private final FeatureStoreInsertGenerator generator;
-  private final SqlPathDefaults sqlPathDefaults;
 
-  public FeatureMutationsSql(
-      Supplier<SqlClient> sqlClient,
-      FeatureStoreInsertGenerator generator,
-      SqlPathDefaults sqlPathDefaults) {
+  public FeatureMutationsSql(Supplier<SqlClient> sqlClient, FeatureStoreInsertGenerator generator) {
     this.sqlClient = sqlClient;
     this.generator = generator;
-    this.sqlPathDefaults = sqlPathDefaults;
   }
 
   public Reactive.Transformer<FeatureDataSql, String> getCreatorFlow(
@@ -135,7 +125,7 @@ public class FeatureMutationsSql {
     SqlQueryColumn idColumn =
         mapping
             .getColumnForId()
-            .map(col -> col.second())
+            .map(de.ii.xtraplatform.base.domain.util.Tuple::second)
             .orElseThrow(
                 () ->
                     new IllegalStateException(

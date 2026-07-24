@@ -15,7 +15,6 @@ import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.AutoEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.entities.domain.ValidationResult.MODE;
 import de.ii.xtraplatform.features.domain.ConnectorFactory;
@@ -58,9 +57,9 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureProviderSqlFactory
-    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderSql>
-    implements EntityFactory {
+    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderSql> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderSqlFactory.class);
 
@@ -159,18 +158,21 @@ public class FeatureProviderSqlFactory
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public EntityData hydrateData(EntityData entityData) {
-    FeatureProviderSqlData data = (FeatureProviderSqlData) entityData;
-
     if (skipHydration) {
       return entityData;
     }
 
+    FeatureProviderSqlData data = (FeatureProviderSqlData) entityData;
+
     try {
       if (data.isAuto()) {
-        LOGGER.info(
-            "Feature provider with id '{}' is in auto mode, generating configuration ...",
-            data.getId());
+        if (LOGGER.isInfoEnabled()) {
+          LOGGER.info(
+              "Feature provider with id '{}' is in auto mode, generating configuration ...",
+              data.getId());
+        }
 
         ConnectionInfoSql connectionInfo = data.getConnectionInfo();
 
@@ -179,12 +181,11 @@ public class FeatureProviderSqlFactory
 
         if (!schemas.isEmpty()) {
           Map<String, List<String>> schemaTables = new LinkedHashMap<>();
+          Map<String, List<String>> allTables = tables;
 
-          for (String schema : schemas) {
-            if (tables.containsKey(schema)) {
-              schemaTables.put(schema, tables.get(schema));
-            }
-          }
+          schemas.stream()
+              .filter(allTables::containsKey)
+              .forEach(schema -> schemaTables.put(schema, allTables.get(schema)));
 
           tables = schemaTables;
         }
@@ -211,7 +212,7 @@ public class FeatureProviderSqlFactory
 
       return data;
 
-    } catch (Throwable e) {
+    } catch (RuntimeException e) {
       LogContext.error(
           LOGGER, e, "Feature provider with id '{}' could not be started", data.getId());
     }
@@ -231,7 +232,8 @@ public class FeatureProviderSqlFactory
 
     while (resolver.needsResolving(types)) {
       types = resolver.resolve(types);
-      if (++rounds >= resolver.maxRounds()) {
+      rounds++;
+      if (rounds >= resolver.maxRounds()) {
         resolver.maxRoundsWarning().ifPresent(LOGGER::warn);
         break;
       }
@@ -245,6 +247,7 @@ public class FeatureProviderSqlFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface ProviderSqlFactoryAssisted
       extends FactoryAssisted<FeatureProviderDataV2, FeatureProviderSql> {
     @Override
