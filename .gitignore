@@ -4,6 +4,7 @@
 *.sublime-workspace
 *.iml
 build/
+bin/
 .idea/
 .gradle/
 node_modules/
