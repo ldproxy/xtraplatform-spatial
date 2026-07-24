@@ -23,6 +23,7 @@ import de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings;
 import de.ii.xtraplatform.features.sql.domain.SqlClientBasic;
 import de.ii.xtraplatform.features.sql.domain.SqlClientBasicFactory;
 import de.ii.xtraplatform.features.sql.infra.db.SchemaGeneratorSql;
+import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Comparator;
@@ -44,7 +45,7 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
 
   @Override
   public <T extends AutoEntity> Map<String, String> check(T entityData) {
-    return null;
+    return Map.of();
   }
 
   @Override
@@ -61,25 +62,21 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
             data.getId(),
             getConnectionInfoWith4Connections(data.getConnectionInfo()));
 
-    SchemaGeneratorSql schemaGeneratorSql = null;
-
-    try {
-      schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic);
-
+    try (SchemaGeneratorSql schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic)) {
       return schemaGeneratorSql.analyze();
+    } catch (IOException e) {
+      return Map.of();
     } finally {
-      if (Objects.nonNull(schemaGeneratorSql)) {
-        try {
-          schemaGeneratorSql.close();
-        } catch (Throwable e) {
-          // ignore
-        }
-        try {
-          sqlClientBasicFactory.dispose(sqlClientBasic);
-        } catch (Throwable e) {
-          // ignore
-        }
-      }
+      disposeQuietly(sqlClientBasic);
+    }
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private void disposeQuietly(SqlClientBasic sqlClientBasic) {
+    try {
+      sqlClientBasicFactory.dispose(sqlClientBasic);
+    } catch (RuntimeException e) {
+      // ignore
     }
   }
 
@@ -109,11 +106,7 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
               data.getId(),
               getConnectionInfoWith4Connections(data.getConnectionInfo()));
 
-      SchemaGeneratorSql schemaGeneratorSql = null;
-
-      try {
-        schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic);
-
+      try (SchemaGeneratorSql schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic)) {
         List<FeatureSchema> featureSchemas = schemaGeneratorSql.generate(types, tracker);
 
         Map<String, Integer> idCounter = new LinkedHashMap<>();
@@ -139,7 +132,7 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
                 .map(Entry::getKey)
                 .orElse("id");
 
-        ImmutableMap<String, FeatureSchema> typeMap =
+        Map<String, FeatureSchema> typeMap =
             featureSchemas.stream()
                 .map(
                     type -> {
@@ -173,19 +166,10 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
         }
 
         return builder.build();
+      } catch (IOException e) {
+        throw new IllegalStateException(e);
       } finally {
-        if (Objects.nonNull(schemaGeneratorSql)) {
-          try {
-            schemaGeneratorSql.close();
-          } catch (Throwable e) {
-            // ignore
-          }
-          try {
-            sqlClientBasicFactory.dispose(sqlClientBasic);
-          } catch (Throwable e) {
-            // ignore
-          }
-        }
+        disposeQuietly(sqlClientBasic);
       }
     }
 

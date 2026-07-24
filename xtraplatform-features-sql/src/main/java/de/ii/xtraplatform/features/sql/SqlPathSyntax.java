@@ -22,7 +22,12 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @Value.Style(deepImmutablesDetection = true)
+@SuppressWarnings("PMD.ExcessivePublicCount")
 public interface SqlPathSyntax {
+
+  String REGEX_GROUP_START = "(?<";
+  String REGEX_GROUP_VALUE_END = ">.+?)\\}";
+  String REGEX_NON_CAPTURING_GROUP_START = "(?:";
 
   default List<String> asList(String path) {
     return getPathSplitter().splitToList(path);
@@ -57,7 +62,7 @@ public interface SqlPathSyntax {
     return matcher.find();
   }
 
-  default String setOidFlag(String path) {
+  default String addOidFlag(String path) {
     return String.format("%s{oid}", path);
   }
 
@@ -67,7 +72,7 @@ public interface SqlPathSyntax {
     return matcher.find();
   }
 
-  default String setSpatialFlag(String path) {
+  default String addSpatialFlag(String path) {
     return String.format("%s{spatial}", path);
   }
 
@@ -77,7 +82,7 @@ public interface SqlPathSyntax {
     return matcher.find();
   }
 
-  default String setTemporalFlag(String path) {
+  default String addTemporalFlag(String path) {
     return String.format("%s{temporal}", path);
   }
 
@@ -91,7 +96,7 @@ public interface SqlPathSyntax {
     return OptionalInt.empty();
   }
 
-  default String setPriorityFlag(String path, int priority) {
+  default String addPriorityFlag(String path, int priority) {
     return String.format("%s{priority=%d}", path, priority);
   }
 
@@ -125,7 +130,7 @@ public interface SqlPathSyntax {
     return Optional.empty();
   }
 
-  default String setQueryableFlag(String path, String queryable) {
+  default String addQueryableFlag(String path, String queryable) {
     return String.format("%s{queryable=%s}", path, queryable);
   }
 
@@ -152,7 +157,7 @@ public interface SqlPathSyntax {
   // TODO: start end separator for flags
   @Value.Derived
   default String getPriorityFlagPattern() {
-    return "\\{priority=" + "(?<" + MatcherGroups.PRIORITY + ">[0-9]+)\\}";
+    return "\\{priority=" + REGEX_GROUP_START + MatcherGroups.PRIORITY + ">[0-9]+)\\}";
   }
 
   @Value.Derived
@@ -172,22 +177,22 @@ public interface SqlPathSyntax {
 
   @Value.Derived
   default String getQueryableFlagPattern() {
-    return "\\{queryable=" + "(?<" + MatcherGroups.QUERYABLE + ">.+?)\\}";
+    return "\\{queryable=" + REGEX_GROUP_START + MatcherGroups.QUERYABLE + REGEX_GROUP_VALUE_END;
   }
 
   @Value.Derived
   default String getConstantFlagPattern() {
-    return "\\{constant=" + "(?<" + MatcherGroups.CONSTANT + ">.+?)\\}";
+    return "\\{constant=" + REGEX_GROUP_START + MatcherGroups.CONSTANT + REGEX_GROUP_VALUE_END;
   }
 
   @Value.Derived
   default String getSortKeyFlagPattern() {
-    return "\\{sortKey=" + "(?<" + MatcherGroups.SORT_KEY + ">.+?)\\}";
+    return "\\{sortKey=" + REGEX_GROUP_START + MatcherGroups.SORT_KEY + REGEX_GROUP_VALUE_END;
   }
 
   @Value.Derived
   default String getFilterFlagPattern() {
-    return "\\{filter=" + "(?<" + MatcherGroups.FILTER + ">.+?)\\}";
+    return "\\{filter=" + REGEX_GROUP_START + MatcherGroups.FILTER + REGEX_GROUP_VALUE_END;
   }
 
   @Value.Derived
@@ -270,7 +275,7 @@ public interface SqlPathSyntax {
   @Value.Derived
   default String getColumnPattern() {
     return getIdentifierPattern()
-        + "(?:"
+        + REGEX_NON_CAPTURING_GROUP_START
         + getMultiColumnSeparator()
         + getIdentifierPattern()
         + ")*";
@@ -294,13 +299,13 @@ public interface SqlPathSyntax {
   @Value.Derived
   default String getJoinConditionPattern() {
     return Pattern.quote(getJoinConditionStart())
-        + "(?<"
+        + REGEX_GROUP_START
         + MatcherGroups.SOURCE_FIELD
         + ">"
         + getIdentifierPattern()
         + ")"
         + Pattern.quote(getJoinConditionSeparator())
-        + "(?<"
+        + REGEX_GROUP_START
         + MatcherGroups.TARGET_FIELD
         + ">"
         + getIdentifierPattern()
@@ -311,11 +316,11 @@ public interface SqlPathSyntax {
   @Value.Derived
   default String getJoinConditionPlainPattern() {
     return Pattern.quote(getJoinConditionStart())
-        + "(?:"
+        + REGEX_NON_CAPTURING_GROUP_START
         + getIdentifierPattern()
         + ")"
         + Pattern.quote(getJoinConditionSeparator())
-        + "(?:"
+        + REGEX_NON_CAPTURING_GROUP_START
         + getIdentifierPattern()
         + ")"
         + Pattern.quote(getJoinConditionEnd());
@@ -323,15 +328,15 @@ public interface SqlPathSyntax {
 
   @Value.Derived
   default String getTablePatternString() {
-    return "(?:"
+    return REGEX_NON_CAPTURING_GROUP_START
         + getJoinConditionPattern()
         + ")?"
-        + "(?<"
+        + REGEX_GROUP_START
         + MatcherGroups.TABLE
         + ">"
         + getIdentifierPattern()
         + ")"
-        + "(?<"
+        + REGEX_GROUP_START
         + MatcherGroups.TABLE_FLAGS
         + ">"
         + getFlagsPattern()
@@ -340,13 +345,13 @@ public interface SqlPathSyntax {
 
   @Value.Derived
   default String getTablePatternPlainString() {
-    return "(?:"
+    return REGEX_NON_CAPTURING_GROUP_START
         + getJoinConditionPlainPattern()
         + ")?"
-        + "(?:"
+        + REGEX_NON_CAPTURING_GROUP_START
         + getIdentifierPattern()
         + ")"
-        + "(?:"
+        + REGEX_NON_CAPTURING_GROUP_START
         + getFlagsPattern()
         + ")?";
   }
@@ -360,7 +365,7 @@ public interface SqlPathSyntax {
   default Pattern getJoinedTablePattern() {
     return Pattern.compile(
         getJoinConditionPattern()
-            + "(?<"
+            + REGEX_GROUP_START
             + MatcherGroups.TABLE
             + ">"
             + getIdentifierPattern()
@@ -373,17 +378,17 @@ public interface SqlPathSyntax {
         "^(?<"
             + MatcherGroups.PATH
             + ">"
-            + "(?:"
+            + REGEX_NON_CAPTURING_GROUP_START
             + getPathSeparator()
             + getTablePatternString()
             + ")+)"
             + getPathSeparator()
-            + "(?<"
+            + REGEX_GROUP_START
             + MatcherGroups.COLUMNS
             + ">"
             + getColumnPattern()
             + ")?"
-            + "(?<"
+            + REGEX_GROUP_START
             + MatcherGroups.PATH_FLAGS
             + ">"
             + getFlagsPattern()
@@ -394,14 +399,14 @@ public interface SqlPathSyntax {
   default Pattern getPartialColumnPathPattern() {
     return Pattern.compile(
         getPathPatternString()
-            + "(?:"
+            + REGEX_NON_CAPTURING_GROUP_START
             + getPathSeparator()
-            + "(?<"
+            + REGEX_GROUP_START
             + MatcherGroups.COLUMNS
             + ">"
             + getColumnPattern()
             + "))"
-            + "(?<"
+            + REGEX_GROUP_START
             + MatcherGroups.PATH_FLAGS
             + ">"
             + getFlagsPattern()
@@ -415,13 +420,13 @@ public interface SqlPathSyntax {
 
   @Value.Derived
   default String getPathPatternString() {
-    return "(?<"
+    return REGEX_GROUP_START
         + MatcherGroups.PATH
         + ">"
         + getPathSeparator()
         + "?"
         + getTablePatternPlainString()
-        + "(?:"
+        + REGEX_NON_CAPTURING_GROUP_START
         + getPathSeparator()
         + getTablePatternPlainString()
         + ")*)";

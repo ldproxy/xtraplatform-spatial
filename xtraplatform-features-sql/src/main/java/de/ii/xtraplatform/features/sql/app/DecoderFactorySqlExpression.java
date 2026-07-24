@@ -56,6 +56,7 @@ public class DecoderFactorySqlExpression implements DecoderFactory {
   }
 
   @Override
+  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   public Tuple<String, String> parseSourcePath(
       String path, String column, String flags, String connectorSpec) {
     Matcher matcher = SQL_FLAG.matcher(flags);

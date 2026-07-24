@@ -633,7 +633,7 @@ public class FeatureProviderSql
 
     this.queryTransformer =
         new FeatureQueryEncoderSql(
-            allQueryTemplates, allQueryTemplates, getData().getQueryGeneration(), sqlDialect);
+            allQueryTemplates, allQueryTemplates, getData().getQueryGeneration());
 
     this.resultSetMaterializer =
         new ResultSetMaterializer(
@@ -654,8 +654,7 @@ public class FeatureProviderSql
             new SqlInsertGenerator2(
                 getData().getNativeCrs().orElse(OgcCrs.CRS84),
                 crsTransformerFactory,
-                getData().getSourcePathDefaults()),
-            getData().getSourcePathDefaults());
+                getData().getSourcePathDefaults()));
     this.pathParser2 = createPathParser2(getData().getSourcePathDefaults(), cql);
 
     return true;
