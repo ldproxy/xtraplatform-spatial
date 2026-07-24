@@ -72,7 +72,7 @@ public interface FeaturePropertyTransformerRename extends FeaturePropertySchemaT
   }
 
   static List<String> merge(List<String> path, String name) {
-    ArrayList<String> merged = new ArrayList<>(path);
+    List<String> merged = new ArrayList<>(path);
     merged.add(name);
     return merged;
   }

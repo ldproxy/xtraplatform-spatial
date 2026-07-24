@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain.transform;
 
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -60,13 +61,15 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
       ZonedDateTime zdt = parse(input, getDefaultTimeZone());
 
       return formatter().format(zdt);
-    } catch (Throwable e) {
-      LOGGER.warn(
-          "{} transformation for property '{}' with value '{}' failed: {}",
-          getType(),
-          getPropertyPath(),
-          input,
-          e.getMessage());
+    } catch (DateTimeException e) {
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "{} transformation for property '{}' with value '{}' failed: {}",
+            getType(),
+            getPropertyPath(),
+            input,
+            e.getMessage());
+      }
     }
 
     return input;

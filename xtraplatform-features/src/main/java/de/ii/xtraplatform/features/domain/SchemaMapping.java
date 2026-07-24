@@ -68,7 +68,6 @@ public interface SchemaMapping extends SchemaMappingBase<FeatureSchema> {
   }
 
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
   default List<FeatureSchema> getSchemas(
       List<String> path, List<FeatureSchema> schemas, boolean useTargetPaths) {
     if (!useTargetPaths
@@ -99,17 +98,22 @@ public interface SchemaMapping extends SchemaMappingBase<FeatureSchema> {
               : Splitter.on('/').omitEmptyStrings().splitToList(coalesce.getSourcePath().get());
 
       if (Objects.equals(sourcePath, path.subList(path.size() - sourcePath.size(), path.size()))) {
-        return new ImmutableFeatureSchema.Builder()
-            .from(schema)
-            .sourcePath(coalesce.getSourcePath())
-            .valueType(coalesce.getValueType().orElse(coalesce.getType()))
-            .sourcePaths(List.of())
-            .coalesce(List.of())
-            .build();
+        return resolveCoalesceSourcePath(schema, coalesce);
       }
     }
 
     return schema;
+  }
+
+  private static FeatureSchema resolveCoalesceSourcePath(
+      FeatureSchema schema, FeatureSchema coalesce) {
+    return new ImmutableFeatureSchema.Builder()
+        .from(schema)
+        .sourcePath(coalesce.getSourcePath())
+        .valueType(coalesce.getValueType().orElse(coalesce.getType()))
+        .sourcePaths(List.of())
+        .coalesce(List.of())
+        .build();
   }
 
   @Override

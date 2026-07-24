@@ -79,16 +79,17 @@ public class SchemaTransformerChain
   @Nullable
   @Override
   public FeatureSchema transform(String path, FeatureSchema schema) {
-    FeatureSchema transformed = schema;
-
     for (int i = currentParentProperties.size() - 1; i >= 0; i--) {
       String parentPath = currentParentProperties.get(i);
 
       if (!path.startsWith(parentPath)) {
         currentParentProperties.remove(i);
-      } else if (transformers.containsKey(parentPath)) {
-        transformed = run(transformers, parentPath, path, schema);
-        if (Objects.isNull(transformed)) {
+        continue;
+      }
+
+      if (transformers.containsKey(parentPath)) {
+        FeatureSchema transformedParent = run(transformers, parentPath, path, schema);
+        if (Objects.isNull(transformedParent)) {
           return null;
         }
       }
@@ -101,9 +102,7 @@ public class SchemaTransformerChain
       currentParentProperties.add(path);
     }
 
-    transformed = run(transformers, path, path, schema);
-
-    return transformed;
+    return run(transformers, path, path, schema);
   }
 
   @Override

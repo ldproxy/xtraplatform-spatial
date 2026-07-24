@@ -24,9 +24,9 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
 
   private FeatureTokenType currentType;
   private int contextIndex;
-  private V context;
-  private List<String> nestingStack;
-  private Map<List<String>, Integer> schemaIndexes;
+  private final V context;
+  private final List<String> nestingStack;
+  private final Map<List<String>, Integer> schemaIndexes;
 
   public FeatureTokenReaderSimple(FeatureEventHandlerSimple<T, U, V> eventHandler, V context) {
     this.eventHandler = eventHandler;
@@ -41,9 +41,6 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
         emitEvent();
         this.context.setSchemaIndex(-1);
       }
-      if (token == FeatureTokenType.FLUSH) {
-        this.currentType = null;
-      }
       initEvent((FeatureTokenType) token);
     } else {
       readContext(token);
@@ -54,6 +51,7 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void initEvent(FeatureTokenType token) {
     this.currentType = token;
     this.contextIndex = 0;
@@ -108,9 +106,14 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
         break;
       case GEOMETRY:
         break;
+      case INPUT:
+      case FEATURE_END:
+      case INPUT_END:
+        break;
     }
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void readContext(Object context) {
     switch (currentType) {
       case INPUT:
@@ -149,6 +152,7 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
         break;
       case FEATURE_END:
       case INPUT_END:
+      case FLUSH:
         break;
     }
 
@@ -161,6 +165,7 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void emitEvent() {
     switch (currentType) {
       case INPUT:
@@ -192,6 +197,8 @@ public class FeatureTokenReaderSimple<T, U, V extends ModifiableContext<T, U>> {
         break;
       case INPUT_END:
         eventHandler.onEnd(context);
+        break;
+      case FLUSH:
         break;
     }
   }

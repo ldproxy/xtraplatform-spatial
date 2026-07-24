@@ -23,8 +23,13 @@ import java.util.Optional;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public interface FeaturePropertyTokenSliceTransformer
     extends FeaturePropertyTransformer<List<Object>> {
+
+  Joiner PATH_JOINER = Joiner.on('.');
+
+  Splitter PATH_SPLITTER = Splitter.on('.');
 
   FeatureSchema transformSchema(FeatureSchema schema);
 
@@ -85,6 +90,7 @@ public interface FeaturePropertyTokenSliceTransformer
     return transformed;
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   default List<Object> transformValueArray(List<String> path, List<Object> slice) {
     if (slice.isEmpty()) {
       return slice;
@@ -104,9 +110,7 @@ public interface FeaturePropertyTokenSliceTransformer
 
     transformed.addAll(before);
 
-    if (!inArray) {
-      transformValue(slice, min, max + 1, transformed);
-    } else {
+    if (inArray) {
 
       int start = findPos(slice, FeatureTokenType.ARRAY, path, min);
       int end = findPos(slice, FeatureTokenType.ARRAY_END, path, start);
@@ -128,6 +132,8 @@ public interface FeaturePropertyTokenSliceTransformer
 
         end = findPos(slice, FeatureTokenType.ARRAY_END, path, start);
       }
+    } else {
+      transformValue(slice, min, max + 1, transformed);
     }
 
     transformed.addAll(after);
@@ -135,6 +141,7 @@ public interface FeaturePropertyTokenSliceTransformer
     return transformed;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   default List<Object> transformValues(List<String> path, boolean isArray, List<Object> slice) {
     if (slice.isEmpty()) {
       return slice;
@@ -154,9 +161,7 @@ public interface FeaturePropertyTokenSliceTransformer
 
     transformed.addAll(before);
 
-    if (!inArray) {
-      transformValue(slice, min, max + 1, transformed);
-    } else {
+    if (inArray) {
 
       int start = findPos(slice, FeatureTokenType.VALUE, path, min);
       int end = findFirstNot(slice, FeatureTokenType.VALUE, path, start);
@@ -178,16 +183,14 @@ public interface FeaturePropertyTokenSliceTransformer
 
         end = findFirstNot(slice, FeatureTokenType.VALUE, path, start);
       }
+    } else {
+      transformValue(slice, min, max + 1, transformed);
     }
 
     transformed.addAll(after);
 
     return transformed;
   }
-
-  Joiner PATH_JOINER = Joiner.on('.');
-
-  Splitter PATH_SPLITTER = Splitter.on('.');
 
   default String pathAsString(List<String> path) {
     return PATH_JOINER.join(path);
@@ -297,6 +300,7 @@ public interface FeaturePropertyTokenSliceTransformer
     return -1;
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   default int findLast(List<Object> slice, List<String> path, int offset) {
     if (offset == -1) {
       return -1;
@@ -415,10 +419,10 @@ public interface FeaturePropertyTokenSliceTransformer
     Map<String, Integer> valueIndexes = new LinkedHashMap<>();
 
     for (int i = from; i < to; i++) {
-      if (slice.get(i) == FeatureTokenType.VALUE) {
-        if (i + 2 < to && slice.get(i + 1) instanceof List) {
-          valueIndexes.put(joinPath((List<String>) slice.get(i + 1)), i + 2);
-        }
+      if (slice.get(i) == FeatureTokenType.VALUE
+          && i + 2 < to
+          && slice.get(i + 1) instanceof List) {
+        valueIndexes.put(joinPath((List<String>) slice.get(i + 1)), i + 2);
       }
     }
 
@@ -430,12 +434,11 @@ public interface FeaturePropertyTokenSliceTransformer
     Map<String, Integer> valueIndexes = new LinkedHashMap<>();
 
     for (int i = from; i < to; i++) {
-      if (slice.get(i) == FeatureTokenType.VALUE) {
-        if (i + 2 < to
-            && slice.get(i + 1) instanceof List
-            && ((List<?>) slice.get(i + 1)).size() > depth) {
-          valueIndexes.put(((List<String>) slice.get(i + 1)).get(depth), i + 2);
-        }
+      if (slice.get(i) == FeatureTokenType.VALUE
+          && i + 2 < to
+          && slice.get(i + 1) instanceof List
+          && ((List<?>) slice.get(i + 1)).size() > depth) {
+        valueIndexes.put(((List<String>) slice.get(i + 1)).get(depth), i + 2);
       }
     }
 
@@ -447,10 +450,11 @@ public interface FeaturePropertyTokenSliceTransformer
     int j = 0;
 
     for (int i = from; i < to; i++) {
-      if (slice.get(i) == FeatureTokenType.VALUE) {
-        if (i + 2 < to && slice.get(i + 1) instanceof List) {
-          valueIndexes.put(Integer.toString(j++), i + 2);
-        }
+      if (slice.get(i) == FeatureTokenType.VALUE
+          && i + 2 < to
+          && slice.get(i + 1) instanceof List) {
+        valueIndexes.put(Integer.toString(j), i + 2);
+        j++;
       }
     }
 
@@ -544,12 +548,11 @@ public interface FeaturePropertyTokenSliceTransformer
 
   static int getValueIndex(List<Object> slice, String path, int from, int to) {
     for (int i = from; i < to; i++) {
-      if (slice.get(i) == FeatureTokenType.VALUE) {
-        if (i + 2 < to && slice.get(i + 1) instanceof List) {
-          if (Objects.equals(path, joinPath((List<String>) slice.get(i + 1)))) {
-            return i + 2;
-          }
-        }
+      if (slice.get(i) == FeatureTokenType.VALUE
+          && i + 2 < to
+          && slice.get(i + 1) instanceof List
+          && Objects.equals(path, joinPath((List<String>) slice.get(i + 1)))) {
+        return i + 2;
       }
     }
 

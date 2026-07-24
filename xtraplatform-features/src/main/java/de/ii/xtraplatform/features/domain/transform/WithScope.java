@@ -38,12 +38,7 @@ public class WithScope implements SchemaVisitorTopDown<FeatureSchema, FeatureSch
       FeatureSchema schema, List<FeatureSchema> parents, List<FeatureSchema> visitedProperties) {
 
     // always include ID property
-    if (!schema.hasOneOf(scopes)
-        && !schema.isId()
-        && !schema.isEmbeddedId()
-        && (!schema.isObject()
-            || scopes.contains(Scope.RETURNABLE)
-            || scopes.contains(Scope.RECEIVABLE))) {
+    if (isExcludedByScope(schema)) {
       return null;
     }
 
@@ -67,11 +62,7 @@ public class WithScope implements SchemaVisitorTopDown<FeatureSchema, FeatureSch
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
 
-    if (schema.isObject()
-        && !parents.isEmpty()
-        && visitedProperties.isEmpty()
-        && visitedConcat.isEmpty()
-        && visitedCoalesce.isEmpty()) {
+    if (isEmptyNestedObject(schema, parents, visitedProperties, visitedConcat, visitedCoalesce)) {
       return null;
     }
 
@@ -81,5 +72,27 @@ public class WithScope implements SchemaVisitorTopDown<FeatureSchema, FeatureSch
         .concat(visitedConcat)
         .coalesce(visitedCoalesce)
         .build();
+  }
+
+  private boolean isExcludedByScope(FeatureSchema schema) {
+    return !schema.hasOneOf(scopes)
+        && !schema.isId()
+        && !schema.isEmbeddedId()
+        && (!schema.isObject()
+            || scopes.contains(Scope.RETURNABLE)
+            || scopes.contains(Scope.RECEIVABLE));
+  }
+
+  private boolean isEmptyNestedObject(
+      FeatureSchema schema,
+      List<FeatureSchema> parents,
+      List<FeatureSchema> visitedProperties,
+      List<FeatureSchema> visitedConcat,
+      List<FeatureSchema> visitedCoalesce) {
+    return schema.isObject()
+        && !parents.isEmpty()
+        && visitedProperties.isEmpty()
+        && visitedConcat.isEmpty()
+        && visitedCoalesce.isEmpty();
   }
 }

@@ -48,6 +48,7 @@ public abstract class FeaturePropertyTransformerFlatten
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public List<Object> transform(String currentPropertyPath, List<Object> slice) {
     List<Object> transformed = new ArrayList<>();
     boolean isValue = false;
@@ -58,7 +59,7 @@ public abstract class FeaturePropertyTransformerFlatten
     boolean inArray = false;
     boolean isObject = false;
     Map<List<String>, Integer> arrays = new HashMap<>();
-    List<String> arrayPath = null;
+    List<String> arrayPath = List.of();
     List<String> currentPath = null;
 
     for (Object token : slice) {
@@ -79,7 +80,6 @@ public abstract class FeaturePropertyTransformerFlatten
           arrays.put(arrayPath, 0);
           inArray = true;
         } else if (isArrayEnd) {
-          arrayPath = null;
           inArray = false;
         }
 
@@ -88,14 +88,7 @@ public abstract class FeaturePropertyTransformerFlatten
         }
 
         if (isValue && inArray) {
-          List<String> newPath = new ArrayList<>(arrayPath);
-          newPath.set(
-              newPath.size() - 1,
-              newPath.get(newPath.size() - 1) + "[" + arrays.get(arrayPath) + "]");
-          if (currentPath.size() > arrayPath.size()) {
-            newPath.add(currentPath.get(currentPath.size() - 1));
-          }
-          currentPath = newPath;
+          currentPath = toIndexedPath(currentPath, arrayPath, arrays.get(arrayPath));
         }
       }
 
@@ -111,6 +104,16 @@ public abstract class FeaturePropertyTransformerFlatten
     }
 
     return transformed;
+  }
+
+  private static List<String> toIndexedPath(
+      List<String> currentPath, List<String> arrayPath, Integer index) {
+    List<String> newPath = new ArrayList<>(arrayPath);
+    newPath.set(newPath.size() - 1, newPath.get(newPath.size() - 1) + "[" + index + "]");
+    if (currentPath.size() > arrayPath.size()) {
+      newPath.add(currentPath.get(currentPath.size() - 1));
+    }
+    return newPath;
   }
 
   @Override

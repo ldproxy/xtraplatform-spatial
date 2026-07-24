@@ -87,12 +87,8 @@ public class PropertyTransformationsCollector
   public PropertyTransformations finalizeVisit(
       FeatureSchema schema, Map<String, List<PropertyTransformation>> transformations) {
     PropertyTransformations schemaTransformations = () -> transformations;
-
-    PropertyTransformations mergedTransformations =
-        preferSchemaTransformations
-            ? schemaTransformations.mergeInto(additionalTransformations)
-            : additionalTransformations.mergeInto(schemaTransformations);
-
-    return mergedTransformations;
+    return preferSchemaTransformations
+        ? schemaTransformations.mergeInto(additionalTransformations)
+        : additionalTransformations.mergeInto(schemaTransformations);
   }
 }

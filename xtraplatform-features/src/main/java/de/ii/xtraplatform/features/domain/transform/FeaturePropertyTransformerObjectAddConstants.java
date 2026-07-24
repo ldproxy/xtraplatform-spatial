@@ -44,6 +44,7 @@ public interface FeaturePropertyTransformerObjectAddConstants
     return builder.build();
   }
 
+  @Override
   default void transformObject(
       String currentPropertyPath,
       List<Object> slice,

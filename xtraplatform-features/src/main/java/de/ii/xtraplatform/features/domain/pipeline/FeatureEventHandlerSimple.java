@@ -100,6 +100,7 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
 
     // TODO: default values are not cached by Modifiable
     @Value.Default
+    @Override
     default ModifiableCollectionMetadata metadata() {
       ModifiableCollectionMetadata collectionMetadata = ModifiableCollectionMetadata.create();
 

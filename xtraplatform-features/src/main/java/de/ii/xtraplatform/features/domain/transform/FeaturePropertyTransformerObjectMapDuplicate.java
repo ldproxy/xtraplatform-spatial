@@ -66,6 +66,7 @@ public interface FeaturePropertyTransformerObjectMapDuplicate
     return builder.build();
   }
 
+  @Override
   default void transformObject(
       String currentPropertyPath,
       List<Object> slice,
