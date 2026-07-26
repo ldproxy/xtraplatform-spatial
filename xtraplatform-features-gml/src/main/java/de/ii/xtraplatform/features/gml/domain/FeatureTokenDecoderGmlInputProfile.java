@@ -164,7 +164,15 @@ public interface FeatureTokenDecoderGmlInputProfile {
 
   List<String> getXmlAttributes();
 
-  Map<String, List<String>> getValueWrap();
+  /**
+   * Reverse of {@code GmlConfiguration#xmlPaths}: per property (keyed by property path, in
+   * technical or alias form), the complete element chain the encoder writes for it — the first
+   * segment is the property element, the innermost segment holds the value. On input, a property
+   * whose chain has inner segments is treated as value-wrapped: elements between the property
+   * element and the character data are consumed transparently (attributes on them are dropped,
+   * injected empty elements are skipped).
+   */
+  Map<String, List<String>> getXmlPaths();
 
   /**
    * Reverse of {@code GmlConfiguration#objectTypeSuffixedProperties}: the property id (technical

@@ -1108,6 +1108,14 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     }
 
     try {
+      // The junction patches run before the main-table UPDATE. Both locate the parent row with
+      // the same predicate, and on a retire-in-place update that predicate requires the version
+      // to still be open — which is exactly what the main-table SET is about to end. Patching
+      // afterwards would silently match no rows and drop the values.
+      for (JunctionPatch patch : junctionPatches.values()) {
+        runJunctionPatch(patch, mainTableName, idColumnName, idLiteral, extraWherePredicate, crs);
+      }
+
       if (!setClauses.isEmpty()) {
         String sql =
             "UPDATE "
@@ -1139,10 +1147,6 @@ public class SqlMutationSession implements FeatureTransactions.Session {
         for (String id : returned) {
           builder.addIds(id);
         }
-      }
-
-      for (JunctionPatch patch : junctionPatches.values()) {
-        runJunctionPatch(patch, mainTableName, idColumnName, idLiteral, extraWherePredicate, crs);
       }
 
       // No main-table SET ran but at least one junction was patched: confirm the feature exists.

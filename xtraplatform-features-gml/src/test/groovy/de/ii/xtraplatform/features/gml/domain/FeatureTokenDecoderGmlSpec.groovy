@@ -22,9 +22,6 @@ import de.ii.xtraplatform.features.domain.SchemaBase
 import de.ii.xtraplatform.features.domain.SchemaMapping
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple
-import de.ii.xtraplatform.features.gml.domain.FeatureTokenDecoderGmlInputProfile
-import de.ii.xtraplatform.features.gml.domain.ImmutableFeatureTokenDecoderGmlInputProfile
-import de.ii.xtraplatform.features.gml.domain.ImmutableVariableObjectName
 import de.ii.xtraplatform.geometries.domain.Geometry
 import de.ii.xtraplatform.geometries.domain.GeometryType
 import de.ii.xtraplatform.streams.app.ReactiveRx
@@ -1745,12 +1742,12 @@ class FeatureTokenDecoderGmlSpec extends Specification {
     }
 
     /**
-     * AX_Flurstueck slice for the valueWrap reverse-mapping checks. {@code lzi_beg} mirrors
+     * AX_Flurstueck slice for the xmlPaths reverse-mapping checks. {@code lzi_beg} mirrors
      * the AA_Objekt {@code lebenszeitintervall} property: a DATETIME with SQL column {@code
      * lzi__beg}, label {@code lebenszeitintervall_beginnt} and alias {@code
      * lebenszeitintervall}. The encoder wraps the scalar value in {@code
      * <AA_Lebenszeitintervall><beginnt>…</beginnt></AA_Lebenszeitintervall>}, matching the
-     * {@code valueWrap} example in {@code GmlConfiguration}.
+     * {@code xmlPaths} example in {@code GmlConfiguration}.
      */
     static FeatureSchema axFlurstueckWithLifeCycleSchema() {
         new ImmutableFeatureSchema.Builder()
@@ -1773,14 +1770,14 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                 .build()
     }
 
-    def 'valueWrap reverse-maps a wrapped scalar back to the property source path'() {
+    def 'xmlPaths reverse-maps a wrapped scalar back to the property source path'() {
         given:
         // Encoder shape: <adv:lebenszeitintervall> (alias-named property element) wraps an
         // <adv:AA_Lebenszeitintervall><adv:beginnt>…</adv:beginnt></adv:AA_Lebenszeitintervall>
         // chain around the scalar. Reverse mapping must surface the inner text at lzi__beg.
         def profile = ImmutableFeatureTokenDecoderGmlInputProfile.builder()
                 .useAlias(true)
-                .putValueWrap("lzi_beg", ["AA_Lebenszeitintervall", "beginnt"])
+                .putXmlPaths("lzi_beg", ["lebenszeitintervall", "AA_Lebenszeitintervall", "beginnt"])
                 .build()
         def decoder = newDecoder(axFlurstueckWithLifeCycleSchema(), profile)
         def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
@@ -1800,14 +1797,14 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         valueAtPath(tokens, ["lzi_beg"]) == "2010-09-14T11:54:36Z"
     }
 
-    def 'a sibling after a valueWrap chain still resolves at its own source path'() {
+    def 'a sibling after a xmlPaths chain still resolves at its own source path'() {
         given:
         // Path tracker must shorten back to the feature root once the wrapper chain closes, so
         // the following <adv:flurstueckskennzeichen> sibling lands at fsk, not at a stale path
         // left behind by the inner <adv:beginnt> wrapper.
         def profile = ImmutableFeatureTokenDecoderGmlInputProfile.builder()
                 .useAlias(true)
-                .putValueWrap("lzi_beg", ["AA_Lebenszeitintervall", "beginnt"])
+                .putXmlPaths("lzi_beg", ["lebenszeitintervall", "AA_Lebenszeitintervall", "beginnt"])
                 .build()
         def decoder = newDecoder(axFlurstueckWithLifeCycleSchema(), profile)
         def xml = """<adv:AX_Flurstueck xmlns:adv="${ADV_NS}"
@@ -1831,7 +1828,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
 
     def 'an unconfigured wrapped scalar is not surfaced (no permissive fallback)'() {
         given:
-        // valueWrap is gated on configuration: without an entry, wrapper elements inside a
+        // xmlPaths is gated on configuration: without an entry, wrapper elements inside a
         // VALUE_PROPERTY are treated as unknown descendants and the inner text is not emitted.
         // This matches the encoder side, which only wraps when the option is set.
         def decoder = newDecoder(axFlurstueckWithLifeCycleSchema(), useAliasProfile())
@@ -1965,7 +1962,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
     /**
      * NAS-shaped namespace profile: AX_PunktortAU / AX_DQPunktort fall back to the default adv
      * namespace, the four ISO 19115 object types (LI_Lineage, LI_ProcessStep, LI_Source,
-     * CI_ResponsibleParty) are in gmd. The {@code valueWrap} entries declare the two adv-
+     * CI_ResponsibleParty) are in gmd. The {@code xmlPaths} entries declare the two adv-
      * namespaced content-carrying wrappers that the encoder writes around two of the
      * LI_ProcessStep scalar children; gmd/gco wrappers (gco:DateTime, gco:CharacterString,
      * gmd:CI_RoleCode) are auto-detected by the decoder and need no entry here.
@@ -1978,8 +1975,8 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                 .putObjectTypeNamespaces("LI_ProcessStep", "gmd")
                 .putObjectTypeNamespaces("LI_Source", "gmd")
                 .putObjectTypeNamespaces("CI_ResponsibleParty", "gmd")
-                .putValueWrap("qag.dpl.prs.des", ["AX_LI_ProcessStep_Punktort_Description"])
-                .putValueWrap("qag.dpl.prs.src.des", ["AX_Datenerhebung_Punktort"])
+                .putXmlPaths("qag.dpl.prs.des", ["gmd:description", "AX_LI_ProcessStep_Punktort_Description"])
+                .putXmlPaths("qag.dpl.prs.src.des", ["gmd:description", "AX_Datenerhebung_Punktort"])
                 .build()
     }
 
@@ -2019,12 +2016,12 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         // LI_Source) is in gmd, with leaf values wrapped in adv-namespaced or gmd/gco
         // content-carrying objects:
         //   - description (LI_ProcessStep) wraps <adv:AX_LI_ProcessStep_Punktort_Description>
-        //     — adv namespace, requires explicit valueWrap config
+        //     — adv namespace, requires explicit xmlPaths config
         //   - dateTime wraps <gco:DateTime> — gmd/gco auto-detected
         //   - organisationName wraps <gco:CharacterString> — auto-detected
         //   - role wraps <gmd:CI_RoleCode codeListValue=…> — auto-detected; text content used
         //     (rol has a codelist constraint, but the gmd text path wins; see the focused test below)
-        //   - source/description wraps <adv:AX_Datenerhebung_Punktort> — explicit valueWrap
+        //   - source/description wraps <adv:AX_Datenerhebung_Punktort> — explicit xmlPaths
         // The sibling <adv:genauigkeitsstufe> at AX_DQPunktort level exercises a scalar that
         // sits next to the deep dpl subtree.
         def decoder = newPunktortAuDecoder(nasNamespaceProfile())
@@ -2690,7 +2687,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
     //   - defaultNamespace pointing at that "aaa" prefix
     //   - useAlias: true with mixed-namespace inner elements (adv + gmd/gco) reached via
     //     objectTypeNamespaces for the ISO 19115 object types
-    //   - valueWrap entries keyed both by alias path (lebenszeitintervall) and by property-name
+    //   - xmlPaths entries keyed both by alias path (lebenszeitintervall) and by property-name
     //     path (qag.dpl.prs.des / qag.dpl.prs.src.des), which are the two key shapes the decoder
     //     recognises
     //   - codelistUriTemplate and featureRefTemplate so that xlink:href on adv:anlass and
@@ -2714,7 +2711,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
      * AX_Gebaeude slice covering every property in {@code src/test/resources/nas/AX_Gebaeude.xml}:
      * {@code oid} (gml:id) and {@code idn} (gml:identifier); the surface geometry {@code gpo}
      * (position); the simple STRING {@code gfk} (gebaeudefunktion); the DATETIME {@code lzi_beg}
-     * (lebenszeitintervall) reached through an adv-namespaced valueWrap chain; the OBJECT_ARRAY
+     * (lebenszeitintervall) reached through an adv-namespaced xmlPaths chain; the OBJECT_ARRAY
      * {@code mat} (modellart) with {@code stm} / {@code som} children; the codelist VALUE_ARRAY
      * {@code anl} (anlass); the FEATURE_REF {@code hat}; and the deep transparent OBJECT chain
      * {@code qag} (qualitaetsangaben) → {@code dpl} (LI_Lineage) → {@code prs}
@@ -2831,11 +2828,11 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                 .putObjectTypeNamespaces("LI_ProcessStep", "gmd")
                 .putObjectTypeNamespaces("LI_Source", "gmd")
                 .putObjectTypeNamespaces("CI_ResponsibleParty", "gmd")
-                // valueWrap is recognised under either the alias path or the property-name path;
+                // xmlPaths is recognised under either the alias path or the property-name path;
                 // exercise both shapes against the same fixture.
-                .putValueWrap("lebenszeitintervall", ["AA_Lebenszeitintervall", "beginnt"])
-                .putValueWrap("qag.dpl.prs.des", ["AX_LI_ProcessStep_MitDatenerhebung_Description"])
-                .putValueWrap("qag.dpl.prs.src.des", ["AX_Datenerhebung"])
+                .putXmlPaths("lebenszeitintervall", ["lebenszeitintervall", "AA_Lebenszeitintervall", "beginnt"])
+                .putXmlPaths("qag.dpl.prs.des", ["gmd:description", "AX_LI_ProcessStep_MitDatenerhebung_Description"])
+                .putXmlPaths("qag.dpl.prs.src.des", ["gmd:description", "AX_Datenerhebung"])
                 .codelistUriTemplate("https://registry.gdi-de.org/codelist/de.adv-online.gid/{{codelistId}}/{{value}}")
                 .featureRefTemplate("urn:adv:oid:{{value}}")
                 .build()
@@ -2877,7 +2874,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         valueAtPath(tokens, ["gfk"]) == "2500"
     }
 
-    def 'AX_Gebaeude: valueWrap keyed by alias path decodes the wrapped scalar to the property source path'() {
+    def 'AX_Gebaeude: xmlPaths keyed by alias path decodes the wrapped scalar to the property source path'() {
         given:
         def decoder = newAxGebaeudeDecoder(axGebaeudeSchema(), axGebaeudeProfile())
         def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_PREFIX_URI}"
@@ -2914,7 +2911,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         valueAtPath(tokens, ["oid"]) == "DENW36AL10000Egu"
         // gml:identifier (matched via the gml: prefix on the alias)
         valueAtPath(tokens, ["idn"]) == "urn:adv:oid:DENW36AL10000Egu"
-        // lebenszeitintervall/AA_Lebenszeitintervall/beginnt → lzi_beg (alias-keyed valueWrap)
+        // lebenszeitintervall/AA_Lebenszeitintervall/beginnt → lzi_beg (alias-keyed xmlPaths)
         valueAtPath(tokens, ["lzi_beg"]) == "2024-10-15T07:55:13Z"
         // gebaeudefunktion → gfk
         valueAtPath(tokens, ["gfk"]) == "2500"
@@ -2951,5 +2948,437 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         def geometries = tokens.findAll { it instanceof Geometry } as List<Geometry>
         geometries.size() == 1
         pathBeforeGeometry(tokens) == ["gpo"]
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Structural xmlPaths chains: the mapped property is FLAT and its element chain names
+    // ancestor elements the schema does not contain — e.g. lzi_beg encoded as
+    // <lebenszeitintervall><AA_Lebenszeitintervall><beginnt>. The chain's elements match no
+    // property, so the decoder descends them transparently and resolves the innermost segment to
+    // the flat property. (When the first segment IS the property's own element — the option's
+    // value-wrapping use — the ordinary property lookup handles it; see the cases above.)
+    // -------------------------------------------------------------------------------------------
+
+    static final Map<String, String> TEST_NAMESPACES = [
+            "adv": ADV_NS,
+            "gmd": GMD_NS,
+            "gco": GCO_NS,
+            "gml": "http://www.opengis.net/gml/3.2",
+            "xlink": "http://www.w3.org/1999/xlink",
+            "xsi": "http://www.w3.org/2001/XMLSchema-instance"
+    ]
+
+    /**
+     * AX_Gebaeude where the lifespan is flat ({@code lzi_beg} / {@code
+     * lzi_end}), {@code mat} is a plain VALUE_ARRAY, the quality group is lifted to the flat {@code
+     * zpe} / {@code src} / {@code des}, and {@code fdv} keeps only {@code art} and {@code nam}. No
+     * property carries an alias — the XML element names come exclusively from the xmlPaths chains.
+     */
+    static FeatureSchema gebaeudeSchema() {
+        new ImmutableFeatureSchema.Builder()
+                .name("ax_gebaeude")
+                .sourcePath("/o31001")
+                .type(SchemaBase.Type.OBJECT)
+                .objectType("AX_Gebaeude")
+                .putProperties2("id", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("objid")
+                        .type(SchemaBase.Type.STRING)
+                        .role(SchemaBase.Role.ID))
+                .putProperties2("lzi_beg", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("lzi__beg")
+                        .type(SchemaBase.Type.DATETIME))
+                .putProperties2("lzi_end", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("lzi__endx")
+                        .type(SchemaBase.Type.DATETIME))
+                .putProperties2("mat", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("[id=rid]o31001__mat/stm")
+                        .type(SchemaBase.Type.VALUE_ARRAY)
+                        .valueType(SchemaBase.Type.STRING))
+                .putProperties2("gfk", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("gfk")
+                        .type(SchemaBase.Type.STRING)
+                        .alias("gebaeudefunktion"))
+                .putProperties2("fdv", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("[id=rid]o31001__fdv")
+                        .type(SchemaBase.Type.OBJECT_ARRAY)
+                        .objectType("AA_Fachdatenverbindung")
+                        .alias("zeigtAufExternes")
+                        .putProperties2("art", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("art")
+                                .type(SchemaBase.Type.STRING)
+                                .alias("art"))
+                        .putProperties2("nam", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("fdo__nam")
+                                .type(SchemaBase.Type.STRING)))
+                .putProperties2("vsg_wvs", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("vsg__wvs")
+                        .type(SchemaBase.Type.FLOAT))
+                .putProperties2("vsg_hvs", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("[id=rid]o14005__vsg__hvs/vsg__hvs")
+                        .type(SchemaBase.Type.VALUE_ARRAY)
+                        .valueType(SchemaBase.Type.FLOAT))
+                .putProperties2("des", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("qag__dpl_des")
+                        .type(SchemaBase.Type.STRING))
+                .putProperties2("zpe", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("qag__dpl_prs_dat")
+                        .type(SchemaBase.Type.DATETIME))
+                .putProperties2("src", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("qag__dpl_prs_src")
+                        .type(SchemaBase.Type.STRING))
+                .build()
+    }
+
+    static FeatureTokenDecoderGmlInputProfile gebaeudeProfile() {
+        ImmutableFeatureTokenDecoderGmlInputProfile.builder()
+                .useAlias(true)
+                .defaultNamespace("adv")
+                .putApplicationNamespaces("adv", ADV_NS)
+                .putApplicationNamespaces("gmd", GMD_NS)
+                .putApplicationNamespaces("gco", GCO_NS)
+                .putXmlPaths("lzi_beg", ["lebenszeitintervall", "AA_Lebenszeitintervall", "beginnt"])
+                .putXmlPaths("lzi_end", ["lebenszeitintervall", "AA_Lebenszeitintervall", "endet"])
+                .putXmlPaths("mat", ["modellart", "AA_Modellart", "advStandardModell"])
+                .putXmlPaths("fdv.nam", ["fachdatenobjekt", "AA_Fachdatenobjekt", "name"])
+                .putXmlPaths("vsg_wvs", ["vertikalerSchweregradient", "AX_VertikalerSchweregradient",
+                                         "wertVertikalerSchweregradient"])
+                .putXmlPaths("vsg_hvs", ["vertikalerSchweregradient", "AX_VertikalerSchweregradient",
+                                         "messhoeheVertikalerSchweregradient"])
+                .putXmlPaths("des", ["qualitaetsangaben", "AX_DQMitDatenerhebung", "herkunft",
+                                     "gmd:LI_Lineage", "gmd:processStep", "gmd:LI_ProcessStep",
+                                     "gmd:description", "AX_LI_ProcessStep_MitDatenerhebung_Description"])
+                .putXmlPaths("zpe", ["qualitaetsangaben", "AX_DQMitDatenerhebung", "herkunft",
+                                     "gmd:LI_Lineage", "gmd:processStep", "gmd:LI_ProcessStep",
+                                     "gmd:dateTime", "gco:DateTime"])
+                .putXmlPaths("src", ["qualitaetsangaben", "AX_DQMitDatenerhebung", "herkunft",
+                                     "gmd:LI_Lineage", "gmd:processStep", "gmd:LI_ProcessStep",
+                                     "gmd:source", "gmd:LI_Source", "gmd:description",
+                                     "AX_Datenerhebung"])
+                .build()
+    }
+
+    static FeatureTokenDecoderSimple<byte[], FeatureSchema, SchemaMapping, FeatureEventHandlerSimple.ModifiableContext<FeatureSchema, SchemaMapping>> newDecoder2(
+            FeatureSchema schema, FeatureTokenDecoderGmlInputProfile profile) {
+        new FeatureTokenDecoderGml(
+                TEST_NAMESPACES,
+                [new QName(ADV_NS, "AX_Gebaeude")],
+                schema,
+                ImmutableFeatureQuery.builder().type(schema.getName()).build(),
+                Map.of(schema.getName(),
+                        new ImmutableSchemaMapping.Builder()
+                                .targetSchema(schema)
+                                .sourcePathTransformer((path, isValue) -> path)
+                                .build()),
+                STORAGE_CRS,
+                Optional.empty(),
+                Optional.empty(),
+                profile)
+    }
+
+    def 'a structural chain resolves the flat property the chain maps'() {
+        given:
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010014RVJ">
+              <adv:lebenszeitintervall>
+                <adv:AA_Lebenszeitintervall>
+                  <adv:beginnt>2009-11-04T14:25:08Z</adv:beginnt>
+                </adv:AA_Lebenszeitintervall>
+              </adv:lebenszeitintervall>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["lzi_beg"]) == "2009-11-04T14:25:08Z"
+    }
+
+    def 'properties merged into one wrapper instance both resolve'() {
+        given:
+        // The encoder keeps AA_Lebenszeitintervall open across lzi_beg and lzi_end; on input both
+        // children of the shared wrapper must resolve to their own flat property.
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010019MA6">
+              <adv:lebenszeitintervall>
+                <adv:AA_Lebenszeitintervall>
+                  <adv:beginnt>2020-10-08T05:53:29Z</adv:beginnt>
+                  <adv:endet>2026-01-12T10:30:46Z</adv:endet>
+                </adv:AA_Lebenszeitintervall>
+              </adv:lebenszeitintervall>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["lzi_beg"]) == "2020-10-08T05:53:29Z"
+        valueAtPath(tokens, ["lzi_end"]) == "2026-01-12T10:30:46Z"
+    }
+
+    def 'a sibling after a structural chain resolves at its own path'() {
+        given:
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010014RVJ">
+              <adv:lebenszeitintervall>
+                <adv:AA_Lebenszeitintervall>
+                  <adv:beginnt>2009-11-04T14:25:08Z</adv:beginnt>
+                </adv:AA_Lebenszeitintervall>
+              </adv:lebenszeitintervall>
+              <adv:gebaeudefunktion>1000</adv:gebaeudefunktion>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["lzi_beg"]) == "2009-11-04T14:25:08Z"
+        valueAtPath(tokens, ["gfk"]) == "1000"
+    }
+
+    def 'a repeated chain brackets the multi-valued property in one ARRAY pair'() {
+        given:
+        // mat is a VALUE_ARRAY whose wire form is the repeated modellart chain; the ARRAY bracket
+        // belongs at the property path, spanning all repetitions.
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010014RVJ">
+              <adv:modellart>
+                <adv:AA_Modellart>
+                  <adv:advStandardModell>DLKM</adv:advStandardModell>
+                </adv:AA_Modellart>
+              </adv:modellart>
+              <adv:modellart>
+                <adv:AA_Modellart>
+                  <adv:advStandardModell>Basis-DLM</adv:advStandardModell>
+                </adv:AA_Modellart>
+              </adv:modellart>
+              <adv:gebaeudefunktion>1000</adv:gebaeudefunktion>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY, ["mat"]) >= 0
+        indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["mat"]) >= 0
+        tokens.count { it == FeatureTokenType.ARRAY } == 1
+        tokens.count { it == FeatureTokenType.ARRAY_END } == 1
+
+        and: 'both values sit inside the bracket, the following sibling outside'
+        def arrayStart = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY, ["mat"])
+        def arrayEnd = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["mat"])
+        def values = indicesOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["mat"])
+        values.size() == 2
+        values.every { it > arrayStart && it < arrayEnd }
+        indexOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["gfk"]) > arrayEnd
+    }
+
+    def 'a repeated innermost chain element brackets its values in one ARRAY pair'() {
+        given: 'one wrapper holding a single-valued member and a multi-valued one'
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE860010007ZVh">
+              <adv:vertikalerSchweregradient>
+                <adv:AX_VertikalerSchweregradient>
+                  <adv:wertVertikalerSchweregradient>-0.000003214</adv:wertVertikalerSchweregradient>
+                  <adv:messhoeheVertikalerSchweregradient>123</adv:messhoeheVertikalerSchweregradient>
+                  <adv:messhoeheVertikalerSchweregradient>758</adv:messhoeheVertikalerSchweregradient>
+                </adv:AX_VertikalerSchweregradient>
+              </adv:vertikalerSchweregradient>
+              <adv:gebaeudefunktion>1000</adv:gebaeudefunktion>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then: 'both repetitions land inside a single bracket at the property path'
+        def arrayStart = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY, ["vsg_hvs"])
+        def arrayEnd = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["vsg_hvs"])
+        arrayStart >= 0 && arrayEnd > arrayStart
+        tokens.count { it == FeatureTokenType.ARRAY } == 1
+        tokens.count { it == FeatureTokenType.ARRAY_END } == 1
+        def values = indicesOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["vsg_hvs"])
+        values.size() == 2
+        values.every { it > arrayStart && it < arrayEnd }
+
+        and: 'the single-valued member of the same wrapper stays outside the bracket'
+        def wvs = indexOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["vsg_wvs"])
+        wvs >= 0 && wvs < arrayStart
+        indexOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["gfk"]) > arrayEnd
+    }
+
+    def 'a structural chain inside an object array member resolves at the member path'() {
+        given:
+        // fdv.nam is mapped to fachdatenobjekt/AA_Fachdatenobjekt/name — a chain relative to the
+        // interior of the member object element, alongside the directly matched art.
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010014RVJ">
+              <adv:zeigtAufExternes>
+                <adv:AA_Fachdatenverbindung>
+                  <adv:art>urn:rp:fdv:1030</adv:art>
+                  <adv:fachdatenobjekt>
+                    <adv:AA_Fachdatenobjekt>
+                      <adv:name>2021/00074199-SQ</adv:name>
+                    </adv:AA_Fachdatenobjekt>
+                  </adv:fachdatenobjekt>
+                </adv:AA_Fachdatenverbindung>
+              </adv:zeigtAufExternes>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["fdv", "art"]) == "urn:rp:fdv:1030"
+        valueAtPath(tokens, ["fdv", "nam"]) == "2021/00074199-SQ"
+    }
+
+    def 'the lifted quality group resolves to its flat properties'() {
+        given:
+        // The deep ISO 19115 chain carries three flat properties (des/zpe/src) merged into one
+        // LI_ProcessStep instance; each innermost value element resolves to its own property.
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gmd="${GMD_NS}" xmlns:gco="${GCO_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010014RVJ">
+              <adv:qualitaetsangaben>
+                <adv:AX_DQMitDatenerhebung>
+                  <adv:herkunft>
+                    <gmd:LI_Lineage>
+                      <gmd:processStep>
+                        <gmd:LI_ProcessStep>
+                          <gmd:description>
+                            <adv:AX_LI_ProcessStep_MitDatenerhebung_Description>Erhebung</adv:AX_LI_ProcessStep_MitDatenerhebung_Description>
+                          </gmd:description>
+                          <gmd:dateTime>
+                            <gco:DateTime>2009-11-04T14:25:08Z</gco:DateTime>
+                          </gmd:dateTime>
+                          <gmd:source>
+                            <gmd:LI_Source>
+                              <gmd:description>
+                                <adv:AX_Datenerhebung>4200</adv:AX_Datenerhebung>
+                              </gmd:description>
+                            </gmd:LI_Source>
+                          </gmd:source>
+                        </gmd:LI_ProcessStep>
+                      </gmd:processStep>
+                    </gmd:LI_Lineage>
+                  </adv:herkunft>
+                </adv:AX_DQMitDatenerhebung>
+              </adv:qualitaetsangaben>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["des"]) == "Erhebung"
+        valueAtPath(tokens, ["zpe"]) == "2009-11-04T14:25:08Z"
+        valueAtPath(tokens, ["src"]) == "4200"
+    }
+
+        def 'an injected empty element is skipped and xsi:type on the value element is accepted'() {
+        given:
+        // The ISO 19139 quantitative-result shape: gmd:valueUnit is configured with a trailing '/'
+        // (written empty by the encoder, carrying only its attribute) and must be skipped on input,
+        // while the following gmd:value continues the chain and the anyType gco:Record carries the
+        // value plus an xsi:type the decoder drops.
+        def schema = new ImmutableFeatureSchema.Builder()
+                .name("ax_punktortau")
+                .sourcePath("/o14003")
+                .type(SchemaBase.Type.OBJECT)
+                .objectType("AX_PunktortAU")
+                .putProperties2("id", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("objid")
+                        .type(SchemaBase.Type.STRING)
+                        .role(SchemaBase.Role.ID))
+                .putProperties2("gwt", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("q2d__gwt")
+                        .type(SchemaBase.Type.STRING))
+                .build()
+        def profile = ImmutableFeatureTokenDecoderGmlInputProfile.builder()
+                .useAlias(true)
+                .defaultNamespace("adv")
+                .putApplicationNamespaces("adv", ADV_NS)
+                .putApplicationNamespaces("gmd", GMD_NS)
+                .putApplicationNamespaces("gco", GCO_NS)
+                .putXmlPaths("gwt", ["genauigkeitswert", "gmd:DQ_RelativeInternalPositionalAccuracy",
+                                     "gmd:result", "gmd:DQ_QuantitativeResult",
+                                     "gmd:valueUnit[xlink:href=urn:adv:uom:m]/", "gmd:value",
+                                     "gco:Record[xsi:type=gml:doubleList]"])
+                .build()
+        def decoder = new FeatureTokenDecoderGml(
+                TEST_NAMESPACES,
+                [new QName(ADV_NS, "AX_PunktortAU")],
+                schema,
+                ImmutableFeatureQuery.builder().type(schema.getName()).build(),
+                Map.of(schema.getName(),
+                        new ImmutableSchemaMapping.Builder()
+                                .targetSchema(schema)
+                                .sourcePathTransformer((path, isValue) -> path)
+                                .build()),
+                STORAGE_CRS,
+                Optional.empty(),
+                Optional.empty(),
+                profile)
+        def xml = """<adv:AX_PunktortAU xmlns:adv="${ADV_NS}"
+                xmlns:gmd="${GMD_NS}" xmlns:gco="${GCO_NS}"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE680010005aR1">
+              <adv:genauigkeitswert>
+                <gmd:DQ_RelativeInternalPositionalAccuracy>
+                  <gmd:result>
+                    <gmd:DQ_QuantitativeResult>
+                      <gmd:valueUnit xlink:href="urn:adv:uom:m"/>
+                      <gmd:value>
+                        <gco:Record xsi:type="gml:doubleList">0.0074721</gco:Record>
+                      </gmd:value>
+                    </gmd:DQ_QuantitativeResult>
+                  </gmd:result>
+                </gmd:DQ_RelativeInternalPositionalAccuracy>
+              </adv:genauigkeitswert>
+            </adv:AX_PunktortAU>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["gwt"]) == "0.0074721"
+    }
+
+    def 'an unmapped element inside a structural chain is ignored'() {
+        given:
+        def decoder = newDecoder2(gebaeudeSchema(), gebaeudeProfile())
+        def xml = """<adv:AX_Gebaeude xmlns:adv="${ADV_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DEHE862010014RVJ">
+              <adv:lebenszeitintervall>
+                <adv:AA_Lebenszeitintervall>
+                  <adv:beginnt>2009-11-04T14:25:08Z</adv:beginnt>
+                  <adv:unbekannt>xyz</adv:unbekannt>
+                </adv:AA_Lebenszeitintervall>
+              </adv:lebenszeitintervall>
+              <adv:gebaeudefunktion>1000</adv:gebaeudefunktion>
+            </adv:AX_Gebaeude>"""
+
+        when:
+        def tokens = runDecoder(decoder, xml)
+
+        then:
+        valueAtPath(tokens, ["lzi_beg"]) == "2009-11-04T14:25:08Z"
+        valueAtPath(tokens, ["gfk"]) == "1000"
     }
 }

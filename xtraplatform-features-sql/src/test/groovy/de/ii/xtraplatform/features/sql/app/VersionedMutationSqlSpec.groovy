@@ -41,12 +41,11 @@ import java.time.Instant
  *
  * The actual Insert / Replace-insert SQL flows through
  * {@code FeatureMutationsSql} + {@code FeatureEncoderSql} which need a
- * full schema fixture; those paths are exercised end-to-end via the
- * gvd/alkis transactions smoke harness, not here.
+ * full schema fixture.
  */
 class VersionedMutationSqlSpec extends Specification {
 
-    static final String TABLE = 'o02340'                       // AP_PTO main table
+    static final String TABLE = 'o02340'
     static final String COL_ID = 'objid'
     static final String COL_START = 'lzi__beg'
     static final String COL_END = 'lzi__endx'

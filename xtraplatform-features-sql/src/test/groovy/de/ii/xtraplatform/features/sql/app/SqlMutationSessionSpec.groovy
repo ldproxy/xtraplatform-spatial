@@ -23,8 +23,8 @@ import spock.lang.Specification
  * </ul>
  *
  * The full insert/replace mutation path (driven via {@code FeatureMutationsSql} +
- * {@code FeatureEncoderSql} + a Reactive stream runner) needs a heavier fixture and is exercised
- * end-to-end via the gvd/alkis transactions smoke configuration.
+ * {@code FeatureEncoderSql} + a Reactive stream runner) needs a heavier fixture and has to be
+ * exercised end-to-end via a transactions smoke configuration.
  */
 class SqlMutationSessionSpec extends Specification {
 
