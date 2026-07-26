@@ -102,13 +102,12 @@ public interface EpsgCrs {
 
   /**
    * An alternative identifier under which this CRS is known in a community (e.g. the AdV identifier
-   * {@code urn:adv:crs:ETRS89_UTM32} for EPSG:25832), declared on the entries of the {@code
-   * additionalCrs} option of the CRS building block. Unlike {@link #getUriOverride()} — which
-   * echoes the identifier a request used — the alternative URI is only used when a feature encoding
-   * renders CRS identifiers on the wire (e.g. the GML {@code srsName} with {@code srsNameStyle:
-   * TEMPLATE}) and when decoding such identifiers on input. Auxiliary, i.e., excluded from {@code
-   * equals()}/{@code hashCode()}: instances differing only in this attribute represent the same
-   * CRS.
+   * `urn:adv:crs:ETRS89_UTM32` for EPSG:25832), declared on the entries of the `additionalCrs`
+   * option of the CRS building block. Unlike `uriOverride`, which echoes the identifier a request
+   * used, the alternative URI is only used when a feature encoding renders CRS identifiers on the
+   * wire (e.g. the GML `srsName` with `srsNameStyle: TEMPLATE`) and when decoding such identifiers
+   * on input. Auxiliary, i.e., excluded from `equals()`/`hashCode()`: instances differing only in
+   * this attribute represent the same CRS.
    */
   @Value.Auxiliary
   Optional<String> getAlternativeUri();

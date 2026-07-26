@@ -13,14 +13,14 @@ import java.util.Optional;
 import org.immutables.value.Value;
 
 /**
- * @langEn Some feature types store the same logical position in one of several CRSs — including
+ * @langEn Some feature types store the same logical position in one of several CRSs - including
  *     CRSs that cannot be expressed as the storage CRS of the property (realizations that map to
  *     the same coordinate reference system, or 1D vertical reference systems). Each variant is
  *     stored in its own property; `crsVariants` on the main geometry property declares which
  *     sibling properties hold the variants. All referenced properties must be siblings of the
  *     geometry property (properties of the same object) and are implicitly `internal`.
  * @langDe Manche Objektarten speichern dieselbe logische Position in einem von mehreren
- *     Koordinatenreferenzsystemen — einschließlich Systemen, die nicht als Speicher-CRS der
+ *     Koordinatenreferenzsystemen - einschließlich Systemen, die nicht als Speicher-CRS der
  *     Eigenschaft ausgedrückt werden können (Realisierungen, die auf dasselbe
  *     Koordinatenreferenzsystem abgebildet werden, oder eindimensionale Höhenreferenzsysteme). Jede
  *     Variante wird in einer eigenen Eigenschaft gespeichert; `crsVariants` an der

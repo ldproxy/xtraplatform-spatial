@@ -176,8 +176,8 @@ public interface CustomFunction {
   /**
    * A built-in function that is only meaningful within a query expression (a semi-join against a
    * result set defined by another query) and is encoded by a dedicated handler rather than a SQL
-   * template. Such a function therefore defines neither {@code expression} nor {@code expressions}.
-   * Not intended for user-defined functions.
+   * template. Such a function therefore defines neither `expression` nor `expressions`. Not
+   * intended for user-defined functions.
    */
   @Value.Default
   default boolean getQueryExpressionOnly() {
