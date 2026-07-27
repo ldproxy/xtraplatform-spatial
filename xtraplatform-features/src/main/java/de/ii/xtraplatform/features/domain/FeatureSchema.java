@@ -283,13 +283,13 @@ public interface FeatureSchema
   /**
    * @langEn Declares sibling properties that store the position of this geometry property in other
    *     reference systems, for feature types that store the same logical position in one of several
-   *     CRSs — including CRSs that cannot be expressed as a storage CRS (realizations that map to
+   *     CRSs - including CRSs that cannot be expressed as a storage CRS (realizations that map to
    *     the same coordinate reference system, or 1D vertical reference systems). Only relevant for
    *     properties with `type: GEOMETRY` in SQL feature providers. All referenced properties are
    *     implicitly `internal`. See [Position Variants](#position-variants).
    * @langDe Deklariert Nachbareigenschaften, die die Position dieser Geometrieeigenschaft in
    *     anderen Referenzsystemen speichern, für Objektarten, die dieselbe logische Position in
-   *     einem von mehreren Koordinatenreferenzsystemen speichern — einschließlich Systemen, die
+   *     einem von mehreren Koordinatenreferenzsystemen speichern - einschließlich Systemen, die
    *     nicht als Speicher-CRS ausgedrückt werden können (Realisierungen, die auf dasselbe
    *     Koordinatenreferenzsystem abgebildet werden, oder eindimensionale Höhenreferenzsysteme).
    *     Nur relevant für Eigenschaften mit `type: GEOMETRY` in SQL-Feature-Providern. Alle
@@ -323,7 +323,7 @@ public interface FeatureSchema
    *     `ORIGINAL_GEOMETRY`. When non-zero, the difference is added to the easting (the first
    *     ordinate) on input and subtracted on output, so the stored coordinates conform to
    *     `nativeCrs`. Example: German Gauss-Krüger coordinates written without the zone prefix use a
-   *     false easting of 500000, while EPSG:5677 (zone 3, E-N) defines 3500000 — the difference is
+   *     false easting of 500000, while EPSG:5677 (zone 3, E-N) defines 3500000 - the difference is
    *     3000000.
    * @langDe Die Differenz zwischen dem False Easting des Speicher-CRS (`nativeCrs`) und dem False
    *     Easting der Koordinaten, die eine der `originalCrsIdentifiers` dieser Eigenschaft
@@ -331,7 +331,7 @@ public interface FeatureSchema
    *     ungleich 0 wird die Differenz beim Einlesen zum Rechtswert (der ersten Ordinate) addiert
    *     und bei der Ausgabe subtrahiert, sodass die gespeicherten Koordinaten dem Speicher-CRS
    *     entsprechen. Beispiel: Gauß-Krüger-Koordinaten ohne Zonenkennzahl verwenden ein False
-   *     Easting von 500000, EPSG:5677 (Zone 3, E-N) definiert 3500000 — die Differenz beträgt
+   *     Easting von 500000, EPSG:5677 (Zone 3, E-N) definiert 3500000 - die Differenz beträgt
    *     3000000.
    * @default null
    * @since v4.8

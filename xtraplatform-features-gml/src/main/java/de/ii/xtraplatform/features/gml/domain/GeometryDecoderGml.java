@@ -160,8 +160,8 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   /**
    * @param srsNameMappings reverse-mapping from {@code srsName} URI/URN forms to {@link EpsgCrs};
    *     consulted before the built-in EPSG / OGC URN parsers and intended to resolve
-   *     application-profile forms (e.g. ALKIS NAS uses {@code urn:adv:crs:DE_DHDN_3GK2_NW101}) that
-   *     the built-in parsers cannot handle.
+   *     application-profile forms (e.g. ALKIS NAS uses {@code urn:adv:crs:DE_DHDN_3GK3}) that the
+   *     built-in parsers cannot handle.
    */
   public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings) {
     this(srsNameMappings, Set.of());
