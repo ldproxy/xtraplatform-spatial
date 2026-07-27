@@ -3381,4 +3381,218 @@ class FeatureTokenDecoderGmlSpec extends Specification {
         valueAtPath(tokens, ["lzi_beg"]) == "2009-11-04T14:25:08Z"
         valueAtPath(tokens, ["gfk"]) == "1000"
     }
+
+    // -------------------------------------------------------------------------------------------
+    // xmlPaths chains mapping an object array: the chain carries the ancestor elements of the
+    // dissolved objects, the segment marked '*' repeats per member, the innermost element takes
+    // the role of the object element and the member chains are relative to it (the shape of a
+    // NAS quality group whose process steps live in their own table).
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * AX_PunktortAU in a flattened provider model: the quality group is dissolved into the flat
+     * {@code q2d_gst} and the joined process-step array is hoisted to the feature type as {@code
+     * q2d_dpl_prs}, mapped back to the NAS structure by an object chain.
+     */
+    static FeatureSchema punktortSchema() {
+        new ImmutableFeatureSchema.Builder()
+                .name("ax_punktortau")
+                .sourcePath("/o14003")
+                .type(SchemaBase.Type.OBJECT)
+                .objectType("AX_PunktortAU")
+                .putProperties2("id", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("objid")
+                        .type(SchemaBase.Type.STRING)
+                        .role(SchemaBase.Role.ID))
+                .putProperties2("q2d_dpl_prs", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("[id=rid]o14003__q2d__dpl_prs")
+                        .type(SchemaBase.Type.OBJECT_ARRAY)
+                        .objectType("LI_ProcessStep")
+                        .putProperties2("des", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("des")
+                                .type(SchemaBase.Type.STRING))
+                        .putProperties2("zpe", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("dat")
+                                .type(SchemaBase.Type.DATETIME))
+                        .putProperties2("pro", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("pro_resp_org")
+                                .type(SchemaBase.Type.STRING))
+                        .putProperties2("rol", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("pro_resp_rol_cdv")
+                                .type(SchemaBase.Type.STRING))
+                        .putProperties2("src", new ImmutableFeatureSchema.Builder()
+                                .sourcePath("src_des")
+                                .type(SchemaBase.Type.STRING)))
+                .putProperties2("q2d_gst", new ImmutableFeatureSchema.Builder()
+                        .sourcePath("q2d__gst")
+                        .type(SchemaBase.Type.STRING))
+                .build()
+    }
+
+    static FeatureTokenDecoderGmlInputProfile punktortProfile() {
+        ImmutableFeatureTokenDecoderGmlInputProfile.builder()
+                .useAlias(true)
+                .defaultNamespace("adv")
+                .putApplicationNamespaces("adv", ADV_NS)
+                .putApplicationNamespaces("gmd", GMD_NS)
+                .putApplicationNamespaces("gco", GCO_NS)
+                .putXmlPaths("q2d_dpl_prs", ["qualitaetsangaben", "AX_DQPunktort", "herkunft",
+                                             "gmd:LI_Lineage", "*gmd:processStep", "gmd:LI_ProcessStep"])
+                .putXmlPaths("q2d_dpl_prs.des", ["gmd:description",
+                                                 "AX_LI_ProcessStep_Punktort_Description"])
+                .putXmlPaths("q2d_dpl_prs.zpe", ["gmd:dateTime", "gco:DateTime"])
+                .putXmlPaths("q2d_dpl_prs.pro", ["gmd:processor", "gmd:CI_ResponsibleParty",
+                                                 "gmd:organisationName", "gco:CharacterString"])
+                .putXmlPaths("q2d_dpl_prs.rol", ["gmd:processor", "gmd:CI_ResponsibleParty",
+                                                 "gmd:role", "gmd:CI_RoleCode"])
+                .putXmlPaths("q2d_dpl_prs.src", ["gmd:source", "gmd:LI_Source", "gmd:description",
+                                                 "adv:AX_Datenerhebung_Punktort"])
+                .putXmlPaths("q2d_gst", ["qualitaetsangaben", "AX_DQPunktort", "genauigkeitsstufe"])
+                .build()
+    }
+
+    static FeatureTokenDecoderSimple<byte[], FeatureSchema, SchemaMapping, FeatureEventHandlerSimple.ModifiableContext<FeatureSchema, SchemaMapping>> newPunktortDecoder() {
+        new FeatureTokenDecoderGml(
+                TEST_NAMESPACES,
+                [new QName(ADV_NS, "AX_PunktortAU")],
+                punktortSchema(),
+                ImmutableFeatureQuery.builder().type("ax_punktortau").build(),
+                Map.of("ax_punktortau",
+                        new ImmutableSchemaMapping.Builder()
+                                .targetSchema(punktortSchema())
+                                .sourcePathTransformer((path, isValue) -> path)
+                                .build()),
+                STORAGE_CRS,
+                Optional.empty(),
+                Optional.empty(),
+                punktortProfile())
+    }
+
+    static String punktortXml(String steps) {
+        """<adv:AX_PunktortAU xmlns:adv="${ADV_NS}"
+                xmlns:gmd="${GMD_NS}" xmlns:gco="${GCO_NS}"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                gml:id="DENW36AL10000Yzf">
+              <adv:qualitaetsangaben>
+                <adv:AX_DQPunktort>
+                  <adv:herkunft>
+                    <gmd:LI_Lineage>
+                      ${steps}
+                    </gmd:LI_Lineage>
+                  </adv:herkunft>
+                  <adv:genauigkeitsstufe>2000</adv:genauigkeitsstufe>
+                </adv:AX_DQPunktort>
+              </adv:qualitaetsangaben>
+            </adv:AX_PunktortAU>"""
+    }
+
+    static final String ERHEBUNG_STEP = """<gmd:processStep>
+                        <gmd:LI_ProcessStep>
+                          <gmd:description>
+                            <adv:AX_LI_ProcessStep_Punktort_Description>Erhebung</adv:AX_LI_ProcessStep_Punktort_Description>
+                          </gmd:description>
+                          <gmd:dateTime>
+                            <gco:DateTime>2008-08-26T00:00:00Z</gco:DateTime>
+                          </gmd:dateTime>
+                          <gmd:processor>
+                            <gmd:CI_ResponsibleParty>
+                              <gmd:organisationName>
+                                <gco:CharacterString>Kataster- und Vermessungsamt</gco:CharacterString>
+                              </gmd:organisationName>
+                              <gmd:role>
+                                <gmd:CI_RoleCode codeList="http://www.isotc211.org/2005/gmd#CI_RoleCode" codeListValue="processor">processor</gmd:CI_RoleCode>
+                              </gmd:role>
+                            </gmd:CI_ResponsibleParty>
+                          </gmd:processor>
+                          <gmd:source>
+                            <gmd:LI_Source>
+                              <gmd:description>
+                                <adv:AX_Datenerhebung_Punktort>4300</adv:AX_Datenerhebung_Punktort>
+                              </gmd:description>
+                            </gmd:LI_Source>
+                          </gmd:source>
+                        </gmd:LI_ProcessStep>
+                      </gmd:processStep>"""
+
+    static final String BERECHNUNG_STEP = """<gmd:processStep>
+                        <gmd:LI_ProcessStep>
+                          <gmd:description>
+                            <adv:AX_LI_ProcessStep_Punktort_Description>Berechnung</adv:AX_LI_ProcessStep_Punktort_Description>
+                          </gmd:description>
+                          <gmd:dateTime>
+                            <gco:DateTime>2015-12-01T00:00:00Z</gco:DateTime>
+                          </gmd:dateTime>
+                        </gmd:LI_ProcessStep>
+                      </gmd:processStep>"""
+
+    def 'an object chain with a repetition marker brackets all members in one ARRAY pair'() {
+        given: 'two process steps repeating from the marked gmd:processStep segment'
+        def decoder = newPunktortDecoder()
+
+        when:
+        def tokens = runDecoder(decoder, punktortXml(ERHEBUNG_STEP + "\n" + BERECHNUNG_STEP))
+
+        then: 'one ARRAY pair at the property path, one OBJECT pair per member'
+        indicesOfTokenAtPath(tokens, FeatureTokenType.ARRAY, ["q2d_dpl_prs"]).size() == 1
+        indicesOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["q2d_dpl_prs"]).size() == 1
+        indicesOfTokenAtPath(tokens, FeatureTokenType.OBJECT, ["q2d_dpl_prs"]).size() == 2
+        indicesOfTokenAtPath(tokens, FeatureTokenType.OBJECT_END, ["q2d_dpl_prs"]).size() == 2
+
+        and: 'both members sit inside the bracket'
+        def arrayStart = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY, ["q2d_dpl_prs"])
+        def arrayEnd = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["q2d_dpl_prs"])
+        indicesOfTokenAtPath(tokens, FeatureTokenType.OBJECT, ["q2d_dpl_prs"]).every {
+            it > arrayStart && it < arrayEnd
+        }
+
+        and: 'the member values arrive at the member paths, one per member'
+        def desValues = indicesOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["q2d_dpl_prs", "des"])
+                .collect { tokens.get(it + 2) as String }
+        desValues == ["Erhebung", "Berechnung"]
+        def zpeValues = indicesOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["q2d_dpl_prs", "zpe"])
+                .collect { tokens.get(it + 2) as String }
+        zpeValues == ["2008-08-26T00:00:00Z", "2015-12-01T00:00:00Z"]
+    }
+
+    def 'the members of a chained object resolve through their own chains'() {
+        given: 'member chains relative to the innermost LI_ProcessStep, incl. a shared processor prefix'
+        def decoder = newPunktortDecoder()
+
+        when:
+        def tokens = runDecoder(decoder, punktortXml(ERHEBUNG_STEP))
+
+        then:
+        valueAtPath(tokens, ["q2d_dpl_prs", "des"]) == "Erhebung"
+        valueAtPath(tokens, ["q2d_dpl_prs", "zpe"]) == "2008-08-26T00:00:00Z"
+        valueAtPath(tokens, ["q2d_dpl_prs", "pro"]) == "Kataster- und Vermessungsamt"
+        valueAtPath(tokens, ["q2d_dpl_prs", "rol"]) == "processor"
+        valueAtPath(tokens, ["q2d_dpl_prs", "src"]) == "4300"
+    }
+
+    def 'a single member still arrives inside an ARRAY pair'() {
+        given:
+        def decoder = newPunktortDecoder()
+
+        when:
+        def tokens = runDecoder(decoder, punktortXml(ERHEBUNG_STEP))
+
+        then:
+        indicesOfTokenAtPath(tokens, FeatureTokenType.ARRAY, ["q2d_dpl_prs"]).size() == 1
+        indicesOfTokenAtPath(tokens, FeatureTokenType.OBJECT, ["q2d_dpl_prs"]).size() == 1
+        indicesOfTokenAtPath(tokens, FeatureTokenType.OBJECT_END, ["q2d_dpl_prs"]).size() == 1
+        indicesOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["q2d_dpl_prs"]).size() == 1
+    }
+
+    def 'a flat sibling sharing the leading segments resolves after the object chain closes'() {
+        given: 'q2d_gst shares qualitaetsangaben/AX_DQPunktort with the hoisted array'
+        def decoder = newPunktortDecoder()
+
+        when:
+        def tokens = runDecoder(decoder, punktortXml(ERHEBUNG_STEP + "\n" + BERECHNUNG_STEP))
+
+        then: 'the flat property resolves at its own path, outside the ARRAY pair'
+        valueAtPath(tokens, ["q2d_gst"]) == "2000"
+        def arrayEnd = indexOfTokenAtPath(tokens, FeatureTokenType.ARRAY_END, ["q2d_dpl_prs"])
+        indexOfTokenAtPath(tokens, FeatureTokenType.VALUE, ["q2d_gst"]) > arrayEnd
+    }
 }
