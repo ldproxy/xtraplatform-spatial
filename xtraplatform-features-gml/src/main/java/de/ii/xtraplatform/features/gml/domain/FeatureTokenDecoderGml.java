@@ -230,7 +230,10 @@ public class FeatureTokenDecoderGml
      * Element of an {@code xmlPaths} chain that represents a property as a nested element structure
      * (see {@link #structuralChainsByOwnerPath}). Contributes no path segment of its own; its child
      * elements continue the chain until its innermost segment is reached, which resolves to the
-     * mapped property and is decoded as a {@link #VALUE_PROPERTY}.
+     * mapped property — decoded as a {@link #VALUE_PROPERTY} for a value, or as an {@link
+     * #OBJECT_ELEMENT} holding the object's members for a mapped object. For an object array the
+     * segment carrying the repetition marker anchors the ARRAY bracket on this frame, so all
+     * members repeating from that segment land in one ARRAY pair.
      */
     XML_PATH_CHAIN,
     /** Element with no matching schema property; descendants are ignored. */
@@ -251,7 +254,9 @@ public class FeatureTokenDecoderGml
      * Resolved source-path segment contributed by this frame to the path tracker, or {@code null}
      * when no segment is contributed — this is the case for a <em>transparent</em> OBJECT_PROPERTY
      * (no {@code sourcePath}, used to flatten nested objects whose leaves carry columns of the
-     * parent table), and for OBJECT_ELEMENT / UNKNOWN frames.
+     * parent table), and for OBJECT_ELEMENT / UNKNOWN frames. Exception: an OBJECT_ELEMENT resolved
+     * from an {@code xmlPaths} chain carries the mapped property's segment (see {@link
+     * #chainObjectElement}).
      */
     final String segment;
 
@@ -363,6 +368,15 @@ public class FeatureTokenDecoderGml
       return new Frame(FrameKind.OBJECT_ELEMENT, null, lookupOwner, null, pathDepth);
     }
 
+    /**
+     * OBJECT_ELEMENT resolved from the innermost segment of an {@code xmlPaths} chain. Unlike a
+     * regular object element it carries the property's segment: no OBJECT_PROPERTY frame encloses
+     * it, so its own END emits the {@code onObjectEnd}, re-tracked at this segment.
+     */
+    static Frame chainObjectElement(FeatureSchema prop, String segment, int pathDepth) {
+      return new Frame(FrameKind.OBJECT_ELEMENT, prop, prop, segment, pathDepth);
+    }
+
     static Frame valueWrapper() {
       return new Frame(FrameKind.VALUE_WRAPPER, null, null, null, -1);
     }
@@ -470,10 +484,18 @@ public class FeatureTokenDecoderGml
     final String namespaceUri;
     final boolean emptyElement;
 
-    XmlPathSegment(String localName, String namespaceUri, boolean emptyElement) {
+    /**
+     * {@code true} for the segment marked with a leading {@code *}: the chain repeats from this
+     * segment for each member of a mapped object array, so the ARRAY bracket is anchored at the
+     * frame whose children match this segment.
+     */
+    final boolean repeats;
+
+    XmlPathSegment(String localName, String namespaceUri, boolean emptyElement, boolean repeats) {
       this.localName = localName;
       this.namespaceUri = namespaceUri;
       this.emptyElement = emptyElement;
+      this.repeats = repeats;
     }
 
     boolean matches(String wireLocalName, String wireNamespaceUri) {
@@ -534,12 +556,18 @@ public class FeatureTokenDecoderGml
 
   /**
    * Parses one configured chain segment. Mirrors the encoder's grammar {@code
-   * name([attribute=value])*'/'?}: the attribute predicates only affect output and are dropped, a
-   * trailing {@code /} marks an injected empty element, and a {@code prefix:} resolves to the
-   * expected namespace URI (falling back to the input profile's {@code defaultNamespace}).
+   * '*'?name([attribute=value])*'/'?}: the attribute predicates only affect output and are dropped,
+   * a trailing {@code /} marks an injected empty element, and a {@code prefix:} resolves to the
+   * expected namespace URI (falling back to the input profile's {@code defaultNamespace}). The
+   * leading {@code *} marks the segment from which the chain repeats for each member of a mapped
+   * object array; it anchors the ARRAY bracket in {@link #continueStructuralChain(Frame)}.
    */
   private XmlPathSegment parseXmlPathSegment(String configured) {
     String segment = configured.trim();
+    boolean repeats = segment.startsWith("*");
+    if (repeats) {
+      segment = segment.substring(1).trim();
+    }
     boolean emptyElement = segment.endsWith("/");
     if (emptyElement) {
       segment = segment.substring(0, segment.length() - 1).trim();
@@ -560,7 +588,7 @@ public class FeatureTokenDecoderGml
               ? null
               : namespaceNormalizer.getNamespaceURI(defaultPrefix);
     }
-    return new XmlPathSegment(segment, namespaceUri, emptyElement);
+    return new XmlPathSegment(segment, namespaceUri, emptyElement, repeats);
   }
 
   /**
@@ -1063,13 +1091,43 @@ public class FeatureTokenDecoderGml
         }
       }
       context.pathTracker().track(segment, pathDepth);
+      if (prop.isObject() && !prop.isFeatureRef()) {
+        // The innermost element of a mapped object's chain takes the role of the object element:
+        // its children are the object's members, resolved against the property's schema —
+        // including the members' own chains, which are relative to this element.
+        downstream.onObjectStart(context);
+        frames.push(Frame.chainObjectElement(prop, segment, pathDepth));
+        return;
+      }
       frames.push(createValueFrame(prop, segment, pathDepth));
       return;
     }
 
-    closeChainArray(parent);
+    // Descending an intermediate segment. The segment carrying the repetition marker introduces
+    // one member of a mapped object array: the ARRAY bracket opens here, on the frame whose
+    // children repeat, and stays open while the marker element repeats — so all members land in
+    // one ARRAY pair, closed when this frame ends or a sibling of another property arrives.
+    FeatureSchema repeating =
+        matched.size() == 1
+                && resolved.segments.get(matchedIndex).repeats
+                && resolved.property.isArray()
+            ? resolved.property
+            : null;
+    if (repeating != null && !Objects.equals(parent.chainContainerArrayPath, repeating.getName())) {
+      if (!Objects.equals(parent.openArrayChildPath, repeating.getName())) {
+        closeChainArray(parent);
+        context.pathTracker().track(repeating.getName(), parent.chainContainerPathDepth + 1);
+        downstream.onArrayStart(context);
+        parent.openArrayChildPath = repeating.getName();
+      }
+    } else {
+      closeChainArray(parent);
+    }
     Frame nested = Frame.xmlPathChain(matched, matchedIndex + 1, parent.chainContainerPathDepth);
-    nested.chainContainerArrayPath = parent.chainContainerArrayPath;
+    nested.chainContainerArrayPath =
+        parent.openArrayChildPath != null
+            ? parent.openArrayChildPath
+            : parent.chainContainerArrayPath;
     frames.push(nested);
   }
 
@@ -1160,14 +1218,21 @@ public class FeatureTokenDecoderGml
       // For array non-FEATURE_REF OBJECT_PROPERTYs the per-peer OBJECT pair is closed here, at
       // the path of the enclosing OBJECT_PROPERTY (the OBJECT_ELEMENT itself contributes no path
       // segment). For non-array OBJECT_PROPERTYs the OBJECT_ELEMENT END is silent — onObjectEnd
-      // fires at the enclosing OBJECT_PROPERTY's END above.
-      Frame enclosing = frames.peek();
-      if (enclosing != null
-          && enclosing.kind == FrameKind.OBJECT_PROPERTY
-          && enclosing.prop.isArray()
-          && !enclosing.prop.isFeatureRef()) {
-        context.pathTracker().track(enclosing.segment, enclosing.pathDepth);
+      // fires at the enclosing OBJECT_PROPERTY's END above. An object element resolved from an
+      // xmlPaths chain carries its own segment and has no enclosing OBJECT_PROPERTY, so its END
+      // closes the OBJECT pair itself.
+      if (frame.segment != null) {
+        context.pathTracker().track(frame.segment, frame.pathDepth);
         downstream.onObjectEnd(context);
+      } else {
+        Frame enclosing = frames.peek();
+        if (enclosing != null
+            && enclosing.kind == FrameKind.OBJECT_PROPERTY
+            && enclosing.prop.isArray()
+            && !enclosing.prop.isFeatureRef()) {
+          context.pathTracker().track(enclosing.segment, enclosing.pathDepth);
+          downstream.onObjectEnd(context);
+        }
       }
     }
 
