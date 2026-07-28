@@ -17,7 +17,6 @@ import de.ii.xtraplatform.features.domain.ImmutableSortKey;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.Query;
 import de.ii.xtraplatform.features.domain.SchemaBase;
-import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.domain.TypeQuery;
@@ -25,8 +24,6 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGenera
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryBatch;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySet;
-import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
-import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryBatch;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
@@ -43,31 +40,24 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.function.TriFunction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch, SqlQueryOptions> {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureQueryEncoderSql.class);
 
   private final Map<String, List<SqlQueryTemplates>> allQueryTemplates;
   private final Map<String, List<SqlQueryTemplates>> allQueryTemplatesMutations;
   private final int chunkSize;
-  private final SqlDialect sqlDialect;
   private final boolean geometryAsWkb;
   private final boolean computeNumberMatched;
 
   public FeatureQueryEncoderSql(
       Map<String, List<SqlQueryTemplates>> allQueryTemplates,
       Map<String, List<SqlQueryTemplates>> allQueryTemplatesMutations,
-      QueryGeneratorSettings queryGeneratorSettings,
-      SqlDialect sqlDialect) {
+      QueryGeneratorSettings queryGeneratorSettings) {
     this.allQueryTemplates = allQueryTemplates;
     this.allQueryTemplatesMutations = allQueryTemplatesMutations;
     this.chunkSize = queryGeneratorSettings.getChunkSize();
     this.geometryAsWkb = queryGeneratorSettings.getGeometryAsWkb();
     this.computeNumberMatched = queryGeneratorSettings.getComputeNumberMatched();
-    this.sqlDialect = sqlDialect;
   }
 
   // TODO: add cql2 classes
@@ -185,6 +175,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .withQuerySets(querySets);
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private SqlQuerySet createQuerySet(
       SqlQueryTemplates queryTemplates,
       long limit,
@@ -305,16 +296,5 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
               return ImmutableSortKey.builder().from(sortKey).field(columnName).build();
             })
         .collect(ImmutableList.toImmutableList());
-  }
-
-  private boolean typeIsSortable(PropertyTypeInfo typeInfo) {
-    if (typeInfo.getInArray()) {
-      return false;
-    }
-    Type t = typeInfo.getType();
-    if (typeInfo.getType() == Type.VALUE) {
-      t = typeInfo.getValueType().orElse(Type.STRING);
-    }
-    return t == Type.STRING || t == Type.INTEGER || t == Type.FLOAT || t == Type.FEATURE_REF;
   }
 }

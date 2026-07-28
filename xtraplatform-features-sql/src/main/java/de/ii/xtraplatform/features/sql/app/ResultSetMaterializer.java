@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
  * (when the dialect supports it); otherwise it is left unmaterialized and falls back to the inline
  * (CTE) re-evaluation.
  */
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class ResultSetMaterializer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultSetMaterializer.class);
@@ -94,6 +95,12 @@ public class ResultSetMaterializer {
    * oversized result sets into {@code createdTables}. The caller owns their lifecycle and must
    * {@link #dropTables(java.util.Collection) drop} them once the query's stream has completed.
    */
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidInstantiatingObjectsInLoops"
+  })
   public MultiFeatureQuery materialize(MultiFeatureQuery query, List<String> createdTables) {
     Map<String, InResultSet> sets = new LinkedHashMap<>();
     for (SubQuery subQuery : query.getQueries()) {
@@ -318,7 +325,8 @@ public class ResultSetMaterializer {
   }
 
   /** Drops the given result-set tables, best effort. Safe to call with an empty collection. */
-  public void dropTables(java.util.Collection<String> tables) {
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  public void dropTables(Collection<String> tables) {
     for (String table : tables) {
       try {
         sqlClient.get().run(dialect.dropResultSetTable(table), SqlQueryOptions.ddl()).join();
@@ -347,6 +355,7 @@ public class ResultSetMaterializer {
     UNKNOWN
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private static Truth truth(CqlNode node, Map<String, List<Object>> materialized) {
     if (node instanceof InResultSet) {
       List<Object> values = materialized.get(((InResultSet) node).getSetName());
@@ -415,7 +424,7 @@ public class ResultSetMaterializer {
   }
 
   /** Records the {@link InResultSet} nodes encountered while traversing a filter. */
-  private static class Collector extends CqlVisitorCopy {
+  private static final class Collector extends CqlVisitorCopy {
     private final List<InResultSet> found = new ArrayList<>();
 
     @Override
@@ -435,6 +444,7 @@ public class ResultSetMaterializer {
 
     ApplyMaterialized(
         Map<String, List<Object>> materialized, Map<String, String> materializedTables) {
+      super();
       this.materialized = materialized;
       this.materializedTables = materializedTables;
     }

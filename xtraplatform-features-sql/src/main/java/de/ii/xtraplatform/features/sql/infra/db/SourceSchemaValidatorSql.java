@@ -21,14 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import schemacrawler.schema.Catalog;
 import schemacrawler.schemacrawler.exceptions.SchemaCrawlerException;
 
 public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SourceSchemaValidatorSql.class);
   public static final String TABLE_DOES_NOT_EXIST = "%s: table '%s' does not exist";
   public static final String COLUMN_DOES_NOT_EXIST = "%s: column '%s' in table '%s' does not exist";
   public static final String COLUMN_NOT_UNIQUE =
@@ -37,7 +34,7 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
       "%s: column '%s' in table '%s' cannot be used as %s";
 
   private final List<String> schemas;
-  private Supplier<SqlClient> sqlClient;
+  private final Supplier<SqlClient> sqlClient;
 
   public SourceSchemaValidatorSql(List<String> schemas, Supplier<SqlClient> sqlClient) {
     this.schemas = schemas;
@@ -60,11 +57,22 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
     }
   }
 
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private ValidationResult validate(
       String typeName, SchemaSql tableSchema, MODE mode, SchemaInfo schemaInfo) {
     ImmutableValidationResult.Builder result = ImmutableValidationResult.builder().mode(mode);
 
-    if (!tableSchema.getRelation().isEmpty()) {
+    if (tableSchema.getRelation().isEmpty()) {
+      if (!schemaInfo.tableExists(tableSchema.getName())) {
+        String context = String.format("Invalid sourcePath in type '%s'", typeName);
+        result.addErrors(String.format(TABLE_DOES_NOT_EXIST, context, tableSchema.getName()));
+      }
+    } else {
       List<SqlRelation> relations = tableSchema.getRelation();
 
       for (int i = 0; i < relations.size(); i++) {
@@ -87,17 +95,18 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
                   relation.getSourceContainer()));
         }
 
-        if (!schemaInfo.tableExists(relation.getTargetContainer())) {
+        if (schemaInfo.tableExists(relation.getTargetContainer())) {
+          if (!schemaInfo.columnExists(relation.getTargetField(), relation.getTargetContainer())) {
+            result.addErrors(
+                String.format(
+                    COLUMN_DOES_NOT_EXIST,
+                    context,
+                    relation.getTargetField(),
+                    relation.getTargetContainer()));
+          }
+        } else {
           result.addErrors(
               String.format(TABLE_DOES_NOT_EXIST, context, relation.getTargetContainer()));
-        } else if (!schemaInfo.columnExists(
-            relation.getTargetField(), relation.getTargetContainer())) {
-          result.addErrors(
-              String.format(
-                  COLUMN_DOES_NOT_EXIST,
-                  context,
-                  relation.getTargetField(),
-                  relation.getTargetContainer()));
         }
 
         if (relation.getJunction().isPresent()
@@ -105,34 +114,31 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
           result.addErrors(
               String.format(TABLE_DOES_NOT_EXIST, context, relation.getJunction().get()));
         } else {
-          if (relation.getJunctionSource().isPresent() && relation.getJunction().isPresent()) {
-            if (!schemaInfo.columnExists(
-                relation.getJunctionSource().get(), relation.getJunction().get())) {
-              result.addErrors(
-                  String.format(
-                      COLUMN_DOES_NOT_EXIST,
-                      context,
-                      relation.getJunctionSource().get(),
-                      relation.getJunction().get()));
-            }
+          if (relation.getJunctionSource().isPresent()
+              && relation.getJunction().isPresent()
+              && !schemaInfo.columnExists(
+                  relation.getJunctionSource().get(), relation.getJunction().get())) {
+            result.addErrors(
+                String.format(
+                    COLUMN_DOES_NOT_EXIST,
+                    context,
+                    relation.getJunctionSource().get(),
+                    relation.getJunction().get()));
           }
 
-          if (relation.getJunctionTarget().isPresent() && relation.getJunction().isPresent()) {
-            if (!schemaInfo.columnExists(
-                relation.getJunctionTarget().get(), relation.getJunction().get())) {
-              result.addErrors(
-                  String.format(
-                      COLUMN_DOES_NOT_EXIST,
-                      context,
-                      relation.getJunctionTarget().get(),
-                      relation.getJunction().get()));
-            }
+          if (relation.getJunctionTarget().isPresent()
+              && relation.getJunction().isPresent()
+              && !schemaInfo.columnExists(
+                  relation.getJunctionTarget().get(), relation.getJunction().get())) {
+            result.addErrors(
+                String.format(
+                    COLUMN_DOES_NOT_EXIST,
+                    context,
+                    relation.getJunctionTarget().get(),
+                    relation.getJunction().get()));
           }
         }
       }
-    } else if (!schemaInfo.tableExists(tableSchema.getName())) {
-      String context = String.format("Invalid sourcePath in type '%s'", typeName);
-      result.addErrors(String.format(TABLE_DOES_NOT_EXIST, context, tableSchema.getName()));
     }
 
     ValidationResult intermediateResult = result.build();
@@ -141,21 +147,23 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
     }
 
     String context = String.format("Invalid sort key for type '%s'", typeName);
-    if (!schemaInfo.columnExists(tableSchema.getSortKey().get(), tableSchema.getName())) {
+    if (schemaInfo.columnExists(tableSchema.getSortKey().get(), tableSchema.getName())) {
+      if (!schemaInfo.isColumnUnique(tableSchema.getSortKey().get(), tableSchema.getName())) {
+        result.addStrictErrors(
+            String.format(
+                COLUMN_NOT_UNIQUE,
+                context,
+                tableSchema.getSortKey().get(),
+                tableSchema.getName(),
+                "sort key"));
+      }
+    } else {
       result.addErrors(
           String.format(
               COLUMN_DOES_NOT_EXIST,
               context,
               tableSchema.getSortKey().get(),
               tableSchema.getName()));
-    } else if (!schemaInfo.isColumnUnique(tableSchema.getSortKey().get(), tableSchema.getName())) {
-      result.addStrictErrors(
-          String.format(
-              COLUMN_NOT_UNIQUE,
-              context,
-              tableSchema.getSortKey().get(),
-              tableSchema.getName(),
-              "sort key"));
     }
 
     tableSchema
@@ -168,14 +176,7 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
                         "Invalid sourcePath for property '%s' in type '%s'",
                         attribute.getSourcePath().orElse("???"), typeName);
 
-                if (!schemaInfo.columnExists(attribute.getName(), tableSchema.getName())) {
-                  result.addErrors(
-                      String.format(
-                          COLUMN_DOES_NOT_EXIST,
-                          context2,
-                          attribute.getName(),
-                          tableSchema.getName()));
-                } else {
+                if (schemaInfo.columnExists(attribute.getName(), tableSchema.getName())) {
                   if (attribute.isId()
                       && !schemaInfo.isColumnUnique(attribute.getName(), tableSchema.getName())) {
                     String context3 =
@@ -213,6 +214,13 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
                             tableSchema.getName(),
                             "datetime"));
                   }
+                } else {
+                  result.addErrors(
+                      String.format(
+                          COLUMN_DOES_NOT_EXIST,
+                          context2,
+                          attribute.getName(),
+                          tableSchema.getName()));
                 }
               }
             });

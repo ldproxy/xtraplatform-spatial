@@ -58,7 +58,7 @@ final class SqlLiterals {
     try {
       return new BigDecimal(value.trim()).toBigIntegerExact().toString();
     } catch (NumberFormatException | ArithmeticException e) {
-      throw new IllegalArgumentException("not a valid integer value: '" + value + "'");
+      throw new IllegalArgumentException("not a valid integer value: '" + value + "'", e);
     }
   }
 
@@ -68,10 +68,11 @@ final class SqlLiterals {
       // SQL dialects.
       return new BigDecimal(value.trim()).toPlainString();
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("not a valid number value: '" + value + "'");
+      throw new IllegalArgumentException("not a valid number value: '" + value + "'", e);
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static String bool(String value) {
     String normalized = value.trim().toLowerCase(Locale.ROOT);
     switch (normalized) {

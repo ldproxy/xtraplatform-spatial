@@ -47,9 +47,11 @@ import org.postgresql.PGNotification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class SqlClientRx implements SqlClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlClientRx.class);
+  private static final String SQL_LOG_EXECUTING = "Executing statement: {}";
 
   private final Database session;
   private final SqlDbmsAdapter dbmsAdapter;
@@ -70,7 +72,7 @@ public class SqlClientRx implements SqlClient {
   @Override
   public CompletableFuture<Collection<SqlRow>> run(String query, SqlQueryOptions options) {
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", query);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, query);
     }
     CompletableFuture<Collection<SqlRow>> result = new CompletableFuture<>();
 
@@ -93,9 +95,10 @@ public class SqlClientRx implements SqlClient {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Reactive.Source<SqlRow> getSourceStream(String query, SqlQueryOptions options) {
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", query);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, query);
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 
@@ -207,7 +210,7 @@ public class SqlClientRx implements SqlClient {
             // LOGGER.debug("VALUES {}", values);
             LOGGER.debug("");
           } catch (SQLException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to process generated key for a mutation statement", e);
           }
           i[0]++;
 
@@ -216,7 +219,7 @@ public class SqlClientRx implements SqlClient {
 
     String first = statements.get(0).get();
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", first);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, first);
     }
 
     Flowable<? extends Tx<?>> txFlowable =
@@ -234,7 +237,7 @@ public class SqlClientRx implements SqlClient {
               tx -> {
                 String next = statements.get(finalJ).get();
                 if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-                  LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
+                  LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, next);
                 }
 
                 return tx.update(next)
@@ -254,6 +257,7 @@ public class SqlClientRx implements SqlClient {
   }
 
   @Override
+  @SuppressWarnings("PMD.UnnecessaryCast")
   public Transformer<FeatureDataSql, String> getMutationFlow(
       Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
       Object executionContext,

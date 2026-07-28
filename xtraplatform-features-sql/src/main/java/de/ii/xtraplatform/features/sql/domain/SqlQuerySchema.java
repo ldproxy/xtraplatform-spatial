@@ -83,17 +83,17 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @Value.Lazy
   default List<String> getSortKeys() {
     List<String> keys = new ArrayList<>();
-    String prefix = "";
+    StringBuilder prefix = new StringBuilder();
 
     for (SqlQueryJoin join : getRelations()) {
-      prefix += join.getPathSegment();
+      prefix.append(join.getPathSegment());
       if (!join.isJunction()) {
-        keys.add(String.format("%s.%s", prefix, join.getSortKey()));
+        keys.add(String.format("%s.%s", prefix.toString(), join.getSortKey()));
       }
     }
-    prefix += this.getPathSegment();
+    prefix.append(this.getPathSegment());
 
-    keys.add(String.format("%s.%s", prefix, this.getSortKey()));
+    keys.add(String.format("%s.%s", prefix.toString(), this.getSortKey()));
 
     return keys;
   }

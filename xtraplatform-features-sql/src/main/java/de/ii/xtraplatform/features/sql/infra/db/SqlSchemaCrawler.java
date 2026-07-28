@@ -28,7 +28,6 @@ import schemacrawler.schemacrawler.LoadOptionsBuilder;
 import schemacrawler.schemacrawler.SchemaCrawlerOptions;
 import schemacrawler.schemacrawler.SchemaCrawlerOptionsBuilder;
 import schemacrawler.schemacrawler.SchemaInfoLevelBuilder;
-import schemacrawler.schemacrawler.exceptions.SchemaCrawlerException;
 import schemacrawler.tools.utility.SchemaCrawlerUtility;
 import us.fatehi.utility.datasource.DatabaseConnectionSource;
 
@@ -40,26 +39,23 @@ public class SqlSchemaCrawler implements Closeable {
     this.connection = new SingleDatabaseConnectionSource(connection);
   }
 
-  public Catalog getCatalog(List<String> excludeSchemas, List<String> excludeTables)
-      throws SchemaCrawlerException {
+  public Catalog getCatalog(List<String> excludeSchemas, List<String> excludeTables) {
     return crawlSchemasAndTables(excludeSchemas, excludeTables);
   }
 
-  public Catalog getCatalog(String schema, String table) throws SchemaCrawlerException {
+  public Catalog getCatalog(String schema, String table) {
     return getCatalogAndMatching(
             schema.isEmpty() ? List.of() : List.of(schema), List.of(table), List.of())
         .first();
   }
 
   public Catalog getCatalog(
-      List<String> schemas, List<String> includeTables, List<String> excludeTables)
-      throws SchemaCrawlerException {
+      List<String> schemas, List<String> includeTables, List<String> excludeTables) {
     return getCatalogAndMatching(schemas, includeTables, excludeTables).first();
   }
 
   public Tuple<Catalog, List<String>> getCatalogAndMatching(
-      List<String> schemas, List<String> includeTables, List<String> excludeTables)
-      throws SchemaCrawlerException {
+      List<String> schemas, List<String> includeTables, List<String> excludeTables) {
     Catalog catalog = crawlWithDetails(schemas, includeTables, excludeTables);
     List<String> matchingTables =
         catalog.getTables().stream().map(Table::getName).collect(Collectors.toList());
@@ -84,8 +80,7 @@ public class SqlSchemaCrawler implements Closeable {
   }
 
   private Catalog crawlWithDetails(
-      List<String> schemas, List<String> includeTables, List<String> excludeTables)
-      throws SchemaCrawlerException {
+      List<String> schemas, List<String> includeTables, List<String> excludeTables) {
     String includeSchemas = schemas.stream().distinct().collect(Collectors.joining("|", "(", ")"));
 
     Collector<CharSequence, ?, String> tableCollector =
@@ -118,8 +113,7 @@ public class SqlSchemaCrawler implements Closeable {
     return SchemaCrawlerUtility.getCatalog(connection, options);
   }
 
-  private Catalog crawlSchemasAndTables(List<String> excludeSchemas, List<String> excludeTables)
-      throws SchemaCrawlerException {
+  private Catalog crawlSchemasAndTables(List<String> excludeSchemas, List<String> excludeTables) {
     LimitOptionsBuilder limitOptionsBuilder =
         LimitOptionsBuilder.builder()
             .tableTypes("BASE TABLE", "TABLE", "VIEW", "MATERIALIZED VIEW");
@@ -147,6 +141,7 @@ public class SqlSchemaCrawler implements Closeable {
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public void close() throws IOException {
     try {
       connection.close();

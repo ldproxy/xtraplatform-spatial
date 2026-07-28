@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
-import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
@@ -17,12 +16,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AggregateStatsQueryGenerator {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateStatsQueryGenerator.class);
+  private static final String FORMAT_TABLE_ALIAS = "%s %s";
+  private static final String FORMAT_WHERE = " WHERE %s";
 
   private final SqlDialect sqlDialect;
   private final FilterEncoderSql filterEncoder;
@@ -37,10 +35,10 @@ public class AggregateStatsQueryGenerator {
 
     List<String> aliases = AliasGenerator.getAliases(sourceSchema);
 
-    String mainTable = String.format("%s %s", sourceSchema.getName(), aliases.get(0));
+    String mainTable = String.format(FORMAT_TABLE_ALIAS, sourceSchema.getName(), aliases.get(0));
 
     Optional<String> filter = getFilter(mapping, sourceSchema);
-    String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
+    String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
     return String.format("SELECT COUNT(*) FROM %s%s", mainTable, where);
   }
@@ -52,7 +50,7 @@ public class AggregateStatsQueryGenerator {
     List<String> aliases = AliasGenerator.getAliases(spatial);
     String spatialAlias = aliases.get(aliases.size() - 1);
 
-    String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
+    String mainTable = String.format(FORMAT_TABLE_ALIAS, mainSchema.getName(), aliases.get(0));
 
     String column =
         SqlQueryColumnOperations.getQualifiedColumnResolved(
@@ -66,7 +64,7 @@ public class AggregateStatsQueryGenerator {
     String join = JoinGenerator.getJoins(spatial, aliases, filterEncoder);
 
     Optional<String> filter = getFilter(mapping, mainSchema);
-    String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
+    String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
     return String.format(
         "SELECT %s FROM %s%s%s%s", columnExtent, mainTable, join.isEmpty() ? "" : " ", join, where);
@@ -79,7 +77,7 @@ public class AggregateStatsQueryGenerator {
     List<String> aliases = AliasGenerator.getAliases(instant);
     String temporalAlias = aliases.get(aliases.size() - 1);
 
-    String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
+    String mainTable = String.format(FORMAT_TABLE_ALIAS, mainSchema.getName(), aliases.get(0));
 
     SqlQueryColumn instantColumnDatetime = SqlQueryColumnOperations.dateToDatetime(instantColumn);
 
@@ -90,7 +88,7 @@ public class AggregateStatsQueryGenerator {
     String join = JoinGenerator.getJoins(instant, aliases, filterEncoder);
 
     Optional<String> filter = getFilter(mapping, mainSchema);
-    String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
+    String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
     return String.format(
         "SELECT MIN(%s), MAX(%s) FROM %s%s%s%s",
@@ -109,7 +107,7 @@ public class AggregateStatsQueryGenerator {
       List<String> aliases = AliasGenerator.getAliases(intervalStart);
       String temporalAlias = aliases.get(aliases.size() - 1);
 
-      String mainTable = String.format("%s %s", mainSchema.getName(), aliases.get(0));
+      String mainTable = String.format(FORMAT_TABLE_ALIAS, mainSchema.getName(), aliases.get(0));
 
       SqlQueryColumn intervalStartColumnColumnDatetime =
           SqlQueryColumnOperations.dateToDatetime(intervalStartColumn);
@@ -127,7 +125,7 @@ public class AggregateStatsQueryGenerator {
       String join = JoinGenerator.getJoins(intervalStart, aliases, filterEncoder);
 
       Optional<String> filter = getFilter(mapping, mainSchema);
-      String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
+      String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
       return String.format(
           "SELECT MIN(%s), MAX(%s) FROM %s%s%s%s",
@@ -139,7 +137,8 @@ public class AggregateStatsQueryGenerator {
       List<String> endAliases = AliasGenerator.getAliases(intervalEnd);
       String endAlias = endAliases.get(endAliases.size() - 1);
 
-      String mainTable = String.format("%s %s", mainSchema.getName(), startAliases.get(0));
+      String mainTable =
+          String.format(FORMAT_TABLE_ALIAS, mainSchema.getName(), startAliases.get(0));
 
       String columnStart =
           SqlQueryColumnOperations.getQualifiedColumnResolved(
@@ -157,7 +156,7 @@ public class AggregateStatsQueryGenerator {
           String.format("%s%s%s", mainTable, endJoin.isEmpty() ? "" : " ", endJoin);
 
       Optional<String> filter = getFilter(mapping, mainSchema);
-      String where = filter.isPresent() ? String.format(" WHERE %s", filter.get()) : "";
+      String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
       return String.format(
           "SELECT * FROM (SELECT MIN(%s) FROM %s%s) AS A, (SELECT MAX(%s) from %s%s) AS B;",
@@ -165,20 +164,7 @@ public class AggregateStatsQueryGenerator {
     }
   }
 
-  private Optional<String> getFilter(SchemaSql schemaSql) {
-    return schemaSql.getFilter().map(cql -> filterEncoder.encode(cql, schemaSql));
-  }
-
   private Optional<String> getFilter(SqlQueryMapping mapping, SqlQuerySchema schemaSql) {
     return schemaSql.getFilter().map(cql -> filterEncoder.encode(cql, mapping));
-  }
-
-  private String getQualifiedColumn(String table, String column) {
-    if (column.startsWith("[EXPRESSION]{sql=")) {
-      return column.substring(17, column.length() - 1).replaceAll("\\$T\\$", table);
-    }
-    return column.contains("(")
-        ? column.replaceAll("((?:\\w+\\()+)(\\w+)((?:\\))+)", "$1" + table + ".$2$3 AS $2")
-        : String.format("%s.%s", table, column);
   }
 }

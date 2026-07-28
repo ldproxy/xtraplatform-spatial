@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.collect.ImmutableList;
-import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.features.domain.FeatureStoreRelation;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureStoreRelation;
@@ -26,19 +25,13 @@ import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PathParserSql {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PathParserSql.class);
-
   private final SqlPathSyntax syntax;
-  private final Cql cql;
 
-  public PathParserSql(SqlPathSyntax syntax, Cql cql) {
+  public PathParserSql(SqlPathSyntax syntax) {
     this.syntax = syntax;
-    this.cql = cql;
   }
 
   public Optional<SqlPath> parse(String path, boolean isColumn) {
@@ -72,8 +65,6 @@ public class PathParserSql {
       List<String> tablePathAsList = syntax.asList(tablePath);
       boolean isRoot = tablePathAsList.size() == 1;
       boolean isJunction = syntax.isJunctionTable(tablePathAsList.get(tablePathAsList.size() - 1));
-      Optional<String> queryable =
-          syntax.getQueryableFlag(flags).map(q -> q.replaceAll("\\[", "").replaceAll("]", ""));
       boolean isSpatial = syntax.getSpatialFlag(flags);
 
       try {
@@ -89,9 +80,8 @@ public class PathParserSql {
                 .queryable("" /*queryable.get()*/)
                 .isSpatial(isSpatial)
                 .build());
-      } catch (Throwable e) {
+      } catch (IllegalStateException e) {
         // invalid path
-        boolean br = true;
       }
     }
 

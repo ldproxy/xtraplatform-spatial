@@ -55,9 +55,30 @@ import org.slf4j.LoggerFactory;
  * FeatureMutationsSql} to derive insert/delete statements and executes them sequentially on the
  * underlying {@link SqlSession} so that all mutations participate in one transaction.
  */
+@SuppressWarnings({
+  "PMD.AvoidCatchingGenericException",
+  "PMD.CouplingBetweenObjects",
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods"
+})
 public class SqlMutationSession implements FeatureTransactions.Session {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlMutationSession.class);
+
+  private static final String SQL_EQ = " = ";
+  private static final String SQL_NULL = "NULL";
+  private static final String SQL_AND = " AND ";
+  private static final String SQL_IS_NULL = " IS NULL";
+  private static final String SQL_UPDATE = "UPDATE ";
+  private static final String SQL_SET = " SET ";
+  private static final String SQL_WHERE = " WHERE ";
+  private static final String SQL_RETURNING = " RETURNING ";
+  private static final String SQL_SELECT = "SELECT ";
+  private static final String SQL_FROM = " FROM ";
+  private static final String SQL_INSERT_INTO = "INSERT INTO ";
+  private static final String ERROR_FEATURE_TYPE = "Feature type '";
+  private static final String ERROR_IN_COLLECTION = "' in collection '";
 
   private final SqlSession sqlSession;
   private final Map<String, List<SqlQueryMapping>> queryMappings;
@@ -177,6 +198,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // the end-col predicate narrows to the just-inserted open version (versioned collections
   // bind `PRIMARY_INTERVAL_END`; plain collections skip the predicate). Role overrides whose
   // column IS writable have already landed via the INSERT path and are skipped here.
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void applyPostInsertRoleOverrides(
       SqlQueryMapping mapping, List<String> ids, Map<SchemaBase.Role, Object> overrides) {
     if (ids.isEmpty()) {
@@ -200,7 +222,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       }
       if (postUpdateTable == null) {
         postUpdateTable = table;
-      } else if (postUpdateTable != table) {
+      } else if (!Objects.equals(postUpdateTable, table)) {
         // All deferred overrides for a single feature must target the same table (typically the
         // main table). A future role binding on a sub-table would need a separate UPDATE.
         continue;
@@ -224,22 +246,22 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       }
       setClause
           .append(d.first().getName())
-          .append(" = ")
-          .append(d.second() == null ? "NULL" : formatRoleOverrideValue(d.first(), d.second()));
+          .append(SQL_EQ)
+          .append(d.second() == null ? SQL_NULL : formatRoleOverrideValue(d.first(), d.second()));
     }
     String tableName = postUpdateTable.getName();
     String idColName = idColumn.get().second().getName();
     String endPredicate =
-        endColumn.map(t -> " AND " + t.second().getName() + " IS NULL").orElse("");
+        endColumn.map(t -> SQL_AND + t.second().getName() + SQL_IS_NULL).orElse("");
     for (String id : ids) {
       String sql =
-          "UPDATE "
+          SQL_UPDATE
               + tableName
-              + " SET "
+              + SQL_SET
               + setClause
-              + " WHERE "
+              + SQL_WHERE
               + idColName
-              + " = "
+              + SQL_EQ
               + sqlString(id)
               + endPredicate
               + ";";
@@ -307,6 +329,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // 409-style conflict. When `expectedStart` is present, the WHERE also requires `startCol =
   // expectedStart` — an If-Unmodified-Since-style check that the caller maps to a 412 on miss.
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public FeatureTransactions.MutationResult retireFeature(
       String featureType,
       String featureId,
@@ -324,7 +347,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' has no PRIMARY_INTERVAL_END role column; cannot retire."))
           .build();
@@ -335,7 +358,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' has no PRIMARY_INTERVAL_START role column; cannot enforce"
                       + " no-backdating during retire."))
@@ -347,7 +370,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '" + featureType + "' has no id column; cannot retire."))
+                  ERROR_FEATURE_TYPE + featureType + "' has no id column; cannot retire."))
           .build();
     }
 
@@ -359,7 +382,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' has id / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END on more"
                       + " than one table; retirement requires all three on the main table."))
@@ -376,7 +399,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     // role to a column on the main table, set it to the retirement timestamp — which is also
     // the new version's start in retire-and-insert flows. Opt-in: no SUCCESSOR_INTERVAL_START
     // role on the schema means no SET clause is added.
-    StringBuilder setClause = new StringBuilder(endColumnName).append(" = ").append(tsLiteral);
+    StringBuilder setClause = new StringBuilder(endColumnName).append(SQL_EQ).append(tsLiteral);
     Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
         successorColumn = mapping.getColumnForRole(SchemaBase.Role.SUCCESSOR_INTERVAL_START);
     if (successorColumn.isPresent()
@@ -384,7 +407,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       setClause
           .append(", ")
           .append(successorColumn.get().second().getName())
-          .append(" = ")
+          .append(SQL_EQ)
           .append(tsLiteral);
     }
 
@@ -396,9 +419,9 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     // 412 on miss (composite-id convention).
     StringBuilder where =
         new StringBuilder(idColumnName)
-            .append(" = ")
+            .append(SQL_EQ)
             .append(sqlString(featureId))
-            .append(" AND ")
+            .append(SQL_AND)
             .append(endColumnName)
             .append(" IS NULL AND ")
             .append(startColumnName)
@@ -406,19 +429,19 @@ public class SqlMutationSession implements FeatureTransactions.Session {
             .append(tsLiteral);
     if (expectedStart.isPresent()) {
       where
-          .append(" AND ")
+          .append(SQL_AND)
           .append(startColumnName)
-          .append(" = ")
+          .append(SQL_EQ)
           .append(sqlString(expectedStart.get().toString()));
     }
     String sql =
-        "UPDATE "
+        SQL_UPDATE
             + mainTableName
-            + " SET "
+            + SQL_SET
             + setClause
-            + " WHERE "
+            + SQL_WHERE
             + where
-            + " RETURNING "
+            + SQL_RETURNING
             + idColumnName
             + ";";
     try {
@@ -451,7 +474,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' has no id column; cannot run the versioned-insert pre-flight."))
           .build();
@@ -461,9 +484,9 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     String sql =
         "SELECT 1 FROM "
             + mainTableName
-            + " WHERE "
+            + SQL_WHERE
             + idCol
-            + " = "
+            + SQL_EQ
             + sqlString(featureId)
             + " LIMIT 1;";
     try {
@@ -474,7 +497,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                 new IllegalArgumentException(
                     "Cannot create feature id '"
                         + featureId
-                        + "' in collection '"
+                        + ERROR_IN_COLLECTION
                         + featureType
                         + "': a version of this feature already exists (use Replace or Update to"
                         + " add a new version)."))
@@ -509,15 +532,15 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return Optional.empty();
     }
     String sql =
-        "SELECT "
+        SQL_SELECT
             + startColumn.get().second().getName()
-            + " FROM "
+            + SQL_FROM
             + mainTableName
-            + " WHERE "
+            + SQL_WHERE
             + idColumn.get().second().getName()
-            + " = "
+            + SQL_EQ
             + sqlString(featureId)
-            + " AND "
+            + SQL_AND
             + endColumn.get().second().getName()
             + " IS NULL LIMIT 1;";
     try {
@@ -599,13 +622,13 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' has no PRIMARY_INTERVAL_END role column; cannot patch open version."))
           .build();
     }
     String endColumnName = endColumn.get().second().getName();
-    String extra = " AND " + endColumnName + " IS NULL";
+    StringBuilder extra = new StringBuilder(SQL_AND).append(endColumnName).append(SQL_IS_NULL);
 
     Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
         startColumn = mapping.getColumnForRole(SchemaBase.Role.PRIMARY_INTERVAL_START);
@@ -621,7 +644,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
         if (resolved.isPresent()
             && Objects.equals(resolved.get().second().getName(), endColumnName)) {
           String endLiteral = encodeLiteral(resolved.get().second(), u.getValue(), crs);
-          extra = extra + " AND " + startColumnName + " < " + endLiteral;
+          extra.append(SQL_AND).append(startColumnName).append(" < ").append(endLiteral);
           break;
         }
       }
@@ -629,12 +652,16 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       // equal the value the client encoded in the rid's suffix. Otherwise the UPDATE matches 0
       // rows and the caller maps that to a 412 Precondition Failed.
       if (expectedStart.isPresent()) {
-        extra =
-            extra + " AND " + startColumnName + " = " + sqlString(expectedStart.get().toString());
+        extra
+            .append(SQL_AND)
+            .append(startColumnName)
+            .append(SQL_EQ)
+            .append(sqlString(expectedStart.get().toString()));
       }
     }
 
-    return patchInternal(featureType, featureId, updates, crs, extra, "open version of feature");
+    return patchInternal(
+        featureType, featureId, updates, crs, extra.toString(), "open version of feature");
   }
 
   // Versioned Update CLONE_AND_PATCH: create a new version of the open row, carry
@@ -652,6 +679,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   //      DELETE+INSERT junction path.
   // An empty result on step 1 → caller maps to 409 (or 412 when `expectedStart` was present).
   @Override
+  @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public FeatureTransactions.MutationResult cloneAndPatchFeature(
       String featureType,
       String featureId,
@@ -675,7 +703,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' is missing ID / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END role"
                       + " columns; cannot clone-and-patch."))
@@ -688,7 +716,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '"
+                  ERROR_FEATURE_TYPE
                       + featureType
                       + "' has id / PRIMARY_INTERVAL_START / PRIMARY_INTERVAL_END on more than"
                       + " one table; clone-and-patch requires all three on the main table."))
@@ -713,22 +741,23 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
     // Step 1: capture the open row's surrogate PK (and reject early if no open row matches).
     StringBuilder findPk =
-        new StringBuilder("SELECT ")
+        new StringBuilder(128)
+            .append(SQL_SELECT)
             .append(pkColumnName)
-            .append(" FROM ")
+            .append(SQL_FROM)
             .append(mainTableName)
-            .append(" WHERE ")
+            .append(SQL_WHERE)
             .append(idColumnName)
-            .append(" = ")
+            .append(SQL_EQ)
             .append(sqlString(featureId))
-            .append(" AND ")
+            .append(SQL_AND)
             .append(endColumnName)
-            .append(" IS NULL");
+            .append(SQL_IS_NULL);
     if (expectedStart.isPresent()) {
       findPk
-          .append(" AND ")
+          .append(SQL_AND)
           .append(startColumnName)
-          .append(" = ")
+          .append(SQL_EQ)
           .append(sqlString(expectedStart.get().toString()));
     }
     findPk.append(" LIMIT 1;");
@@ -751,13 +780,13 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       try {
         List<String> startRows =
             sqlSession.runReturning(
-                "SELECT "
+                SQL_SELECT
                     + startColumnName
-                    + " FROM "
+                    + SQL_FROM
                     + mainTableName
-                    + " WHERE "
+                    + SQL_WHERE
                     + pkColumnName
-                    + " = "
+                    + SQL_EQ
                     + oldPkLit
                     + ";");
         if (!startRows.isEmpty()) {
@@ -798,16 +827,16 @@ public class SqlMutationSession implements FeatureTransactions.Session {
           continue;
         }
         if (role.get() == SchemaBase.Role.PRIMARY_INTERVAL_END) {
-          selectExprs.add("NULL");
+          selectExprs.add(SQL_NULL);
           continue;
         }
         if (role.get() == SchemaBase.Role.PREDECESSOR_INTERVAL_START) {
-          selectExprs.add(oldStart.map(SqlMutationSession::sqlString).orElse("NULL"));
+          selectExprs.add(oldStart.map(SqlMutationSession::sqlString).orElse(SQL_NULL));
           continue;
         }
         if (role.get() == SchemaBase.Role.SUCCESSOR_INTERVAL_START) {
           // The new row is open — no successor yet.
-          selectExprs.add("NULL");
+          selectExprs.add(SQL_NULL);
           continue;
         }
       }
@@ -815,19 +844,19 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       selectExprs.add(patchLit != null ? patchLit : "m." + name);
     }
     String cloneMainSql =
-        "INSERT INTO "
+        SQL_INSERT_INTO
             + mainTableName
             + " ("
             + String.join(", ", insertCols)
             + ") SELECT "
             + String.join(", ", selectExprs)
-            + " FROM "
+            + SQL_FROM
             + mainTableName
             + " m WHERE m."
             + pkColumnName
-            + " = "
+            + SQL_EQ
             + oldPkLit
-            + " RETURNING "
+            + SQL_RETURNING
             + pkColumnName
             + ";";
     List<String> newPkRows;
@@ -842,7 +871,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
               new IllegalStateException(
                   "Clone-and-patch of feature id '"
                       + featureId
-                      + "' in collection '"
+                      + ERROR_IN_COLLECTION
                       + featureType
                       + "' did not return a new row PK; clone INSERT must have inserted 0 rows."))
           .build();
@@ -868,30 +897,30 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     }
 
     // Step 4: retire OLD. Same guard as retireFeature — no-backdating + must be the open row.
-    StringBuilder retireSet = new StringBuilder(endColumnName).append(" = ").append(tsLiteral);
+    StringBuilder retireSet = new StringBuilder(endColumnName).append(SQL_EQ).append(tsLiteral);
     if (successorOnMain) {
       retireSet
           .append(", ")
           .append(successorColumn.get().second().getName())
-          .append(" = ")
+          .append(SQL_EQ)
           .append(tsLiteral);
     }
     String retireSql =
-        "UPDATE "
+        SQL_UPDATE
             + mainTableName
-            + " SET "
+            + SQL_SET
             + retireSet
-            + " WHERE "
+            + SQL_WHERE
             + pkColumnName
-            + " = "
+            + SQL_EQ
             + oldPkLit
-            + " AND "
+            + SQL_AND
             + endColumnName
             + " IS NULL AND "
             + startColumnName
             + " < "
             + tsLiteral
-            + " RETURNING "
+            + SQL_RETURNING
             + pkColumnName
             + ";";
     List<String> retiredRows;
@@ -906,7 +935,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
               new IllegalStateException(
                   "Clone-and-patch of feature id '"
                       + featureId
-                      + "' in collection '"
+                      + ERROR_IN_COLLECTION
                       + featureType
                       + "': failed to retire the previous open version (concurrent modification or"
                       + " no-backdating violation)."))
@@ -935,7 +964,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
               featureId,
               junctionUpdates,
               crs,
-              " AND " + endColumnName + " IS NULL",
+              SQL_AND + endColumnName + SQL_IS_NULL,
               "open version of feature");
       if (patchResult.getError().isPresent()) {
         return builder.error(patchResult.getError().get()).build();
@@ -982,17 +1011,17 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return;
     }
     String sql =
-        "INSERT INTO "
+        SQL_INSERT_INTO
             + junction.getName()
             + " ("
             + String.join(", ", insertCols)
             + ") SELECT "
             + String.join(", ", selectExprs)
-            + " FROM "
+            + SQL_FROM
             + junction.getName()
-            + " WHERE "
+            + SQL_WHERE
             + fkColumn
-            + " = "
+            + SQL_EQ
             + oldPkLit
             + ";";
     sqlSession.runReturning(sql);
@@ -1003,7 +1032,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // anything that isn't a plain integer.
   private static String sqlLiteralForPk(String raw) {
     if (raw == null) {
-      return "NULL";
+      return SQL_NULL;
     }
     try {
       Long.parseLong(raw);
@@ -1013,6 +1042,11 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     }
   }
 
+  @SuppressWarnings({
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity"
+  })
   private FeatureTransactions.MutationResult patchInternal(
       String featureType,
       String featureId,
@@ -1035,7 +1069,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       return builder
           .error(
               new IllegalStateException(
-                  "Feature type '" + featureType + "' has no id column; cannot patch in place."))
+                  ERROR_FEATURE_TYPE + featureType + "' has no id column; cannot patch in place."))
           .build();
     }
     SqlQuerySchema mainTable = mapping.getMainTable();
@@ -1045,8 +1079,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
     List<String> setClauses = new ArrayList<>();
     // Junction-backed updates: ordered by first-touch path so deterministic SQL ordering.
-    java.util.LinkedHashMap<String, JunctionPatch> junctionPatches =
-        new java.util.LinkedHashMap<>();
+    Map<String, JunctionPatch> junctionPatches = new java.util.LinkedHashMap<>();
 
     for (FeatureTransactions.PropertyUpdate update : updates) {
       String joined = String.join(".", update.getPath());
@@ -1060,7 +1093,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
           SqlQueryColumn column = resolved.get().second();
           if (Objects.equals(table.getName(), mainTableName)) {
             String literal = encodeLiteral(column, update.getValue(), crs);
-            setClauses.add(column.getName() + " = " + literal);
+            setClauses.add(column.getName() + SQL_EQ + literal);
           } else if (table.isOne2N()) {
             JunctionPatch patch =
                 junctionPatches.computeIfAbsent(
@@ -1118,16 +1151,16 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
       if (!setClauses.isEmpty()) {
         String sql =
-            "UPDATE "
+            SQL_UPDATE
                 + mainTableName
-                + " SET "
+                + SQL_SET
                 + String.join(", ", setClauses)
-                + " WHERE "
+                + SQL_WHERE
                 + idColumnName
-                + " = "
+                + SQL_EQ
                 + idLiteral
                 + extraWherePredicate
-                + " RETURNING "
+                + SQL_RETURNING
                 + idColumnName
                 + ";";
         List<String> returned = sqlSession.runReturning(sql);
@@ -1139,7 +1172,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                           + missingTargetLabel
                           + " with id '"
                           + featureId
-                          + "' in collection '"
+                          + ERROR_IN_COLLECTION
                           + featureType
                           + "'."))
               .build();
@@ -1153,13 +1186,13 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       if (setClauses.isEmpty() && !junctionPatches.isEmpty()) {
         List<String> exists =
             sqlSession.runReturning(
-                "SELECT "
+                SQL_SELECT
                     + idColumnName
-                    + " FROM "
+                    + SQL_FROM
                     + mainTableName
-                    + " WHERE "
+                    + SQL_WHERE
                     + idColumnName
-                    + " = "
+                    + SQL_EQ
                     + idLiteral
                     + extraWherePredicate
                     + ";");
@@ -1171,7 +1204,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                           + missingTargetLabel
                           + " with id '"
                           + featureId
-                          + "' in collection '"
+                          + ERROR_IN_COLLECTION
                           + featureType
                           + "'."))
               .build();
@@ -1184,6 +1217,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     return builder.build();
   }
 
+  @SuppressWarnings({"PMD.AvoidInstantiatingObjectsInLoops", "PMD.CyclomaticComplexity"})
   private void runJunctionPatch(
       JunctionPatch patch,
       String mainTableName,
@@ -1203,15 +1237,15 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     String deleteSql =
         "DELETE FROM "
             + junctionTable
-            + " WHERE "
+            + SQL_WHERE
             + junctionFk
             + " IN (SELECT "
             + parentPk
-            + " FROM "
+            + SQL_FROM
             + mainTableName
-            + " WHERE "
+            + SQL_WHERE
             + idColumnName
-            + " = "
+            + SQL_EQ
             + idLiteral
             + extraWherePredicate
             + ");";
@@ -1226,14 +1260,16 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       String valueCol = patch.valueColumn.getName();
       StringBuilder valuesList = new StringBuilder();
       for (int i = 0; i < patch.values.size(); i++) {
-        if (i > 0) valuesList.append(", ");
+        if (i > 0) {
+          valuesList.append(", ");
+        }
         valuesList
-            .append("(")
+            .append('(')
             .append(encodeLiteral(patch.valueColumn, Optional.of(patch.values.get(i)), crs))
-            .append(")");
+            .append(')');
       }
       String insertSql =
-          "INSERT INTO "
+          SQL_INSERT_INTO
               + junctionTable
               + " ("
               + junctionFk
@@ -1247,7 +1283,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
               + valuesList
               + ") AS v(val) WHERE m."
               + idColumnName
-              + " = "
+              + SQL_EQ
               + idLiteral
               + qualifyAliasPredicate(extraWherePredicate, "m")
               + ";";
@@ -1273,22 +1309,23 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       StringBuilder selectLits = new StringBuilder("m.").append(parentPk);
       for (String childKey : childKeys) {
         com.fasterxml.jackson.databind.JsonNode v = element.get(childKey);
-        selectLits.append(", ");
-        selectLits.append(
-            encodeLiteral(patch.objectChildColumns.get(childKey), Optional.ofNullable(v), crs));
+        selectLits
+            .append(", ")
+            .append(
+                encodeLiteral(patch.objectChildColumns.get(childKey), Optional.ofNullable(v), crs));
       }
       String insertSql =
-          "INSERT INTO "
+          SQL_INSERT_INTO
               + junctionTable
               + " ("
               + cols
               + ") SELECT "
               + selectLits
-              + " FROM "
+              + SQL_FROM
               + mainTableName
               + " m WHERE m."
               + idColumnName
-              + " = "
+              + SQL_EQ
               + idLiteral
               + qualifyAliasPredicate(extraWherePredicate, "m")
               + ";";
@@ -1300,12 +1337,16 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // references must be qualified with that alias. Single-pass replace works because the predicate
   // is generated by us (`" AND <colName> IS NULL"`); not robust against arbitrary user input.
   private static String qualifyAliasPredicate(String extraPredicate, String alias) {
-    if (extraPredicate.isEmpty()) return extraPredicate;
+    if (extraPredicate.isEmpty()) {
+      return extraPredicate;
+    }
     // Strip leading " AND " and prefix every word-start with the alias.
     int and = extraPredicate.indexOf("AND ");
-    if (and < 0) return extraPredicate;
+    if (and < 0) {
+      return extraPredicate;
+    }
     String rest = extraPredicate.substring(and + 4);
-    return " AND " + alias + "." + rest;
+    return SQL_AND + alias + "." + rest;
   }
 
   // Patch state for a junction-backed property. Two modes are encoded in the same record so the
@@ -1316,14 +1357,14 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   private static final class JunctionPatch {
     final SqlQuerySchema junction;
     final SqlQueryColumn valueColumn;
-    final java.util.LinkedHashMap<String, SqlQueryColumn> objectChildColumns;
+    final Map<String, SqlQueryColumn> objectChildColumns;
     final String objectPath;
     final List<com.fasterxml.jackson.databind.JsonNode> values = new ArrayList<>();
 
     private JunctionPatch(
         SqlQuerySchema junction,
         SqlQueryColumn valueColumn,
-        java.util.LinkedHashMap<String, SqlQueryColumn> objectChildColumns,
+        Map<String, SqlQueryColumn> objectChildColumns,
         String objectPath) {
       this.junction = junction;
       this.valueColumn = valueColumn;
@@ -1337,7 +1378,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
     static JunctionPatch objectArray(
         SqlQuerySchema junction, FeatureSchema objectSchema, SqlQueryMapping mapping, String path) {
-      java.util.LinkedHashMap<String, SqlQueryColumn> cols = new java.util.LinkedHashMap<>();
+      Map<String, SqlQueryColumn> cols = new java.util.LinkedHashMap<>();
       for (FeatureSchema child : objectSchema.getProperties()) {
         if (child.getType() == SchemaBase.Type.OBJECT
             || child.getType() == SchemaBase.Type.OBJECT_ARRAY) {
@@ -1412,7 +1453,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       Optional<com.fasterxml.jackson.databind.JsonNode> valueOpt,
       EpsgCrs crs) {
     if (valueOpt.isEmpty() || valueOpt.get().isNull()) {
-      return "NULL";
+      return SQL_NULL;
     }
     com.fasterxml.jackson.databind.JsonNode value = valueOpt.get();
     if (column.hasOperation(SqlQueryColumn.Operation.WKT)
@@ -1424,6 +1465,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     return SqlLiterals.forType(column.getType(), value.asText());
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private String encodeGeometryLiteral(
       SqlQueryColumn column, com.fasterxml.jackson.databind.JsonNode value, EpsgCrs crs) {
     if (!value.isObject()) {
@@ -1514,7 +1556,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
   private static String sqlString(String value) {
     if (value == null) {
-      return "NULL";
+      return SQL_NULL;
     }
     return "'" + value.replace("'", "''") + "'";
   }
@@ -1637,7 +1679,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                     crsTransformerFactory,
                     nativeTimeZone,
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            .via(Transformer.map(feature -> (FeatureDataSql) feature));
+            .via(Transformer.map(feature -> feature));
 
     if (partial) {
       featureSqlSource =
@@ -1702,6 +1744,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // consumer (so child statements can read them from currentRow.ids), then send all children
   // across all features through a single sqlSession.run — letting the existing JDBC batch path
   // collapse the entire tail into one executeBatch.
+  @SuppressWarnings("PMD.NullAssignment")
   private void writeFeaturesBatched(
       List<FeatureDataSql> collected,
       RowCursor rowCursor,
@@ -1752,8 +1795,9 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // sqlSession.runReturning so we receive every generated PK in insertion order. Features whose
   // main SQL doesn't fit the shape (e.g. DEFAULT VALUES, or a different table) are flushed as a
   // single-row insert via the same path; null-SQL slots are skipped entirely.
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   private void runMainInsertsGrouped(
-      String[] mainSqls, Consumer<?>[] consumersRaw, String[] returnedPks) {
+      String[] mainSqls, Consumer<?>[] consumersRaw, String... returnedPks) {
     int n = mainSqls.length;
     int i = 0;
     while (i < n) {
@@ -1764,7 +1808,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       MainInsertParts head = splitMainInsert(mainSqls[i]);
       if (head == null) {
         // SQL doesn't match the standard shape — execute on its own.
-        executeAndDispatch(mainSqls[i], consumersRaw, returnedPks, new int[] {i});
+        executeAndDispatch(mainSqls[i], consumersRaw, returnedPks, i);
         i++;
         continue;
       }
@@ -1794,7 +1838,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
   @SuppressWarnings("unchecked")
   private void executeAndDispatch(
-      String sql, Consumer<?>[] consumersRaw, String[] returnedPks, int[] featureIndices) {
+      String sql, Consumer<?>[] consumersRaw, String[] returnedPks, int... featureIndices) {
     List<String> ids = sqlSession.runReturning(sql);
     for (int k = 0; k < featureIndices.length; k++) {
       String returned = k < ids.size() ? ids.get(k) : null;
@@ -1831,11 +1875,10 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   // " RETURNING "). Returns null when the SQL doesn't match — e.g. DEFAULT VALUES, or some other
   // shape — so the caller can fall back to a single-row execution.
   private static MainInsertParts splitMainInsert(String sql) {
-    int retIdx = sql.lastIndexOf(" RETURNING ");
+    int retIdx = sql.lastIndexOf(SQL_RETURNING);
     if (retIdx < 0 || !sql.endsWith(";")) {
       return null;
     }
-    String suffix = sql.substring(retIdx);
     String body = sql.substring(0, retIdx);
     int valIdx = body.lastIndexOf(" VALUES (");
     if (valIdx < 0 || !body.endsWith(")")) {
@@ -1844,6 +1887,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     int prefixEnd = valIdx + " VALUES ".length();
     String prefix = sql.substring(0, prefixEnd);
     String values = body.substring(prefixEnd);
+    String suffix = sql.substring(retIdx);
     return new MainInsertParts(prefix, values, suffix);
   }
 

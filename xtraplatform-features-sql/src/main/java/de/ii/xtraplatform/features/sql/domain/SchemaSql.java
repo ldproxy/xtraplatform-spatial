@@ -151,6 +151,7 @@ public interface SchemaSql extends SchemaBase<SchemaSql> {
   }
 
   // TODO: should we do this here? can we derive it from the above?
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   default List<String> getSortKeys(
       ListIterator<String> aliasesIterator, boolean onlyRelations, int keyIndexStart) {
     ImmutableList.Builder<String> keys = ImmutableList.builder();

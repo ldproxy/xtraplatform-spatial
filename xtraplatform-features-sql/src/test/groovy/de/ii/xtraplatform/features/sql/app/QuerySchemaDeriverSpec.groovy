@@ -31,7 +31,7 @@ class QuerySchemaDeriverSpec extends Specification {
         def defaults = new ImmutableSqlPathDefaults.Builder().build()
         def cql = new CqlImpl()
         def pathParser = new SqlPathParser(defaults, cql, Map.of("JSON", new DecoderFactoryJson()))
-        def pathParser2 = new PathParserSql(ImmutableSqlPathSyntax.builder().options(defaults).build(), cql)
+        def pathParser2 = new PathParserSql(ImmutableSqlPathSyntax.builder().options(defaults).build())
         schemaDeriver = new QuerySchemaDeriver(pathParser)
         schemaDeriver2 = new MutationSchemaDeriver(pathParser2, pathParser)
         mappingOperationResolver = new MappingOperationResolver()

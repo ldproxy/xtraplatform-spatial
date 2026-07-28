@@ -22,7 +22,23 @@ import java.util.Optional;
 import java.util.Set;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public interface SqlDialect {
+
+  Map<SpatialFunction, String> SPATIAL_OPERATORS =
+      new ImmutableMap.Builder<SpatialFunction, String>()
+          .put(SpatialFunction.S_EQUALS, "ST_Equals")
+          .put(SpatialFunction.S_DISJOINT, "ST_Disjoint")
+          .put(SpatialFunction.S_TOUCHES, "ST_Touches")
+          .put(SpatialFunction.S_WITHIN, "ST_Within")
+          .put(SpatialFunction.S_OVERLAPS, "ST_Overlaps")
+          .put(SpatialFunction.S_CROSSES, "ST_Crosses")
+          .put(SpatialFunction.S_INTERSECTS, "ST_Intersects")
+          .put(SpatialFunction.S_CONTAINS, "ST_Contains")
+          .build();
+
+  Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
+      new ImmutableMap.Builder<SpatialFunction, String>().build();
 
   String getId();
 
@@ -151,19 +167,4 @@ public interface SqlDialect {
       String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
     return name;
   }
-
-  Map<SpatialFunction, String> SPATIAL_OPERATORS =
-      new ImmutableMap.Builder<SpatialFunction, String>()
-          .put(SpatialFunction.S_EQUALS, "ST_Equals")
-          .put(SpatialFunction.S_DISJOINT, "ST_Disjoint")
-          .put(SpatialFunction.S_TOUCHES, "ST_Touches")
-          .put(SpatialFunction.S_WITHIN, "ST_Within")
-          .put(SpatialFunction.S_OVERLAPS, "ST_Overlaps")
-          .put(SpatialFunction.S_CROSSES, "ST_Crosses")
-          .put(SpatialFunction.S_INTERSECTS, "ST_Intersects")
-          .put(SpatialFunction.S_CONTAINS, "ST_Contains")
-          .build();
-
-  Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
-      new ImmutableMap.Builder<SpatialFunction, String>().build();
 }
