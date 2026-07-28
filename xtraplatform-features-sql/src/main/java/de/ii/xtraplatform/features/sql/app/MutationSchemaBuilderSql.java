@@ -100,27 +100,27 @@ public class MutationSchemaBuilderSql implements SchemaVisitor<SchemaSql, Schema
             .build();
 
     List<String> newChildPath =
-        !parent.getRelation().isEmpty()
-            ? Lists.newArrayList(Iterables.concat(parent.getParentPath(), childRelation.asPath()))
-            : ImmutableList.of(child.getName());
+        parent.getRelation().isEmpty()
+            ? ImmutableList.of(child.getName())
+            : Lists.newArrayList(Iterables.concat(parent.getParentPath(), childRelation.asPath()));
 
-    newChild = replaceInParentPath(!parent.getRelation().isEmpty() ? 1 : 0, newChildPath, newChild);
+    newChild = replaceInParentPath(parent.getRelation().isEmpty() ? 0 : 1, newChildPath, newChild);
 
     // TODO: rebuild mainTable without relation, change nested parentPaths
 
     // TODO: make schema child of mainTable, change nested parentPaths
 
     Optional<SqlRelation> newParentRelation =
-        !parent.getRelation().isEmpty()
-            ? Optional.of(
+        parent.getRelation().isEmpty()
+            ? Optional.empty()
+            : Optional.of(
                 new ImmutableSqlRelation.Builder()
                     .from(parent.getRelation().get(0))
                     .sourceContainer(parent.getRelation().get(0).getSourceContainer())
                     .sourceField(parent.getRelation().get(0).getSourceField())
                     .targetContainer(childRelation.getTargetContainer())
                     .targetField(childRelation.getTargetField())
-                    .build())
-            : Optional.empty();
+                    .build());
 
     List<String> newParentPath =
         newParentRelation.isPresent() ? parent.getParentPath() : ImmutableList.of(child.getName());

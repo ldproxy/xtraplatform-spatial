@@ -32,7 +32,9 @@ import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.select.SelectItemVisitorAdapter;
 import net.sf.jsqlparser.util.TablesNamesFinder;
 
-public class ViewInfo {
+public final class ViewInfo {
+
+  private ViewInfo() {}
 
   public static List<String> getOriginalTables(String viewDefinition) {
     if (Objects.isNull(viewDefinition)) {
@@ -42,7 +44,7 @@ public class ViewInfo {
       PlainSelect select = parse(viewDefinition);
 
       TablesNamesFinder<Void> tablesNamesFinder =
-          new TablesNamesFinder<Void>() {
+          new TablesNamesFinder<>() {
             @Override
             protected String extractTableName(Table table) {
               return table.getName();
@@ -61,7 +63,6 @@ public class ViewInfo {
 
     } catch (JSQLParserException | ParseException e) {
       // ignore
-      boolean br = true;
     }
 
     return ImmutableList.of();
@@ -80,7 +81,6 @@ public class ViewInfo {
 
     } catch (JSQLParserException | ParseException e) {
       // ignore
-      boolean br = true;
     }
 
     return Optional.empty();
@@ -91,28 +91,29 @@ public class ViewInfo {
     ImmutableTuple.Builder<String, String> builder =
         ImmutableTuple.<String, String>builder().second(columnName);
 
-    for (SelectItem<? extends Expression> selectItem : select.getSelectItems()) {
-      selectItem.accept(
-          new SelectItemVisitorAdapter<Void>() {
-            @Override
-            public void visit(SelectItem<? extends Expression> item) {
-              if (item.getExpression() instanceof Column) {
-                Column column = (Column) item.getExpression();
+    SelectItemVisitorAdapter<Void> visitor =
+        new SelectItemVisitorAdapter<>() {
+          @Override
+          public void visit(SelectItem<? extends Expression> item) {
+            if (item.getExpression() instanceof Column) {
+              Column column = (Column) item.getExpression();
 
-                if (Objects.nonNull(item.getAlias())
-                    && Objects.equals(item.getAlias().getName(), columnName)) {
-                  builder.first(column.getTable().getName()).second(column.getColumnName());
-                } else if (Objects.equals(column.getColumnName(), columnName)) {
-                  builder.first(column.getTable().getName());
-                }
+              if (Objects.nonNull(item.getAlias())
+                  && Objects.equals(item.getAlias().getName(), columnName)) {
+                builder.first(column.getTable().getName()).second(column.getColumnName());
+              } else if (Objects.equals(column.getColumnName(), columnName)) {
+                builder.first(column.getTable().getName());
               }
             }
-          },
-          null);
+          }
+        };
+
+    for (SelectItem<? extends Expression> selectItem : select.getSelectItems()) {
+      selectItem.accept(visitor, null);
     }
     try {
       return Optional.of(builder.build());
-    } catch (Throwable e) {
+    } catch (IllegalStateException e) {
       // column not found
     }
 
@@ -147,7 +148,7 @@ public class ViewInfo {
   }
 
   private static PlainSelect parse(String select) throws JSQLParserException, ParseException {
-    net.sf.jsqlparser.statement.Statement parsed =
+    Statement parsed =
         CCJSqlParserUtil.parse(select, ccjSqlParser -> ccjSqlParser.setErrorRecovery(true));
 
     Select statement;

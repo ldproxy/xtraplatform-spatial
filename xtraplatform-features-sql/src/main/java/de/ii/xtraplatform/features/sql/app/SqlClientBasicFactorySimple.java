@@ -46,6 +46,7 @@ public class SqlClientBasicFactorySimple implements SqlClientBasicFactory {
   }
 
   @Override
+  @SuppressWarnings("PMD.CloseResource")
   public void dispose(SqlClientBasic sqlClient) {
     if (sqlClient instanceof SqlClientBasicSimple) {
       for (Connection connection : ((SqlClientBasicSimple) sqlClient).connections) {
@@ -66,7 +67,7 @@ public class SqlClientBasicFactorySimple implements SqlClientBasicFactory {
     }
   }
 
-  private static class SqlClientBasicSimple implements SqlClientBasic {
+  private static final class SqlClientBasicSimple implements SqlClientBasic {
     private final DataSource dataSource;
     private final ConnectionInfoSql connectionInfo;
     private final SqlDbmsAdapter dbmsAdapter;
@@ -93,7 +94,7 @@ public class SqlClientBasicFactorySimple implements SqlClientBasicFactory {
             dataSource.getConnection(
                 connectionInfo.getUser().orElse(""), SqlConnectorRx.getPassword(connectionInfo));
       } catch (SQLException e) {
-        throw new RuntimeException(e);
+        throw new IllegalStateException(e);
       }
 
       this.connections.add(connection);

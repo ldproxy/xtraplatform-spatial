@@ -22,15 +22,16 @@ import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings("PMD.GodClass")
 public class SqlDialectGpkg implements SqlDialect {
+
+  private static final Splitter BBOX_SPLITTER =
+      Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
   @Override
   public String getId() {
     return SqlDbmsAdapterGpkg.ID;
   }
-
-  private static final Splitter BBOX_SPLITTER =
-      Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
@@ -125,7 +126,6 @@ public class SqlDialectGpkg implements SqlDialect {
   public String applyToInstantMin() {
     return "0001-01-01T00:00:00Z";
   }
-  ;
 
   @Override
   public String applyToInstantMax() {
@@ -139,6 +139,7 @@ public class SqlDialectGpkg implements SqlDialect {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public String applyToJsonValue(
       String alias, String column, String path, PropertyTypeInfo typeInfo) {
 
@@ -164,6 +165,8 @@ public class SqlDialectGpkg implements SqlDialect {
         case FEATURE_REF_ARRAY:
           throw new IllegalArgumentException(
               "Arrays as queryables are not supported for GeoPackage feature providers.");
+        default:
+          break;
       }
     }
 
@@ -186,8 +189,8 @@ public class SqlDialectGpkg implements SqlDialect {
       case INTEGER:
       case BOOLEAN:
         return "integer";
-      default:
       case STRING:
+      default:
         return "text";
     }
   }

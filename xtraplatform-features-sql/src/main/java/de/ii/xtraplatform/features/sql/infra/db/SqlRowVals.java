@@ -34,6 +34,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // TODO: extensive unit tests for compareTo
+// compareTo is used purely for sort-merge ordering in the query pipeline; instances are never
+// used in equals()-based collections or hashed, so no equals()/hashCode() are provided.
+@SuppressWarnings({
+  "PMD.AvoidCatchingGenericException",
+  "PMD.OverrideBothEqualsAndHashCodeOnComparable"
+})
 class SqlRowVals implements SqlRow {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlRowVals.class);
@@ -160,6 +166,12 @@ class SqlRowVals implements SqlRow {
   }
 
   // TODO: use result.nextObject when column type info is supported
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.ExceptionAsFlowControl"
+  })
   SqlRow read(ResultSet result, SqlQueryOptions queryOptions) {
     this.priority = queryOptions.getContainerPriority();
     this.queryIndex = queryOptions.getQueryIndex();
@@ -175,8 +187,10 @@ class SqlRowVals implements SqlRow {
       columnTypes = queryOptions.getColumnTypes();
 
       for (int i = 0; i < sortKeyNames.size(); i++) {
+        int currentCursor = cursor;
+        cursor++;
         try {
-          Object id = result.getObject(cursor++);
+          Object id = result.getObject(currentCursor);
           if (Objects.isNull(id)) {
             sortKeys.add(null);
             if (i >= queryOptions.getCustomSortKeys().size()) {
@@ -203,9 +217,11 @@ class SqlRowVals implements SqlRow {
       columnTypes = queryOptions.getColumnTypes();
     }
 
-    for (int i = 0; i < columnTypes.size(); i++) {
+    for (Class<?> columnType : columnTypes) {
+      int currentCursor = cursor;
+      cursor++;
       try {
-        values.add(getValue(result, cursor++, columnTypes.get(i)));
+        values.add(getValue(result, currentCursor, columnType));
       } catch (Throwable e) {
         break;
       }
@@ -214,26 +230,58 @@ class SqlRowVals implements SqlRow {
     return this;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private Object getValue(ResultSet result, int cursor, Class<?> type) throws SQLException {
-    if (type == BigDecimal.class) return result.getBigDecimal(cursor);
-    if (type == Blob.class) return result.getBlob(cursor);
-    if (type == Byte.class) return result.getByte(cursor);
-    if (type == byte[].class) return result.getBytes(cursor);
-    if (type == Clob.class) return result.getClob(cursor);
-    if (type == Date.class) return result.getDate(cursor);
-    if (type == Double.class) return result.getDouble(cursor);
-    if (type == Float.class) return result.getFloat(cursor);
-    if (type == Integer.class) return result.getInt(cursor);
-    if (type == Long.class) return result.getLong(cursor);
-    if (type == Object.class) return result.getObject(cursor);
-    if (type == Short.class) return result.getShort(cursor);
-    if (type == String.class) return result.getString(cursor);
-    if (type == Time.class) return result.getTime(cursor);
-    if (type == Timestamp.class) return result.getTimestamp(cursor);
+    if (type == BigDecimal.class) {
+      return result.getBigDecimal(cursor);
+    }
+    if (type == Blob.class) {
+      return result.getBlob(cursor);
+    }
+    if (type == Byte.class) {
+      return result.getByte(cursor);
+    }
+    if (type == byte[].class) {
+      return result.getBytes(cursor);
+    }
+    if (type == Clob.class) {
+      return result.getClob(cursor);
+    }
+    if (type == Date.class) {
+      return result.getDate(cursor);
+    }
+    if (type == Double.class) {
+      return result.getDouble(cursor);
+    }
+    if (type == Float.class) {
+      return result.getFloat(cursor);
+    }
+    if (type == Integer.class) {
+      return result.getInt(cursor);
+    }
+    if (type == Long.class) {
+      return result.getLong(cursor);
+    }
+    if (type == Object.class) {
+      return result.getObject(cursor);
+    }
+    if (type == Short.class) {
+      return result.getShort(cursor);
+    }
+    if (type == String.class) {
+      return result.getString(cursor);
+    }
+    if (type == Time.class) {
+      return result.getTime(cursor);
+    }
+    if (type == Timestamp.class) {
+      return result.getTimestamp(cursor);
+    }
 
     return result.getString(cursor);
   }
 
+  @SuppressWarnings("PMD.NullAssignment")
   void clear() {
     this.values.clear();
     this.ids.clear();
@@ -282,6 +330,7 @@ class SqlRowVals implements SqlRow {
     return size;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private static int compareSortKeys(
       List<Comparable<?>> ids1,
       List<Comparable<?>> ids2,
@@ -289,7 +338,7 @@ class SqlRowVals implements SqlRow {
       List<Direction> idColumnDirections,
       Collator collator) {
     for (int i = 0; i < numberOfIds; i++) {
-      int result = 0;
+      int result;
       Comparable<?> id1 = ids1.get(i);
       Comparable<?> id2 = ids2.get(i);
       int direction = idColumnDirections.get(i) == Direction.DESCENDING ? -1 : 1;

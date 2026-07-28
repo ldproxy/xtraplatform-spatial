@@ -20,7 +20,9 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-public class JoinGenerator {
+public final class JoinGenerator {
+
+  private JoinGenerator() {}
 
   public static String getJoins(
       SchemaSql table,
@@ -73,8 +75,12 @@ public class JoinGenerator {
                 table.getRelation().stream())
             .filter(t -> !t.getTargetField().equals(userFilterTargetField))
             .flatMap(
-                relation ->
-                    toJoins(relation, aliasesIterator, relationFilters.get(i[0]++), instanceFilter))
+                relation -> {
+                  int index = i[0];
+                  i[0]++;
+                  return toJoins(
+                      relation, aliasesIterator, relationFilters.get(index), instanceFilter);
+                })
             .collect(Collectors.joining(" "));
     return String.format(
         "%1$s%3$s%2$s",
@@ -114,8 +120,12 @@ public class JoinGenerator {
         table.getRelations().stream()
             .filter(t -> !t.getTargetField().equals(userFilterTargetField))
             .flatMap(
-                relation ->
-                    toJoins(relation, aliasesIterator, relationFilters.get(i[0]++), instanceFilter))
+                relation -> {
+                  int index = i[0];
+                  i[0]++;
+                  return toJoins(
+                      relation, aliasesIterator, relationFilters.get(index), instanceFilter);
+                })
             .collect(Collectors.joining(" "));
     return String.format(
         "%1$s%3$s%2$s",

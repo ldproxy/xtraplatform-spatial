@@ -15,6 +15,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @Value.Style(deepImmutablesDetection = true, builder = "new", attributeBuilderDetection = true)
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface SchemaMappingSql extends SchemaMappingBase<SchemaSql> {
 
   @Override

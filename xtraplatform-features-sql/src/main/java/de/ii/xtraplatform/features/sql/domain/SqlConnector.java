@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.sql.domain;
 
 import com.google.common.collect.ImmutableList;
-import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
 import de.ii.xtraplatform.features.domain.JobHook;
@@ -33,7 +32,56 @@ import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 
 public interface SqlConnector
-    extends FeatureProviderConnector<SqlRow, SqlQueryBatch, SqlQueryOptions>, Volatile2 {
+    extends FeatureProviderConnector<SqlRow, SqlQueryBatch, SqlQueryOptions> {
+
+  // Per-sub-query row buffer for the concurrent single-shot value phase (see getSourceStream).
+  int UNPAGED_SUBQUERY_PREFETCH = 256;
+
+  String NEWLINE_INDENT = "\n  ";
+
+  Function<Throwable, Throwable> PSQL_CONTEXT =
+      throwable -> {
+        if (throwable instanceof PSQLException) {
+          PSQLException e = (PSQLException) throwable;
+          String message =
+              Optional.ofNullable(e.getServerErrorMessage())
+                  .map(
+                      serverErrorMessage -> {
+                        StringBuilder totalMessage = new StringBuilder(NEWLINE_INDENT);
+                        String msg = serverErrorMessage.getSeverity();
+                        if (msg != null) {
+                          totalMessage.append(msg).append(": ");
+                        }
+                        msg = serverErrorMessage.getMessage();
+                        if (msg != null) {
+                          totalMessage.append(msg);
+                        }
+                        msg = serverErrorMessage.getDetail();
+                        if (msg != null) {
+                          totalMessage.append(NEWLINE_INDENT + "Detail: ").append(msg);
+                        }
+
+                        msg = serverErrorMessage.getHint();
+                        if (msg != null) {
+                          totalMessage.append(NEWLINE_INDENT + "Hint: ").append(msg);
+                        }
+                        msg = String.valueOf(serverErrorMessage.getPosition());
+                        if (!"0".equals(msg)) {
+                          totalMessage.append(NEWLINE_INDENT + "Position: ").append(msg);
+                        }
+                        msg = serverErrorMessage.getWhere();
+                        if (msg != null) {
+                          totalMessage.append(NEWLINE_INDENT + "Where: ").append(msg);
+                        }
+                        return totalMessage.toString();
+                      })
+                  .orElseGet(e::getMessage);
+
+          return new PSQLException(
+              "Unexpected SQL query error: " + message, PSQLState.UNKNOWN_STATE, throwable);
+        }
+        return throwable;
+      };
 
   int getMaxConnections();
 
@@ -82,6 +130,7 @@ public interface SqlConnector
       this.noOffset = false;
     }
 
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     Optional<Tuple<Long, Long>> get(String currentTable) {
       long found = lastNumberReturned + lastNumberSkipped;
 
@@ -120,11 +169,9 @@ public interface SqlConnector
     }
   }
 
-  // Per-sub-query row buffer for the concurrent single-shot value phase (see getSourceStream).
-  int UNPAGED_SUBQUERY_PREFETCH = 256;
-
   // TODO: simplify, class SqlQueryRunner, remove options, singleFeature
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   default Reactive.Source<SqlRow> getSourceStream(
       SqlQueryBatch queryBatch, SqlQueryOptions options) {
     Paging paging =
@@ -193,20 +240,20 @@ public interface SqlConnector
                           rows.get(0).getNumberMatched().isEmpty()
                                   && nextRow.getNumberMatched().isEmpty()
                               ? OptionalLong.empty()
-                              : !Objects.equals(rows.get(0).getName(), nextRow.getName())
-                                  ? OptionalLong.of(
+                              : Objects.equals(rows.get(0).getName(), nextRow.getName())
+                                  ? rows.get(0).getNumberMatched()
+                                  : OptionalLong.of(
                                       rows.get(0).getNumberMatched().orElse(0)
-                                          + nextRow.getNumberMatched().orElse(0))
-                                  : rows.get(0).getNumberMatched();
+                                          + nextRow.getNumberMatched().orElse(0));
                       OptionalLong numberSkipped3 =
                           rows.get(0).getNumberSkipped().isEmpty()
                                   && nextRow.getNumberSkipped().isEmpty()
                               ? OptionalLong.empty()
-                              : !Objects.equals(rows.get(0).getName(), nextRow.getName())
-                                  ? OptionalLong.of(
+                              : Objects.equals(rows.get(0).getName(), nextRow.getName())
+                                  ? rows.get(0).getNumberSkipped()
+                                  : OptionalLong.of(
                                       rows.get(0).getNumberSkipped().orElse(0)
-                                          + nextRow.getNumberSkipped().orElse(0))
-                                  : rows.get(0).getNumberSkipped();
+                                          + nextRow.getNumberSkipped().orElse(0));
 
                       rows.set(
                           0,
@@ -247,30 +294,32 @@ public interface SqlConnector
                         // the limit caps the main table of the query set (0 = no limit)
                         BiFunction<Integer, Long, Source<SqlRow>> valuePhase =
                             (index, limit) -> {
-                              int[] i = {0};
-                              Source<SqlRow>[] sqlRows =
+                              List<String> valueQueries =
                                   querySets
                                       .get(index)
                                       .getValueQueries()
                                       .apply(sqlRowMeta, limit, 0L)
-                                      .map(
-                                          valueQuery ->
+                                      .collect(Collectors.toList());
+                              Source<SqlRow>[] sqlRows =
+                                  IntStream.range(0, valueQueries.size())
+                                      .mapToObj(
+                                          k ->
                                               getSqlClient()
                                                   .getSourceStream(
-                                                      valueQuery,
+                                                      valueQueries.get(k),
                                                       new ImmutableSqlQueryOptions.Builder()
                                                           .from(options)
                                                           .tableSchema(
                                                               querySets
                                                                   .get(index)
                                                                   .getTableSchemas()
-                                                                  .get(i[0]))
+                                                                  .get(k))
                                                           .type(
                                                               querySets
                                                                   .get(index)
                                                                   .getOptions()
                                                                   .getType())
-                                                          .containerPriority(i[0]++)
+                                                          .containerPriority(k)
                                                           .queryIndex(
                                                               querySets.get(index).getQueryIndex())
                                                           .fetchSize(fetchSize)
@@ -432,11 +481,12 @@ public interface SqlConnector
                               queryBatch.getOffset(),
                               queryBatch.getChunkSize(),
                               false);
-                      int[] i = {0};
 
                       if (options.isHitsOnly()) {
                         return Source.single(aggregatedMetaResult);
                       }
+
+                      int[] i = {0};
 
                       return Source.iterable(
                               IntStream.range(0, querySets.size())
@@ -453,7 +503,6 @@ public interface SqlConnector
                                                 .getTableSchemas()
                                                 .get(0)
                                                 .getFullPathAsString();
-                                    int[] j = {0};
 
                                     if (metaResults.get(index).getNumberReturned() <= 0) {
                                       paging2.register(currentTable, metaResults.get(index));
@@ -463,6 +512,7 @@ public interface SqlConnector
                                     Optional<Tuple<Long, Long>> maxLimitAndSkipped =
                                         paging2.get(currentTable);
 
+                                    int[] j = {0};
                                     Source<SqlRow>[] sqlRows =
                                         querySets
                                             .get(index)
@@ -472,28 +522,33 @@ public interface SqlConnector
                                                 maxLimitAndSkipped.get().first(),
                                                 maxLimitAndSkipped.get().second())
                                             .map(
-                                                valueQuery ->
-                                                    getSqlClient()
-                                                        .getSourceStream(
-                                                            valueQuery,
-                                                            new ImmutableSqlQueryOptions.Builder()
-                                                                .from(options)
-                                                                .tableSchema(
-                                                                    querySets
-                                                                        .get(index)
-                                                                        .getTableSchemas()
-                                                                        .get(j[0]++))
-                                                                .type(
-                                                                    querySets
-                                                                        .get(index)
-                                                                        .getOptions()
-                                                                        .getType())
-                                                                .containerPriority(i[0]++)
-                                                                .queryIndex(
-                                                                    querySets
-                                                                        .get(index)
-                                                                        .getQueryIndex())
-                                                                .build()))
+                                                valueQuery -> {
+                                                  int tableIndex = j[0];
+                                                  j[0]++;
+                                                  int priority = i[0];
+                                                  i[0]++;
+                                                  return getSqlClient()
+                                                      .getSourceStream(
+                                                          valueQuery,
+                                                          new ImmutableSqlQueryOptions.Builder()
+                                                              .from(options)
+                                                              .tableSchema(
+                                                                  querySets
+                                                                      .get(index)
+                                                                      .getTableSchemas()
+                                                                      .get(tableIndex))
+                                                              .type(
+                                                                  querySets
+                                                                      .get(index)
+                                                                      .getOptions()
+                                                                      .getType())
+                                                              .containerPriority(priority)
+                                                              .queryIndex(
+                                                                  querySets
+                                                                      .get(index)
+                                                                      .getQueryIndex())
+                                                              .build());
+                                                })
                                             .toArray((IntFunction<Source<SqlRow>[]>) Source[]::new);
 
                                     paging2.register(currentTable, metaResults.get(index));
@@ -571,48 +626,4 @@ public interface SqlConnector
     }
     return mergedAndSorted;
   }
-
-  Function<Throwable, Throwable> PSQL_CONTEXT =
-      throwable -> {
-        if (throwable instanceof PSQLException) {
-          PSQLException e = (PSQLException) throwable;
-          String message =
-              Optional.ofNullable(e.getServerErrorMessage())
-                  .map(
-                      serverErrorMessage -> {
-                        StringBuilder totalMessage = new StringBuilder("\n  ");
-                        String msg = serverErrorMessage.getSeverity();
-                        if (msg != null) {
-                          totalMessage.append(msg).append(": ");
-                        }
-                        msg = serverErrorMessage.getMessage();
-                        if (msg != null) {
-                          totalMessage.append(msg);
-                        }
-                        msg = serverErrorMessage.getDetail();
-                        if (msg != null) {
-                          totalMessage.append("\n  ").append("Detail: ").append(msg);
-                        }
-
-                        msg = serverErrorMessage.getHint();
-                        if (msg != null) {
-                          totalMessage.append("\n  ").append("Hint: ").append(msg);
-                        }
-                        msg = String.valueOf(serverErrorMessage.getPosition());
-                        if (!"0".equals(msg)) {
-                          totalMessage.append("\n  ").append("Position: ").append(msg);
-                        }
-                        msg = serverErrorMessage.getWhere();
-                        if (msg != null) {
-                          totalMessage.append("\n  ").append("Where: ").append(msg);
-                        }
-                        return totalMessage.toString();
-                      })
-                  .orElseGet(e::getMessage);
-
-          return new PSQLException(
-              "Unexpected SQL query error: " + message, PSQLState.UNKNOWN_STATE, throwable);
-        }
-        return throwable;
-      };
 }

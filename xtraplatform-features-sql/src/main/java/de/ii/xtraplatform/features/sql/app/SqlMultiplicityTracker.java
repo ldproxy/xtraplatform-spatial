@@ -34,7 +34,6 @@ public class SqlMultiplicityTracker implements FeatureStoreMultiplicityTracker {
     this.currentIds = new HashMap<>();
     this.currentMultiplicities = new HashMap<>();
     this.children = new LinkedHashMap<>();
-    ;
 
     // TODO: test with geoval
     multiTables.forEach(
@@ -63,6 +62,7 @@ public class SqlMultiplicityTracker implements FeatureStoreMultiplicityTracker {
   }
 
   @Override
+  @SuppressWarnings({"PMD.AvoidInstantiatingObjectsInLoops", "PMD.CognitiveComplexity"})
   public void track(List<String> path, List<Comparable<?>> ids) {
     int multiplicityIndex = 0;
     boolean increased = false;
@@ -90,7 +90,7 @@ public class SqlMultiplicityTracker implements FeatureStoreMultiplicityTracker {
           currentMultiplicities.putIfAbsent(table, 1);
         }
 
-        children.putIfAbsent(table, new HashSet<>());
+        children.computeIfAbsent(table, ignored -> new HashSet<>());
         if (multiplicityIndex > 0) {
           parentTables.forEach(parent -> children.get(parent).add(table));
         }
@@ -106,7 +106,9 @@ public class SqlMultiplicityTracker implements FeatureStoreMultiplicityTracker {
           .get(increasedMultiplicityKey)
           .forEach(
               child -> {
-                if (!parentTables.contains(child)) currentMultiplicities.remove(child);
+                if (!parentTables.contains(child)) {
+                  currentMultiplicities.remove(child);
+                }
               });
     }
   }

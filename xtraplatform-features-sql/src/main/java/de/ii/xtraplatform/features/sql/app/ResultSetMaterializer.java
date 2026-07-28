@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
  * (when the dialect supports it); otherwise it is left unmaterialized and falls back to the inline
  * (CTE) re-evaluation.
  */
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class ResultSetMaterializer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultSetMaterializer.class);
@@ -98,6 +99,12 @@ public class ResultSetMaterializer {
    * oversized result sets into {@code createdTables}. The caller owns their lifecycle and must
    * {@link #dropTables(java.util.Collection) drop} them once the query's stream has completed.
    */
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidInstantiatingObjectsInLoops"
+  })
   public MultiFeatureQuery materialize(MultiFeatureQuery query, List<String> createdTables) {
     Map<String, ResultSetReference> sets = new LinkedHashMap<>();
     for (SubQuery subQuery : query.getQueries()) {
@@ -389,7 +396,8 @@ public class ResultSetMaterializer {
   }
 
   /** Drops the given result-set tables, best effort. Safe to call with an empty collection. */
-  public void dropTables(java.util.Collection<String> tables) {
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  public void dropTables(Collection<String> tables) {
     for (String table : tables) {
       try {
         sqlClient.get().run(dialect.dropResultSetTable(table), SqlQueryOptions.ddl()).join();
@@ -420,6 +428,7 @@ public class ResultSetMaterializer {
     UNKNOWN
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private static Truth truth(
       CqlNode node,
       Map<String, List<Object>> materialized,
@@ -496,7 +505,7 @@ public class ResultSetMaterializer {
   }
 
   /** Records the result-set references encountered while traversing a filter. */
-  private static class Collector extends CqlVisitorCopy {
+  private static final class Collector extends CqlVisitorCopy {
     private final List<ResultSetReference> found = new ArrayList<>();
 
     @Override
@@ -519,6 +528,7 @@ public class ResultSetMaterializer {
         Map<String, List<Object>> materialized,
         Map<String, List<List<Object>>> materializedKeys,
         Map<String, String> materializedTables) {
+      super();
       this.materialized = materialized;
       this.materializedKeys = materializedKeys;
       this.materializedTables = materializedTables;

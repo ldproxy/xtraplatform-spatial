@@ -37,6 +37,7 @@ import schemacrawler.schema.ColumnDataType;
 import schemacrawler.schema.Schema;
 import schemacrawler.schema.Table;
 
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class SchemaGeneratorSql implements SchemaGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaGeneratorSql.class);
@@ -54,6 +55,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Map<String, List<String>> analyze() {
     try {
       Catalog catalog =
@@ -77,6 +79,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public List<FeatureSchema> generate(
       Map<String, List<String>> types, Consumer<Map<String, List<String>>> tracker) {
     try {
@@ -112,12 +115,14 @@ public class SchemaGeneratorSql implements SchemaGenerator {
 
                                   return getFeatureType(table, geoInfo);
                                 } catch (Throwable e) {
-                                  LOGGER.warn(
-                                      "Could not generate schema for {}.{}: {} ({})",
-                                      schema.getKey(),
-                                      tableName,
-                                      e.getClass().getSimpleName(),
-                                      Objects.requireNonNullElse(e.getMessage(), "no message"));
+                                  if (LOGGER.isWarnEnabled()) {
+                                    LOGGER.warn(
+                                        "Could not generate schema for {}.{}: {} ({})",
+                                        schema.getKey(),
+                                        tableName,
+                                        e.getClass().getSimpleName(),
+                                        Objects.requireNonNullElse(e.getMessage(), "no message"));
+                                  }
                                   if (LOGGER.isDebugEnabled()) {
                                     LOGGER.debug("Stacktrace:", e);
                                   }
@@ -158,6 +163,16 @@ public class SchemaGeneratorSql implements SchemaGenerator {
     }
   }
 
+  // Kept for direct unit-test coverage (SchemaGeneratorSqlSpec); the production path in generate()
+  // uses the single-table getFeatureType(), which PMD's source-only analysis can't see.
+  @SuppressWarnings({
+    "PMD.UnusedPrivateMethod",
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   private List<FeatureSchema> getFeatureTypes(
       Catalog catalog, List<String> includeTables, Map<String, GeoInfo> geometryInfos) {
     ImmutableList.Builder<FeatureSchema> featureTypes = new ImmutableList.Builder<>();
@@ -177,7 +192,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
         ImmutableFeatureSchema.Builder featureType =
             new ImmutableFeatureSchema.Builder()
                 .name(table.getName())
-                .sourcePath("/" + table.getName().toLowerCase());
+                .sourcePath("/" + table.getName().toLowerCase(Locale.ROOT));
 
         boolean idFound = false;
 
@@ -211,7 +226,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
                       ImmutableMap.of(
                           "crs", String.valueOf(srid), "force", geometryInfo.getForce()));
                 }
-              } catch (Throwable e) {
+              } catch (NumberFormatException e) {
                 // ignore
               }
 
@@ -224,7 +239,8 @@ public class SchemaGeneratorSql implements SchemaGenerator {
 
         ImmutableFeatureSchema featureSchema = featureType.build();
 
-        if (featureSchema.getProperties().stream().noneMatch(FeatureSchema::isId)) {
+        if (featureSchema.getProperties().stream().noneMatch(FeatureSchema::isId)
+            && LOGGER.isWarnEnabled()) {
           LOGGER.warn(
               "No primary key or unique column found for table '{}', you have to adjust the type configuration manually.",
               table.getName());
@@ -236,6 +252,13 @@ public class SchemaGeneratorSql implements SchemaGenerator {
     return featureTypes.build();
   }
 
+  @SuppressWarnings({
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   private FeatureSchema getFeatureType(Table table, Map<String, GeoInfo> geometryInfos) {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Generating type '{}'", table.getName());
@@ -246,7 +269,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
     ImmutableFeatureSchema.Builder featureType =
         new ImmutableFeatureSchema.Builder()
             .name(table.getName())
-            .sourcePath("/" + table.getName().toLowerCase());
+            .sourcePath("/" + table.getName().toLowerCase(Locale.ROOT));
 
     boolean idFound = false;
 
@@ -283,7 +306,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
               featureProperty.additionalInfo(
                   ImmutableMap.of("crs", String.valueOf(srid), "force", geometryInfo.getForce()));
             }
-          } catch (Throwable e) {
+          } catch (NumberFormatException e) {
             // ignore
           }
 
@@ -296,7 +319,8 @@ public class SchemaGeneratorSql implements SchemaGenerator {
 
     FeatureSchema featureSchema = featureType.build();
 
-    if (featureSchema.getProperties().stream().noneMatch(FeatureSchema::isId)) {
+    if (featureSchema.getProperties().stream().noneMatch(FeatureSchema::isId)
+        && LOGGER.isWarnEnabled()) {
       LOGGER.warn(
           "No primary key or unique column found for table '{}', you have to adjust the type configuration manually.",
           table.getName());
@@ -330,7 +354,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
               != WktWkbGeometryType.NONE) {
         return SchemaBase.Type.GEOMETRY;
       }
-    } catch (Exception ignore) {
+    } catch (IllegalArgumentException ignore) {
       // ignore, not a geometry
     }
 

@@ -36,6 +36,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPath> {
 
   private final SqlPathParser pathParser;
@@ -73,6 +74,7 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public SchemaSql create(
       FeatureSchema targetSchema,
       SqlPath path,
@@ -120,15 +122,17 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
     Type type = isConnected && !isExpression ? Type.STRING : targetSchema.getType();
     Optional<Type> valueType = targetSchema.getValueType();
 
-    if (!targetSchema.getConcat().isEmpty()) {
-      if (!relations.isEmpty()) {
-        sortKey = Optional.empty();
-      } else if (type == Type.VALUE_ARRAY) {
-        type = valueType.orElse(Type.STRING);
-        valueType = Optional.empty();
-      } else if (targetSchema.isFeature() && type == Type.OBJECT_ARRAY) {
-        type = Type.OBJECT;
-      }
+    boolean hasConcat = !targetSchema.getConcat().isEmpty();
+    if (hasConcat && relations.isEmpty() && type == Type.VALUE_ARRAY) {
+      type = valueType.orElse(Type.STRING);
+      valueType = Optional.empty();
+    } else if (hasConcat
+        && relations.isEmpty()
+        && targetSchema.isFeature()
+        && type == Type.OBJECT_ARRAY) {
+      type = Type.OBJECT;
+    } else if (hasConcat && !relations.isEmpty()) {
+      sortKey = Optional.empty();
     }
 
     Builder builder =
@@ -237,6 +241,7 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
     return new SubConnector(subDecoderPaths, subDecoderTypes);
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private static Map<String, SubConnector> getSubConnectors(
       List<SchemaSql> properties, FeatureSchema targetSchema, SqlPath path, boolean nestedArray) {
     Map<String, Map<String, String>> subConnectorPaths = new HashMap<>();
@@ -332,7 +337,6 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
               if (newProperties.stream().anyMatch(p -> !p.getRelation().isEmpty())) {
                 newProperties =
                     createTableParents(newProperties, targetSchema, relations, sortKeys);
-                boolean br = true;
               }
 
               boolean isArray = entry.getValue().stream().anyMatch(SchemaBase::isArray);
@@ -362,9 +366,9 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
                       .sortKeyUnique(tablePath.getSortKeyUnique())
                       .primaryKey(tablePath.getPrimaryKey())
                       .sourcePath(
-                          !targetSchema.isFeature()
-                              ? Optional.of(targetSchema.getName())
-                              : Optional.empty())
+                          targetSchema.isFeature()
+                              ? Optional.empty()
+                              : Optional.of(targetSchema.getName()))
                       .build());
             })
         .collect(Collectors.toList());
@@ -393,16 +397,16 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
                   prop.getSourcePath()
                       .map(
                           sourcePath ->
-                              !targetSchema.isFeature()
-                                  ? targetSchema.getName() + "." + sourcePath
-                                  : sourcePath))
+                              targetSchema.isFeature()
+                                  ? sourcePath
+                                  : targetSchema.getName() + "." + sourcePath))
               .sourcePaths(
                   prop.getSourcePaths().stream()
                       .map(
                           sourcePath ->
-                              !targetSchema.isFeature()
-                                  ? targetSchema.getName() + "." + sourcePath
-                                  : sourcePath)
+                              targetSchema.isFeature()
+                                  ? sourcePath
+                                  : targetSchema.getName() + "." + sourcePath)
                       .collect(Collectors.toList()))
               .build());
     };
@@ -417,17 +421,8 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
     List<SqlRelation> childRelations =
         hasValueSiblings
             ? propertiesByRelation.getKey()
-            : !relations.isEmpty()
-                ? propertiesByRelation.getKey().stream()
-                    .map(
-                        rel ->
-                            new ImmutableSqlRelation.Builder()
-                                .from(rel)
-                                .sourceSortKey(Optional.empty())
-                                .sourcePrimaryKey(Optional.empty())
-                                .build())
-                    .collect(Collectors.toList())
-                : propertiesByRelation.getKey().size() > 1
+            : relations.isEmpty()
+                ? propertiesByRelation.getKey().size() > 1
                     ? Stream.concat(
                             Stream.of(propertiesByRelation.getKey().get(0)),
                             propertiesByRelation
@@ -442,7 +437,16 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
                                             .sourcePrimaryKey(Optional.empty())
                                             .build()))
                         .collect(Collectors.toList())
-                    : propertiesByRelation.getKey();
+                    : propertiesByRelation.getKey()
+                : propertiesByRelation.getKey().stream()
+                    .map(
+                        rel ->
+                            new ImmutableSqlRelation.Builder()
+                                .from(rel)
+                                .sourceSortKey(Optional.empty())
+                                .sourcePrimaryKey(Optional.empty())
+                                .build())
+                    .collect(Collectors.toList());
 
     List<String> childSortKeys =
         Stream.concat(
@@ -530,54 +534,54 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
                 Collectors.groupingBy(
                     SchemaSql::getRelation, LinkedHashMap::new, Collectors.toList()));
 
-    Map<List<SqlRelation>, List<SchemaSql>> groupedByRelation2 =
-        groupedByRelation.entrySet().stream()
-            .flatMap(
-                entry -> {
-                  List<SqlRelation> relation1 = entry.getKey();
-                  List<SchemaSql> mergeable =
-                      groupedByRelation.entrySet().stream()
-                          .filter(
-                              entry2 ->
-                                  relation1.size() > 0
-                                      && relation1.size() < entry2.getKey().size()
-                                      && Objects.equals(
-                                          relation1, entry2.getKey().subList(0, relation1.size())))
-                          .flatMap(entry2 -> entry2.getValue().stream())
-                          /*.map(
-                          prop ->
-                              new Builder()
-                                  .from(prop)
-                                  .relation(
-                                      prop.getRelation()
-                                          .subList(relation1.size(), prop.getRelation().size()))
-                                  .addAllParentPath(
-                                      prop.getRelation().subList(0, relation1.size()).stream()
-                                          .flatMap(s -> s.asPath().stream())
-                                          .collect(Collectors.toList()))
-                                  .build())*/
-                          .collect(Collectors.toList());
-
-                  if (!mergeable.isEmpty()) {
-                    List<SchemaSql> newProps =
-                        Stream.concat(entry.getValue().stream(), mergeable.stream())
-                            .collect(Collectors.toList());
-
-                    return Stream.of(new SimpleImmutableEntry<>(relation1, newProps));
-                  } else if (groupedByRelation.keySet().stream()
-                      .anyMatch(
-                          relation2 ->
-                              relation2.size() > 0
-                                  && relation2.size() < relation1.size()
+    return groupedByRelation.entrySet().stream()
+        .flatMap(
+            entry -> {
+              List<SqlRelation> relation1 = entry.getKey();
+              List<SchemaSql> mergeable =
+                  groupedByRelation.entrySet().stream()
+                      .filter(
+                          entry2 ->
+                              !relation1.isEmpty()
+                                  && relation1.size() < entry2.getKey().size()
                                   && Objects.equals(
-                                      relation2, relation1.subList(0, relation2.size())))) {
-                    return Stream.empty();
-                  }
+                                      relation1, entry2.getKey().subList(0, relation1.size())))
+                      .flatMap(entry2 -> entry2.getValue().stream())
+                      /*.map(
+                      prop ->
+                          new Builder()
+                              .from(prop)
+                              .relation(
+                                  prop.getRelation()
+                                      .subList(relation1.size(), prop.getRelation().size()))
+                              .addAllParentPath(
+                                  prop.getRelation().subList(0, relation1.size()).stream()
+                                      .flatMap(s -> s.asPath().stream())
+                                      .collect(Collectors.toList()))
+                              .build())*/
+                      .collect(Collectors.toList());
 
-                  return Stream.of(new SimpleImmutableEntry<>(relation1, entry.getValue()));
-                })
-            .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
-    return groupedByRelation2;
+              if (mergeable.isEmpty()) {
+                if (groupedByRelation.keySet().stream()
+                    .anyMatch(
+                        relation2 ->
+                            !relation2.isEmpty()
+                                && relation2.size() < relation1.size()
+                                && Objects.equals(
+                                    relation2, relation1.subList(0, relation2.size())))) {
+                  return Stream.empty();
+                }
+              } else {
+                List<SchemaSql> newProps =
+                    Stream.concat(entry.getValue().stream(), mergeable.stream())
+                        .collect(Collectors.toList());
+
+                return Stream.of(new SimpleImmutableEntry<>(relation1, newProps));
+              }
+
+              return Stream.of(new SimpleImmutableEntry<>(relation1, entry.getValue()));
+            })
+        .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private static PropertyTypeInfo getTypeInfo(SchemaSql column, boolean nestedArray) {
@@ -621,7 +625,7 @@ public class QuerySchemaDeriver implements MappedSchemaDeriver<SchemaSql, SqlPat
 
   private static List<SchemaSql> adjustParentSortKeys(
       List<SchemaSql> schemas, List<String> parentSortKeys) {
-    ArrayList<String> keys = new ArrayList<>(parentSortKeys);
+    List<String> keys = new ArrayList<>(parentSortKeys);
 
     return schemas.stream()
         .map(

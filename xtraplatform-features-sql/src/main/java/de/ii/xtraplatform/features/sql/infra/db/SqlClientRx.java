@@ -40,9 +40,11 @@ import org.postgresql.PGNotification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class SqlClientRx implements SqlClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlClientRx.class);
+  private static final String SQL_LOG_EXECUTING = "Executing statement: {}";
 
   // Generous on purpose: this is not a query budget but a stall detector, so it has to sit
   // well above the slowest legitimate gap between two rows (a count over a large table, a
@@ -69,7 +71,7 @@ public class SqlClientRx implements SqlClient {
   @Override
   public CompletableFuture<Collection<SqlRow>> run(String query, SqlQueryOptions options) {
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", query);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, query);
     }
     CompletableFuture<Collection<SqlRow>> result = new CompletableFuture<>();
 
@@ -105,9 +107,10 @@ public class SqlClientRx implements SqlClient {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Reactive.Source<SqlRow> getSourceStream(String query, SqlQueryOptions options) {
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", query);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, query);
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 

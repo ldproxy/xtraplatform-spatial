@@ -30,6 +30,9 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableSqlQueryMapping.Builder.class)
 public interface SqlQueryMapping {
 
+  String IN_CONNECTED_ARRAY = "IN_CONNECTED_ARRAY";
+  String PATH_IN_CONNECTOR = "PATH_IN_CONNECTOR";
+
   List<SqlQuerySchema> getTables();
 
   @Value.Lazy
@@ -211,9 +214,6 @@ public interface SqlQueryMapping {
         .map(Map.Entry::getValue)
         .findFirst();
   }
-
-  String IN_CONNECTED_ARRAY = "IN_CONNECTED_ARRAY";
-  String PATH_IN_CONNECTOR = "PATH_IN_CONNECTOR";
 
   default boolean isInConnectedArray(FeatureSchema schema) {
     return Boolean.parseBoolean(schema.getAdditionalInfo().get(IN_CONNECTED_ARRAY));

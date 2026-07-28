@@ -35,11 +35,11 @@ class SchemaInfo {
     this.tables = tables;
   }
 
-  public boolean tableExists(String name) {
+  boolean tableExists(String name) {
     return tables.stream().anyMatch(t -> t.getName().equals(name));
   }
 
-  public boolean columnExists(String name, String table) {
+  boolean columnExists(String name, String table) {
     return tables.stream()
         .filter(t -> t.getName().equals(table))
         .flatMap(t -> t.getColumns().stream())
@@ -48,11 +48,11 @@ class SchemaInfo {
 
   // TODO: unique may be either column constraint, table constraint or index plus primary key
   // TODO: NOT NULL constraints
-  public boolean isColumnUnique(String columnName, String tableName) {
+  boolean isColumnUnique(String columnName, String tableName) {
     return isColumnUnique(columnName, tableName, true);
   }
 
-  public boolean isColumnUnique(String columnName, String tableName, boolean warn) {
+  boolean isColumnUnique(String columnName, String tableName, boolean warn) {
     Optional<Column> optionalColumn = getColumn(tableName, columnName, true, warn);
 
     if (optionalColumn.isPresent()) {
@@ -80,13 +80,13 @@ class SchemaInfo {
     return false;
   }
 
-  public boolean isColumnReadOnly(String columnName, String tableName) {
+  boolean isColumnReadOnly(String columnName, String tableName) {
     return getColumn(tableName, columnName, true, false)
         .map(column -> column.isAutoIncremented() || column.isGenerated())
         .orElse(false);
   }
 
-  public boolean isColumnSpatial(String table, String name) {
+  boolean isColumnSpatial(String table, String name) {
     return getColumn(table, name)
         .filter(
             c ->
@@ -97,7 +97,7 @@ class SchemaInfo {
         .isPresent();
   }
 
-  public boolean isColumnTemporal(String table, String name) {
+  boolean isColumnTemporal(String table, String name) {
     return getColumn(table, name)
         .filter(
             c ->
@@ -140,7 +140,7 @@ class SchemaInfo {
     return getColumn(tableName, columnName, false, false);
   }
 
-  public Optional<Column> getColumn(
+  Optional<Column> getColumn(
       String tableName, String columnName, boolean resolveViews, boolean warn) {
     Optional<Column> optionalColumn =
         tables.stream()
@@ -149,21 +149,25 @@ class SchemaInfo {
             .filter(c -> c.getName().equals(columnName))
             .findFirst();
 
-    if (resolveViews && optionalColumn.isPresent()) {
-      Table table = optionalColumn.get().getParent();
+    if (!resolveViews || optionalColumn.isEmpty()) {
+      return optionalColumn;
+    }
 
-      if (table instanceof View) {
-        Optional<Tuple<String, String>> originalColumn =
-            ViewInfo.getOriginalTableAndColumn(table.getDefinition(), columnName);
+    Table table = optionalColumn.get().getParent();
 
-        if (originalColumn.isPresent()) {
-          return getColumn(originalColumn.get().first(), originalColumn.get().second());
-        }
+    if (!(table instanceof View)) {
+      return optionalColumn;
+    }
 
-        if (warn) {
-          LOGGER.warn(VIEW_COLUMN_NOT_ANALYZABLE, columnName, tableName);
-        }
-      }
+    Optional<Tuple<String, String>> originalColumn =
+        ViewInfo.getOriginalTableAndColumn(table.getDefinition(), columnName);
+
+    if (originalColumn.isPresent()) {
+      return getColumn(originalColumn.get().first(), originalColumn.get().second());
+    }
+
+    if (warn) {
+      LOGGER.warn(VIEW_COLUMN_NOT_ANALYZABLE, columnName, tableName);
     }
 
     return optionalColumn;

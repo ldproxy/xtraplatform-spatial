@@ -22,7 +22,42 @@ import java.util.Optional;
 import java.util.Set;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public interface SqlDialect {
+
+  Map<SpatialFunction, String> SPATIAL_OPERATORS =
+      new ImmutableMap.Builder<SpatialFunction, String>()
+          .put(SpatialFunction.S_EQUALS, "ST_Equals")
+          .put(SpatialFunction.S_DISJOINT, "ST_Disjoint")
+          .put(SpatialFunction.S_TOUCHES, "ST_Touches")
+          .put(SpatialFunction.S_WITHIN, "ST_Within")
+          .put(SpatialFunction.S_OVERLAPS, "ST_Overlaps")
+          .put(SpatialFunction.S_CROSSES, "ST_Crosses")
+          .put(SpatialFunction.S_INTERSECTS, "ST_Intersects")
+          .put(SpatialFunction.S_CONTAINS, "ST_Contains")
+          .build();
+
+  Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
+      new ImmutableMap.Builder<SpatialFunction, String>().build();
+
+  /**
+   * The spatial operators for which a match implies that the bounding boxes of both operands
+   * intersect. Only for these may a bounding box predicate from a spatial index be added as a
+   * conjunct: the conjunct is then implied by the exact predicate, so it changes neither the result
+   * nor the meaning of the predicate under negation.
+   *
+   * <p>{@code S_DISJOINT} is absent because two geometries can be disjoint while being arbitrarily
+   * far apart, so a bounding box predicate would discard matching rows.
+   */
+  Set<SpatialFunction> SPATIAL_OPERATORS_IMPLYING_BBOX_INTERSECTION =
+      ImmutableSet.of(
+          SpatialFunction.S_EQUALS,
+          SpatialFunction.S_TOUCHES,
+          SpatialFunction.S_WITHIN,
+          SpatialFunction.S_OVERLAPS,
+          SpatialFunction.S_CROSSES,
+          SpatialFunction.S_INTERSECTS,
+          SpatialFunction.S_CONTAINS);
 
   String getId();
 
@@ -223,38 +258,4 @@ public interface SqlDialect {
 
     return String.format("(%s) AS %s", expression, name);
   }
-
-  Map<SpatialFunction, String> SPATIAL_OPERATORS =
-      new ImmutableMap.Builder<SpatialFunction, String>()
-          .put(SpatialFunction.S_EQUALS, "ST_Equals")
-          .put(SpatialFunction.S_DISJOINT, "ST_Disjoint")
-          .put(SpatialFunction.S_TOUCHES, "ST_Touches")
-          .put(SpatialFunction.S_WITHIN, "ST_Within")
-          .put(SpatialFunction.S_OVERLAPS, "ST_Overlaps")
-          .put(SpatialFunction.S_CROSSES, "ST_Crosses")
-          .put(SpatialFunction.S_INTERSECTS, "ST_Intersects")
-          .put(SpatialFunction.S_CONTAINS, "ST_Contains")
-          .build();
-
-  Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
-      new ImmutableMap.Builder<SpatialFunction, String>().build();
-
-  /**
-   * The spatial operators for which a match implies that the bounding boxes of both operands
-   * intersect. Only for these may a bounding box predicate from a spatial index be added as a
-   * conjunct: the conjunct is then implied by the exact predicate, so it changes neither the result
-   * nor the meaning of the predicate under negation.
-   *
-   * <p>{@code S_DISJOINT} is absent because two geometries can be disjoint while being arbitrarily
-   * far apart, so a bounding box predicate would discard matching rows.
-   */
-  Set<SpatialFunction> SPATIAL_OPERATORS_IMPLYING_BBOX_INTERSECTION =
-      ImmutableSet.of(
-          SpatialFunction.S_EQUALS,
-          SpatialFunction.S_TOUCHES,
-          SpatialFunction.S_WITHIN,
-          SpatialFunction.S_OVERLAPS,
-          SpatialFunction.S_CROSSES,
-          SpatialFunction.S_INTERSECTS,
-          SpatialFunction.S_CONTAINS);
 }

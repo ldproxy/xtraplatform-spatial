@@ -46,8 +46,7 @@ public class MutationSchemaDeriver implements ReverseSchemaDeriver<SchemaSql> {
   public SchemaSql create(List<String> path, FeatureSchema targetSchema) {
     List<String> path2 =
         path.stream()
-            .map(
-                path1 -> !targetSchema.isValue() ? pathParser3.tablePathWithDefaults(path1) : path1)
+            .map(path1 -> targetSchema.isValue() ? path1 : pathParser3.tablePathWithDefaults(path1))
             .collect(Collectors.toList());
 
     if (LOGGER.isTraceEnabled()) {
@@ -73,7 +72,7 @@ public class MutationSchemaDeriver implements ReverseSchemaDeriver<SchemaSql> {
     }
 
     if (targetSchema.isValue()) {
-      de.ii.xtraplatform.features.sql.domain.SqlPath strings = pathParser3.parseColumnPath(path);
+      pathParser3.parseColumnPath(path);
     }
 
     return null;
@@ -86,8 +85,6 @@ public class MutationSchemaDeriver implements ReverseSchemaDeriver<SchemaSql> {
     String path = JOINER.join(child.getFullPath());
     if (!shouldIgnore(parentParentPath)) {
       path = parentParentPath + "/" + path;
-    } else {
-      boolean br = true;
     }
 
     Optional<SqlPath> sqlPath = pathParser.parse(path, child.isValue());
@@ -96,11 +93,6 @@ public class MutationSchemaDeriver implements ReverseSchemaDeriver<SchemaSql> {
     if (!sqlPath.isPresent()) {
       throw new IllegalArgumentException("Parse error for SQL path: " + path);
     }
-
-    List<String> tablePathAsList =
-        ReverseSchemaDeriver.SPLITTER.splitToList(sqlPath.get().getTablePath());
-
-    boolean hasRelation = tablePathAsList.size() > 1; // (isRoot ? 1 : 0);
 
     List<SqlRelation> relations =
         ImmutableList
@@ -209,7 +201,9 @@ public class MutationSchemaDeriver implements ReverseSchemaDeriver<SchemaSql> {
 
   @Override
   public String ignore() {
-    return IGNORE + ignoreCounter++;
+    String result = IGNORE + ignoreCounter;
+    ignoreCounter++;
+    return result;
   }
 
   private boolean shouldIgnore(String path) {
