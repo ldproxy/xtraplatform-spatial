@@ -17,6 +17,7 @@ public interface Tile3dStoreReadOnly {
 
   Optional<Blob> get(Tile3dQuery tile) throws IOException;
 
+  @SuppressWarnings("PMD.LinguisticNaming")
   Optional<Boolean> isEmpty(Tile3dQuery tile) throws IOException;
 
   boolean isEmpty() throws IOException;

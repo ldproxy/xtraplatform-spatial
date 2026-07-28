@@ -1,4 +1,3 @@
-
 maturity = 'CANDIDATE'
 maintenance = 'NONE'
 description = 'WFS feature provider and GML features.'
@@ -9,6 +8,7 @@ dependencies {
     provided 'de.interactive_instruments:xtraplatform-streams'
     provided 'de.interactive_instruments:xtraplatform-values'
     provided 'de.interactive_instruments:xtraplatform-web'
+    provided 'de.interactive_instruments:xtraplatform-services'
     provided project(':xtraplatform-codelists')
     provided project(':xtraplatform-cql')
     provided project(':xtraplatform-crs')
@@ -18,12 +18,25 @@ dependencies {
     testProvided(testFixtures(project(":xtraplatform-features")))
 
     embedded libs.xsom
-    embeddedFlat libs.aalto
+    embeddedFlatExport libs.aalto
     embeddedFlat libs.staxmate
 }
 
 moduleInfo {
-    requires = [
-            'java.xml',
-    ]
+    requires = ['java.xml',]
+}
+
+/*
+  Aalto XML should only be used explicitly, the default XML stack is Woodstox
+  Therefore we exclude the service loaders here (javax.xml.stream.XMLEventFactory, javax.xml.stream.XMLInputFactory, javax.xml.stream.XMLOutputFactory)
+  Otherwise the default would be chosen by module resolution order and could change at any time
+ */
+project.subprojects { Project subproject ->
+    if (subproject.name.endsWith("-tpl")) {
+        subproject.afterEvaluate {
+            subproject.tasks.named("jar") {
+                exclude 'META-INF/services/**'
+            }
+        }
+    }
 }

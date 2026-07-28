@@ -362,7 +362,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
                       tileMatrixSets,
                       tileMatrixSetRepository,
                       partitions,
-                      cache.getSeeded() && cache.getSeededOnly())
+                      cache.getSeeded() && cache.isSeededOnly())
                   : new TileStorePlain(cacheStore);
             });
   }

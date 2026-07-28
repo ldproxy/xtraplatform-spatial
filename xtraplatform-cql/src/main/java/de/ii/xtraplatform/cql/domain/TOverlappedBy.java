@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTOverlappedBy.Builder.class)
-public interface TOverlappedBy extends BinaryTemporalOperation, CqlNode {
+public interface TOverlappedBy extends BinaryTemporalOperation {
 
   String TYPE = "t_overlappedBy";
 

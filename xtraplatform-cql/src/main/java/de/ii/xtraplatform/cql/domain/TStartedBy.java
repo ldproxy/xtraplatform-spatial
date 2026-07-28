@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTStartedBy.Builder.class)
-public interface TStartedBy extends BinaryTemporalOperation, CqlNode {
+public interface TStartedBy extends BinaryTemporalOperation {
 
   String TYPE = "t_startedBy";
 

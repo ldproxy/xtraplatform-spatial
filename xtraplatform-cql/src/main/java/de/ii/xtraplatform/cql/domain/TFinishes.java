@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTFinishes.Builder.class)
-public interface TFinishes extends BinaryTemporalOperation, CqlNode {
+public interface TFinishes extends BinaryTemporalOperation {
 
   String TYPE = "t_finishes";
 

@@ -18,6 +18,8 @@ import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsPgis;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -31,8 +33,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
@@ -184,11 +184,15 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
     Map<String, GeoInfo> result = new LinkedHashMap<>();
 
     while (rs.next()) {
+      String schema = rs.getString(GeoInfo.SCHEMA);
+      String table = rs.getString(GeoInfo.TABLE);
+      String key = String.format("%s.%s", schema, table).toLowerCase(Locale.ROOT);
+
       result.put(
-          rs.getString(GeoInfo.TABLE),
+          key,
           ImmutableGeoInfo.of(
-              rs.getString(GeoInfo.SCHEMA),
-              rs.getString(GeoInfo.TABLE),
+              schema,
+              table,
               rs.getString(GeoInfo.COLUMN),
               rs.getString(GeoInfo.DIMENSION),
               rs.getString(GeoInfo.SRID),

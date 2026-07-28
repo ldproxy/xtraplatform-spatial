@@ -107,6 +107,7 @@ public interface Tileset3dFeatures
 
   abstract class Builder implements BuildableBuilder<Tileset3dFeatures> {}
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   default Tileset3dFeatures mergeDefaults(Tileset3dFeaturesDefaults defaults) {
     if (Objects.isNull(defaults)) {
       return this;

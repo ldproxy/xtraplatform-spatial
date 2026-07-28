@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAOverlaps.Builder.class)
-public interface AOverlaps extends BinaryArrayOperation, CqlNode {
+@FunctionalInterface
+public interface AOverlaps extends BinaryArrayOperation {
 
   String TYPE = "a_overlaps";
 

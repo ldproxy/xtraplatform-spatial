@@ -37,6 +37,7 @@ public interface ChainedTile3dProvider {
 
   TileResult getTile(Tile3dQuery tile) throws IOException;
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   default TileResult get(Tile3dQuery tile) {
     TileResult tileResult = TileResult.notFound();
 
@@ -44,14 +45,16 @@ public interface ChainedTile3dProvider {
       try {
         tileResult = getTile(tile);
       } catch (IOException e) {
-        LOGGER.warn(
-            "Failed to retrieve tile {}/{}/{}/{} for tileset '{}'. Reason: {}",
-            "", // tile.getTileMatrixSet().getId(),
-            tile.getLevel(),
-            tile.getRow(),
-            tile.getCol(),
-            tile.getTileset(),
-            e.getMessage());
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn(
+              "Failed to retrieve tile {}/{}/{}/{} for tileset '{}'. Reason: {}",
+              "", // tile.getTileMatrixSet().getId(),
+              tile.getLevel(),
+              tile.getRow(),
+              tile.getCol(),
+              tile.getTileset(),
+              e.getMessage());
+        }
         if (LOGGER.isDebugEnabled(LogContext.MARKER.STACKTRACE)) {
           LOGGER.debug(LogContext.MARKER.STACKTRACE, "Stacktrace: ", e);
         }
@@ -68,14 +71,16 @@ public interface ChainedTile3dProvider {
       try {
         return processDelegateResult(tile, delegateResult);
       } catch (IOException e) {
-        LOGGER.warn(
-            "Failed to retrieve tile {}/{}/{}/{} for tileset '{}'. Reason: {}",
-            "", // tile.getTileMatrixSet().getId(),
-            tile.getLevel(),
-            tile.getRow(),
-            tile.getCol(),
-            tile.getTileset(),
-            e.getMessage());
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn(
+              "Failed to retrieve tile {}/{}/{}/{} for tileset '{}'. Reason: {}",
+              "", // tile.getTileMatrixSet().getId(),
+              tile.getLevel(),
+              tile.getRow(),
+              tile.getCol(),
+              tile.getTileset(),
+              e.getMessage());
+        }
         if (LOGGER.isDebugEnabled(LogContext.MARKER.STACKTRACE)) {
           LOGGER.debug(LogContext.MARKER.STACKTRACE, "Stacktrace: ", e);
         }

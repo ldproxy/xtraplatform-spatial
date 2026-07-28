@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTContains.Builder.class)
-public interface TContains extends BinaryTemporalOperation, CqlNode {
+public interface TContains extends BinaryTemporalOperation {
 
   String TYPE = "t_contains";
 

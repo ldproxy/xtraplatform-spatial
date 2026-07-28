@@ -24,6 +24,7 @@ import java.util.Optional;
 
 public interface GeometryVisitor<T> {
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   default T visit(Geometry<?> geometry) {
 
     Optional<T> defaultResult = initAndCheckGeometry(geometry);

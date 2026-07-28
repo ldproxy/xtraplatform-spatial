@@ -12,6 +12,12 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -74,11 +80,11 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
 
     try {
       if (!start.isEmpty() && !end.isEmpty()) {
-        temporalExtentSetter.accept(Tuple.of(Instant.parse(start), Instant.parse(end)));
+        temporalExtentSetter.accept(Tuple.of(parseTemporal(start), parseTemporal(end)));
       } else if (!start.isEmpty()) {
-        temporalExtentSetter.accept(Tuple.of(Instant.parse(start), null));
+        temporalExtentSetter.accept(Tuple.of(parseTemporal(start), null));
       } else if (!end.isEmpty()) {
-        temporalExtentSetter.accept(Tuple.of(null, Instant.parse(end)));
+        temporalExtentSetter.accept(Tuple.of(null, parseTemporal(end)));
       }
     } catch (Throwable ignore) {
     }
@@ -91,6 +97,20 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
     }
 
     super.onEnd(context);
+  }
+
+  // The primary instant/interval properties may be DATETIME or DATE; a date is interpreted as
+  // start of day UTC.
+  private static Instant parseTemporal(String value) {
+    TemporalAccessor ta =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss[.SSS]][X]")
+            .parseBest(value, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
+    if (ta instanceof OffsetDateTime) {
+      return ((OffsetDateTime) ta).toInstant();
+    } else if (ta instanceof LocalDateTime) {
+      return ((LocalDateTime) ta).toInstant(ZoneOffset.UTC);
+    }
+    return ((LocalDate) ta).atStartOfDay(ZoneOffset.UTC).toInstant();
   }
 
   @Override

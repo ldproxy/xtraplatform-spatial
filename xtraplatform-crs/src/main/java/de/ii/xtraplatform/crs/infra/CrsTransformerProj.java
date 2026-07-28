@@ -11,7 +11,6 @@ import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.crs.domain.BoundingBoxTransformer;
 import de.ii.xtraplatform.crs.domain.CoordinateTuple;
 import de.ii.xtraplatform.crs.domain.CoordinateTupleWithPrecision;
-import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import java.util.Optional;
 import javax.measure.Unit;
@@ -22,13 +21,14 @@ import org.opengis.referencing.crs.SingleCRS;
 import org.opengis.referencing.datum.GeodeticDatum;
 import org.opengis.referencing.operation.CoordinateOperation;
 import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * @author zahnen
  */
-public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTransformer {
+public class CrsTransformerProj extends BoundingBoxTransformer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CrsTransformerProj.class);
 
@@ -52,14 +52,15 @@ public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTra
       int targetDimension,
       CoordinateOperation coordinateOperation,
       Optional<CoordinateOperation> horizontalCoordinateOperation) {
+    super();
     this.sourceCrs = origSourceCrs;
     this.targetCrs = origTargetCrs;
 
     Unit<?> sourceUnit = sourceCrs.getCoordinateSystem().getAxis(0).getUnit();
     Unit<?> targetUnit = targetCrs.getCoordinateSystem().getAxis(0).getUnit();
 
-    this.isSourceMetric = sourceUnit == Units.METRE;
-    this.isTargetMetric = targetUnit == Units.METRE;
+    this.isSourceMetric = Units.METRE.equals(sourceUnit);
+    this.isTargetMetric = Units.METRE.equals(targetUnit);
 
     SingleCRS horizontalSourceCrs = getHorizontalCrs(sourceCrs);
     SingleCRS horizontalTargetCrs = getHorizontalCrs(targetCrs);
@@ -96,6 +97,7 @@ public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTra
   }
 
   @Override
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
   public double[] transform(double[] coordinates, int numberOfPoints, int dimension) {
     if (dimension > sourceDimension) {
       throw new IllegalStateException(
@@ -110,7 +112,7 @@ public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTra
       getMathTransform(dimension).transform(coordinates, 0, target, 0, numberOfPoints);
 
       return target;
-    } catch (Throwable ex) {
+    } catch (TransformException | IllegalArgumentException | IllegalStateException ex) {
       LogContext.errorAsDebug(LOGGER, ex, "PROJ");
     }
 
@@ -148,7 +150,8 @@ public class CrsTransformerProj extends BoundingBoxTransformer implements CrsTra
     return (isSource ? isSourceMetric : isTargetMetric)
             || !(horizontalCrs.getDatum() instanceof GeodeticDatum)
         ? 1
-        : (Math.PI / 180.00)
+        : Math.PI
+            / 180.00
             * ((GeodeticDatum) horizontalCrs.getDatum()).getEllipsoid().getSemiMajorAxis();
   }
 

@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.cql.app;
 
+@SuppressWarnings("PMD.FieldNamingConventions")
 public enum Type {
   String,
   Boolean,
@@ -22,6 +23,7 @@ public enum Type {
   List,
   UNKNOWN;
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public String schemaType() {
     return switch (this) {
       case String -> "STRING";

@@ -36,7 +36,6 @@ import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector.QueryOptions;
 import de.ii.xtraplatform.features.domain.FeatureProviderDataV2;
-import de.ii.xtraplatform.features.domain.FeatureQueries;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureQueryEncoder;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
@@ -50,6 +49,7 @@ import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.graphql.domain.FeatureProviderGraphQlData;
 import de.ii.xtraplatform.features.graphql.domain.GraphQlConnector;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.ValueStore;
@@ -59,9 +59,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.ws.rs.core.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
 
 /**
@@ -177,16 +174,15 @@ import org.threeten.extra.Interval;
           value = FeatureProviderGraphQl.PROVIDER_TYPE)
     },
     data = FeatureProviderGraphQlData.class)
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureProviderGraphQl
     extends AbstractFeatureProvider<
         byte[], String, FeatureProviderConnector.QueryOptions, FeatureSchema>
-    implements FeatureProvider, FeatureQueries, FeatureCrs, FeatureExtents, FeatureMetadata {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderGraphQl.class);
+    implements FeatureCrs, FeatureExtents, FeatureMetadata {
 
   static final String ENTITY_SUB_TYPE = "feature/graphql";
   public static final String PROVIDER_TYPE = "GRAPHQL";
-  private static final MediaType MEDIA_TYPE = new MediaType("application", "geo+json");
+  // private static final MediaType MEDIA_TYPE = new MediaType("application", "geo+json");
 
   private final Cql cql;
 
@@ -202,6 +198,7 @@ public class FeatureProviderGraphQl
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      AuditLog auditLog,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
     super(
@@ -211,6 +208,7 @@ public class FeatureProviderGraphQl
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLog,
         data,
         volatileRegistry);
 
@@ -243,20 +241,18 @@ public class FeatureProviderGraphQl
 
   @Override
   protected Map<String, List<FeatureSchema>> getSourceSchemas() {
-    Map<String, List<FeatureSchema>> types =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    new SimpleImmutableEntry<>(
-                        entry.getKey(),
-                        List.of(
-                            entry
-                                .getValue()
-                                .accept(
-                                    new SchemaDeriverGraphQl(
-                                        getData().getTypes(), getData().getQueries())))))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    return types;
+    return getData().getTypes().entrySet().stream()
+        .map(
+            entry ->
+                new SimpleImmutableEntry<>(
+                    entry.getKey(),
+                    List.of(
+                        entry
+                            .getValue()
+                            .accept(
+                                new SchemaDeriverGraphQl(
+                                    getData().getTypes(), getData().getQueries())))))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
@@ -278,10 +274,9 @@ public class FeatureProviderGraphQl
   protected FeatureTokenDecoder<
           byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
       getDecoder(Query query, Map<String, SchemaMapping> mappings) {
-    if (!(query instanceof FeatureQuery)) {
+    if (!(query instanceof FeatureQuery featureQuery)) {
       throw new IllegalArgumentException();
     }
-    FeatureQuery featureQuery = (FeatureQuery) query;
     FeatureSchema featureSchema = getSourceSchemas().get(featureQuery.getType()).get(0);
     String name =
         featureSchema.getSourcePath().map(sourcePath -> sourcePath.substring(1)).orElse(null);
@@ -291,7 +286,7 @@ public class FeatureProviderGraphQl
             ? getData().getQueries().getSingle().get().getName(name)
             : getData().getQueries().getCollection().getName(name);
 
-    // TODO: does mapping need SchemaDeriverGraphQl applied?
+    // NOTE: does mapping need SchemaDeriverGraphQl applied?
     return new FeatureTokenDecoderGraphQlJson2(
         featureSchema, featureQuery, mappings, name, wrapper);
   }
@@ -312,6 +307,7 @@ public class FeatureProviderGraphQl
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public long getFeatureCount(String typeName) {
     if (getData().getTypes().containsKey(typeName)) {
       return -1;
@@ -357,6 +353,7 @@ public class FeatureProviderGraphQl
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
     if (getData().getTypes().containsKey(typeName)) {
       return Optional.empty();
@@ -375,7 +372,6 @@ public class FeatureProviderGraphQl
           .join();
     } catch (Throwable e) {
       // continue
-      boolean br = true;
     }
 
     return Optional.empty();

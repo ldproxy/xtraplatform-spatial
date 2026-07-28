@@ -12,6 +12,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class CqlIncompatibleTypes extends IllegalArgumentException {
+
+  private static final long serialVersionUID = 1L;
+
   public CqlIncompatibleTypes(String cqlText, String type, List<String> expectedTypes) {
     super(
         String.format(

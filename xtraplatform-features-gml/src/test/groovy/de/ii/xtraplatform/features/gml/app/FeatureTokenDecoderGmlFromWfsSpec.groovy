@@ -22,9 +22,9 @@ import javax.xml.namespace.QName
 /**
  * @author zahnen
  */
-class FeatureTokenDecoderGmlSpec extends Specification {
+class FeatureTokenDecoderGmlFromWfsSpec extends Specification {
 
-    static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenDecoderGmlSpec.class)
+    static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenDecoderGmlFromWfsSpec.class)
 
     @Shared
     Reactive reactive
@@ -57,7 +57,7 @@ class FeatureTokenDecoderGmlSpec extends Specification {
                         .geometryType(GeometryType.POLYGON))
                 .build()
 
-        decoder = new FeatureTokenDecoderGml(
+        decoder = new FeatureTokenDecoderGmlFromWfs(
                 ["bag": "http://bag.geonovum.nl", "gml": "http://www.opengis.net/gml/3.2"],
                 [new QName("http://bag.geonovum.nl", "pand")],
                 schema,

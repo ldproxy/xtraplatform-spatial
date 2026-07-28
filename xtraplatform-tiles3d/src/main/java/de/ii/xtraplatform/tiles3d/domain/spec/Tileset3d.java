@@ -11,7 +11,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +21,16 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableTileset3d.Builder.class)
 @JsonInclude(Include.NON_EMPTY)
 public interface Tileset3d {
+
+  String SCHEMA_REF = "#/components/schemas/Tileset3dTiles";
+
+  @SuppressWarnings("UnstableApiUsage")
+  Funnel<Tileset3d> FUNNEL =
+      (from, into) -> {
+        AssetMetadata.FUNNEL.funnel(from.getAsset(), into);
+        from.getGeometricError().ifPresent(into::putFloat);
+        Tile3d.FUNNEL.funnel(from.getRoot(), into);
+      };
 
   default Tileset3d withUris(String uriPrefix) {
     return new ImmutableTileset3d.Builder().from(this).root(getRoot().withUris(uriPrefix)).build();
@@ -40,16 +49,6 @@ public interface Tileset3d {
   default Tileset3d withSchemaUri(String schemaUri) {
     return new ImmutableTileset3d.Builder().from(this).schemaUri(schemaUri).build();
   }
-
-  String SCHEMA_REF = "#/components/schemas/Tileset3dTiles";
-
-  @SuppressWarnings("UnstableApiUsage")
-  Funnel<Tileset3d> FUNNEL =
-      (from, into) -> {
-        AssetMetadata.FUNNEL.funnel(from.getAsset(), into);
-        from.getGeometricError().ifPresent(into::putFloat);
-        Tile3d.FUNNEL.funnel(from.getRoot(), into);
-      };
 
   AssetMetadata getAsset();
 
@@ -77,10 +76,10 @@ public interface Tileset3d {
 
   Map<String, Object> getExtras();
 
-  default void validate(Path source) {
+  default void validate(java.nio.file.Path source) {
     if (Objects.isNull(getAsset())
-        || (!Objects.equals(getAsset().getVersion(), "1.0")
-            && !Objects.equals(getAsset().getVersion(), "1.1"))) {
+        || !Objects.equals(getAsset().getVersion(), "1.0")
+            && !Objects.equals(getAsset().getVersion(), "1.1")) {
       throw new IllegalStateException("Invalid version found in 3D Tiles tileset file: " + source);
     }
 

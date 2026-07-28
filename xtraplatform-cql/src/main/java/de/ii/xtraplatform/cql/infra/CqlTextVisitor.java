@@ -38,6 +38,7 @@ import de.ii.xtraplatform.cql.domain.ImmutableLt;
 import de.ii.xtraplatform.cql.domain.ImmutableLte;
 import de.ii.xtraplatform.cql.domain.ImmutableNeq;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.Not;
@@ -66,11 +67,10 @@ import de.ii.xtraplatform.geometries.domain.Point;
 import de.ii.xtraplatform.geometries.domain.Polygon;
 import de.ii.xtraplatform.geometries.domain.Position;
 import de.ii.xtraplatform.geometries.domain.PositionList;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -78,12 +78,18 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 
-public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
-    implements CqlParserVisitor<CqlNode> {
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.TooManyMethods",
+  "PMD.CyclomaticComplexity",
+  "PMD.CouplingBetweenObjects"
+})
+public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
 
   private final EpsgCrs defaultCrs;
 
   public CqlTextVisitor(EpsgCrs defaultCrs) {
+    super();
     this.defaultCrs = defaultCrs;
   }
 
@@ -127,15 +133,17 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
 
   @Override
   public CqlNode visitBooleanFactor(CqlParser.BooleanFactorContext ctx) {
-    CqlNode booleanPrimary = ctx.booleanPrimary().accept(this);
-    if (Objects.nonNull(ctx.booleanPrimary().LEFTPAREN())) {
-      booleanPrimary = ctx.booleanPrimary().booleanExpression().accept(this);
-    }
     if (Objects.nonNull(ctx.NOT())) {
+      CqlNode booleanPrimary =
+          Objects.nonNull(ctx.booleanPrimary().LEFTPAREN())
+              ? ctx.booleanPrimary().booleanExpression().accept(this)
+              : ctx.booleanPrimary().accept(this);
       return Not.of((Cql2Expression) booleanPrimary);
     }
-
-    return booleanPrimary;
+    if (Objects.nonNull(ctx.booleanPrimary().LEFTPAREN())) {
+      return ctx.booleanPrimary().booleanExpression().accept(this);
+    }
+    return ctx.booleanPrimary().accept(this);
   }
 
   @Override
@@ -143,9 +151,6 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
 
     ComparisonOperator comparisonOperator =
         ComparisonOperator.valueOfCqlText(ctx.ComparisonOperator().getText());
-
-    Scalar scalar1 = (Scalar) ctx.scalarExpression(0).accept(this);
-    Scalar scalar2 = (Scalar) ctx.scalarExpression(1).accept(this);
 
     BinaryScalarOperation.Builder<? extends BinaryScalarOperation> builder;
 
@@ -171,6 +176,9 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
       default:
         throw new IllegalStateException("unknown comparison operator: " + comparisonOperator);
     }
+
+    Scalar scalar1 = (Scalar) ctx.scalarExpression(0).accept(this);
+    Scalar scalar2 = (Scalar) ctx.scalarExpression(1).accept(this);
 
     return builder.args(ImmutableList.of(scalar1, scalar2)).build();
   }
@@ -223,7 +231,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
             .map(v -> (Scalar) v.accept(this))
             .collect(Collectors.toList());
 
-    // TODO IN currently requires a property on the left side and literals on the right side
+    // NOTE: IN currently requires a property on the left side and literals on the right side
     in =
         new ImmutableIn.Builder()
             .addArgs((Scalar) ctx.scalarExpression(0).accept(this))
@@ -241,12 +249,12 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
     if (Objects.nonNull(ctx.IS())) {
       Scalar scalar1 = (Scalar) ctx.isNullOperand().accept(this);
 
-      IsNull isNull = new ImmutableIsNull.Builder().addArgs(scalar1).build();
+      IsNull nullPredicate = new ImmutableIsNull.Builder().addArgs(scalar1).build();
       if (Objects.nonNull(ctx.NOT())) {
-        return Not.of(isNull);
+        return Not.of(nullPredicate);
       }
 
-      return isNull;
+      return nullPredicate;
     }
     return null;
   }
@@ -254,11 +262,12 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitTemporalPredicate(CqlParser.TemporalPredicateContext ctx) {
 
-    if (Objects.isNull(ctx.TemporalFunction()))
+    if (Objects.isNull(ctx.TemporalFunction())) {
       throw new IllegalStateException("unknown temporal predicate: " + ctx.getText());
+    }
 
     TemporalFunction temporalFunction =
-        TemporalFunction.valueOf(ctx.TemporalFunction().getText().toUpperCase());
+        TemporalFunction.valueOf(ctx.TemporalFunction().getText().toUpperCase(Locale.ROOT));
 
     Temporal temporal1 = (Temporal) ctx.temporalExpression(0).accept(this);
     Temporal temporal2 = (Temporal) ctx.temporalExpression(1).accept(this);
@@ -269,11 +278,12 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitSpatialPredicate(CqlParser.SpatialPredicateContext ctx) {
 
-    if (Objects.isNull(ctx.SpatialFunction()))
+    if (Objects.isNull(ctx.SpatialFunction())) {
       throw new IllegalStateException("unknown spatial operator: " + ctx.getText());
+    }
 
     SpatialFunction spatialFunction =
-        SpatialFunction.valueOf(ctx.SpatialFunction().getText().toUpperCase());
+        SpatialFunction.valueOf(ctx.SpatialFunction().getText().toUpperCase(Locale.ROOT));
 
     Spatial spatial1 = (Spatial) ctx.geomExpression().get(0).accept(this);
     Spatial spatial2 = (Spatial) ctx.geomExpression().get(1).accept(this);
@@ -284,11 +294,12 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitArrayPredicate(CqlParser.ArrayPredicateContext ctx) {
 
-    if (Objects.isNull(ctx.ArrayFunction()))
+    if (Objects.isNull(ctx.ArrayFunction())) {
       throw new IllegalStateException("unknown array operator: " + ctx.getText());
+    }
 
     ArrayFunction arrayFunction =
-        ArrayFunction.valueOf(ctx.ArrayFunction().getText().toUpperCase());
+        ArrayFunction.valueOf(ctx.ArrayFunction().getText().toUpperCase(Locale.ROOT));
 
     Vector vector1 = (Vector) ctx.arrayExpression().get(0).accept(this);
     Vector vector2 = (Vector) ctx.arrayExpression().get(1).accept(this);
@@ -305,7 +316,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
               .collect(Collectors.toList());
       return ArrayLiteral.of(values);
     } catch (CqlParseException e) {
-      throw new IllegalArgumentException(e.getMessage());
+      throw new IllegalArgumentException(e.getMessage(), e);
     }
   }
 
@@ -315,6 +326,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
       Map<String, Cql2Expression> nestedFilters = new HashMap<>();
       for (int i = 0; i < ctx.nestedCqlFilter().size(); i++) {
         Cql2Expression nestedFilter = (Cql2Expression) ctx.nestedCqlFilter(i).accept(this);
+        @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
         CqlVisitorPropertyPrefix prefix =
             new CqlVisitorPropertyPrefix(stripDoubleQuotes(ctx.Identifier(i).getText()));
         nestedFilter = (Cql2Expression) nestedFilter.accept(prefix);
@@ -349,7 +361,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitBooleanLiteral(CqlParser.BooleanLiteralContext ctx) {
     if (ctx.parent instanceof CqlParser.BooleanPrimaryContext) {
-      return BooleanValue2.of(java.lang.Boolean.valueOf(ctx.getText()));
+      return BooleanValue2.of(Boolean.valueOf(ctx.getText()));
     }
 
     return ScalarLiteral.of(ctx.getText(), true);
@@ -362,7 +374,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
         return ctx.interval().accept(this);
       }
     } catch (CqlParseException e) {
-      throw new IllegalArgumentException(e.getMessage());
+      throw new IllegalArgumentException(e.getMessage(), e);
     }
     return ctx.instantInstance().accept(this);
   }
@@ -382,7 +394,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitIntervalParameter(CqlParser.IntervalParameterContext ctx) {
     if (Objects.nonNull(ctx.NOW())) {
-      return TemporalLiteral.of(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+      return TemporalLiteral.of(TemporalLiteral.now());
     } else if (Objects.nonNull(ctx.DateString())) {
       String s = ctx.DateString().getText();
       return TemporalLiteral.of(s.substring(1, s.length() - 1));
@@ -400,7 +412,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
   @Override
   public CqlNode visitInstantInstance(CqlParser.InstantInstanceContext ctx) {
     if (Objects.nonNull(ctx.NOW())) {
-      return TemporalLiteral.of(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+      return TemporalLiteral.of(TemporalLiteral.now());
     }
 
     String s =
@@ -502,7 +514,7 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
         ctx.polygonDef().stream()
             .map(
                 polygonDefContext ->
-                    (Polygon) ((GeometryNode) (polygonDefContext.accept(this))).getGeometry())
+                    (Polygon) ((GeometryNode) polygonDefContext.accept(this)).getGeometry())
             .toList();
 
     return GeometryNode.of(MultiPolygon.of(polygons, Optional.of(defaultCrs)));
@@ -591,6 +603,15 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode>
         ctx.argumentList().positionalArgument().argument().stream()
             .map(arg -> (Operand) arg.accept(this))
             .collect(Collectors.toList());
+
+    if ("INRESULTSET".equalsIgnoreCase(functionName)
+        && args.size() == 2
+        && args.get(0) instanceof Property
+        && args.get(1) instanceof ScalarLiteral) {
+      return InResultSet.of(
+          (Property) args.get(0), String.valueOf(((ScalarLiteral) args.get(1)).getValue()));
+    }
+
     return Function.of(functionName, args);
   }
 

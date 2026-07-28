@@ -20,11 +20,15 @@ public interface LineString extends SingleCurve {
     return ImmutableLineString.builder().value(PositionList.empty(axes)).build();
   }
 
-  static LineString of(double[] xyCoordinates) {
+  static LineString of(double... xyCoordinates) {
     return ImmutableLineString.builder().value(PositionList.of(Axes.XY, xyCoordinates)).build();
   }
 
   static LineString of(double[] xyCoordinates, EpsgCrs crs) {
+    return of(crs, xyCoordinates);
+  }
+
+  static LineString of(EpsgCrs crs, double... xyCoordinates) {
     return ImmutableLineString.builder()
         .crs(crs)
         .value(PositionList.of(Axes.XY, xyCoordinates))
@@ -57,6 +61,7 @@ public interface LineString extends SingleCurve {
     return ImmutableLineString.builder().value(PositionList.of(axes, coordinates)).build();
   }
 
+  @Override
   @Value.Derived
   @Value.Auxiliary
   default Axes getAxes() {
@@ -74,8 +79,10 @@ public interface LineString extends SingleCurve {
   default void check() {
     Preconditions.checkState(
         getValue().getNumPositions() != 1,
-        "A non-empty line string must have at least two positions, found %s positions.",
-        getValue().getNumPositions());
+        "A non-empty line string must have at least two positions, found %s positions with axes %s: %s",
+        getValue().getNumPositions(),
+        getValue().getAxes(),
+        GeometryFormatting.formatPositions(getValue().getCoordinates(), getValue().getAxes(), 4));
   }
 
   @Override

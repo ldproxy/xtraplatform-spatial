@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.sql.domain;
 import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
@@ -20,6 +19,8 @@ import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
@@ -54,7 +55,6 @@ import de.ii.xtraplatform.features.domain.FeatureStream;
 import de.ii.xtraplatform.features.domain.FeatureStreamImpl;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
 import de.ii.xtraplatform.features.domain.FeatureTokenSource;
-import de.ii.xtraplatform.features.domain.FeatureTokenTransformer;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Builder;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Type;
@@ -72,12 +72,14 @@ import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.ProviderExtensionRegistry;
 import de.ii.xtraplatform.features.domain.Query;
+import de.ii.xtraplatform.features.domain.QueryRunner;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
+import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
@@ -92,14 +94,17 @@ import de.ii.xtraplatform.features.sql.app.ModifiableFeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
+import de.ii.xtraplatform.features.sql.app.ResultSetMaterializer;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
 import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
+import de.ii.xtraplatform.features.sql.app.SqlMutationSession;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
@@ -110,14 +115,18 @@ import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -464,9 +473,11 @@ public class FeatureProviderSql
   private PathParserSql pathParser2;
   private SqlPathParser pathParser3;
   private FilterEncoderSql filterEncoder;
+  private ResultSetMaterializer resultSetMaterializer;
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SqlQueryMapping>> queryMappings;
+  private List<CustomFunction> cql2Functions;
   private String cronJob;
 
   @AssistedInject
@@ -483,6 +494,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     this(
         crsTransformerFactory,
@@ -497,6 +509,7 @@ public class FeatureProviderSql
         volatileRegistry,
         cache,
         scheduler,
+        auditLog,
         data,
         decoderFactories.getConnectorDecoders());
   }
@@ -514,6 +527,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLog auditLog,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
     super(
@@ -523,6 +537,7 @@ public class FeatureProviderSql
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLog,
         data,
         volatileRegistry);
 
@@ -533,6 +548,7 @@ public class FeatureProviderSql
     this.subdecoders = subdecoders;
     this.cronJob = null;
     this.tableSchemas = null;
+    this.cql2Functions = List.of();
   }
 
   private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
@@ -573,6 +589,7 @@ public class FeatureProviderSql
     }
 
     SqlDialect sqlDialect = dbmsAdapters.getDialect(getData().getConnectionInfo().getDialect());
+    this.cql2Functions = getDialectAwareCustomFunctions(sqlDialect);
     String accentiCollation =
         Objects.nonNull(getData().getQueryGeneration())
             ? getData().getQueryGeneration().getAccentiCollation().orElse(null)
@@ -584,7 +601,12 @@ public class FeatureProviderSql
             crsTransformerFactory,
             crsInfo,
             cql,
-            accentiCollation);
+            getCql2Functions(),
+            accentiCollation,
+            type ->
+                Optional.ofNullable(queryMappings.get(type))
+                    .filter(mappings -> mappings.size() == 1)
+                    .map(mappings -> mappings.get(0)));
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
@@ -610,6 +632,13 @@ public class FeatureProviderSql
     this.queryTransformer =
         new FeatureQueryEncoderSql(
             allQueryTemplates, allQueryTemplates, getData().getQueryGeneration(), sqlDialect);
+
+    this.resultSetMaterializer =
+        new ResultSetMaterializer(
+            this::getSqlClient,
+            filterEncoder,
+            getData().getQueryGeneration().getResultSetMaterializationMaxSize(),
+            sqlDialect);
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
@@ -917,11 +946,6 @@ public class FeatureProviderSql
   }
 
   @Override
-  protected List<FeatureTokenTransformer> getDecoderTransformers() {
-    return ImmutableList.of(); // new FeatureTokenTransformerSorting());
-  }
-
-  @Override
   public FeatureProviderSqlData getData() {
     return (FeatureProviderSqlData) super.getData();
   }
@@ -945,11 +969,7 @@ public class FeatureProviderSql
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
       return false;
     }
-    if (!getData().getDatasetChanges().isModeCrud()) {
-      return false;
-    }
-
-    return true;
+    return getData().getDatasetChanges().isModeCrud();
   }
 
   @Override
@@ -1245,6 +1265,18 @@ public class FeatureProviderSql
   }
 
   @Override
+  public Session openSession() {
+    return new SqlMutationSession(
+        getSqlClient().openSession(),
+        queryMappings,
+        featureMutationsSql,
+        getNativeCrs(),
+        crsTransformerFactory,
+        getData().getNativeTimeZone(),
+        getStreamRunner());
+  }
+
+  @Override
   public MutationResult deleteFeature(String featureType, String id) {
     Optional<List<SqlQueryMapping>> queryMapping =
         Optional.ofNullable(queryMappings.get(featureType));
@@ -1335,7 +1367,7 @@ public class FeatureProviderSql
                     crsTransformerFactory,
                     getData().getNativeTimeZone(),
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            .via(Transformer.map(feature -> (FeatureDataSql) feature));
+            .via(Transformer.map(feature -> feature));
 
     if (partial) {
       featureSqlSource =
@@ -1372,7 +1404,13 @@ public class FeatureProviderSql
     return mutationStream.run().toCompletableFuture().join();
   }
 
+  @Override
   protected Query preprocessQuery(Query query) {
+    // result-set tables created here are discarded: callers that need to drop them use the overload
+    return preprocessQuery(query, new ArrayList<>());
+  }
+
+  protected Query preprocessQuery(Query query, List<String> resultSetTables) {
     if (query instanceof FeatureQuery
         && (((FeatureQuery) query).getFields().size() > 1
             || !"*".equals(((FeatureQuery) query).getFields().get(0)))) {
@@ -1406,29 +1444,40 @@ public class FeatureProviderSql
       // - disable optimized paging as soon as a sort key is specified for at least one subquery
       // - fix a bug in SqlRowVals or transformations, it seems that the same number of columns is
       // expected for all queries
-      List<SubQuery> queries = ((MultiFeatureQuery) query).getQueries();
+      MultiFeatureQuery multiQuery = (MultiFeatureQuery) query;
+      List<SubQuery> queries = multiQuery.getQueries();
       OptionalInt maxSortKeys =
           queries.stream().mapToInt(subQuery -> subQuery.getSortKeys().size()).max();
 
       if (maxSortKeys.orElse(0) > 0) {
-        return ImmutableMultiFeatureQuery.builder()
-            .from(query)
-            .queries(
-                queries.stream()
-                    .map(
-                        subQuery ->
-                            ImmutableSubQuery.builder()
-                                .from(subQuery)
-                                .sortKeys(
-                                    subQuery.getSortKeys().size() < maxSortKeys.getAsInt()
-                                        ? IntStream.range(0, maxSortKeys.getAsInt())
-                                            .mapToObj(i -> SortKey.of(ID_PLACEHOLDER))
-                                            .collect(Collectors.toList())
-                                        : subQuery.getSortKeys())
-                                .build())
-                    .collect(Collectors.toList()))
-            .build();
+        multiQuery =
+            ImmutableMultiFeatureQuery.builder()
+                .from(multiQuery)
+                .queries(
+                    queries.stream()
+                        .map(
+                            subQuery ->
+                                ImmutableSubQuery.builder()
+                                    .from(subQuery)
+                                    .sortKeys(
+                                        subQuery.getSortKeys().size() < maxSortKeys.getAsInt()
+                                            ? IntStream.range(0, maxSortKeys.getAsInt())
+                                                .mapToObj(i -> SortKey.of(ID_PLACEHOLDER))
+                                                .collect(Collectors.toList())
+                                            : subQuery.getSortKeys())
+                                    .build())
+                        .collect(Collectors.toList()))
+                .build();
       }
+
+      // materialize the result sets of a multi-query once and reuse them across its queries,
+      // instead
+      // of re-deriving each shared result set in every sub-query statement
+      if (ResultSetMaterializer.hasResultSets(multiQuery)) {
+        multiQuery = resultSetMaterializer.materialize(multiQuery, resultSetTables);
+      }
+
+      return multiQuery;
     }
 
     return query;
@@ -1438,9 +1487,28 @@ public class FeatureProviderSql
   public FeatureStream getFeatureStream(MultiFeatureQuery query) {
     validateQuery(query);
 
-    Query query2 = preprocessQuery(query);
+    List<String> resultSetTables = new ArrayList<>();
+    Query query2 = preprocessQuery(query, resultSetTables);
 
     boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
+
+    // drop any tables materialized for oversized result sets once the query's stream has completed
+    QueryRunner runner =
+        resultSetTables.isEmpty()
+            ? this::runQuery
+            : new QueryRunner() {
+              @Override
+              public <W extends FeatureStream.ResultBase> CompletionStage<W> runQuery(
+                  BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<W>> stream,
+                  Query runQuery,
+                  Map<String, PropertyTransformations> propertyTransformations,
+                  boolean passThrough) {
+                return FeatureProviderSql.this
+                    .runQuery(stream, runQuery, propertyTransformations, passThrough)
+                    .whenComplete(
+                        (result, error) -> resultSetMaterializer.dropTables(resultSetTables));
+              }
+            };
 
     return new FeatureStreamImpl(
         query2,
@@ -1448,8 +1516,9 @@ public class FeatureProviderSql
         crsTransformerFactory,
         nativeCrsIs3d,
         getCodelists(),
-        this::runQuery,
-        !query.hitsOnly());
+        runner,
+        !query.hitsOnly(),
+        auditLog);
   }
 
   @Override
@@ -1480,6 +1549,46 @@ public class FeatureProviderSql
   @Override
   public boolean supportsIsNull() {
     return true;
+  }
+
+  @Override
+  public List<CustomFunction> getCql2Functions() {
+    return CqlBuiltInFunctions.prependBuiltInFunctions(cql2Functions);
+  }
+
+  private List<CustomFunction> getDialectAwareCustomFunctions(SqlDialect sqlDialect) {
+    final String dialectKey = "SQL/" + sqlDialect.getId().toUpperCase(Locale.ROOT);
+
+    return getData().getCql2Functions().stream()
+        .filter(
+            function -> {
+              if (function.getQueryExpressionOnly()) {
+                // encoded by a dedicated handler, not a SQL template; not template-renderable
+                return false;
+              }
+
+              if (Objects.nonNull(function.getExpression())
+                  && !function.getExpression().isBlank()) {
+                return true;
+              }
+
+              Map<String, String> expressions = function.getExpressions();
+              boolean hasDialectExpression = expressions.containsKey(dialectKey);
+              boolean hasGenericExpression = expressions.containsKey("SQL");
+
+              if (hasDialectExpression || hasGenericExpression) {
+                return true;
+              }
+
+              LOGGER.error(
+                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no expression is defined for dialect '{}' (available keys: {}).",
+                  getId(),
+                  function.getName(),
+                  dialectKey,
+                  expressions.keySet());
+              return false;
+            })
+        .toList();
   }
 
   @Override

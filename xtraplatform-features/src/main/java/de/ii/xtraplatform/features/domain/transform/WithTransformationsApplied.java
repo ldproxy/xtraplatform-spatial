@@ -81,7 +81,7 @@ public class WithTransformationsApplied
 
   private Optional<PropertyTransformation> getFeatureTransformations(FeatureSchema schema) {
     PropertyTransformations schemaTransformations =
-        () -> ImmutableMap.of(PropertyTransformations.WILDCARD, schema.getTransformations());
+        () -> ImmutableMap.of(WILDCARD, schema.getTransformations());
 
     PropertyTransformations mergedTransformations =
         preferSchemaTransformations
@@ -113,7 +113,6 @@ public class WithTransformationsApplied
                             visitedProperties.stream().flatMap(m -> m.entrySet().stream()))
                         .collect(
                             ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
-    ;
 
     PropertyTransformations mergedTransformations =
         preferSchemaTransformations

@@ -43,6 +43,11 @@ public interface SqlRow extends Comparable<SqlRow> {
 
   Optional<String> getType();
 
+  /** Index of the query in a multi-query that produced this row. */
+  default int getQueryIndex() {
+    return 0;
+  }
+
   default List<List<String>> getColumnPaths() {
     return ImmutableList.of();
   }

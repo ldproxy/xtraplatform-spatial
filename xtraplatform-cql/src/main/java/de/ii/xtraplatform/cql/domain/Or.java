@@ -13,7 +13,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableOr.Builder.class)
-public interface Or extends LogicalOperation, CqlNode {
+@FunctionalInterface
+public interface Or extends LogicalOperation {
 
   String TYPE = "or";
 

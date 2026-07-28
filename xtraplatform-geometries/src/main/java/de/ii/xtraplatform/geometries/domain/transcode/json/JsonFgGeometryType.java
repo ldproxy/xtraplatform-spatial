@@ -48,7 +48,7 @@ public enum JsonFgGeometryType {
   }
 
   public static JsonFgGeometryType forString(String type) {
-    for (JsonFgGeometryType jsonFgType : JsonFgGeometryType.values()) {
+    for (JsonFgGeometryType jsonFgType : values()) {
       if (jsonFgType.toString().equals(type)) {
         return jsonFgType;
       }
@@ -64,8 +64,8 @@ public enum JsonFgGeometryType {
       return POLYHEDRON;
     }
 
-    for (JsonFgGeometryType jsonFgType : JsonFgGeometryType.values()) {
-      if (jsonFgType.geometryType.equals(geometry.getType())) {
+    for (JsonFgGeometryType jsonFgType : values()) {
+      if (jsonFgType.geometryType == geometry.getType()) {
         return jsonFgType;
       }
     }

@@ -8,14 +8,15 @@
 package de.ii.xtraplatform.cql.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.Locale;
 import org.immutables.value.Value;
 
-public interface BinaryArrayOperation extends BinaryOperation2<Vector>, CqlNode {
+public interface BinaryArrayOperation extends BinaryOperation2<Vector> {
 
   @JsonIgnore
   @Value.Derived
   default ArrayFunction getArrayOperator() {
-    return ArrayFunction.valueOf(getOp().toUpperCase());
+    return ArrayFunction.valueOf(getOp().toUpperCase(Locale.ROOT));
   }
 
   static BinaryArrayOperation of(ArrayFunction operator, Vector vector1, Vector vector2) {

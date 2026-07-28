@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTFinishedBy.Builder.class)
-public interface TFinishedBy extends BinaryTemporalOperation, CqlNode {
+public interface TFinishedBy extends BinaryTemporalOperation {
 
   String TYPE = "t_finishedBy";
 

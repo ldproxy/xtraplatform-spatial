@@ -8,13 +8,23 @@
 package de.ii.xtraplatform.features.sql.app
 
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
+import de.ii.xtraplatform.cql.domain.CustomFunction
+import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.ImmutableCql2FunctionArgument
+import de.ii.xtraplatform.cql.domain.Eq
+import de.ii.xtraplatform.cql.domain.Gt
+import de.ii.xtraplatform.cql.domain.Function
+import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.cql.app.CqlFilterExamples
 import de.ii.xtraplatform.cql.app.CqlImpl
+import de.ii.xtraplatform.cql.domain.ScalarLiteral
+import de.ii.xtraplatform.cql.domain.IsNull
 import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
+import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
 import de.ii.xtraplatform.proj.domain.ProjLoaderImpl
 import spock.lang.Shared
@@ -31,6 +41,24 @@ class FilterEncoderSqlSpec extends Specification {
     @Shared
     FilterEncoderSql filterEncoder2
 
+    @Shared
+    FilterEncoderSql filterEncoderCustom
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomBoolean
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomGeometry
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomConcatPgis
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomConcatGpkg
+
+    @Shared
+    FilterEncoderSql filterEncoderCustomPgisOnlyOnGpkg
+
     def setupSpec() {
 
         filterEncoder = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), null, null, new CqlImpl(), null)
@@ -40,6 +68,213 @@ class FilterEncoderSqlSpec extends Specification {
         CrsTransformerFactoryProj transformerFactory = new CrsTransformerFactoryProj(new ProjLoaderImpl(Path.of(System.getProperty("java.io.tmpdir"), "proj", "data")), resourceStore, volatileRegistry)
         transformerFactory.onStart(false).toCompletableFuture().join()
         filterEncoder2 = new FilterEncoderSql(OgcCrs.CRS84, new SqlDialectPgis(), (CrsTransformerFactory) transformerFactory, null, new CqlImpl(), null)
+        def customFunction = Stub(CustomFunction)
+        customFunction.getName() >> "my_concat"
+        customFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("string").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("string").build()
+        ]
+        customFunction.getReturns() >> ["string"]
+        customFunction.getExpression() >> "concat(\$arg1, '-', \$arg2)"
+        customFunction.getExpressions() >> [:]
+        filterEncoderCustom = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [customFunction],
+                null)
+
+        def booleanFunction = Stub(CustomFunction)
+        booleanFunction.getName() >> "my_upper_match"
+        booleanFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        booleanFunction.getReturns() >> ["BOOLEAN"]
+        booleanFunction.getExpression() >> "UPPER(\$arg1) LIKE UPPER(\$arg2)"
+        booleanFunction.getExpressions() >> [:]
+        filterEncoderCustomBoolean = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [booleanFunction],
+                null)
+
+        def geometryFunction = Stub(CustomFunction)
+        geometryFunction.getName() >> "ist_in_bereich"
+        geometryFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("GEOMETRY").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        geometryFunction.getReturns() >> ["BOOLEAN"]
+        geometryFunction.getExpression() >> "ST_Intersects(\$arg1, (SELECT geometrie FROM bereiche WHERE name=\$arg2))"
+        geometryFunction.getExpressions() >> [:]
+        filterEncoderCustomGeometry = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [geometryFunction],
+                null)
+
+        def concatDialectFunction = Stub(CustomFunction)
+        concatDialectFunction.getName() >> "my_concat"
+        concatDialectFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build(),
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        concatDialectFunction.getReturns() >> ["STRING"]
+        concatDialectFunction.getExpression() >> null
+        concatDialectFunction.getExpressions() >> ["SQL/GPKG": "concat(\$arg1, ' (', \$arg2, ')')", "SQL/PGIS": "\$arg1 || ' (' || \$arg2 || ')'"]
+        filterEncoderCustomConcatPgis = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectPgis(),
+                null,
+                null,
+                new CqlImpl(),
+                [concatDialectFunction],
+                null)
+        filterEncoderCustomConcatGpkg = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectGpkg(),
+                null,
+                null,
+                new CqlImpl(),
+                [concatDialectFunction],
+                null)
+
+        def pgisOnlyFunction = Stub(CustomFunction)
+        pgisOnlyFunction.getName() >> "my_pgis_only"
+        pgisOnlyFunction.getArguments() >> [
+                new ImmutableCql2FunctionArgument.Builder().addType("STRING").build()
+        ]
+        pgisOnlyFunction.getReturns() >> ["STRING"]
+        pgisOnlyFunction.getExpression() >> null
+        pgisOnlyFunction.getExpressions() >> ["SQL/PGIS": "UPPER(\$arg1)"]
+        filterEncoderCustomPgisOnlyOnGpkg = new FilterEncoderSql(
+                OgcCrs.CRS84,
+                new SqlDialectGpkg(),
+                null,
+                null,
+                new CqlImpl(),
+                [pgisOnlyFunction],
+                null)
+    }
+
+    def 'custom function dialect-specific expression: SQL/PGIS'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), Property.of("created")]),
+                        ScalarLiteral.of("Kupp (Serrig)")
+                ])
+
+        when:
+        String expected = "A.name || ' (' || A.created || ')' = 'Kupp (Serrig)'"
+
+        String actual = filterEncoderCustomConcatPgis.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom function dialect-specific expression: SQL/GPKG'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), Property.of("created")]),
+                        ScalarLiteral.of("Kupp (Serrig)")
+                ])
+
+        when:
+        String expected = "concat(A.name, ' (', A.created, ')') = 'Kupp (Serrig)'"
+
+        String actual = filterEncoderCustomConcatGpkg.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom function without expression for current dialect throws clear error'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_pgis_only", [Property.of("name")]),
+                        ScalarLiteral.of("KUPP")
+                ])
+
+        when:
+        filterEncoderCustomPgisOnlyOnGpkg.encode(filter, instanceContainer)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "Custom function 'my_pgis_only' has no expression for dialect 'SQL/GPKG'"
+
+    }
+
+    def 'custom function template with property and literal'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Eq.of(
+                [
+                        Function.of("my_concat", [Property.of("name"), ScalarLiteral.of("x")]),
+                        ScalarLiteral.of("foo-x")
+                ])
+
+        when:
+        String expected = "concat(A.name, '-', 'x') = 'foo-x'"
+
+        String actual = filterEncoderCustom.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
+
+    }
+
+    def 'custom boolean function with two string properties'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Function.of("my_upper_match", [Property.of("name"), ScalarLiteral.of("kupp%")])
+
+        when:
+        String expected = "UPPER(A.name) LIKE UPPER('kupp%')"
+
+        String actual = filterEncoderCustomBoolean.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+    }
+
+    def 'custom boolean geometry function (IST_IN_BEREICH pattern)'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_GEOMETRY
+        def filter = Function.of("ist_in_bereich", [Property.of("location"), ScalarLiteral.of("Bereich Saar")])
+
+        when:
+        String expected = "ST_Intersects(A.location, (SELECT geometrie FROM bereiche WHERE name='Bereich Saar'))"
+
+        String actual = filterEncoderCustomGeometry.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
 
     }
 
@@ -50,7 +285,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_15
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Within(AA.location, ST_GeomFromText('POLYGON((-118.0 33.8,-117.9 33.8,-117.9 34.0,-118.0 34.0,-118.0 33.8))',4326)))"
+        String expected = "ST_Within(A.location, ST_GeomFromText('POLYGON((-118.0 33.8,-117.9 33.8,-117.9 34.0,-118.0 34.0,-118.0 33.8))',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -67,7 +302,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_15)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE NOT ST_Within(AA.location, ST_GeomFromText('POLYGON((-118.0 33.8,-117.9 33.8,-117.9 34.0,-118.0 34.0,-118.0 33.8))',4326)))"
+        String expected = "NOT (ST_Within(A.location, ST_GeomFromText('POLYGON((-118.0 33.8,-117.9 33.8,-117.9 34.0,-118.0 34.0,-118.0 33.8))',4326)))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -101,7 +336,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_16)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE NOT ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326)))"
+        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -119,7 +354,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_15_RandomCrs
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Within(AA.location, ST_GeomFromText('POLYGON((-118.0 33.8,-118.0 34.0,-117.9 34.0,-117.9 33.8,-118.0 33.8))',4326)))"
+        String expected = "ST_Within(A.location, ST_GeomFromText('POLYGON((-118.0 33.8,-118.0 34.0,-117.9 34.0,-117.9 33.8,-118.0 33.8))',4326))"
 
         String actual = filterEncoder2.encode(filter, instanceContainer)
 
@@ -134,7 +369,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_12
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.built::timestamp(0) < TIMESTAMP '2012-06-05T00:00:00Z')"
+        String expected = "A.built::timestamp(0) < TIMESTAMP '2012-06-05T00:00:00Z'"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -151,7 +386,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_12)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.built::timestamp(0) >= TIMESTAMP '2012-06-05T00:00:00Z')"
+        String expected = "A.built::timestamp(0) >= TIMESTAMP '2012-06-05T00:00:00Z'"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -168,7 +403,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_12_date
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.built::date < DATE '2012-06-05')"
+        String expected = "A.built::date < DATE '2012-06-05'"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -185,7 +420,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_12_date)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.built::date >= DATE '2012-06-05')"
+        String expected = "A.built::date >= DATE '2012-06-05'"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -202,7 +437,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_14
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE AA.updated::timestamp(0) > TIMESTAMP '2017-06-10T07:30:00Z') AND A.id IN (SELECT AA.id FROM building AA WHERE AA.updated::timestamp(0) < TIMESTAMP '2017-06-11T10:30:00Z'))"
+        String expected = "(A.updated::timestamp(0) > TIMESTAMP '2017-06-10T07:30:00Z' AND A.updated::timestamp(0) < TIMESTAMP '2017-06-11T10:30:00Z')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -219,7 +454,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_14_B
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE TIMESTAMP '2017-06-10T07:30:00Z' > AA.updated::timestamp(0)) AND A.id IN (SELECT AA.id FROM building AA WHERE TIMESTAMP '2017-06-11T10:30:00Z' < AA.updated::timestamp(0)))"
+        String expected = "(TIMESTAMP '2017-06-10T07:30:00Z' > A.updated::timestamp(0) AND TIMESTAMP '2017-06-11T10:30:00Z' < A.updated::timestamp(0))"
         String actual = filterEncoder.encode(filter, instanceContainer)
 
         then:
@@ -235,7 +470,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_Interval
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE (TIMESTAMP '2017-06-10T07:30:00Z', TIMESTAMP '2017-06-11T10:30:00Z') OVERLAPS (TIMESTAMP '2012-06-05T00:00:00Z', COALESCE(AA.end,TIMESTAMP 'infinity')))"
+        String expected = "(TIMESTAMP '2017-06-10T07:30:00Z', TIMESTAMP '2017-06-11T10:30:00Z') OVERLAPS (TIMESTAMP '2012-06-05T00:00:00Z', COALESCE(A.end,TIMESTAMP 'infinity'))"
         String actual = filterEncoder.encode(filter, instanceContainer)
 
         then:
@@ -251,7 +486,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_Illegal_Interval
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE TIMESTAMP '2017-06-10T07:30:00Z' > AA.updated::timestamp(0)) AND A.id IN (SELECT AA.id FROM building AA WHERE TIMESTAMP '2017-06-11T10:30:00Z' < AA.updated::timestamp(0)))"
+        String expected = "(TIMESTAMP '2017-06-10T07:30:00Z' > A.updated::timestamp(0) AND TIMESTAMP '2017-06-11T10:30:00Z' < A.updated::timestamp(0))"
         String actual = filterEncoder.encode(filter, instanceContainer)
 
         then:
@@ -267,7 +502,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_14_Negation
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE AA.updated::timestamp(0) <= TIMESTAMP '2017-06-10T07:30:00Z') OR A.id IN (SELECT AA.id FROM building AA WHERE AA.updated::timestamp(0) >= TIMESTAMP '2017-06-11T10:30:00Z'))"
+        String expected = "(A.updated::timestamp(0) <= TIMESTAMP '2017-06-10T07:30:00Z' OR A.updated::timestamp(0) >= TIMESTAMP '2017-06-11T10:30:00Z')"
         String actual = filterEncoder.encode(filter, instanceContainer)
 
         then:
@@ -283,7 +518,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_20
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.owner IS NULL)"
+        String expected = "A.owner IS NULL"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -300,7 +535,24 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_20)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.owner IS NOT NULL)"
+        String expected = "A.owner IS NOT NULL"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
+
+    }
+
+    def 'is Null test, joined property'() {
+
+        given: 'a feature without any related row has no value, so it must match'
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = IsNull.of("location")
+
+        when:
+        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -317,7 +569,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_40
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.owner NOT IN ('Mike','John','Tom'))"
+        String expected = "A.owner NOT IN ('Mike','John','Tom')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -334,7 +586,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_3
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.owner::varchar LIKE '% Jones %')"
+        String expected = "A.owner::varchar LIKE '% Jones %'"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -351,7 +603,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_3)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE AA.owner::varchar NOT LIKE '% Jones %')"
+        String expected = "A.owner::varchar NOT LIKE '% Jones %'"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -368,7 +620,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_CASEI
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE LOWER(AA.road_class) IN ('οδος','straße'))"
+        String expected = "LOWER(A.road_class) IN ('οδος','straße')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -385,7 +637,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_CASEI)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE LOWER(AA.road_class) NOT IN ('οδος','straße'))"
+        String expected = "LOWER(A.road_class) NOT IN ('οδος','straße')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -402,7 +654,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_ACCENTI
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE LOWER(AA.road_class) IN ('οδος','straße'))"
+        String expected = "LOWER(A.road_class) IN ('οδος','straße')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -419,7 +671,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_ACCENTI)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE LOWER(AA.road_class) NOT IN ('οδος','straße'))"
+        String expected = "LOWER(A.road_class) NOT IN ('οδος','straße')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -436,7 +688,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_16
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326)))"
+        String expected = "ST_Intersects(A.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -453,7 +705,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_16)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE NOT ST_Intersects(AA.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326)))"
+        String expected = "NOT (ST_Intersects(A.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326)))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -480,6 +732,23 @@ class FilterEncoderSqlSpec extends Specification {
 
     }
 
+    def 'test AContains with a single value omits the tautological HAVING'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = CqlFilterExamples.EXAMPLE_AContains_SingleValue_ValidFor_JOINED_GEOMETRY
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id') GROUP BY AA.id)"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+
+        actual == expected
+
+    }
+
     def 'test AContains with not'() {
 
         given:
@@ -487,7 +756,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_AContains_ValidFor_JOINED_GEOMETRY)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE NOT AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2)"
+        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -554,7 +823,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_25z
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE (COALESCE(AA.start,TIMESTAMP '-infinity'), TIMESTAMP 'infinity') OVERLAPS (DATE '2017-06-10',TIMESTAMP 'infinity'))"
+        String expected = "(COALESCE(A.start,TIMESTAMP '-infinity'), TIMESTAMP 'infinity') OVERLAPS (DATE '2017-06-10',TIMESTAMP 'infinity')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -571,7 +840,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_25y
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE (COALESCE(AA.start,TIMESTAMP '-infinity'), COALESCE(AA.end,TIMESTAMP 'infinity')) OVERLAPS (DATE '2017-06-10',DATE '2017-06-12'))"
+        String expected = "(COALESCE(A.start,TIMESTAMP '-infinity'), COALESCE(A.end,TIMESTAMP 'infinity')) OVERLAPS (DATE '2017-06-10',DATE '2017-06-12')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -588,7 +857,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_25y)
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE NOT (COALESCE(AA.start,TIMESTAMP '-infinity'), COALESCE(AA.end,TIMESTAMP 'infinity')) OVERLAPS (DATE '2017-06-10',DATE '2017-06-12'))"
+        String expected = "NOT ((COALESCE(A.start,TIMESTAMP '-infinity'), COALESCE(A.end,TIMESTAMP 'infinity')) OVERLAPS (DATE '2017-06-10',DATE '2017-06-12'))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -605,7 +874,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_16_MultiPolygon
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, ST_GeomFromText('MULTIPOLYGON(((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)),((-15.0 -15.0,15.0 -15.0,15.0 15.0,-15.0 -15.0)))',4326)))"
+        String expected = "ST_Intersects(A.location, ST_GeomFromText('MULTIPOLYGON(((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)),((-15.0 -15.0,15.0 -15.0,15.0 15.0,-15.0 -15.0)))',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -622,7 +891,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_16_MultiLineString
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, ST_GeomFromText('MULTILINESTRING((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0),(-15.0 -15.0,15.0 -15.0,15.0 15.0,-15.0 -15.0))',4326)))"
+        String expected = "ST_Intersects(A.location, ST_GeomFromText('MULTILINESTRING((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0),(-15.0 -15.0,15.0 -15.0,15.0 15.0,-15.0 -15.0))',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -639,7 +908,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_16_LineString
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, ST_GeomFromText('LINESTRING(-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)',4326)))"
+        String expected = "ST_Intersects(A.location, ST_GeomFromText('LINESTRING(-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0)',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -656,7 +925,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_16_Point
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, ST_GeomFromText('POINT(10.0 -10.0)',4326)))"
+        String expected = "ST_Intersects(A.location, ST_GeomFromText('POINT(10.0 -10.0)',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -673,7 +942,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_16_MultiPoint
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA WHERE ST_Intersects(AA.location, ST_GeomFromText('MULTIPOINT(10.0 -10.0,10.0 10.0)',4326)))"
+        String expected = "ST_Intersects(A.location, ST_GeomFromText('MULTIPOINT(10.0 -10.0,10.0 10.0)',4326))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -690,7 +959,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_26
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE AA.updated > TIMESTAMP '2017-06-10T07:30:00Z') AND A.id IN (SELECT AA.id FROM building AA WHERE AA.updated < TIMESTAMP 'infinity'))"
+        String expected = "(A.updated > TIMESTAMP '2017-06-10T07:30:00Z' AND A.updated < TIMESTAMP 'infinity')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -707,7 +976,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_26)
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE AA.updated <= TIMESTAMP '2017-06-10T07:30:00Z') OR A.id IN (SELECT AA.id FROM building AA WHERE AA.updated >= TIMESTAMP 'infinity'))"
+        String expected = "(A.updated <= TIMESTAMP '2017-06-10T07:30:00Z' OR A.updated >= TIMESTAMP 'infinity')"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -775,12 +1044,45 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_NOT
 
         when:
-        String expected = "(A.id IN (SELECT AA.id FROM building AA WHERE AA.test = 1) OR (A.id IN (SELECT AA.id FROM building AA WHERE AA.test1 <> 1) AND A.id IN (SELECT AA.id FROM building AA WHERE AA.test2 = 'foo') AND A.id IN (SELECT AA.id FROM building AA WHERE AA.test3 <= 'bar')) OR (A.id IN (SELECT AA.id FROM building AA WHERE AA.test1 <> 1) OR A.id IN (SELECT AA.id FROM building AA WHERE AA.test2 = 'foo') OR A.id IN (SELECT AA.id FROM building AA WHERE AA.test3 <= 'bar')) OR A.id IN (SELECT AA.id FROM building AA WHERE AA.test <> 1))"
+        String expected = "(A.test = 1 OR (A.test1 <> 1 AND A.test2 = 'foo' AND A.test3 <= 'bar') OR (A.test1 <> 1 OR A.test2 = 'foo' OR A.test3 <= 'bar') OR A.test <> 1)"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
         then:
 
+        actual == expected
+    }
+
+    def 'built-in ALIKE function, no join'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.SIMPLE_DATE
+        def filter = Function.of("ALIKE", [Property.of("name"), ScalarLiteral.of("kupp%")])
+
+        when:
+        // ALIKE returns BOOLEAN — used directly as filter predicate
+        String expected = "A.name::varchar LIKE 'kupp%'"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+    }
+
+    def 'built-in DIAMETER2D function, 1:n join'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def filter = Gt.ofFunction(
+                Function.of("DIAMETER2D", [Property.of("location")]),
+                ScalarLiteral.of(100))
+
+        when:
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Length(ST_BoundingDiagonal(Box2D(ST_Transform(AB.location,3857)))) > 100)"
+
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
         actual == expected
     }
 

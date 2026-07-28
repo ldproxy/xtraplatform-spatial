@@ -13,7 +13,6 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
-import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
@@ -33,6 +32,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,7 +52,9 @@ public class FeatureEncoderSql
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureEncoderSql.class);
 
   private final SqlQueryMapping mapping;
+  private final EpsgCrs inputCrs;
   private final EpsgCrs nativeCrs;
+  private final CrsTransformerFactory crsTransformerFactory;
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<ZoneId> timeZone;
   private final Optional<String> nullValue;
@@ -65,6 +67,11 @@ public class FeatureEncoderSql
   private JsonBuilder currentJson;
   private Consumer<String> currentJsonSetter;
 
+  // Junction table targeted by the currently open VALUE_ARRAY, or null when no junction-backed
+  // VALUE_ARRAY is open. Set on onArrayStart when the array's value column lives on a non-current
+  // table; each onValue inside the array becomes its own junction row.
+  private SqlQuerySchema currentArrayJunctionTable;
+
   public FeatureEncoderSql(
       SqlQueryMapping mapping,
       EpsgCrs inputCrs,
@@ -73,13 +80,15 @@ public class FeatureEncoderSql
       Optional<ZoneId> timeZone,
       Optional<String> nullValue) {
     this.mapping = mapping;
+    this.inputCrs = inputCrs;
+    this.crsTransformerFactory = crsTransformerFactory;
     this.crsTransformer = crsTransformerFactory.getTransformer(inputCrs, nativeCrs);
     this.nativeCrs = nativeCrs;
     this.timeZone = timeZone;
     this.nullValue = nullValue;
     this.jsonColumns = new LinkedHashMap<>();
     this.isPatch = nullValue.isPresent();
-    this.trace = false;
+    this.trace = LOGGER.isTraceEnabled();
   }
 
   @Modifiable
@@ -100,12 +109,13 @@ public class FeatureEncoderSql
       currentJsonColumn = null;
       jsonColumns.clear();
     }
-    if (trace) LOGGER.debug("onFeatureStart: {}", context.pathAsString());
+    currentArrayJunctionTable = null;
+    if (trace) LOGGER.trace("onFeatureStart: {}", context.pathAsString());
   }
 
   @Override
   public void onFeatureEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onFeatureEnd: {}", context.pathAsString());
+    if (trace) LOGGER.trace("onFeatureEnd: {}", context.pathAsString());
 
     if (currentJsonColumn != null) {
       try {
@@ -123,7 +133,7 @@ public class FeatureEncoderSql
         .forEach(
             row -> {
               if (trace)
-                LOGGER.debug("push: {} {}", row.first().getFullPathAsString(), row.second());
+                LOGGER.trace("push: {} {}", row.first().getFullPathAsString(), row.second());
             });
 
     push(currentFeature);
@@ -131,20 +141,20 @@ public class FeatureEncoderSql
 
   @Override
   public void onObjectStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onObjectStart: {}", context.pathAsString());
+    if (trace) LOGGER.trace("onObjectStart: {}", context.pathAsString());
 
     mapping.getMainSchema().getAllObjects().stream()
         .filter(schema -> Objects.equals(schema.getFullPath(), context.path()))
         .findFirst()
         .ifPresent(
             schema -> {
-              if (trace) LOGGER.debug("onObjectStart: {} {}", context.pathAsString(), schema);
+              if (trace) LOGGER.trace("onObjectStart: {} {}", context.pathAsString(), schema);
             });
 
     Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
     if (tableSchema.isPresent()) {
-      if (trace) LOGGER.debug("onObjectStart: table found for {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectStart: table found for {}", context.pathAsString());
 
       currentFeature.addRow(tableSchema.get());
       return;
@@ -156,7 +166,7 @@ public class FeatureEncoderSql
     if (column.isPresent() && checkJson(column.get())) {
       currentJson.openObject(context.path());
 
-      if (trace) LOGGER.debug("onObjectStart: JSON {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectStart: JSON {}", context.pathAsString());
       return;
     }
 
@@ -165,12 +175,12 @@ public class FeatureEncoderSql
 
   @Override
   public void onObjectEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onObjectEnd: {}", context.pathAsString());
+    if (trace) LOGGER.trace("onObjectEnd: {}", context.pathAsString());
 
     Optional<SqlQuerySchema> tableSchema = mapping.getTableForObject(context.pathAsString());
 
     if (tableSchema.isPresent()) {
-      if (trace) LOGGER.debug("onObjectEnd: table found for {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectEnd: table found for {}", context.pathAsString());
 
       currentFeature.closeRow(tableSchema.get());
       return;
@@ -182,7 +192,7 @@ public class FeatureEncoderSql
     if (column.isPresent() && checkJson(column.get())) {
       currentJson.closeObject(context.path());
 
-      if (trace) LOGGER.debug("onObjectEnd: JSON {}", context.pathAsString());
+      if (trace) LOGGER.trace("onObjectEnd: JSON {}", context.pathAsString());
       return;
     }
 
@@ -191,7 +201,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onArrayStart: {} {}", context.pathAsString());
+    if (trace) LOGGER.trace("onArrayStart: {} {}", context.pathAsString());
 
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -200,7 +210,20 @@ public class FeatureEncoderSql
               if (checkJson(column)) {
                 currentJson.openArray(context.path());
 
-                if (trace) LOGGER.debug("onArrayStart: JSON {}", context.pathAsString());
+                if (trace) LOGGER.trace("onArrayStart: JSON {}", context.pathAsString());
+                return;
+              }
+              // VALUE_ARRAY whose value column lives on a junction table other than the row at the
+              // top of the stack. Record the table here and defer the per-element addRow to
+              // onValue, so each array element becomes its own row — mirroring how OBJECT_ARRAY
+              // junctions get a row per member via onObjectStart.
+              if (!currentFeature.isCurrent(column.first())) {
+                currentArrayJunctionTable = column.first();
+                if (trace)
+                  LOGGER.trace(
+                      "onArrayStart: junction {} {}",
+                      context.pathAsString(),
+                      column.first().getFullPathAsString());
               }
             },
             () -> {
@@ -211,7 +234,7 @@ public class FeatureEncoderSql
 
   @Override
   public void onArrayEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (trace) LOGGER.debug("onArrayEnd: {} {}", context.pathAsString());
+    if (trace) LOGGER.trace("onArrayEnd: {} {}", context.pathAsString());
 
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -220,13 +243,15 @@ public class FeatureEncoderSql
               if (checkJson(column)) {
                 currentJson.closeArray(context.path());
 
-                if (trace) LOGGER.debug("onArrayEnd: JSON {}", context.pathAsString());
+                if (trace) LOGGER.trace("onArrayEnd: JSON {}", context.pathAsString());
               }
             },
             () -> {
               if (trace)
                 LOGGER.warn("onArrayEnd: JSON {} not found in mapping", context.pathAsString());
             });
+
+    currentArrayJunctionTable = null;
   }
 
   @Override
@@ -234,37 +259,69 @@ public class FeatureEncoderSql
     Geometry<?> geometry = context.geometry();
 
     if (trace) {
-      LOGGER.debug("geometry: {} {}", context.pathAsString(), geometry);
+      LOGGER.trace("geometry: {} {}", context.pathAsString(), geometry);
     }
 
-    mapping
-        .getColumnForPrimaryGeometry()
+    // A geometry property that is mapped to its own writable column under its property path
+    // (e.g. a per-CRS position variant) takes precedence over the primary geometry. The column's
+    // storage CRS — the WKT/WKB operation parameter, set from the schema's `crs` option —
+    // determines the transformation target and the SRID of the literal; without the option this
+    // is the provider's nativeCrs, preserving the previous behavior.
+    Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> columnForPath =
+        mapping
+            .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+            .filter(
+                c ->
+                    c.second().hasOperation(SqlQueryColumn.Operation.WKT)
+                        || c.second().hasOperation(SqlQueryColumn.Operation.WKB));
+
+    columnForPath
+        .or(
+            () ->
+                mapping
+                    .getColumnForPrimaryGeometry()
+                    .filter(c -> mapping.getSchemaForPrimaryGeometry().isPresent()))
         .ifPresentOrElse(
             column -> {
-              mapping
-                  .getSchemaForPrimaryGeometry()
-                  .ifPresentOrElse(
-                      schema -> {
-                        String value = toWkt(geometry, crsTransformer, nativeCrs);
+              EpsgCrs storageCrs = storageCrs(column.second());
+              String value = toWkt(geometry, transformerFor(geometry, storageCrs), storageCrs);
 
-                        currentFeature.addColumn(column.first(), column.second(), value);
+              currentFeature.addColumn(column.first(), column.second(), value);
 
-                        if (trace) {
-                          LOGGER.debug("onGeometry: {} {}", context.pathAsString(), value);
-                        }
-                      },
-                      () -> {
-                        if (trace) {
-                          LOGGER.warn(
-                              "onGeometry: {} not found in mapping", context.pathAsString());
-                        }
-                      });
+              if (trace) {
+                LOGGER.trace("onGeometry: {} {}", context.pathAsString(), value);
+              }
             },
             () -> {
               if (trace) {
                 LOGGER.warn("onGeometry: {} not found in mapping", context.pathAsString());
               }
             });
+  }
+
+  private EpsgCrs storageCrs(SqlQueryColumn column) {
+    SqlQueryColumn.Operation op =
+        column.hasOperation(SqlQueryColumn.Operation.WKB)
+            ? SqlQueryColumn.Operation.WKB
+            : SqlQueryColumn.Operation.WKT;
+    List<String> parameters = column.getOperationParameters(op);
+    if (parameters.isEmpty()) {
+      return nativeCrs;
+    }
+    return EpsgCrs.of(
+        Integer.parseInt(parameters.get(0)),
+        parameters.size() > 1 ? EpsgCrs.Force.valueOf(parameters.get(1)) : EpsgCrs.Force.NONE);
+  }
+
+  // The transformation source is the CRS the geometry actually arrived in (set by the format
+  // decoder from srsName or the request CRS), falling back to the request CRS for decoders that
+  // do not tag geometries.
+  private Optional<CrsTransformer> transformerFor(Geometry<?> geometry, EpsgCrs storageCrs) {
+    EpsgCrs sourceCrs = geometry.getCrs().orElse(inputCrs);
+    if (Objects.equals(sourceCrs, storageCrs)) {
+      return Optional.empty();
+    }
+    return crsTransformerFactory.getTransformer(sourceCrs, storageCrs);
   }
 
   @Override
@@ -288,26 +345,30 @@ public class FeatureEncoderSql
                 // TODO: does this use the sql name or json name?
                 currentJson.addValue(context.path(), value);
 
-                if (trace) LOGGER.debug("onValue: JSON {} {}", context.pathAsString(), value);
+                if (trace) LOGGER.trace("onValue: JSON {} {}", context.pathAsString(), value);
                 return;
               }
 
-              boolean needsQuotes =
-                  column.second().getType() == SchemaBase.Type.STRING
-                      || column.second().getType() == SchemaBase.Type.DATETIME
-                      || column.second().getType() == SchemaBase.Type.DATE;
-              /* (schemaSql.getType() == SchemaBase.Type.FEATURE_REF
-              && schemaSql.getValueType().orElse(SchemaBase.Type.STRING)
-              == SchemaBase.Type.STRING)*/
-
+              // Numeric/boolean values are validated and re-rendered (never inlined as raw request
+              // text); string/date values are quoted with quote-doubling. A null stays null so the
+              // downstream row renderer emits SQL NULL. See SqlLiterals.
               value =
-                  needsQuotes && Objects.nonNull(value)
-                      ? String.format("'%s'", value.replaceAll("'", "''"))
+                  Objects.nonNull(value)
+                      ? SqlLiterals.forType(column.second().getType(), value)
                       : value;
 
+              boolean junctionElement =
+                  currentArrayJunctionTable != null
+                      && Objects.equals(column.first(), currentArrayJunctionTable);
+              if (junctionElement) {
+                currentFeature.addRow(column.first());
+              }
               currentFeature.addColumn(column.first(), column.second(), value);
+              if (junctionElement) {
+                currentFeature.closeRow(column.first());
+              }
 
-              if (trace) LOGGER.debug("onValue: {} {}", context.pathAsString(), value);
+              if (trace) LOGGER.trace("onValue: {} {}", context.pathAsString(), value);
             },
             () -> {
               if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
@@ -328,7 +389,7 @@ public class FeatureEncoderSql
 
   private boolean checkJson(Tuple<SqlQuerySchema, SqlQueryColumn> column) {
     if (column.second().hasOperation(Operation.CONNECTOR)) {
-      if (column.second().getOperationParameter(Operation.CONNECTOR, "").equals("JSON")) {
+      if ("JSON".equals(column.second().getOperationParameter(Operation.CONNECTOR, ""))) {
         if (currentJsonColumn == null) {
           this.currentJsonColumn = column;
           this.jsonColumns.put(currentJsonColumn.second().getPathSegment(), new JsonBuilder());
@@ -356,7 +417,7 @@ public class FeatureEncoderSql
       String newValue = formatter.format(instant) + "Z";
 
       if (trace) {
-        LOGGER.debug(
+        LOGGER.trace(
             "onValue: {} transformed datetime value from '{}' to '{}'", path, value, newValue);
       }
 
@@ -369,7 +430,7 @@ public class FeatureEncoderSql
   }
 
   private static String toWkt(
-      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs nativeCrs) {
+      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs storageCrs) {
 
     if (crsTransformer.isPresent()) {
       geometry =
@@ -386,7 +447,7 @@ public class FeatureEncoderSql
     }
 
     // TODO: functions from Dialect
-    String result = String.format("ST_GeomFromText('%s',%s)", wkt, nativeCrs.getCode());
+    String result = String.format("ST_GeomFromText('%s',%s)", wkt, storageCrs.getCode());
 
     if (geometry.getType() == GeometryType.POLYGON
         || geometry.getType() == GeometryType.MULTI_POLYGON) {

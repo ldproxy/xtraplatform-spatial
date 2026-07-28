@@ -17,6 +17,9 @@ import org.immutables.value.Value;
 @Value.Style(jdkOnly = true)
 public abstract class JsonSchemaFalse extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaFalse> FUNNEL = (from, into) -> {};
+
   // any instance is invalid
 
   @JsonValue
@@ -25,7 +28,4 @@ public abstract class JsonSchemaFalse extends JsonSchema {
   }
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaFalse> FUNNEL = (from, into) -> {};
 }

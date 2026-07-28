@@ -11,6 +11,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs.Force;
 import java.util.Objects;
 import java.util.Optional;
 
+@SuppressWarnings("PMD.FieldNamingConventions")
 public interface OgcCrs {
 
   EpsgCrs CRS84 = EpsgCrs.of(4326, Force.LON_LAT);
@@ -19,6 +20,13 @@ public interface OgcCrs {
   String CRS84_URI_NEW = "http://www.opengis.net/def/crs/OGC/0/CRS84";
   String CRS84_CURIE = "OGC:CRS84";
 
+  /**
+   * The same CRS as {@link #CRS84} ({@code equals()} is {@code true}), but {@code toUriString()}
+   * returns the "OGC/0/CRS84" alias URI instead of the "OGC/1.3/CRS84" URI.
+   */
+  EpsgCrs CRS84_OGC0 =
+      new ImmutableEpsgCrs.Builder().from(CRS84).uriOverride(CRS84_URI_NEW).build();
+
   EpsgCrs CRS84h = EpsgCrs.of(4979, Force.LON_LAT);
 
   String CRS84h_URI = "http://www.opengis.net/def/crs/OGC/0/CRS84h";
@@ -26,7 +34,7 @@ public interface OgcCrs {
 
   static Optional<EpsgCrs> fromString(String prefixedCode) {
     if (Objects.equals(prefixedCode, CRS84_URI_NEW)) {
-      return Optional.of(CRS84);
+      return Optional.of(CRS84_OGC0);
     }
     if (Objects.equals(prefixedCode, CRS84_URI)) {
       return Optional.of(CRS84);

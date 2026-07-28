@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTMetBy.Builder.class)
-public interface TMetBy extends BinaryTemporalOperation, CqlNode {
+public interface TMetBy extends BinaryTemporalOperation {
 
   String TYPE = "t_metBy";
 

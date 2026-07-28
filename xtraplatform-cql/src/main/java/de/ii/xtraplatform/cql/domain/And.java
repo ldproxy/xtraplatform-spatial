@@ -13,7 +13,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAnd.Builder.class)
-public interface And extends LogicalOperation, CqlNode {
+@FunctionalInterface
+public interface And extends LogicalOperation {
 
   String TYPE = "and";
 

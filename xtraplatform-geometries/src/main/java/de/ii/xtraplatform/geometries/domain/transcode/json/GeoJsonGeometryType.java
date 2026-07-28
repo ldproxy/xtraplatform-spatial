@@ -39,7 +39,7 @@ public enum GeoJsonGeometryType {
   }
 
   public static GeoJsonGeometryType forString(String type) {
-    for (GeoJsonGeometryType geoJsonType : GeoJsonGeometryType.values()) {
+    for (GeoJsonGeometryType geoJsonType : values()) {
       if (geoJsonType.toString().equals(type)) {
         return geoJsonType;
       }
@@ -49,8 +49,8 @@ public enum GeoJsonGeometryType {
   }
 
   public static GeoJsonGeometryType forGeometry(Geometry<?> geometry) {
-    for (GeoJsonGeometryType geoJsonType : GeoJsonGeometryType.values()) {
-      if (geoJsonType.geometryType != null && geoJsonType.geometryType.equals(geometry.getType())) {
+    for (GeoJsonGeometryType geoJsonType : values()) {
+      if (geoJsonType.geometryType != null && geoJsonType.geometryType == geometry.getType()) {
         return geoJsonType;
       }
     }

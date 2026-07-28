@@ -17,8 +17,6 @@ import java.util.Optional;
 
 public class WithoutRoles implements SchemaVisitorTopDown<FeatureSchema, FeatureSchema> {
 
-  public WithoutRoles() {}
-
   @Override
   public FeatureSchema visit(
       FeatureSchema schema, List<FeatureSchema> parents, List<FeatureSchema> visitedProperties) {

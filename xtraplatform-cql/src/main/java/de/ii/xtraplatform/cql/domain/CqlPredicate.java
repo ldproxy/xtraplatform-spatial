@@ -27,6 +27,7 @@ public interface CqlPredicate
         ArrayExpression,
         CqlNode {
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   static CqlPredicate of(CqlNode node) {
     ImmutableCqlPredicate.Builder builder = new ImmutableCqlPredicate.Builder();
 

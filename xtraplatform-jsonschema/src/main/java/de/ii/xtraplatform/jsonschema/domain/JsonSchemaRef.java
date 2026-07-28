@@ -19,6 +19,10 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaRef.Builder.class)
 public abstract class JsonSchemaRef extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaRef> FUNNEL =
+      (from, into) -> into.putString(from.getRef(), StandardCharsets.UTF_8);
+
   @JsonProperty("$ref")
   public abstract String getRef();
 
@@ -34,8 +38,4 @@ public abstract class JsonSchemaRef extends JsonSchema {
   }
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaRef> FUNNEL =
-      (from, into) -> into.putString(from.getRef(), StandardCharsets.UTF_8);
 }

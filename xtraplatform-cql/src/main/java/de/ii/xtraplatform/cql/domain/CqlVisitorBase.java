@@ -9,6 +9,7 @@ package de.ii.xtraplatform.cql.domain;
 
 import java.util.List;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class CqlVisitorBase<T> implements CqlVisitor<T> {
   @Override
   public T visit(LogicalOperation logicalOperation, List<T> children) {

@@ -16,12 +16,12 @@ import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
 import de.ii.xtraplatform.features.graphql.app.FeatureProviderGraphQl;
 import de.ii.xtraplatform.features.graphql.domain.ConnectionInfoGraphQlHttp;
 import de.ii.xtraplatform.features.graphql.domain.GraphQlConnector;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 
 @Singleton
 @AutoBind
@@ -81,6 +81,7 @@ public class GraphQlConnectorHttpFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface FactoryAssisted {
     GraphQlConnectorHttp create(String providerId, ConnectionInfoGraphQlHttp connectionInfo);
   }

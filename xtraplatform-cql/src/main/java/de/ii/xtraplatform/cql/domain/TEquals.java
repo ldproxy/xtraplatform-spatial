@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTEquals.Builder.class)
-public interface TEquals extends BinaryTemporalOperation, CqlNode {
+public interface TEquals extends BinaryTemporalOperation {
 
   String TYPE = "t_equals";
 

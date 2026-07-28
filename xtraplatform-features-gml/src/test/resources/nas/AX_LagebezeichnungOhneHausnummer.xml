@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_LagebezeichnungOhneHausnummer gml:id="DENW36AL10000FFW" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL10000FFW</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2013-02-27T15:45:05Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:sonstigesModell xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_WeitereModellart/NWABK" xlink:title="NWABK"/>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/000000" xlink:title="Ersteinrichtung"/>
+          <adv:lagebezeichnung>
+            <adv:AX_Lagebezeichnung>
+              <adv:unverschluesselt>Katzenlochbach</adv:unverschluesselt>
+            </adv:AX_Lagebezeichnung>
+          </adv:lagebezeichnung>
+        </adv:AX_LagebezeichnungOhneHausnummer>

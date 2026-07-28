@@ -15,7 +15,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAccenti.Builder.class)
-public interface Accenti extends CqlNode, Operand, Scalar {
+@FunctionalInterface
+public interface Accenti extends Scalar {
 
   String TYPE = "accenti";
 

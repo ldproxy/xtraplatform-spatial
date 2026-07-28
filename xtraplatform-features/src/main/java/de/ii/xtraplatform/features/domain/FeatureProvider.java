@@ -72,11 +72,16 @@ import java.util.function.Supplier;
  *     <p>{@docVar:embedFeatureRefs}
  * @langDe ### Einbetten von Objektreferenzen
  *     <p>{@docVar:embedFeatureRefs}
+ * @langEn ### Custom CQL2 Functions
+ *     <p>{@docVar:cql2Functions}
+ * @langDe ### Benutzerdefinierte CQL2-Funktionen
+ *     <p>{@docVar:cql2Functions}
  * @ref:cfgProperties {@link de.ii.xtraplatform.features.domain.ImmutableFeatureProviderCommonData}
  * @ref:cfgProperties:types {@link de.ii.xtraplatform.features.domain.ImmutableFeatureSchema}
  * @ref:mappingOps {@link de.ii.xtraplatform.features.domain.MappingOperationResolver}
  * @ref:featureRefs {@link de.ii.xtraplatform.features.domain.transform.FeatureRefResolver}
  * @ref:embedFeatureRefs {@link de.ii.xtraplatform.features.domain.transform.FeatureRefEmbedder}
+ * @ref:cql2Functions {@link de.ii.xtraplatform.cql.domain.CustomFunction}
  */
 @DocFile(
     path = "providers/feature",
@@ -144,6 +149,12 @@ import java.util.function.Supplier;
           name = "embedFeatureRefs",
           value = {
             @DocStep(type = Step.TAG_REFS, params = "{@ref:embedFeatureRefs}"),
+            @DocStep(type = Step.TAG, params = "{@bodyBlock}")
+          }),
+      @DocVar(
+          name = "cql2Functions",
+          value = {
+            @DocStep(type = Step.TAG_REFS, params = "{@ref:cql2Functions}"),
             @DocStep(type = Step.TAG, params = "{@bodyBlock}")
           }),
     })

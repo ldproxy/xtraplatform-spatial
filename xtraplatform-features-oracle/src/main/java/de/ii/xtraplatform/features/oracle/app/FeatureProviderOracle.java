@@ -35,6 +35,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryBatch;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.values.domain.ValueStore;
@@ -126,6 +127,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     super(
         crsTransformerFactory,
@@ -140,6 +142,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
         volatileRegistry,
         cache,
         scheduler,
+        auditLog,
         data,
         Map.of());
   }

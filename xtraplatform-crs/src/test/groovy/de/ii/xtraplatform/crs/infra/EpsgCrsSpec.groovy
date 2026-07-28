@@ -43,6 +43,21 @@ class EpsgCrsSpec extends Specification {
 
     }
 
+    def 'fromString - crs84 alias'() {
+        when:
+        def crs = EpsgCrs.fromString(OgcCrs.CRS84_URI_NEW)
+
+        then:
+        crs.code == 4326
+        crs.forceAxisOrder == EpsgCrs.Force.LON_LAT
+        crs == OgcCrs.CRS84
+        crs.hashCode() == OgcCrs.CRS84.hashCode()
+        crs.toUriString() == OgcCrs.CRS84_URI_NEW
+        crs.toUrnString() == "urn:ogc:def:crs:OGC::4326"
+        crs.toSafeCurie() == OgcCrs.CRS84_CURIE
+
+    }
+
     def 'fromString - crs84h'() {
         when:
         def crs = EpsgCrs.fromString(OgcCrs.CRS84h_URI)
@@ -93,10 +108,23 @@ class EpsgCrsSpec extends Specification {
         crs.toUriString() == uri
 
         where:
-        crs               | uri
-        EpsgCrs.of(25832) | "http://www.opengis.net/def/crs/EPSG/0/25832"
-        OgcCrs.CRS84      | OgcCrs.CRS84_URI
-        OgcCrs.CRS84h     | OgcCrs.CRS84h_URI
+        crs                | uri
+        EpsgCrs.of(25832)  | "http://www.opengis.net/def/crs/EPSG/0/25832"
+        OgcCrs.CRS84       | OgcCrs.CRS84_URI
+        OgcCrs.CRS84_OGC0  | OgcCrs.CRS84_URI_NEW
+        OgcCrs.CRS84h      | OgcCrs.CRS84h_URI
+    }
+
+    def 'allUris'() {
+        expect:
+        crs.allUris() == uris
+
+        where:
+        crs                | uris
+        EpsgCrs.of(25832)  | ["http://www.opengis.net/def/crs/EPSG/0/25832"]
+        OgcCrs.CRS84       | [OgcCrs.CRS84_URI, OgcCrs.CRS84_URI_NEW]
+        OgcCrs.CRS84_OGC0  | [OgcCrs.CRS84_URI, OgcCrs.CRS84_URI_NEW]
+        OgcCrs.CRS84h      | [OgcCrs.CRS84h_URI]
     }
 
     def 'CoordinateTupleWithPrecision - uri'() {

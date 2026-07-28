@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTBefore.Builder.class)
-public interface TBefore extends BinaryTemporalOperation, CqlNode {
+public interface TBefore extends BinaryTemporalOperation {
 
   String TYPE = "t_before";
 

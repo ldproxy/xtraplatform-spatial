@@ -245,7 +245,7 @@ import java.util.stream.Collectors;
  *     <p>#### Concat
  *     <p>Wenn die Werte für ein Array-Property oder für eine Objektart aus mehr als einem
  *     `sourcePath` stammen können, erlaubt diese Option alle verfügbaren Werte zu konkatenieren.
- *     <p>Bei Objektarten, die 'concat' verwenden, müssen die verschiedenen verketteten „Sub-Typen“
+ *     <p>Bei Objektarten, die 'concat' verwenden, müssen die verschiedenen verketteten "Sub-Typen"
  *     die folgenden Bedingungen erfüllen:
  *     <p><code>
  * - Alle ID-Eigenschaften müssen den gleichen Pfad und Typ haben.
@@ -325,7 +325,7 @@ public class MappingOperationResolver implements TypesResolver {
 
   public static String cleanConcatPath(String propertyPath) {
     if (isConcatPath(propertyPath)) {
-      return propertyPath.substring(propertyPath.indexOf("_") + 1);
+      return propertyPath.substring(propertyPath.indexOf('_') + 1);
     }
 
     return propertyPath;

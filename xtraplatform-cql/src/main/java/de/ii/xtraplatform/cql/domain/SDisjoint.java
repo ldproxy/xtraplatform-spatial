@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSDisjoint.Builder.class)
-public interface SDisjoint extends BinarySpatialOperation, CqlNode {
+public interface SDisjoint extends BinarySpatialOperation {
 
   String TYPE = "s_disjoint";
 

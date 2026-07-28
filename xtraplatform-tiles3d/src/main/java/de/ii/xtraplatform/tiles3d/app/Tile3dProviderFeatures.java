@@ -40,7 +40,6 @@ import de.ii.xtraplatform.tiles3d.domain.ImmutableCache3d;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableSeedingOptions3d;
 import de.ii.xtraplatform.tiles3d.domain.ImmutableTile3dQuery;
 import de.ii.xtraplatform.tiles3d.domain.SeedingOptions3d;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dAccess;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dBuilder;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dCoordinates;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dGenerationParameters;
@@ -65,7 +64,6 @@ import de.ii.xtraplatform.tiles3d.domain.spec.Subtree;
 import de.ii.xtraplatform.tiles3d.domain.spec.Tileset3d;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
@@ -92,10 +90,12 @@ import org.slf4j.LoggerFactory;
           value = Tile3dProviderFeaturesData.PROVIDER_SUBTYPE)
     },
     data = Tile3dProviderFeaturesData.class)
+@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProviderFeaturesData>
-    implements Tile3dProvider, Tile3dAccess, Tile3dSeeding {
+    implements Tile3dSeeding {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dProviderFeatures.class);
+  private static final byte[] NO_CONTENT = new byte[0];
 
   private final ResourceStore rootStore;
   private final Map<String, Tileset3d> metadata;
@@ -120,8 +120,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     super(volatileRegistry, data, "access", "seeding", "generation");
 
     this.rootStore =
-        blobStore.with(
-            Tile3dProvider.STORE_DIR_NAME, Tile3dProvider.clean(data.getId()), "cache_dyn");
+        blobStore.with(STORE_DIR_NAME, Tile3dProvider.clean(data.getId()), "cache_dyn");
     this.metadata = new LinkedHashMap<>();
     this.stores = new LinkedHashMap<>();
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
@@ -175,23 +174,10 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       stores.put(tilesetCfg.getId(), store);
     }
 
-    List<Cache3d> caches =
-        !getData().getCaches().isEmpty()
-            ? getData().getCaches()
-            : List.of(
-                new ImmutableCache3d.Builder()
-                    .type(Cache3d.Type.DYNAMIC)
-                    .levels(
-                        getData()
-                            .getTilesetDefaults()
-                            .getLevels()
-                            .getOrDefault("default", MinMax.of(0, 0)))
-                    .tilesetLevels(
-                        getData().getTilesets().entrySet().stream()
-                            .collect(
-                                Collectors.toMap(
-                                    Entry::getKey, e -> e.getValue().getLevels().get("default"))))
-                    .build());
+    List<Cache3d> caches = getData().getCaches();
+    if (caches.isEmpty()) {
+      caches = List.of(createDefaultCache());
+    }
 
     initCaches(caches);
 
@@ -199,42 +185,46 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   }
 
   private void initCaches(List<Cache3d> caches) {
-    for (int i = 0; i < caches.size(); i++) {
-      Cache3d cache = caches.get(i);
-
+    for (Cache3d cache : caches) {
       if (cache.getType() == Cache3d.Type.DYNAMIC) {
-        Map<String, Map<String, Range<Integer>>> cacheRanges = getCacheRanges(cache);
-        Map<String, Map<String, TileMatrixSetBase>> customTms =
-            cacheRanges.entrySet().stream()
-                .map(
-                    entry ->
-                        Map.entry(
-                            entry.getKey(),
-                            entry.getValue().entrySet().stream()
-                                .map(
-                                    tmsEntry -> {
-                                      String tmsId = tmsEntry.getKey();
-                                      TileMatrixSetData tmsData =
-                                          tileGenerator.getTileMatrixSetData(
-                                              entry.getKey(), tmsId, tmsEntry.getValue());
-                                      return Map.entry(
-                                          tmsId, (TileMatrixSetBase) TileMatrixSet.custom(tmsData));
-                                    })
-                                .collect(MapStreams.toMap())))
-                .collect(MapStreams.toMap());
-        Tile3dCacheDynamic current =
-            new Tile3dCacheDynamic(tileWalker, customTms, cacheRanges, cache.getSeeded());
-
-        generatorCaches.add(current);
+        generatorCaches.add(createDynamicCache(cache));
       }
     }
   }
 
-  @Override
-  protected void onStopped() {
-    // unregisterChangeHandlers();
+  private Cache3d createDefaultCache() {
+    return new ImmutableCache3d.Builder()
+        .type(Cache3d.Type.DYNAMIC)
+        .levels(getData().getTilesetDefaults().getLevels().getOrDefault("default", MinMax.of(0, 0)))
+        .tilesetLevels(
+            getData().getTilesets().entrySet().stream()
+                .collect(
+                    Collectors.toMap(Entry::getKey, e -> e.getValue().getLevels().get("default"))))
+        .build();
+  }
 
-    super.onStopped();
+  private Tile3dCacheDynamic createDynamicCache(Cache3d cache) {
+    Map<String, Map<String, Range<Integer>>> cacheRanges = getCacheRanges(cache);
+    Map<String, Map<String, TileMatrixSetBase>> customTms =
+        cacheRanges.entrySet().stream()
+            .map(
+                entry ->
+                    Map.entry(
+                        entry.getKey(),
+                        entry.getValue().entrySet().stream()
+                            .map(
+                                tmsEntry -> {
+                                  String tmsId = tmsEntry.getKey();
+                                  TileMatrixSetData tmsData =
+                                      tileGenerator.getTileMatrixSetData(
+                                          entry.getKey(), tmsId, tmsEntry.getValue());
+                                  return Map.entry(
+                                      tmsId, (TileMatrixSetBase) TileMatrixSet.custom(tmsData));
+                                })
+                            .collect(MapStreams.toMap())))
+            .collect(MapStreams.toMap());
+
+    return new Tile3dCacheDynamic(tileWalker, customTms, cacheRanges, cache.getSeeded());
   }
 
   @Override
@@ -243,6 +233,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   }
 
   @Override
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
   public Optional<Blob> getFile(Tile3dQuery tileQuery) throws IOException {
     Optional<TileResult> error = validate(tileQuery);
 
@@ -277,10 +268,10 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
                 true,
                 shouldStore);
 
-        if (!shouldStore && bytes != null) {
+        if (!shouldStore && bytes.length > 0) {
           return Optional.of(
               ImmutableBlob.builder()
-                  .path(Path.of(tileQuery.getFileName().get()))
+                  .path(java.nio.file.Path.of(tileQuery.getFileName().get()))
                   .lastModified(Instant.now().toEpochMilli())
                   .size(bytes.length)
                   .contentSupplier(() -> new ByteArrayInputStream(bytes))
@@ -290,10 +281,10 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
         byte[] bytes =
             seedSubtree(tileQueryImplicit.toTileSubMatrix(), tileset, () -> {}, true, shouldStore);
 
-        if (!shouldStore && bytes != null) {
+        if (!shouldStore && bytes.length > 0) {
           return Optional.of(
               ImmutableBlob.builder()
-                  .path(Path.of(tileQuery.getFileName().get()))
+                  .path(java.nio.file.Path.of(tileQuery.getFileName().get()))
                   .lastModified(Instant.now().toEpochMilli())
                   .size(bytes.length)
                   .contentSupplier(() -> new ByteArrayInputStream(bytes))
@@ -363,6 +354,11 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     }
   }
 
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private byte[] seedSubtree(
       TileSubMatrix coords,
       Tileset3dFeatures tileset,
@@ -390,7 +386,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
                   child.getCol(),
                   child.getRow());
             }
-            return null;
+            return NO_CONTENT;
           }
 
           byte[] subtreeBytes =
@@ -405,7 +401,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
                   coords.getColMin(),
                   coords.getRowMin());
             }
-            return null;
+            return NO_CONTENT;
           }
         }
 
@@ -427,7 +423,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     } finally {
       updateProgress2.run();
     }
-    return null;
+    return NO_CONTENT;
   }
 
   @Override
@@ -452,6 +448,11 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
     }
   }
 
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private byte[] seedTiles(
       TileSubMatrix subMatrix,
       Tileset3dFeatures tileset,
@@ -474,7 +475,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
       }
 
       updateProgress2.accept((int) subMatrix.getNumberOfTiles());
-      return null;
+      return NO_CONTENT;
     }
 
     byte[] subtreeBytes = store.getSubtree(parent.getLevel(), parent.getCol(), parent.getRow());
@@ -512,7 +513,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
         }
       }
     }
-    return null;
+    return NO_CONTENT;
   }
 
   private Map<String, Tile3dGenerationParameters> validTilesets(
@@ -521,7 +522,9 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
         .filter(
             entry -> {
               if (!getData().getTilesets().containsKey(entry.getKey())) {
-                LOGGER.warn("Tileset with name '{}' not found", entry.getKey());
+                if (LOGGER.isWarnEnabled()) {
+                  LOGGER.warn("Tileset with name '{}' not found", entry.getKey());
+                }
                 return false;
               }
               return true;

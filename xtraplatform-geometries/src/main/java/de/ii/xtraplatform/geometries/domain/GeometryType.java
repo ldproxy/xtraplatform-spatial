@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.geometries.domain;
 
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -47,10 +48,6 @@ public enum GeometryType {
   public static final Set<GeometryType> DEFAULT_GEOMETRY_TYPES =
       Set.of(POINT, MULTI_POINT, LINE_STRING, MULTI_LINE_STRING, POLYGON, MULTI_POLYGON);
 
-  public static boolean onlySimpleFeatureGeometries(Set<GeometryType> geometryTypes) {
-    return geometryTypes.stream().allMatch(GeometryType::isSimpleFeature);
-  }
-
   private final boolean isSimpleFeature;
   private final Integer geometryDimension;
   private final Boolean hasNestedGeometries;
@@ -59,6 +56,25 @@ public enum GeometryType {
     this.isSimpleFeature = isSimpleFeature;
     this.geometryDimension = geometryDimension;
     this.hasNestedGeometries = hasNestedGeometries;
+  }
+
+  public static boolean onlySimpleFeatureGeometries(Set<GeometryType> geometryTypes) {
+    return geometryTypes.stream().allMatch(GeometryType::isSimpleFeature);
+  }
+
+  /**
+   * Collapses a list of admissible geometry types to a single effective type: empty -> {@code ANY};
+   * one entry -> that entry; more than one -> {@code ANY} when all entries are simple-feature
+   * types, otherwise {@code ANY_EXTENDED}.
+   */
+  public static GeometryType effectiveType(Collection<GeometryType> geometryTypes) {
+    if (geometryTypes.isEmpty()) {
+      return ANY;
+    }
+    if (geometryTypes.size() == 1) {
+      return geometryTypes.iterator().next();
+    }
+    return onlySimpleFeatureGeometries(Set.copyOf(geometryTypes)) ? ANY : ANY_EXTENDED;
   }
 
   public Optional<Integer> getGeometryDimension() {

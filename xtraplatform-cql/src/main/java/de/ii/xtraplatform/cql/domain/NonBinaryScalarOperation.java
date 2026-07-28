@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.cql.domain;
 
+@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 public interface NonBinaryScalarOperation extends CqlNode {
 
   abstract class Builder<T extends NonBinaryScalarOperation> {}

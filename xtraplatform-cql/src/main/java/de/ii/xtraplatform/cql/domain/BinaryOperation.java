@@ -12,6 +12,7 @@ import com.google.common.collect.Lists;
 import java.util.List;
 import org.immutables.value.Value;
 
+@FunctionalInterface
 public interface BinaryOperation<T extends Literal> extends CqlNode {
 
   // @JsonValue

@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
   @Type(value = Or.class, name = Or.TYPE),
   @Type(value = IsNull.class, name = IsNull.TYPE),
   @Type(value = In.class, name = In.TYPE),
+  @Type(value = InResultSet.class, name = InResultSet.TYPE),
   @Type(value = Between.class, name = Between.TYPE),
   @Type(value = TAfter.class, name = TAfter.TYPE),
   @Type(value = TBefore.class, name = TBefore.TYPE),
@@ -58,7 +59,7 @@ import java.util.stream.Collectors;
   @Type(value = AEquals.class, name = AEquals.TYPE),
   @Type(value = AOverlaps.class, name = AOverlaps.TYPE)
 })
-public interface Operation<T extends Operand> extends Cql2Expression, CqlNode {
+public interface Operation<T extends Operand> extends Cql2Expression {
 
   String getOp();
 

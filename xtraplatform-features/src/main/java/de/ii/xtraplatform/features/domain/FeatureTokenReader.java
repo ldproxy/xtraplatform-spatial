@@ -211,7 +211,7 @@ public class FeatureTokenReader<
   }
 
   private boolean inArray() {
-    return !nestingStack.isEmpty() && nestingStack.get(nestingStack.size() - 1).equals("A");
+    return !nestingStack.isEmpty() && "A".equals(nestingStack.get(nestingStack.size() - 1));
   }
 
   private void push(String type) {

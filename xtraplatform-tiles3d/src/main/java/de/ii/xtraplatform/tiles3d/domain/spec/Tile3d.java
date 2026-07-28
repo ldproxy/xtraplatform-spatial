@@ -12,7 +12,6 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.hash.Funnel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -21,6 +20,17 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableTile3d.Builder.class)
 @JsonInclude(Include.NON_EMPTY)
 public interface Tile3d {
+
+  @SuppressWarnings("UnstableApiUsage")
+  Funnel<Tile3d> FUNNEL =
+      (from, into) -> {
+        BoundingVolume.FUNNEL.funnel(from.getBoundingVolume(), into);
+        from.getGeometricError().ifPresent(into::putFloat);
+        from.getRefine().ifPresent(v -> into.putString(v, StandardCharsets.UTF_8));
+        from.getContent().ifPresent(content -> WithUri.FUNNEL.funnel(content, into));
+        from.getImplicitTiling()
+            .ifPresent(implicit -> ImplicitTiling.FUNNEL.funnel(implicit, into));
+      };
 
   default Tile3d withUris(String uriPrefix) {
     return new ImmutableTile3d.Builder()
@@ -45,7 +55,7 @@ public interface Tile3d {
         .build();
   }
 
-  default Tile3d withUris(Path directory) {
+  default Tile3d withUris(java.nio.file.Path directory) {
     return new ImmutableTile3d.Builder()
         .from(this)
         .content(
@@ -58,17 +68,6 @@ public interface Tile3d {
         .children(getChildren().stream().map(child -> child.withUris(directory)).toList())
         .build();
   }
-
-  @SuppressWarnings("UnstableApiUsage")
-  Funnel<Tile3d> FUNNEL =
-      (from, into) -> {
-        BoundingVolume.FUNNEL.funnel(from.getBoundingVolume(), into);
-        from.getGeometricError().ifPresent(into::putFloat);
-        from.getRefine().ifPresent(v -> into.putString(v, StandardCharsets.UTF_8));
-        from.getContent().ifPresent(content -> WithUri.FUNNEL.funnel(content, into));
-        from.getImplicitTiling()
-            .ifPresent(implicit -> ImplicitTiling.FUNNEL.funnel(implicit, into));
-      };
 
   BoundingVolume getBoundingVolume();
 
@@ -93,7 +92,7 @@ public interface Tile3d {
     return uri.replaceAll("/", "_");
   }
 
-  static String flattenUri(String uri, Path directory) {
+  static String flattenUri(String uri, java.nio.file.Path directory) {
     return flattenUri(directory.resolve(uri).normalize().toString());
   }
 }

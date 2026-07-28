@@ -24,6 +24,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -111,9 +112,19 @@ public class SchemaGeneratorSql implements SchemaGenerator {
 
                                   return getFeatureType(table, geoInfo);
                                 } catch (Throwable e) {
+                                  LOGGER.warn(
+                                      "Could not generate schema for {}.{}: {} ({})",
+                                      schema.getKey(),
+                                      tableName,
+                                      e.getClass().getSimpleName(),
+                                      Objects.requireNonNullElse(e.getMessage(), "no message"));
+                                  if (LOGGER.isDebugEnabled()) {
+                                    LOGGER.debug("Stacktrace:", e);
+                                  }
                                   return null;
                                 }
                               }))
+              .filter(Objects::nonNull)
               .collect(Collectors.toList());
 
       LOGGER.debug("Finished crawling SQL schema");
@@ -186,10 +197,11 @@ public class SchemaGeneratorSql implements SchemaGenerator {
               featureProperty.excludedScopes(ImmutableList.of(Scope.RECEIVABLE));
             }
             if (featurePropertyType == SchemaBase.Type.GEOMETRY) {
-              if (!geometryInfos.containsKey(table.getName())) {
+              GeoInfo geometryInfo =
+                  lookupGeometryInfo(geometryInfos, schema.getName(), table.getName());
+              if (Objects.isNull(geometryInfo)) {
                 continue;
               }
-              GeoInfo geometryInfo = geometryInfos.get(table.getName());
 
               // if srid=0, do not set, will use default
               try {
@@ -258,10 +270,11 @@ public class SchemaGeneratorSql implements SchemaGenerator {
           }
         }
         if (featurePropertyType == SchemaBase.Type.GEOMETRY) {
-          if (!geometryInfos.containsKey(table.getName())) {
+          GeoInfo geometryInfo =
+              lookupGeometryInfo(geometryInfos, table.getSchema().getName(), table.getName());
+          if (Objects.isNull(geometryInfo)) {
             continue;
           }
-          GeoInfo geometryInfo = geometryInfos.get(table.getName());
 
           // if srid=0, do not set, will use default
           try {
@@ -292,11 +305,29 @@ public class SchemaGeneratorSql implements SchemaGenerator {
     return featureSchema;
   }
 
+  private GeoInfo lookupGeometryInfo(
+      Map<String, GeoInfo> geometryInfos, String schema, String table) {
+    String geometryInfoKeySchema =
+        String.format("%s.%s", Objects.requireNonNullElse(schema, ""), table)
+            .toLowerCase(Locale.ROOT);
+    String geometryInfoKeyTable = table.toLowerCase(Locale.ROOT);
+
+    if (geometryInfos.containsKey(geometryInfoKeySchema)) {
+      return geometryInfos.get(geometryInfoKeySchema);
+    }
+    if (geometryInfos.containsKey(geometryInfoKeyTable)) {
+      return geometryInfos.get(geometryInfoKeyTable);
+    }
+
+    return null;
+  }
+
   private SchemaBase.Type getFeaturePropertyType(ColumnDataType columnDataType) {
     // TODO: pass GeoInfo to determine geo columns
     try {
-      if ("GEOMETRY".equals(columnDataType.getName())
-          || WktWkbGeometryType.valueOf(columnDataType.getName()) != WktWkbGeometryType.NONE) {
+      if ("GEOMETRY".equalsIgnoreCase(columnDataType.getName())
+          || WktWkbGeometryType.valueOf(columnDataType.getName().toUpperCase(Locale.ROOT))
+              != WktWkbGeometryType.NONE) {
         return SchemaBase.Type.GEOMETRY;
       }
     } catch (Exception ignore) {

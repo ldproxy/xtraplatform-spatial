@@ -20,6 +20,8 @@ import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg;
 import de.ii.xtraplatform.features.sql.infra.db.SqlDbmsAdapterGpkg.DbInfoGpkg.SpatialMetadata;
 import de.ii.xtraplatform.spatialite.domain.SpatiaLiteLoader;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -29,11 +31,10 @@ import java.sql.Statement;
 import java.text.Collator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
@@ -185,16 +186,23 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
     Map<String, GeoInfo> result = new LinkedHashMap<>();
 
     while (rs.next()) {
-      result.put(
-          rs.getString(GeoInfo.TABLE),
+      String table = rs.getString(GeoInfo.TABLE);
+      String tableKey = table.toLowerCase(Locale.ROOT);
+      String schemaTableKey = String.format("%s.%s", "main", table).toLowerCase(Locale.ROOT);
+      GeoInfo geoInfo =
           ImmutableGeoInfo.of(
               null,
-              rs.getString(GeoInfo.TABLE),
+              table,
               rs.getString(GeoInfo.COLUMN),
               rs.getString(GeoInfo.DIMENSION),
               rs.getString(GeoInfo.SRID),
               forceAxisOrder((DbInfoGpkg) dbInfo).name(),
-              rs.getString(GeoInfo.TYPE)));
+              rs.getString(GeoInfo.TYPE));
+
+      // keep a normalized table-only key as canonical lookup key
+      result.put(tableKey, geoInfo);
+      // additionally provide normalized schema.table compatibility key
+      result.put(schemaTableKey, geoInfo);
     }
 
     return result;

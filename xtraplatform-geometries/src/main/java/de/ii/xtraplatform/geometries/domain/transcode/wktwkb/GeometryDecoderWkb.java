@@ -28,6 +28,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
   private final WkbDialect dialect;
 
   public GeometryDecoderWkb() {
+    super();
     this.dialect = WkbDialect.SQL_MM;
   }
 
@@ -37,6 +38,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
   // 2) The embedded geometries do not repeat the endian byte for COMPOUNDCURVE, CURVEPOLYGON,
   // MULTICURVE, MULTISURFACE.
   public GeometryDecoderWkb(WkbDialect wkbDialect) {
+    super();
     this.dialect = wkbDialect;
   }
 
@@ -50,6 +52,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public Geometry<?> decode(
       DataInputStream dis,
       Optional<EpsgCrs> crs,
@@ -62,106 +65,106 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
             ? isLittleEndianRootGeometry.get()
             : dis.readByte() == 1;
     long typeCode = readUnsignedInt(dis, isLittleEndian);
-    Axes axes = Axes.fromWkbCode(typeCode);
     GeometryType type = WktWkbGeometryType.fromWkbType((int) typeCode).toGeometryType();
 
     if (!allowedTypes.isEmpty() && !allowedTypes.contains(type)) {
       throw new IOException("Unexpected geometry type " + type + ". Allowed: " + allowedTypes);
     }
-    if (allowedAxes != null && !allowedAxes.equals(axes)) {
+
+    Axes axes = Axes.fromWkbCode(typeCode);
+    if (allowedAxes != null && allowedAxes != axes) {
       throw new IOException("Geometry axes " + axes + " do not match expected " + allowedAxes);
     }
 
     return switch (type) {
       case POINT -> point(readPosition(dis, isLittleEndian, axes), crs);
-      case MULTI_POINT -> multiPoint2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POINT), false),
-          crs);
+      case MULTI_POINT ->
+          multiPoint2(
+              readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POINT), false),
+              crs);
       case LINE_STRING -> lineString(readPositionList(dis, isLittleEndian, axes), crs);
-      case MULTI_LINE_STRING -> multiLineString2(
-          readListOfGeometry(
-              dis, crs, axes, isLittleEndian, Set.of(GeometryType.LINE_STRING), false),
-          crs);
+      case MULTI_LINE_STRING ->
+          multiLineString2(
+              readListOfGeometry(
+                  dis, crs, axes, isLittleEndian, Set.of(GeometryType.LINE_STRING), false),
+              crs);
       case POLYGON -> polygon(readListOfPositionList(dis, isLittleEndian, axes), crs);
-      case MULTI_POLYGON -> multiPolygon2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
-          crs);
+      case MULTI_POLYGON ->
+          multiPolygon2(
+              readListOfGeometry(
+                  dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
+              crs);
       case CIRCULAR_STRING -> circularString(readPositionList(dis, isLittleEndian, axes), crs);
-      case POLYHEDRAL_SURFACE -> polyhedralSurface2(
-          readListOfGeometry(dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
-          crs);
-      case COMPOUND_CURVE -> compoundCurve(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING),
-              true),
-          crs);
-      case CURVE_POLYGON -> curvePolygon(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(
-                  GeometryType.LINE_STRING,
-                  GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE),
-              true),
-          crs);
-      case MULTI_CURVE -> multiCurve(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(
-                  GeometryType.LINE_STRING,
-                  GeometryType.CIRCULAR_STRING,
-                  GeometryType.COMPOUND_CURVE),
-              false),
-          crs);
-      case MULTI_SURFACE -> multiSurface(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON),
-              false),
-          crs);
-      case GEOMETRY_COLLECTION -> geometryCollection(
-          readListOfGeometry(
-              dis,
-              crs,
-              axes,
-              isLittleEndian,
-              Set.of(
-                  GeometryType.POINT,
-                  GeometryType.LINE_STRING,
-                  GeometryType.POLYGON,
-                  GeometryType.MULTI_POINT,
-                  GeometryType.MULTI_LINE_STRING,
-                  GeometryType.MULTI_POLYGON,
-                  GeometryType.GEOMETRY_COLLECTION),
-              false),
-          crs);
+      case POLYHEDRAL_SURFACE ->
+          polyhedralSurface2(
+              readListOfGeometry(
+                  dis, crs, axes, isLittleEndian, Set.of(GeometryType.POLYGON), false),
+              crs);
+      case COMPOUND_CURVE ->
+          compoundCurve(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(GeometryType.LINE_STRING, GeometryType.CIRCULAR_STRING),
+                  true),
+              crs);
+      case CURVE_POLYGON ->
+          curvePolygon(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(
+                      GeometryType.LINE_STRING,
+                      GeometryType.CIRCULAR_STRING,
+                      GeometryType.COMPOUND_CURVE),
+                  true),
+              crs);
+      case MULTI_CURVE ->
+          multiCurve(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(
+                      GeometryType.LINE_STRING,
+                      GeometryType.CIRCULAR_STRING,
+                      GeometryType.COMPOUND_CURVE),
+                  false),
+              crs);
+      case MULTI_SURFACE ->
+          multiSurface(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON),
+                  false),
+              crs);
+      case GEOMETRY_COLLECTION ->
+          geometryCollection(
+              readListOfGeometry(
+                  dis,
+                  crs,
+                  axes,
+                  isLittleEndian,
+                  Set.of(
+                      GeometryType.POINT,
+                      GeometryType.LINE_STRING,
+                      GeometryType.POLYGON,
+                      GeometryType.MULTI_POINT,
+                      GeometryType.MULTI_LINE_STRING,
+                      GeometryType.MULTI_POLYGON,
+                      GeometryType.GEOMETRY_COLLECTION),
+                  false),
+              crs);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
-  }
-
-  private Position pointPos(Axes axes, double[] coords) {
-    return Position.of(axes, coords);
-  }
-
-  private PositionList posList(Axes axes, double[] coords) {
-    return PositionList.of(axes, coords);
-  }
-
-  private List<PositionList> posListList(Axes axes, List<double[]> coords) {
-    return coords.stream().map(c -> PositionList.of(axes, c)).toList();
   }
 
   private long readUnsignedInt(DataInputStream dis, boolean isLittleEndian) throws IOException {
@@ -177,8 +180,10 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
   private Position readPosition(DataInputStream dis, boolean isLittleEndian, Axes axes)
       throws IOException {
     double[] coords = new double[axes.size()];
-    for (int j = 0; j < axes.size(); j++) coords[j] = readDouble(dis, isLittleEndian);
-    return pointPos(axes, coords);
+    for (int j = 0; j < axes.size(); j++) {
+      coords[j] = readDouble(dis, isLittleEndian);
+    }
+    return Position.of(axes, coords);
   }
 
   private PositionList readPositionList(DataInputStream dis, boolean isLittleEndian, Axes axes)
@@ -186,9 +191,12 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     int dim = axes.size();
     long num = readUnsignedInt(dis, isLittleEndian);
     double[] coords = new double[dim * (int) num];
-    for (int i = 0; i < num; i++)
-      for (int j = 0; j < dim; j++) coords[i * dim + j] = readDouble(dis, isLittleEndian);
-    return posList(axes, coords);
+    for (int i = 0; i < num; i++) {
+      for (int j = 0; j < dim; j++) {
+        coords[i * dim + j] = readDouble(dis, isLittleEndian);
+      }
+    }
+    return PositionList.of(axes, coords);
   }
 
   private List<PositionList> readListOfPositionList(
@@ -198,12 +206,21 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
     List<double[]> list = new ArrayList<>();
     for (int k = 0; k < num; k++) {
       long numPoints = readUnsignedInt(dis, isLittleEndian);
-      double[] coords = new double[dim * (int) numPoints];
-      for (int i = 0; i < numPoints; i++)
-        for (int j = 0; j < dim; j++) coords[i * dim + j] = readDouble(dis, isLittleEndian);
+      double[] coords = readCoordinates(dis, isLittleEndian, dim, numPoints);
       list.add(coords);
     }
-    return posListList(axes, list);
+    return list.stream().map(c -> PositionList.of(axes, c)).toList();
+  }
+
+  private double[] readCoordinates(
+      DataInputStream dis, boolean isLittleEndian, int dim, long numPoints) throws IOException {
+    double[] coords = new double[dim * (int) numPoints];
+    for (int i = 0; i < numPoints; i++) {
+      for (int j = 0; j < dim; j++) {
+        coords[i * dim + j] = readDouble(dis, isLittleEndian);
+      }
+    }
+    return coords;
   }
 
   private List<Geometry<?>> readListOfGeometry(
@@ -226,7 +243,9 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               dialect == WkbDialect.ORACLE && embeddedGeometriesDoNotHaveLittleEndianFlagInOracle
                   ? Optional.of(isLittleEndian)
                   : Optional.empty());
-      if (g != null) builder.add(g);
+      if (g != null) {
+        builder.add(g);
+      }
     }
     return builder.build();
   }

@@ -1,0 +1,14 @@
+---
+- source: /flurstueck
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /flurstueck/objid
+  target: id
+  type: STRING
+  role: ID
+  index: 0
+- source: /flurstueck/p_buchung
+  target: rel_buchung
+  type: STRING
+  index: 0

@@ -68,9 +68,35 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
     return 0;
   }
 
+  /** Index of the query in a multi-query that this query belongs to. */
+  @Value.Default
+  default int getQueryIndex() {
+    return 0;
+  }
+
   @Value.Default
   default int getChunkSize() {
     return 1000;
+  }
+
+  /**
+   * JDBC fetch size for the result set. When greater than 0, the query is executed inside a
+   * transaction so the database driver can use a server-side cursor and stream rows instead of
+   * buffering the whole result set in memory. Used for single-shot (unpaged) queries.
+   */
+  @Value.Default
+  default int getFetchSize() {
+    return 0;
+  }
+
+  /**
+   * When enabled, the query is subscribed on a worker thread so that several such queries can
+   * execute concurrently (the blocking JDBC connection provider otherwise runs every query on the
+   * single subscribing thread). Used for the concurrent single-shot value phase.
+   */
+  @Value.Default
+  default boolean isParallel() {
+    return false;
   }
 
   @Value.Default

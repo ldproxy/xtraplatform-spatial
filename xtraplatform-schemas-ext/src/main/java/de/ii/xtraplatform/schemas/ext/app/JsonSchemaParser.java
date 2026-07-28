@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.schemas.ext.app;
 
 import java.net.URI;
-import java.nio.file.Path;
 import net.jimblackler.jsonschemafriend.Schema;
 import net.jimblackler.jsonschemafriend.SchemaException;
 import net.jimblackler.jsonschemafriend.SchemaStore;
@@ -20,7 +19,7 @@ public class JsonSchemaParser {
     this.schemaStore = new SchemaStore();
   }
 
-  public Schema parse(Path file) {
+  public Schema parse(java.nio.file.Path file) {
     try {
       return schemaStore.loadSchema(file.toFile());
     } catch (SchemaException e) {

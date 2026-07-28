@@ -23,7 +23,7 @@ import org.immutables.value.Value;
     property = "mappingType")
 @JsonTypeIdResolver(JacksonProvider.DynamicTypeIdResolver.class)
 public interface TargetMapping<T extends Enum<T>> {
-  final String BASE_TYPE = "general";
+  String BASE_TYPE = "general";
 
   // TODO
   @Nullable

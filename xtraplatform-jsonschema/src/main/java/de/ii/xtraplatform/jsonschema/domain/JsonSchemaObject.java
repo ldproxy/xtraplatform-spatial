@@ -31,6 +31,26 @@ import org.immutables.value.Value;
 })
 public abstract class JsonSchemaObject extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaObject> FUNNEL =
+      (from, into) -> {
+        into.putString(from.getType(), StandardCharsets.UTF_8);
+        from.getRequired().stream()
+            .sorted()
+            .forEachOrdered(val -> into.putString(val, StandardCharsets.UTF_8));
+        from.getProperties().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
+        from.getPatternProperties().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
+        from.getAdditionalProperties().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
+        from.getAnyOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
+        from.getOneOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
+        from.getAllOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
+        from.getNot().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
+      };
+
   @Value.Derived
   public String getType() {
     return "object";
@@ -59,24 +79,4 @@ public abstract class JsonSchemaObject extends JsonSchema {
   public abstract Optional<JsonSchema> getNot();
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaObject> FUNNEL =
-      (from, into) -> {
-        into.putString(from.getType(), StandardCharsets.UTF_8);
-        from.getRequired().stream()
-            .sorted()
-            .forEachOrdered(val -> into.putString(val, StandardCharsets.UTF_8));
-        from.getProperties().entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
-        from.getPatternProperties().entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEachOrdered(entry -> JsonSchema.FUNNEL.funnel(entry.getValue(), into));
-        from.getAdditionalProperties().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
-        from.getAnyOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
-        from.getOneOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
-        from.getAllOf().forEach(val -> JsonSchema.FUNNEL.funnel(val, into));
-        from.getNot().ifPresent(val -> JsonSchema.FUNNEL.funnel(val, into));
-      };
 }

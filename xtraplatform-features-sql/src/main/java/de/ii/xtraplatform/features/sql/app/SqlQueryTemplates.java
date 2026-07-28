@@ -36,7 +36,8 @@ public interface SqlQueryTemplates {
         Map<String, String> virtualTables,
         boolean withNumberSkipped,
         boolean withNumberReturned,
-        boolean forceNumberMatched);
+        boolean forceNumberMatched,
+        boolean withNumberMatched);
   }
 
   @FunctionalInterface

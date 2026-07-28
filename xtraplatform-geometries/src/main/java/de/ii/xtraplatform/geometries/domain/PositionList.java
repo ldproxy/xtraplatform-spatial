@@ -7,10 +7,10 @@
  */
 package de.ii.xtraplatform.geometries.domain;
 
+import jakarta.validation.constraints.NotNull;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
-import javax.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -25,7 +25,7 @@ public abstract class PositionList {
     return ImmutablePositionList.builder().axes(axes).coordinates(new double[0]).build();
   }
 
-  public static PositionList of(Axes axes, double[] coordinates) {
+  public static PositionList of(Axes axes, double... coordinates) {
     return ImmutablePositionList.builder().axes(axes).coordinates(coordinates).build();
   }
 
@@ -52,7 +52,7 @@ public abstract class PositionList {
           i * position.getAxes().size(),
           position.getAxes().size());
     }
-    return PositionList.of(axes, coordinates);
+    return of(axes, coordinates);
   }
 
   public static PositionList concat(PositionList first, PositionList second) {
@@ -123,7 +123,7 @@ public abstract class PositionList {
     int dimension = getAxes().size();
     int length = getCoordinates().length;
     double[] coordinates = Arrays.copyOf(getCoordinates(), length);
-    for (int i = 0; i < length / 2; i = i + dimension) {
+    for (int i = 0; i < length / 2; i += dimension) {
       double x = coordinates[i];
       double y = coordinates[i + 1];
 
@@ -149,7 +149,7 @@ public abstract class PositionList {
         coordinates[newMPos] = m;
       }
     }
-    return PositionList.of(getAxes(), coordinates, getInterpolation());
+    return of(getAxes(), coordinates, getInterpolation());
   }
 
   public Position get(int index) {
@@ -175,6 +175,6 @@ public abstract class PositionList {
         coordinates,
         0,
         (toIndex - fromIndex) * getAxes().size());
-    return PositionList.of(getAxes(), coordinates);
+    return of(getAxes(), coordinates);
   }
 }

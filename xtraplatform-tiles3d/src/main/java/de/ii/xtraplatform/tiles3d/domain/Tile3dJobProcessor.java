@@ -71,29 +71,7 @@ public abstract class Tile3dJobProcessor
         return JobResult.error("Tile provider does not support seeding"); // early return
       }
       if (!tileProvider.seeding().isAvailable()) {
-        if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
-          LOGGER.trace(
-              MARKER.JOBS,
-              "Tile provider '{}' not available, suspending job ({})",
-              tileProvider.getId(),
-              job.getId());
-        }
-        tileProvider
-            .seeding()
-            .onStateChange(
-                (oldState, newState) -> {
-                  if (newState == State.AVAILABLE) {
-                    if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
-                      LOGGER.trace(
-                          MARKER.JOBS,
-                          "Tile provider '{}' became available, resuming job ({})",
-                          tileProvider.getId(),
-                          job.getId());
-                    }
-                    jobQueue.push(job);
-                  }
-                },
-                true);
+        suspendUntilAvailable(tileProvider, job, jobQueue);
         return JobResult.onHold(); // early return
       }
 
@@ -116,7 +94,7 @@ public abstract class Tile3dJobProcessor
         executeJob(job.getType(), tileProvider, seedingJob, seedingJobSet, updateProgress);
       } catch (IOException e) {
         return JobResult.retry(e.getMessage());
-      } catch (Throwable e) {
+      } catch (Throwable e) { // NOPMD AvoidCatchingThrowable
         updateProgress.accept(job.getTotal().get());
         throw e;
       }
@@ -146,5 +124,35 @@ public abstract class Tile3dJobProcessor
 
   private Optional<Tile3dProviderFeatures> getTileProvider(String id) {
     return entityRegistry.getEntity(Tile3dProviderFeatures.class, id);
+  }
+
+  private void suspendUntilAvailable(
+      Tile3dProviderFeatures tileProvider, Job job, JobQueueMin jobQueue) {
+    if (LOGGER.isTraceEnabled(MARKER.JOBS)) {
+      LOGGER.trace(
+          MARKER.JOBS,
+          "Tile provider '{}' not available, suspending job ({})",
+          tileProvider.getId(),
+          job.getId());
+    }
+
+    tileProvider
+        .seeding()
+        .onStateChange(
+            (oldState, newState) -> {
+              if (newState != State.AVAILABLE) {
+                return;
+              }
+
+              if (LOGGER.isTraceEnabled(MARKER.JOBS)) {
+                LOGGER.trace(
+                    MARKER.JOBS,
+                    "Tile provider '{}' became available, resuming job ({})",
+                    tileProvider.getId(),
+                    job.getId());
+              }
+              jobQueue.push(job);
+            },
+            true);
   }
 }

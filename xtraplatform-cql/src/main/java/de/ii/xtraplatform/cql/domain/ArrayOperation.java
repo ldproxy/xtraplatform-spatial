@@ -13,7 +13,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(as = ArrayOperation.class)
-public interface ArrayOperation extends BinaryOperation<ArrayLiteral>, CqlNode {
+public interface ArrayOperation extends BinaryOperation<ArrayLiteral> {
 
   @JsonValue
   ArrayFunction getOperator();

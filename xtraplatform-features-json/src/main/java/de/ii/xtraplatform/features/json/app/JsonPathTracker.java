@@ -15,7 +15,6 @@ import java.util.List;
 /**
  * @author zahnen
  */
-// TODO: make XMLPathTracker extension of this
 public class JsonPathTracker {
 
   private static final Joiner JOINER = Joiner.on('.').skipNulls();
@@ -54,12 +53,16 @@ public class JsonPathTracker {
 
   @Override
   public String toString() {
-    if (localPath.isEmpty()) return "";
+    if (localPath.isEmpty()) {
+      return "";
+    }
     return JOINER.join(localPath);
   }
 
   public List<String> asList() {
-    if (localPath.isEmpty()) return ImmutableList.of();
+    if (localPath.isEmpty()) {
+      return ImmutableList.of();
+    }
     return ImmutableList.copyOf(localPath);
   }
 }

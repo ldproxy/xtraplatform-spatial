@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.features.domain.Decoder;
 import de.ii.xtraplatform.features.domain.DecoderFactory;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler;
@@ -34,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +48,7 @@ public class FeatureDecoderSql
 
   private final Map<String, SchemaMapping> mappings;
   private final Query query;
-  private final List<List<String>> mainTablePaths;
+  private final Set<List<String>> mainTablePaths;
   private final FeatureStoreMultiplicityTracker multiplicityTracker;
   private final boolean isSingleFeature;
   private final Map<String, DecoderFactory> subDecoderFactories;
@@ -57,6 +59,7 @@ public class FeatureDecoderSql
   private boolean started;
   private boolean featureStarted;
   private Object currentId;
+  private int currentQueryIndex;
   private boolean isAtLeastOneFeatureWritten;
 
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
@@ -78,7 +81,9 @@ public class FeatureDecoderSql
     this.wkbDialect = wkbDialect;
 
     this.mainTablePaths =
-        sqlQueryMappings.stream().map(s -> s.getMainTable().getFullPath()).toList();
+        sqlQueryMappings.stream()
+            .map(s -> s.getMainTable().getFullPath())
+            .collect(ImmutableSet.toImmutableSet());
     List<List<String>> multiTables =
         sqlQueryMappings.stream()
             .flatMap(s -> s.getTables().stream())
@@ -144,10 +149,14 @@ public class FeatureDecoderSql
 
   private void handleMetaRow(SqlRowMeta sqlRow) {
 
-    context
-        .metadata()
-        .numberReturned(
-            context.metadata().getNumberReturned().orElse(0) + sqlRow.getNumberReturned());
+    // a negative numberReturned marks it as not computed (single-shot/unpaged); leave it unset so
+    // the encoder omits numberReturned instead of reporting 0
+    if (sqlRow.getNumberReturned() >= 0) {
+      context
+          .metadata()
+          .numberReturned(
+              context.metadata().getNumberReturned().orElse(0) + sqlRow.getNumberReturned());
+    }
     if (sqlRow.getNumberMatched().isPresent()) {
       context
           .metadata()
@@ -189,7 +198,9 @@ public class FeatureDecoderSql
       schemaIndexes.clear();
     }
 
-    if (!Objects.equals(currentId, featureId) || !Objects.equals(context.type(), featureType)) {
+    if (!Objects.equals(currentId, featureId)
+        || !Objects.equals(context.type(), featureType)
+        || currentQueryIndex != sqlRow.getQueryIndex()) {
       if (featureStarted) {
         getDownstream().onFeatureEnd(context);
         this.featureStarted = false;
@@ -202,6 +213,7 @@ public class FeatureDecoderSql
       getDownstream().onFeatureStart(context);
       this.featureStarted = true;
       this.currentId = featureId;
+      this.currentQueryIndex = sqlRow.getQueryIndex();
     }
 
     List<Integer> multiplicitiesForPath =

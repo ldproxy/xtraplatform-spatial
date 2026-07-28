@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_Aufnahmepunkt gml:id="DENW36AL10000JBJ" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL10000JBJ</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2013-02-27T15:45:05Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/000000" xlink:title="Ersteinrichtung"/>
+          <adv:punktkennung>323635614440465</adv:punktkennung>
+          <adv:zustaendigeStelle>
+            <adv:AX_Dienststelle_Schluessel>
+              <adv:land>05</adv:land>
+              <adv:stelle>4360</adv:stelle>
+            </adv:AX_Dienststelle_Schluessel>
+          </adv:zustaendigeStelle>
+          <adv:sonstigeEigenschaft>GK25755615140465</adv:sonstigeEigenschaft>
+          <adv:vermarkung_Marke>1000</adv:vermarkung_Marke>
+        </adv:AX_Aufnahmepunkt>

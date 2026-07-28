@@ -23,6 +23,7 @@ public class CqlVisitorExtractParameters extends CqlVisitorBase<Map<String, Json
   private final Map<String, JsonSchema> found;
 
   public CqlVisitorExtractParameters(Map<String, JsonSchema> globalParameters) {
+    super();
     this.globalParameters = globalParameters;
     this.found = new HashMap<>();
   }
@@ -34,7 +35,7 @@ public class CqlVisitorExtractParameters extends CqlVisitorBase<Map<String, Json
     JsonSchema schema =
         Objects.requireNonNullElse(globalParameters.get(name), parameter.getSchema());
     found.put(name, schema);
-    return null;
+    return Map.of();
   }
 
   @Override

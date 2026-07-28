@@ -28,6 +28,7 @@ import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.SchemaFragmentResolver;
 import de.ii.xtraplatform.features.domain.SchemaReferenceResolver;
 import de.ii.xtraplatform.features.domain.TypesResolver;
+import de.ii.xtraplatform.features.domain.transform.CrsVariantsResolver;
 import de.ii.xtraplatform.features.domain.transform.DefaultRolesResolver;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefEmbedder;
 import de.ii.xtraplatform.features.domain.transform.FeatureRefResolver;
@@ -45,13 +46,13 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults;
 import de.ii.xtraplatform.features.sql.domain.SqlClientBasicFactory;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapters;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,6 +199,7 @@ public class FeatureProviderSqlFactory
               new FeatureRefEmbedder(data.getId()),
               new FeatureRefResolver(connectors),
               new ImplicitMappingResolver(),
+              new CrsVariantsResolver(),
               new ConstantsResolver(),
               new LabelTemplateResolver(data.getLabelTemplate()),
               new DefaultRolesResolver(),

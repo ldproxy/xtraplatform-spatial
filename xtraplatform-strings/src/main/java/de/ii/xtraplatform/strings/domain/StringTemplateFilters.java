@@ -15,6 +15,7 @@ import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -37,14 +38,20 @@ import org.slf4j.LoggerFactory;
 /**
  * @author zahnen
  */
-public class StringTemplateFilters {
+@SuppressWarnings({
+  "PMD.NcssCount",
+  "PMD.CognitiveComplexity",
+  "PMD.CyclomaticComplexity",
+  "PMD.NPathComplexity"
+})
+public final class StringTemplateFilters {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StringTemplateFilters.class);
 
-  static final Set<Extension> EXTENSIONS = Collections.singleton(TablesExtension.create());
-  static final Parser parser = Parser.builder().extensions(EXTENSIONS).build();
+  private static final Set<Extension> EXTENSIONS = Collections.singleton(TablesExtension.create());
+  private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS).build();
 
-  static final HtmlRenderer renderer =
+  private static final HtmlRenderer RENDERER =
       HtmlRenderer.builder()
           .extensions(EXTENSIONS)
           .nodeRendererFactory(
@@ -64,10 +71,18 @@ public class StringTemplateFilters {
                   })
           .build();
 
+  private static final Pattern VALUE_PATTERN =
+      Pattern.compile("\\{\\{([\\w.]+)( ?\\| ?[\\w]+(:'[^']*')*)*\\}\\}");
+  private static final Pattern VALUE_PATTERN_SINGLE =
+      Pattern.compile("\\{([\\w.]+)( ?\\| ?[\\w]+(:'[^']*')*)*\\}");
+  private static final Pattern FILTER_PATTERN = Pattern.compile(" ?\\| ?([\\w]+)((?::'[^']*')*)");
+
+  private StringTemplateFilters() {}
+
   public static String applyFilterMarkdown(String value) {
 
-    Node document = parser.parse(value);
-    return renderer.render(document);
+    Node document = PARSER.parse(value);
+    return RENDERER.render(document);
   }
 
   public static String applyTemplate(String template, String value) {
@@ -108,10 +123,6 @@ public class StringTemplateFilters {
     return applyTemplate(template, isHtml -> {}, valueLookup, Map.of(), allowSingleCurlyBraces);
   }
 
-  static Pattern valuePattern = Pattern.compile("\\{\\{([\\w.]+)( ?\\| ?[\\w]+(:'[^']*')*)*\\}\\}");
-  static Pattern valuePatternSingle = Pattern.compile("\\{([\\w.]+)( ?\\| ?[\\w]+(:'[^']*')*)*\\}");
-  static Pattern filterPattern = Pattern.compile(" ?\\| ?([\\w]+)((?::'[^']*')*)");
-
   public static String applyTemplate(
       String template,
       Consumer<Boolean> isHtml,
@@ -123,11 +134,11 @@ public class StringTemplateFilters {
       return "";
     }
 
-    String formattedValue = "";
+    StringBuilder formattedValueBuilder = new StringBuilder();
     Matcher matcher =
         !allowSingleCurlyBraces || template.contains("{{")
-            ? valuePattern.matcher(template)
-            : valuePatternSingle.matcher(template);
+            ? VALUE_PATTERN.matcher(template)
+            : VALUE_PATTERN_SINGLE.matcher(template);
     boolean hasAppliedMarkdown = false;
     Map<String, String> assigns = new HashMap<>();
 
@@ -135,7 +146,7 @@ public class StringTemplateFilters {
     while (matcher.find()) {
       String key = matcher.group(1);
       String filteredValue = valueLookup.apply(key);
-      Matcher matcher2 = filterPattern.matcher(template.substring(matcher.start(), matcher.end()));
+      Matcher matcher2 = FILTER_PATTERN.matcher(template.substring(matcher.start(), matcher.end()));
       while (matcher2.find()) {
         String filter = matcher2.group(1);
         String params = matcher2.group(2);
@@ -150,7 +161,7 @@ public class StringTemplateFilters {
                     .collect(Collectors.toList());
 
         if (Objects.isNull(filteredValue)) {
-          if (filter.equals("orElse") && parameters.size() >= 1) {
+          if ("orElse".equals(filter) && !parameters.isEmpty()) {
             filteredValue =
                 applyTemplate(
                     parameters.get(0).replace("\"", "'"),
@@ -160,42 +171,43 @@ public class StringTemplateFilters {
                     false);
           }
         } else {
-          if (filter.equals("markdown")) {
+          if ("markdown".equals(filter)) {
             filteredValue = applyFilterMarkdown(filteredValue);
             hasAppliedMarkdown = true;
-          } else if (filter.equals("replace") && parameters.size() >= 2) {
+          } else if ("replace".equals(filter) && parameters.size() >= 2) {
             filteredValue = filteredValue.replaceAll(parameters.get(0), parameters.get(1));
-          } else if (filter.equals("prepend") && parameters.size() >= 1) {
-            filteredValue = parameters.get(0) + filteredValue;
-          } else if (filter.equals("append") && parameters.size() >= 1) {
-            filteredValue = filteredValue + parameters.get(0);
-          } else if (filter.equals("urlEncode") || filter.equals("urlencode")) {
+          } else if ("prepend".equals(filter) && !parameters.isEmpty()) {
+            filteredValue = parameters.get(0).concat(filteredValue);
+          } else if ("append".equals(filter) && !parameters.isEmpty()) {
+            filteredValue = filteredValue.concat(parameters.get(0));
+          } else if ("urlEncode".equals(filter) || "urlencode".equals(filter)) {
             try {
               filteredValue = URLEncoder.encode(filteredValue, Charsets.UTF_8.toString());
             } catch (UnsupportedEncodingException e) {
               // ignore
             }
-          } else if (filter.equals("toLower")) {
-            filteredValue = filteredValue.toLowerCase();
-          } else if (filter.equals("toUpper")) {
-            filteredValue = filteredValue.toUpperCase();
-          } else if (filter.equals("assignTo") && parameters.size() >= 1) {
+          } else if ("toLower".equals(filter)) {
+            filteredValue = filteredValue.toLowerCase(Locale.ROOT);
+          } else if ("toUpper".equals(filter)) {
+            filteredValue = filteredValue.toUpperCase(Locale.ROOT);
+          } else if ("assignTo".equals(filter) && !parameters.isEmpty()) {
             assigns.put(parameters.get(0), filteredValue);
-          } else if (filter.equals("unHtml")) {
+          } else if ("unHtml".equals(filter)) {
             filteredValue = filteredValue.replaceAll("<.*?>", "");
           } else if (customFilters.containsKey(filter)) {
             filteredValue = customFilters.get(filter).apply(filteredValue);
-          } else if (!filter.equals("orElse")) {
+          } else if (!"orElse".equals(filter)) {
             LOGGER.warn("Template filter '{}' not supported", filter);
           }
         }
       }
-      formattedValue +=
-          template.substring(lastMatch, matcher.start())
-              + Objects.requireNonNullElse(filteredValue, "");
+      formattedValueBuilder
+          .append(template, lastMatch, matcher.start())
+          .append(Objects.requireNonNullElse(filteredValue, ""));
       lastMatch = matcher.end();
     }
-    formattedValue += template.substring(lastMatch);
+    formattedValueBuilder.append(template.substring(lastMatch));
+    String formattedValue = formattedValueBuilder.toString();
     for (Map.Entry<String, String> entry : assigns.entrySet()) {
       String valueSubst2 = entry.getKey();
       String value2 = entry.getValue();
@@ -204,8 +216,8 @@ public class StringTemplateFilters {
 
     Matcher recurseMatcher =
         !allowSingleCurlyBraces || formattedValue.contains("{{")
-            ? valuePattern.matcher(formattedValue)
-            : valuePatternSingle.matcher(formattedValue);
+            ? VALUE_PATTERN.matcher(formattedValue)
+            : VALUE_PATTERN_SINGLE.matcher(formattedValue);
 
     if (recurseMatcher.find()) {
       final boolean currentHasAppliedMarkdown = hasAppliedMarkdown;

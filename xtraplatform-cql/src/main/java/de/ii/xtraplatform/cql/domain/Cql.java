@@ -22,10 +22,13 @@ public interface Cql {
     JSON
   }
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   Cql2Expression read(String cql, Format format) throws CqlParseException;
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   Cql2Expression read(String cql, Format format, EpsgCrs crs) throws CqlParseException;
 
+  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
   Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters)
       throws CqlParseException;
 
@@ -35,6 +38,11 @@ public interface Cql {
       Cql2Expression cqlPredicate, Collection<String> validProperties);
 
   void checkTypes(Cql2Expression cqlPredicate, Map<String, String> propertyTypes);
+
+  void checkTypes(
+      Cql2Expression cqlPredicate,
+      Map<String, String> propertyTypes,
+      List<CustomFunction> customFunctions);
 
   void checkCoordinates(
       Cql2Expression cqlPredicate,

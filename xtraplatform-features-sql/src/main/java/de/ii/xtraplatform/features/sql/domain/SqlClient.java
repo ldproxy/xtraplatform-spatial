@@ -39,4 +39,13 @@ public interface SqlClient extends SqlClientBasic {
       Optional<String> id);
 
   List<String> getNotifications(Connection connection);
+
+  /**
+   * Opens a synchronous, single-connection session for multi-statement transactions. The default
+   * implementation throws {@link UnsupportedOperationException}.
+   */
+  default SqlSession openSession() {
+    throw new UnsupportedOperationException(
+        "Synchronous SQL sessions are not supported by this SqlClient implementation");
+  }
 }

@@ -200,4 +200,37 @@ class FeatureTokenDecoderGeoJsonSpec2 extends Specification {
         tokens == FeatureTokenFixtures.COLLECTION
 
     }
+
+    def 'large polygon feature: chunk boundary inside coordinates must not lose tokens'() {
+
+        // Reproducer for a bug where a non-blocking chunk boundary falling inside the GeoJSON
+        // coordinates array surfaced as "Unexpected Token: NOT_AVAILABLE" from the sync
+        // GeometryDecoderJson. Fixture is a ~17 KB AX_Flurstueck polygon (701 vertices); we feed it
+        // in two byte chunks split mid-coordinates to force the async pause.
+
+        given:
+        byte[] data = new File('src/test/resources/large_polygon_feature.json').bytes
+        int split = data.length.intdiv(2)
+        byte[] chunk1 = Arrays.copyOfRange(data, 0, split)
+        byte[] chunk2 = Arrays.copyOfRange(data, split, data.length)
+        Reactive.Source<byte[]> chunked = Reactive.Source.iterable([chunk1, chunk2])
+
+        Reactive.Stream<List<Object>> chunkedStream = chunked.via(decoder).to(ListSink())
+
+        FeatureTokenDecoderSimple<byte[], FeatureSchema, SchemaMapping, FeatureEventHandlerSimple.ModifiableContext<FeatureSchema, SchemaMapping>> singleShotDecoder =
+                new FeatureTokenDecoderGeoJson(Optional.empty(), OgcCrs.CRS84, Axes.XY)
+        Reactive.Stream<List<Object>> singleShotStream = Reactive.Source.iterable([data])
+                .via(singleShotDecoder)
+                .to(ListSink())
+
+        when:
+        List<Object> chunkedTokens = runStream(chunkedStream)
+        List<Object> singleShotTokens = runStream(singleShotStream)
+
+        then:
+        // The split-feed must yield the same token sequence as a single-shot feed of the same
+        // bytes, and the run must not throw.
+        !chunkedTokens.isEmpty()
+        chunkedTokens == singleShotTokens
+    }
 }

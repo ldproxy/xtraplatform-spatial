@@ -9,12 +9,14 @@ package de.ii.xtraplatform.cql.domain;
 
 import java.util.List;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public interface CqlVisitor<T> {
 
   default T postProcess(CqlNode node, T t) {
     return t;
   }
 
+  @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   default T visit(CqlNode node, List<T> children) {
     if (node instanceof Not) {
       return visit((Not) node, children);

@@ -55,8 +55,6 @@ public class JsonBuilder {
 
     nestingTracker.closeObject();
 
-    currentObject = null;
-
     restoreParent();
   }
 
@@ -79,8 +77,6 @@ public class JsonBuilder {
     }
 
     nestingTracker.closeArray();
-
-    currentArray = null;
 
     restoreParent();
   }

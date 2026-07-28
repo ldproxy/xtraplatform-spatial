@@ -9,7 +9,6 @@ package de.ii.xtraplatform.cql.app;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.collect.ImmutableSet;
 import de.ii.xtraplatform.cql.domain.Accenti;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
@@ -18,11 +17,14 @@ import de.ii.xtraplatform.cql.domain.BinaryArrayOperation;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
 import de.ii.xtraplatform.cql.domain.BinarySpatialOperation;
 import de.ii.xtraplatform.cql.domain.BinaryTemporalOperation;
+import de.ii.xtraplatform.cql.domain.BooleanValue2;
 import de.ii.xtraplatform.cql.domain.Casei;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
+import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlVisitorBase;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Eq;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.ImmutableBetween;
@@ -35,11 +37,13 @@ import de.ii.xtraplatform.cql.domain.ImmutableLt;
 import de.ii.xtraplatform.cql.domain.ImmutableLte;
 import de.ii.xtraplatform.cql.domain.ImmutableNeq;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.Interval;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
+import de.ii.xtraplatform.cql.domain.Parameter;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
@@ -53,14 +57,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass", "PMD.TooManyMethods"})
 public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private static final Set<Type> NUMBER = ImmutableSet.of(Type.Integer, Type.Long, Type.Double);
-  private static final Set<Type> INTEGER = ImmutableSet.of(Type.Integer, Type.Long);
   private static final Set<Type> TEXT = ImmutableSet.of(Type.String);
   private static final Set<Type> BOOLEAN = ImmutableSet.of(Type.Boolean);
   private static final Set<Type> TEMPORAL =
@@ -105,52 +110,27 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
           .put("ACCENTI", ImmutableSet.of(TEXT))
           .build();
 
-  private static final Map<String, List<Set<Type>>> COMPATIBILITY_FUNCTION =
-      new ImmutableMap.Builder<String, List<Set<Type>>>()
-          .put("UPPER", ImmutableList.of(TEXT))
-          .put("LOWER", ImmutableList.of(TEXT))
-          .put("POSITION", ImmutableList.of(INTEGER))
-          .put("DIAMETER2D", ImmutableList.of(SPATIAL))
-          .put("DIAMETER3D", ImmutableList.of(SPATIAL))
-          .put("ALIKE", ImmutableList.of(ImmutableSet.of(Type.List), ImmutableSet.of(Type.String)))
-          .build();
-
-  private static final Map<String, List<Set<Class<?>>>> COMPATIBILITY_FUNCTION_ARGUMENTS =
-      new Builder<String, List<Set<Class<?>>>>()
-          .put(
-              "UPPER",
-              ImmutableList.of(
-                  ImmutableSet.of(
-                      Property.class,
-                      Function.class,
-                      Accenti.class,
-                      Casei.class,
-                      ScalarLiteral.class)))
-          .put(
-              "LOWER",
-              ImmutableList.of(
-                  ImmutableSet.of(
-                      Property.class,
-                      Function.class,
-                      Accenti.class,
-                      Casei.class,
-                      ScalarLiteral.class)))
-          .put("POSITION", ImmutableList.of())
-          .put("DIAMETER2D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
-          .put("DIAMETER3D", ImmutableList.of(ImmutableSet.of(Property.class, Function.class)))
-          .put(
-              "ALIKE",
-              ImmutableList.of(
-                  ImmutableSet.of(Property.class, Function.class),
-                  ImmutableSet.of(ScalarLiteral.class)))
-          .build();
-
   private final Map<String, String> propertyTypes;
   private final Cql cql;
+  private final Map<String, CustomFunction> customFunctions;
 
   public CqlTypeAndFunctionChecker(Map<String, String> propertyTypes, Cql cql) {
+    this(propertyTypes, cql, ImmutableList.of());
+  }
+
+  public CqlTypeAndFunctionChecker(
+      Map<String, String> propertyTypes, Cql cql, List<CustomFunction> customFunctions) {
+    super();
     this.propertyTypes = propertyTypes;
     this.cql = cql;
+    this.customFunctions =
+        ImmutableMap.copyOf(
+            CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
+                .collect(
+                    Collectors.toMap(
+                        customFunction -> customFunction.getName().toUpperCase(Locale.ROOT),
+                        customFunction -> customFunction,
+                        (left, right) -> right)));
   }
 
   @Override
@@ -172,6 +152,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   @Override
   public Type visit(BinaryScalarOperation scalarOperation, List<Type> children) {
+    if (scalarOperation instanceof InResultSet) {
+      // the first argument may be of any queryable type, the second is always the
+      // name of a result set
+      return Type.Boolean;
+    }
     checkOperation(scalarOperation, children);
     return Type.Boolean;
   }
@@ -233,13 +218,20 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   @Override
   public Type visit(Function function, List<Type> children) {
     checkFunction(function, children);
-    return Type.valueOf(function.getType().getSimpleName());
+
+    Optional<CustomFunction> customFunction = getCustomFunction(function);
+    if (customFunction.isPresent()) {
+      return fromSchemaType(customFunction.get().getReturns().get(0));
+    }
+
+    throw new IllegalArgumentException("Unknown function: " + function.getName());
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public Type visit(Property property, List<Type> children) {
     String schemaType = propertyTypes.get(property.getName());
-    if (Objects.nonNull(schemaType))
+    if (Objects.nonNull(schemaType)) {
       switch (schemaType) {
         case "STRING":
           return Type.String;
@@ -258,7 +250,17 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
         case "VALUE_ARRAY":
         case "OBJECT_ARRAY":
           return Type.List;
+        default:
+          return Type.UNKNOWN;
       }
+    }
+    return Type.UNKNOWN;
+  }
+
+  @Override
+  public Type visit(Parameter parameter, List<Type> children) {
+    // an unbound parameter (e.g. in a stored query validated before invocation) has no known type;
+    // treat it as a wildcard so the concrete operands are still checked
     return Type.UNKNOWN;
   }
 
@@ -269,8 +271,9 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   @Override
   public Type visit(TemporalLiteral temporalLiteral, List<Type> children) {
-    if (temporalLiteral.getType() == Interval.class)
+    if (temporalLiteral.getType() == Interval.class) {
       return ((Interval) temporalLiteral.getValue()).accept(this);
+    }
     return Type.valueOf(temporalLiteral.getType().getSimpleName());
   }
 
@@ -284,19 +287,27 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     return Type.valueOf(arrayLiteral.getType().getSimpleName());
   }
 
+  @Override
+  public Type visit(BooleanValue2 booleanValue, List<Type> children) {
+    return Type.Boolean;
+  }
+
   private void checkOperation(CqlNode node, List<Type> types) {
     final Type firstType = types.get(0);
-    if (firstType == Type.UNKNOWN) return;
-    final List<Type> otherTypes = types.subList(1, types.size());
+    if (firstType == Type.UNKNOWN) {
+      return;
+    }
 
     List<Set<Type>> compatibilityLists = getCompatibilityLists(node.getClass());
-    if (compatibilityLists.isEmpty())
+    if (compatibilityLists.isEmpty()) {
       throw new CqlIncompatibleTypes(getText(node), firstType.schemaType(), ImmutableList.of());
-    if (compatibilityLists.stream().noneMatch(list -> list.contains(firstType)))
+    }
+    if (compatibilityLists.stream().noneMatch(list -> list.contains(firstType))) {
       throw new CqlIncompatibleTypes(
           getText(node),
           firstType.schemaType(),
           asSchemaTypes(compatibilityLists.stream().flatMap(Collection::stream).toList()));
+    }
 
     final List<Type> compatibleTypes =
         getCompatibilityLists(node.getClass()).stream()
@@ -306,8 +317,9 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
             .toList();
     final List<Type> expectedTypes =
         ImmutableList.<Type>builder().add(firstType).addAll(compatibleTypes).build();
+    final List<Type> otherTypes = types.subList(1, types.size());
     otherTypes.stream()
-        .filter(type -> !expectedTypes.contains(type) && !type.equals(Type.UNKNOWN))
+        .filter(type -> !expectedTypes.contains(type) && type != Type.UNKNOWN)
         .findFirst()
         .ifPresent(
             type -> {
@@ -317,49 +329,62 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   }
 
   private void checkFunction(Function function, List<Type> types) {
-    final List<Set<Class<?>>> expectedNodes =
-        Objects.requireNonNullElse(
-            COMPATIBILITY_FUNCTION_ARGUMENTS.get(function.getName().toUpperCase(Locale.ROOT)),
-            ImmutableList.of());
-    if (function.getArgs().size() != expectedNodes.size()) {
+    Optional<CustomFunction> customFunction = getCustomFunction(function);
+
+    if (customFunction.isPresent()) {
+      checkCustomFunction(function, types, customFunction.get());
+      return;
+    }
+
+    throw new IllegalArgumentException("Unknown function: " + function.getName());
+  }
+
+  private void checkCustomFunction(
+      Function function, List<Type> types, CustomFunction customFunction) {
+    if (function.getArgs().size() != customFunction.getArguments().size()) {
       throw new IllegalArgumentException(
           String.format(
               "Function %s expects %d argument(s), but got %d",
-              function.getName(), expectedNodes.size(), function.getArgs().size()));
+              function.getName(), customFunction.getArguments().size(), function.getArgs().size()));
     }
-    IntStream.range(0, function.getArgs().size())
-        .forEach(
-            i -> {
-              CqlNode child = function.getArgs().get(i);
-              Set<Class<?>> expected = expectedNodes.get(i);
-              if (expected.stream()
-                  .noneMatch(expectedNode -> expectedNode.isAssignableFrom(child.getClass()))) {
-                throw new IllegalArgumentException(
-                    String.format(
-                        "Function %s expects argument %d to be a %s, but got %s",
-                        function.getName(),
-                        i + 1,
-                        expected.stream()
-                            .map(Class::getSimpleName)
-                            .collect(Collectors.joining("/")),
-                        child.getClass().getSimpleName().replace("Immutable", "")));
-              }
-            });
 
-    final List<Set<Type>> expectedTypes =
-        Objects.requireNonNullElse(
-            COMPATIBILITY_FUNCTION.get(function.getName().toUpperCase(Locale.ROOT)),
-            ImmutableList.of());
     IntStream.range(0, types.size())
         .forEach(
             i -> {
-              Type type = types.get(i);
-              Set<Type> expected = expectedTypes.get(i);
-              if (expected.stream().noneMatch(expectedType -> expectedType.equals(type))) {
+              List<Type> expected =
+                  customFunction.getArguments().get(i).getType().stream()
+                      .map(this::fromSchemaType)
+                      .collect(Collectors.toList());
+              Type actual = types.get(i);
+
+              if (!(expected.stream().anyMatch(e -> e == actual) || actual == Type.UNKNOWN)) {
                 throw new CqlIncompatibleTypes(
-                    getText(function), i + 1, type.schemaType(), asSchemaTypesFunction(expected));
+                    getText(function),
+                    i + 1,
+                    actual.schemaType(),
+                    customFunction.getArguments().get(i).getType());
               }
             });
+  }
+
+  private Optional<CustomFunction> getCustomFunction(Function function) {
+    return Optional.ofNullable(customFunctions.get(function.getName().toUpperCase(Locale.ROOT)));
+  }
+
+  @SuppressWarnings("PMD.CyclomaticComplexity")
+  private Type fromSchemaType(String schemaType) {
+    return switch (schemaType.toUpperCase(Locale.ROOT)) {
+      case "STRING" -> Type.String;
+      case "BOOLEAN" -> Type.Boolean;
+      case "INTEGER" -> Type.Integer;
+      case "FLOAT" -> Type.Double;
+      case "DATE" -> Type.LocalDate;
+      case "DATETIME", "INSTANT" -> Type.Instant;
+      case "INTERVAL" -> Type.Interval;
+      case "GEOMETRY" -> Type.Geometry;
+      case "VALUE_ARRAY", "OBJECT_ARRAY", "ARRAY" -> Type.List;
+      default -> Type.UNKNOWN;
+    };
   }
 
   private void checkString(CqlNode node, List<Type> types) {
@@ -371,8 +396,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     if (expectedTypes.stream()
         .noneMatch(
             typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
+                types.stream().allMatch(type -> typeList.contains(type) || type == Type.UNKNOWN))) {
       throw new CqlIncompatibleTypes(
           getText(node), asSchemaTypes(types), asSchemaTypes(expectedTypes));
     }
@@ -387,18 +411,13 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
     if (expectedTypes.stream()
         .noneMatch(
             typeList ->
-                types.stream()
-                    .allMatch(type -> typeList.contains(type) || type.equals(Type.UNKNOWN)))) {
+                types.stream().allMatch(type -> typeList.contains(type) || type == Type.UNKNOWN))) {
       throw new CqlIncompatibleTypes(
           getText(node), asSchemaTypes(types), asSchemaTypes(expectedTypes));
     }
   }
 
   private List<String> asSchemaTypes(List<Type> types) {
-    return types.stream().map(Type::schemaType).distinct().toList();
-  }
-
-  private List<String> asSchemaTypesFunction(Set<Type> types) {
     return types.stream().map(Type::schemaType).distinct().toList();
   }
 
@@ -432,7 +451,7 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
       String tmp =
           cql.write(
               TEquals.of(TemporalLiteral.of(Instant.EPOCH), (Interval) node), Cql.Format.TEXT);
-      return tmp.substring(0, tmp.indexOf(",") + 1).replace(")", "");
+      return tmp.substring(0, tmp.indexOf(',') + 1).replace(")", "");
     }
     return cql.write((Cql2Expression) node, Cql.Format.TEXT);
   }

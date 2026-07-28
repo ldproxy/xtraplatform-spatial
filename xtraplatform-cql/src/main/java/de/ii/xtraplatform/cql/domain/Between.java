@@ -14,7 +14,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableBetween.Builder.class)
-public interface Between extends TernaryOperation<Scalar>, CqlNode {
+@FunctionalInterface
+public interface Between extends TernaryOperation<Scalar> {
 
   String TYPE = "between";
 

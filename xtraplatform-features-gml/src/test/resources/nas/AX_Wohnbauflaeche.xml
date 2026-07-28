@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adv:AX_Wohnbauflaeche gml:id="DENW36AL2mD000Cg" xmlns:adv="http://www.adv-online.de/namespaces/adv/gid/7.1" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <gml:identifier codeSpace="http://www.adv-online.de/">urn:adv:oid:DENW36AL2mD000Cg</gml:identifier>
+          <adv:lebenszeitintervall>
+            <adv:AA_Lebenszeitintervall>
+              <adv:beginnt>2024-10-15T07:55:13Z</adv:beginnt>
+            </adv:AA_Lebenszeitintervall>
+          </adv:lebenszeitintervall>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:advStandardModell>DLKM</adv:advStandardModell>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:modellart>
+            <adv:AA_Modellart>
+              <adv:sonstigesModell xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_WeitereModellart/NWABK" xlink:title="NWABK"/>
+            </adv:AA_Modellart>
+          </adv:modellart>
+          <adv:anlass xlink:href="https://registry.gdi-de.org/codelist/de.adv-online.gid/AA_Anlassart/010704" xlink:title="Qualitätssicherung und Datenpflege"/>
+          <adv:zeigtAufExternes>
+            <adv:AA_Fachdatenverbindung>
+              <adv:art>urn:adv:fdv:0901</adv:art>
+              <adv:fachdatenobjekt>
+                <adv:AA_Fachdatenobjekt>
+                  <adv:uri>urn:adv:oid:DENW36PS00001I8A</adv:uri>
+                </adv:AA_Fachdatenobjekt>
+              </adv:fachdatenobjekt>
+            </adv:AA_Fachdatenverbindung>
+          </adv:zeigtAufExternes>
+          <adv:position>
+            <gml:Surface gml:id="o41001.id.27499335.position_complex.Geom_0">
+              <gml:patches>
+                <gml:PolygonPatch>
+                  <gml:exterior>
+                    <gml:Ring>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_1">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364448.865 5612317.147 364412.985 5612294.505</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_2">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364412.985 5612294.505 364413.436 5612294.577</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_3">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364413.436 5612294.577 364417.246 5612293.731</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_4">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364417.246 5612293.731 364420.210 5612291.614</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_5">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364420.210 5612291.614 364423.173 5612289.286</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_6">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364423.173 5612289.286 364425.925 5612285.899</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_7">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364425.925 5612285.899 364427.195 5612282.936</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_8">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364427.195 5612282.936 364428.147 5612279.020</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_9">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364428.147 5612279.020 364428.465 5612275.527</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_10">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364428.465 5612275.527 364428.570 5612272.246</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_11">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364428.570 5612272.246 364428.147 5612269.601</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_12">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364428.147 5612269.601 364426.983 5612267.695</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_13">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364426.983 5612267.695 364424.972 5612266.637</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_14">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364424.972 5612266.637 364422.961 5612266.637</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_15">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364422.961 5612266.637 364420.950 5612266.743</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_16">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364420.950 5612266.743 364419.257 5612267.590</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_17">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364419.257 5612267.590 364416.611 5612268.966</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_18">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364416.611 5612268.966 364414.283 5612271.717</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_19">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364414.283 5612271.717 364412.060 5612275.633</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_20">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364412.060 5612275.633 364409.626 5612279.126</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_21">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364409.626 5612279.126 364408.356 5612282.089</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_22">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364408.356 5612282.089 364407.086 5612284.523</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_23">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364407.086 5612284.523 364406.134 5612287.698</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_24">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364406.134 5612287.698 364406.378 5612290.336</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_25">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364406.378 5612290.336 364401.240 5612287.093</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_26">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364401.240 5612287.093 364399.489 5612286.053</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_27">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364399.489 5612286.053 364400.941 5612281.188</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_28">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364400.941 5612281.188 364404.712 5612270.736</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_29">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364404.712 5612270.736 364406.630 5612266.702</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_30">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364406.630 5612266.702 364408.220 5612263.279</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_31">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364408.220 5612263.279 364409.077 5612261.608</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_32">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364409.077 5612261.608 364411.393 5612257.838</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_33">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364411.393 5612257.838 364413.046 5612255.391</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_34">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364413.046 5612255.391 364414.164 5612253.915</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_35">
+                          <gml:segments>
+                            <gml:Arc>
+                              <gml:posList>364414.164 5612253.915 364415.939 5612253.789 364417.588 5612254.440</gml:posList>
+                            </gml:Arc>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_36">
+                          <gml:segments>
+                            <gml:Arc>
+                              <gml:posList>364417.588 5612254.440 364417.952 5612254.720 364418.281 5612255.040</gml:posList>
+                            </gml:Arc>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_37">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364418.281 5612255.040 364420.140 5612252.732</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_38">
+                          <gml:segments>
+                            <gml:Arc>
+                              <gml:posList>364420.140 5612252.732 364418.667 5612251.568 364418.530 5612249.701</gml:posList>
+                            </gml:Arc>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_39">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364418.530 5612249.701 364419.065 5612249.305</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_40">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364419.065 5612249.305 364422.307 5612246.593</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_41">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364422.307 5612246.593 364425.085 5612243.484</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_42">
+                          <gml:segments>
+                            <gml:Arc>
+                              <gml:posList>364425.085 5612243.484 364426.250 5612243.312 364427.339 5612243.748</gml:posList>
+                            </gml:Arc>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_43">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364427.339 5612243.748 364431.215 5612246.025</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_44">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364431.215 5612246.025 364432.983 5612243.165</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_45">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364432.983 5612243.165 364430.180 5612240.663</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_46">
+                          <gml:segments>
+                            <gml:Arc>
+                              <gml:posList>364430.180 5612240.663 364429.457 5612239.553 364429.481 5612238.237</gml:posList>
+                            </gml:Arc>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_47">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364429.481 5612238.237 364434.228 5612233.587</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_48">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364434.228 5612233.587 364435.856 5612232.731</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_49">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364435.856 5612232.731 364439.626 5612235.043</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_50">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364439.626 5612235.043 364462.598 5612249.217</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_51">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364462.598 5612249.217 364467.958 5612252.569</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_52">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364467.958 5612252.569 364464.433 5612258.755</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_53">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364464.433 5612258.755 364466.746 5612260.272</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_54">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364466.746 5612260.272 364459.593 5612271.172</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_55">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364459.593 5612271.172 364458.071 5612270.173</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_56">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364458.071 5612270.173 364454.740 5612276.492</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_57">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364454.740 5612276.492 364452.417 5612280.979</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_58">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364452.417 5612280.979 364466.492 5612290.573</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                      <gml:curveMember>
+                        <gml:Curve gml:id="o41001.id.27499335.position_complex.Geom_59">
+                          <gml:segments>
+                            <gml:LineStringSegment>
+                              <gml:posList>364466.492 5612290.573 364448.865 5612317.147</gml:posList>
+                            </gml:LineStringSegment>
+                          </gml:segments>
+                        </gml:Curve>
+                      </gml:curveMember>
+                    </gml:Ring>
+                  </gml:exterior>
+                </gml:PolygonPatch>
+              </gml:patches>
+            </gml:Surface>
+          </adv:position>
+        </adv:AX_Wohnbauflaeche>

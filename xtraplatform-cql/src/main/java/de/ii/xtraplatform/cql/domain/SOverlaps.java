@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSOverlaps.Builder.class)
-public interface SOverlaps extends BinarySpatialOperation, CqlNode {
+public interface SOverlaps extends BinarySpatialOperation {
 
   String TYPE = "s_overlaps";
 

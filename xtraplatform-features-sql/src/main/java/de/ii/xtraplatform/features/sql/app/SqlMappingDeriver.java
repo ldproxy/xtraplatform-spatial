@@ -169,7 +169,13 @@ public class SqlMappingDeriver {
 
     if (tableRule.isWritable()
         && !seenWritableProperties.contains(tableRule.getTarget())
-        && !Objects.equals(tableRule.getTarget(), ROOT_TARGET)) {
+        && !Objects.equals(tableRule.getTarget(), ROOT_TARGET)
+        && tableRule.getType() != Type.VALUE_ARRAY) {
+      // VALUE_ARRAY tables share the cleaned target with their single value column (e.g. both end
+      // up as "anl"). Adding the table target here would dedup the column out of the writable loop
+      // below, so this register-as-object-table step is reserved for OBJECT / OBJECT_ARRAY tables.
+      // The value column for a VALUE_ARRAY junction still reaches putWritableTables /
+      // putWritableColumns via the writable column loop, which is what writes need.
       mapping.putObjectTables(tableRule.getTarget(), querySchema);
       seenWritableProperties.add(tableRule.getTarget());
     }
@@ -246,7 +252,7 @@ public class SqlMappingDeriver {
       SqlQueryColumn column1,
       SqlQuerySchema querySchema,
       boolean isWritable) {
-    if (column.getTarget().equals("$")) {
+    if ("$".equals(column.getTarget())) {
       if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
         List<FeatureSchema> connectedSchemas =
             includeSchema
@@ -327,12 +333,12 @@ public class SqlMappingDeriver {
   }
 
   private static String applyRename(String target, String rename) {
-    String prefix = target.contains(".") ? target.substring(0, target.lastIndexOf(".") + 1) : "";
-    String prop = target.contains(".") ? target.substring(target.lastIndexOf(".") + 1) : "";
+    String prefix = target.contains(".") ? target.substring(0, target.lastIndexOf('.') + 1) : "";
+    String prop = target.contains(".") ? target.substring(target.lastIndexOf('.') + 1) : "";
     String renamed = rename;
 
     if (MappingOperationResolver.isConcatPath(prop)) {
-      renamed = prop.substring(0, prop.indexOf("_") + 1) + renamed;
+      renamed = prop.substring(0, prop.indexOf('_') + 1) + renamed;
     }
 
     return prefix + renamed;
@@ -390,6 +396,7 @@ public class SqlMappingDeriver {
             .name(sqlPath.getName())
             .pathSegment(sqlPath.asPath())
             .sortKey(sqlPath.getSortKey())
+            .sortKeyUnique(sqlPath.getSortKeyUnique())
             .primaryKey(sqlPath.getPrimaryKey())
             .filter(sqlPath.getFilter().map(expr -> (Operation<?>) expr))
             .columns(columns.stream().map(column -> getColumn(schema, column)).toList())
@@ -426,6 +433,7 @@ public class SqlMappingDeriver {
                 .pathSegment(parentTable.asPath())
                 .sourceField(childTable.getJoin().get().first())
                 .sortKey(parentTable.getSortKey())
+                .sortKeyUnique(parentTable.getSortKeyUnique())
                 .filter(parentTable.getFilter().map(expr -> (Operation<?>) expr))
                 .target(childTable.getName())
                 .targetField(childTable.getJoin().get().second())
@@ -515,7 +523,18 @@ public class SqlMappingDeriver {
               ? SqlQueryColumn.Operation.WKB
               : SqlQueryColumn.Operation.WKT;
 
-      operations.put(op, new String[] {});
+      // The storage CRS of the column (schema option `crs`) travels as the operation parameters
+      // (code and axis-order force); absent for columns in the provider's nativeCrs. Consumed by
+      // the write path (SRID of the geometry literal and transformation target).
+      String[] storageCrs =
+          propertySchema
+              .flatMap(FeatureSchema::getNativeCrs)
+              .map(
+                  crs ->
+                      new String[] {String.valueOf(crs.getCode()), crs.getForceAxisOrder().name()})
+              .orElse(new String[] {});
+
+      operations.put(op, storageCrs);
 
       if (propertySchema.isPresent() && propertySchema.get().isForcePolygonCCW()) {
         operations.put(SqlQueryColumn.Operation.FORCE_POLYGON_CCW, new String[] {});

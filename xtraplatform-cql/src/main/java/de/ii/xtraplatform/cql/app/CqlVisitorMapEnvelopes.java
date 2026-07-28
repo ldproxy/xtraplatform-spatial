@@ -30,19 +30,22 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
   private final CrsInfo crsInfo;
 
   public CqlVisitorMapEnvelopes(CrsInfo crsInfo) {
+    super();
     this.crsInfo = crsInfo;
   }
 
   @Override
   public CqlNode visit(SpatialLiteral spatialLiteral, List<CqlNode> children) {
-    if (spatialLiteral.getType() == Bbox.class && spatialLiteral.getValue() instanceof Bbox)
+    if (spatialLiteral.getType() == Bbox.class && spatialLiteral.getValue() instanceof Bbox) {
       return SpatialLiteral.of(
           ((GeometryNode) visit((Bbox) spatialLiteral.getValue(), children)).getGeometry());
+    }
 
     return super.visit(spatialLiteral, children);
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public CqlNode visit(Bbox bbox, List<CqlNode> children) {
     List<Double> c = bbox.getCoordinates();
     EpsgCrs crs = bbox.getCrs().orElse(OgcCrs.CRS84);
@@ -54,8 +57,7 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
     } else if (c.get(0).equals(c.get(2)) || c.get(1).equals(c.get(3))) {
       return GeometryNode.of(
           LineString.of(
-              PositionList.of(Axes.XY, new double[] {c.get(0), c.get(1), c.get(2), c.get(3)}),
-              Optional.of(crs)));
+              PositionList.of(Axes.XY, c.get(0), c.get(1), c.get(2), c.get(3)), Optional.of(crs)));
     }
 
     // if the bbox crosses the antimeridian, we create a MultiPolygon with a polygon
@@ -70,20 +72,14 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
                     Polygon.of(
                         List.of(
                             PositionList.of(
-                                Axes.XY,
-                                new double[] {
-                                  c.get(0), c.get(1), 180.0, c.get(1), 180.0, c.get(3), c.get(0),
-                                  c.get(3), c.get(0), c.get(1)
-                                })),
+                                Axes.XY, c.get(0), c.get(1), 180.0, c.get(1), 180.0, c.get(3),
+                                c.get(0), c.get(3), c.get(0), c.get(1))),
                         Optional.of(crs)),
                     Polygon.of(
                         List.of(
                             PositionList.of(
-                                Axes.XY,
-                                new double[] {
-                                  -180, c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), -180,
-                                  c.get(3), -180, c.get(1)
-                                })),
+                                Axes.XY, -180, c.get(1), c.get(2), c.get(1), c.get(2), c.get(3),
+                                -180, c.get(3), -180, c.get(1))),
                         Optional.of(crs))),
                 Optional.of(crs)));
       } else if (axisWithWraparaound == 1 && c.get(1) > c.get(3)) {
@@ -94,20 +90,14 @@ public class CqlVisitorMapEnvelopes extends CqlVisitorCopy {
                     Polygon.of(
                         List.of(
                             PositionList.of(
-                                Axes.XY,
-                                new double[] {
-                                  c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), 180, c.get(0),
-                                  180, c.get(0), c.get(1)
-                                })),
+                                Axes.XY, c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), 180,
+                                c.get(0), 180, c.get(0), c.get(1))),
                         Optional.of(crs)),
                     Polygon.of(
                         List.of(
                             PositionList.of(
-                                Axes.XY,
-                                new double[] {
-                                  c.get(0), -180, c.get(2), -180, c.get(2), c.get(3), c.get(0),
-                                  c.get(3), c.get(0), -180
-                                })),
+                                Axes.XY, c.get(0), -180, c.get(2), -180, c.get(2), c.get(3),
+                                c.get(0), c.get(3), c.get(0), -180)),
                         Optional.of(crs))),
                 Optional.of(crs)));
       }

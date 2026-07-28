@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTOverlaps.Builder.class)
-public interface TOverlaps extends BinaryTemporalOperation, CqlNode {
+public interface TOverlaps extends BinaryTemporalOperation {
 
   String TYPE = "t_overlaps";
 

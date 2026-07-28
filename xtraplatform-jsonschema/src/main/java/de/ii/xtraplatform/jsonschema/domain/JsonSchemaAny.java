@@ -15,12 +15,12 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaAny.Builder.class)
 public abstract class JsonSchemaAny extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaAny> FUNNEL = (from, into) -> {};
+
   public static JsonSchemaAny of() {
     return new ImmutableJsonSchemaAny.Builder().build();
   }
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaAny> FUNNEL = (from, into) -> {};
 }

@@ -18,9 +18,9 @@ import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileProviderMbtilesData;
 import de.ii.xtraplatform.tiles.domain.TileProviderData;
 import de.ii.xtraplatform.tiles.domain.TileProviderMbtilesData;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.Optional;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

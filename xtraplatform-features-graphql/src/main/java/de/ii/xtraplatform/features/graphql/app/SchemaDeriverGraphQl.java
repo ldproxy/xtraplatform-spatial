@@ -46,7 +46,7 @@ public class SchemaDeriverGraphQl implements SchemaVisitorTopDown<FeatureSchema,
                       .map(
                           template ->
                               StringTemplateFilters.applyTemplate(
-                                  template, (Map.of("sourcePath", path))::get))
+                                  template, (String key) -> Map.of("sourcePath", path).get(key)))
                       .map(expr -> FilterEncoderGraphQl.fromString(expr, true))
                       .map(expr -> path + "/" + expr.get(path)));
     } else if (schema.isFeatureRef()) {

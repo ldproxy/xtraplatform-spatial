@@ -13,6 +13,7 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,9 @@ public class NestingTracker {
 
   private final FeatureEventHandler<?, ?, ModifiableContext<?, ?>> downstream;
   private final ModifiableContext<?, ?> context;
-  private final List<List<String>> mainPaths;
+  // a Set so the per-value isNotMain() membership test is O(1) instead of a linear scan of
+  // List<List<String>> with element-wise list equality
+  private final Set<List<String>> mainPaths;
   private final boolean flattenObjects;
   private final boolean flattenArrays;
   private final List<String> nestingStack;
@@ -36,7 +39,7 @@ public class NestingTracker {
   public <T extends ModifiableContext<?, ?>> NestingTracker(
       FeatureEventHandler<?, ?, T> downstream,
       T context,
-      List<List<String>> mainPaths,
+      Set<List<String>> mainPaths,
       boolean flattenObjects,
       boolean flattenArrays,
       boolean skippable) {

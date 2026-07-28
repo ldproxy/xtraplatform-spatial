@@ -96,7 +96,8 @@ public class SqlQueryTemplatesDeriver {
         virtualTables,
         withNumberSkipped,
         withNumberReturned,
-        forceNumberMatched) -> {
+        forceNumberMatched,
+        withNumberMatched) -> {
       String limitAndOffsetSql = sqlDialect.applyToLimitAndOffset(limit, offset);
       String skipOffsetSql = skipOffset > 0 ? sqlDialect.applyToOffset(skipOffset) : "";
       String asIds = sqlDialect.applyToAsIds();
@@ -115,7 +116,7 @@ public class SqlQueryTemplatesDeriver {
 
         columns += getSortColumn("A", sortKey, i) + ", ";
       }
-      columns += String.format("A.%s AS " + SKEY, schema.getSortKey());
+      columns += getSkeyColumn("A", schema, "", false);
       String orderBy = getOrderBy(additionalSortKeys);
       String minMaxColumns = getMinMaxColumns(additionalSortKeys);
 
@@ -130,7 +131,7 @@ public class SqlQueryTemplatesDeriver {
                       sqlDialect.castToBigInt(0)));
 
       String numberMatched =
-          computeNumberMatched || forceNumberMatched
+          (computeNumberMatched || forceNumberMatched) && withNumberMatched
               ? String.format(
                   "SELECT count(*) AS numberMatched FROM (SELECT A.%2$s AS %4$s FROM %1$s A%3$s ORDER BY 1)%5$s",
                   tableName, schema.getSortKey(), where, SKEY, asIds)
@@ -165,11 +166,7 @@ public class SqlQueryTemplatesDeriver {
         forceSimpleFeatures,
         minMaxKeys,
         virtualTables) -> {
-      boolean isIdFilter =
-          filter
-              .filter(
-                  cql2Predicate -> cql2Predicate instanceof In && ((In) cql2Predicate).isIdFilter())
-              .isPresent();
+      boolean isIdFilter = filter.filter(SqlQueryTemplatesDeriver::containsIdFilter).isPresent();
       List<String> aliases = AliasGenerator.getAliases(schema);
 
       SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
@@ -180,14 +177,11 @@ public class SqlQueryTemplatesDeriver {
               ? sqlFilter
               : toWhereClause(
                   aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
+      boolean useRangePaging = additionalSortKeys.isEmpty() && minMaxKeys.isPresent();
       Optional<String> pagingClause =
-          additionalSortKeys.isEmpty() || (limit == 0 && offset == 0)
+          useRangePaging || (limit == 0 && offset == 0)
               ? Optional.empty()
-              : Optional.of(
-                  String.format(
-                      "%s%s",
-                      limit > 0 ? sqlDialect.applyToLimit(limit) : "",
-                      offset > 0 ? sqlDialect.applyToOffset(offset) : ""));
+              : Optional.of(sqlDialect.applyToLimitAndOffset(limit, offset));
 
       return getTableQuery(
           schema,
@@ -288,6 +282,24 @@ public class SqlQueryTemplatesDeriver {
         columns, mainTable, join.isEmpty() ? "" : " ", join, where, orderBy, paging);
   }
 
+  /**
+   * Recognises an id-bounded filter even when it is buried inside conjunctions, e.g. {@code
+   * In(_ID_, [...])} on its own or {@code And(In(_ID_, [...]), <other>)} — both treat the row-set
+   * as constrained by the id list and let the SQL generator skip the surrogate-key range guard.
+   */
+  private static boolean containsIdFilter(Cql2Expression expr) {
+    if (expr instanceof In && ((In) expr).isIdFilter()) {
+      return true;
+    }
+    if (expr instanceof And) {
+      return ((And) expr)
+          .getArgs().stream()
+              .anyMatch(
+                  arg -> arg instanceof Cql2Expression && containsIdFilter((Cql2Expression) arg));
+    }
+    return false;
+  }
+
   private Optional<String> toWhereClause(
       String alias,
       String keyField,
@@ -348,11 +360,29 @@ public class SqlQueryTemplatesDeriver {
     return String.format("'%s'", sqlDialect.escapeString(literalString));
   }
 
+  private String getSkeyExpression(
+      String alias, SqlQueryTable table, boolean useRowNumberForNonUnique) {
+    if (table.isSortKeyUnique()) {
+      return String.format("%s.%s", alias, table.getSortKey());
+    }
+
+    if (!useRowNumberForNonUnique) {
+      return String.format("%s.%s", alias, table.getSortKey());
+    }
+
+    return String.format("ROW_NUMBER() OVER (ORDER BY %s.%s)", alias, table.getSortKey());
+  }
+
+  private String getSkeyColumn(
+      String alias, SqlQueryTable table, String suffix, boolean useRowNumberForNonUnique) {
+    return String.format(
+        "%s AS SKEY%s", getSkeyExpression(alias, table, useRowNumberForNonUnique), suffix);
+  }
+
   private List<String> getSortFields(
       SqlQuerySchema schema, List<String> aliases, List<SortKey> additionalSortKeys) {
 
     final int[] i = {0};
-    final int[] j = {0};
     Stream<String> customSortKeys =
         additionalSortKeys.stream().map(sortKey -> getSortColumn(aliases.get(0), sortKey, i[0]++));
 
@@ -370,14 +400,7 @@ public class SqlQueryTemplatesDeriver {
           .collect(Collectors.toList());
     } else {
       return Stream.concat(
-              customSortKeys,
-              Stream.of(
-                  String.format(
-                      schema.isSortKeyUnique()
-                          ? "%s.%s AS SKEY"
-                          : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
-                      aliases.get(0),
-                      schema.getSortKey())))
+              customSortKeys, Stream.of(getSkeyColumn(aliases.get(0), schema, "", true)))
           .collect(Collectors.toList());
     }
   }
@@ -445,17 +468,10 @@ public class SqlQueryTemplatesDeriver {
     ImmutableList.Builder<String> keys = ImmutableList.builder();
 
     int keyIndex = keyIndexStart;
-    SqlQueryTable previousRelation = null;
 
     if (!onlyRelations) {
       // add key for value table
-      keys.add(
-          String.format(
-              tables.get(0).isSortKeyUnique()
-                  ? "%s.%s AS SKEY"
-                  : "ROW_NUMBER() OVER (ORDER BY %s.%s) AS SKEY",
-              aliasesIterator.next(),
-              tables.get(0).getSortKey()));
+      keys.add(getSkeyColumn(aliasesIterator.next(), tables.get(0), "", true));
       keyIndex++;
     }
 
@@ -465,11 +481,9 @@ public class SqlQueryTemplatesDeriver {
 
       if (!(relation instanceof SqlQueryJoin) || !((SqlQueryJoin) relation).isJunction()) {
         String suffix = keyIndex > 0 ? "_" + keyIndex : "";
-        keys.add(String.format("%s.%s AS SKEY%s", alias, relation.getSortKey(), suffix));
+        keys.add(getSkeyColumn(alias, relation, suffix, true));
         keyIndex++;
       }
-
-      previousRelation = relation;
     }
 
     return keys.build();

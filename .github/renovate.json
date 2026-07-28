@@ -6,6 +6,14 @@
       "matchUpdateTypes": ["patch"],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["digest"],
+      "automerge": true
+    },
+    {
+      "matchPackageNames": ["com.github.davidmoten:rxjava3-jdbc"],
+      "allowedVersions": "!/^0\\.1\\.4$/"
     }
   ]
 }

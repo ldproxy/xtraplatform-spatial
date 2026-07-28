@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableTDisjoint.Builder.class)
-public interface TDisjoint extends BinaryTemporalOperation, CqlNode {
+public interface TDisjoint extends BinaryTemporalOperation {
 
   String TYPE = "t_disjoint";
 

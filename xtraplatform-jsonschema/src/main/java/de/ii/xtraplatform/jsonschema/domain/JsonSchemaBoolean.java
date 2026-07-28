@@ -16,16 +16,16 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaBoolean.Builder.class)
 public abstract class JsonSchemaBoolean extends JsonSchema {
 
+  @SuppressWarnings("UnstableApiUsage")
+  public static final Funnel<JsonSchemaBoolean> FUNNEL =
+      (from, into) -> {
+        into.putString(from.getType(), StandardCharsets.UTF_8);
+      };
+
   @Value.Derived
   public String getType() {
     return "boolean";
   }
 
   public abstract static class Builder extends JsonSchema.Builder {}
-
-  @SuppressWarnings("UnstableApiUsage")
-  public static final Funnel<JsonSchemaBoolean> FUNNEL =
-      (from, into) -> {
-        into.putString(from.getType(), StandardCharsets.UTF_8);
-      };
 }

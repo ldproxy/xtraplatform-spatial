@@ -156,10 +156,14 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     newContext.pathTracker().track(List.of());
     newContext.setType(context.type());
+    // Propagate per-feature state set by upstream transformers (e.g. link captures
+    // from FeatureTokenTransformerPropertyLinks, canonical id captured by
+    // FeatureTokenTransformerCompositeId) into the rebuilt context that downstream sees.
+    newContext.setPropertyLinks(context.propertyLinks());
+    newContext.setCanonicalFeatureId(context.canonicalFeatureId());
 
     downstream.onFeatureStart(newContext);
     downstream.bufferStart();
-    downstream.next(0);
 
     this.currentValueTransformerChain = valueTransformerChains.get(context.type());
   }
@@ -167,6 +171,14 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     applyTokenSliceTransformers(context.type());
+
+    // Upstream transformers (PropertyLinks, CompositeId) may have populated per-feature context
+    // state during/after the property events; propagate it to newContext before the buffer
+    // is flushed so encoders that read these slots during the buffered playback (e.g.
+    // GmlWriterId reading context.canonicalFeatureId() to override the gml:identifier
+    // placeholder) see the up-to-date values.
+    newContext.setPropertyLinks(context.propertyLinks());
+    newContext.setCanonicalFeatureId(context.canonicalFeatureId());
 
     downstream.bufferStop(true);
 
@@ -190,95 +202,72 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
 
   @Override
   public void onObjectStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    int pos = context.pos();
-    if (pos > -1) {
-      downstream.next(pos, context.parentPos());
+    // emit for object/spatial properties but not the feature root itself: a path-less marker
+    // resolves to the root schema (an object), which the type check alone would not exclude
+    if (context
+        .schema()
+        .filter(schema -> (schema.isObject() || schema.isSpatial()) && !schema.isFeature())
+        .isPresent()) {
+      FeatureSchema schema = context.schema().get();
 
-      if (context.schema().filter(schema -> schema.isObject() || schema.isSpatial()).isPresent()) {
-        FeatureSchema schema = context.schema().get();
-
-        downstream.onObjectStart(schema.getFullPath());
-      }
+      downstream.onObjectStart(schema.getFullPath());
     }
   }
 
   @Override
   public void onObjectEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    int pos = context.pos();
-    if (pos > -1) {
-      downstream.next(pos, context.parentPos());
-
-      if (context.schema().filter(schema -> schema.isObject() || schema.isSpatial()).isPresent()) {
-        FeatureSchema schema = context.schema().get();
-        downstream.onObjectEnd(schema.getFullPath());
-      }
+    // not the feature root itself (see onObjectStart)
+    if (context
+        .schema()
+        .filter(schema -> (schema.isObject() || schema.isSpatial()) && !schema.isFeature())
+        .isPresent()) {
+      FeatureSchema schema = context.schema().get();
+      downstream.onObjectEnd(schema.getFullPath());
     }
   }
 
   @Override
   public void onArrayStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    int pos = context.pos();
-    if (pos > -1) {
-      downstream.next(pos, context.parentPos());
+    if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
+      FeatureSchema schema = context.schema().get();
 
-      if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
-        FeatureSchema schema = context.schema().get();
-
-        downstream.onArrayStart(schema.getFullPath());
-      }
+      downstream.onArrayStart(schema.getFullPath());
     }
   }
 
   @Override
   public void onArrayEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    int pos = context.pos();
-    if (pos > -1) {
-      downstream.next(pos, context.parentPos());
-
-      if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
-        FeatureSchema schema = context.schema().get();
-        downstream.onArrayEnd(schema.getFullPath());
-      }
+    if (context.schema().filter(schema -> schema.isArray() || schema.isSpatial()).isPresent()) {
+      FeatureSchema schema = context.schema().get();
+      downstream.onArrayEnd(schema.getFullPath());
     }
   }
 
   @Override
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    int pos = context.pos();
-    if (pos > -1) {
-      downstream.next(pos, context.parentPos());
-
-      if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
-        FeatureSchema schema = context.schema().get();
-        Geometry<?> geometry = context.geometry();
-        downstream.onGeometry(schema.getFullPath(), geometry);
-      }
+    if (context.schema().filter(FeatureSchema::isSpatial).isPresent()) {
+      FeatureSchema schema = context.schema().get();
+      Geometry<?> geometry = context.geometry();
+      downstream.onGeometry(schema.getFullPath(), geometry);
     }
   }
 
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    int pos = context.pos();
-    if (pos > -1) {
-      downstream.next(pos, context.parentPos());
+    if (context.schema().filter(FeatureSchema::isValue).isPresent()) {
+      FeatureSchema schema = context.schema().get();
 
-      if (context.schema().filter(FeatureSchema::isValue).isPresent()) {
-        FeatureSchema schema = context.schema().get();
+      Type valueType =
+          schema.isSpatial() ? context.valueType() : schema.getValueType().orElse(schema.getType());
 
-        Type valueType =
-            schema.isSpatial()
-                ? context.valueType()
-                : schema.getValueType().orElse(schema.getType());
+      String path = schema.getFullPathAsString();
+      String value = context.value();
 
-        String path = schema.getFullPathAsString();
-        String value = context.value();
-
-        if (Objects.nonNull(value)) {
-          value = currentValueTransformerChain.transform(path, value);
-        }
-
-        downstream.onValue(schema.getFullPath(), value, valueType);
+      if (Objects.nonNull(value)) {
+        value = currentValueTransformerChain.transform(path, value);
       }
+
+      downstream.onValue(schema.getFullPath(), value, valueType);
     }
   }
 }

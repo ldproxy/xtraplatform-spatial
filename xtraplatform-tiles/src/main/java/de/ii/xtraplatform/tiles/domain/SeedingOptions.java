@@ -38,9 +38,9 @@ public interface SeedingOptions {
         case M:
           return 1024;
         case L:
-          return 16384;
+          return 16_384;
         case XL:
-          return 65536;
+          return 65_536;
         default:
           return 1024;
       }

@@ -10,6 +10,7 @@ package de.ii.xtraplatform.crs.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,7 +20,6 @@ import org.immutables.value.Value;
 @Value.Immutable
 @Value.Style(builder = "new")
 @JsonDeserialize(builder = ImmutableEpsgCrs.Builder.class)
-// TODO: test
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public interface EpsgCrs {
 
@@ -55,21 +55,19 @@ public interface EpsgCrs {
       return ogcCrs.get();
     }
 
-    int code;
-    try {
-      code = Integer.parseInt(prefixedCode.substring(prefixedCode.lastIndexOf(":") + 1));
-    } catch (NumberFormatException e) {
-      try {
-        code = Integer.parseInt(prefixedCode.substring(prefixedCode.lastIndexOf("/") + 1));
-      } catch (NumberFormatException e2) {
-        try {
-          code = Integer.parseInt(prefixedCode);
-        } catch (NumberFormatException e3) {
-          throw new IllegalArgumentException("Could not parse CRS: " + prefixedCode);
-        }
-      }
+    int separator = Math.max(prefixedCode.lastIndexOf(':'), prefixedCode.lastIndexOf('/'));
+    String codeString = separator >= 0 ? prefixedCode.substring(separator + 1) : prefixedCode;
+
+    if (codeString.isEmpty() || !codeString.chars().allMatch(Character::isDigit)) {
+      throw new IllegalArgumentException("Could not parse CRS: " + prefixedCode);
     }
-    return ImmutableEpsgCrs.of(code);
+
+    BigInteger code = new BigInteger(codeString);
+    if (code.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
+      throw new IllegalArgumentException("Could not parse CRS: " + prefixedCode);
+    }
+
+    return ImmutableEpsgCrs.of(code.intValue());
   }
 
   static EpsgCrs fromString(String prefixedCode, String prefixedCodeVertical) {
@@ -90,6 +88,29 @@ public interface EpsgCrs {
   default Force getForceAxisOrder() {
     return Force.NONE;
   }
+
+  /**
+   * Optional CRS identifier (URI) used to reference this CRS, e.g., the alias
+   * "http://www.opengis.net/def/crs/OGC/0/CRS84" for CRS84. If present, {@code toUriString()}
+   * returns this value so that responses echo the identifier used in the request. Auxiliary, i.e.,
+   * excluded from {@code equals()}/{@code hashCode()}: instances differing only in this attribute
+   * represent the same CRS.
+   */
+  @JsonIgnore
+  @Value.Auxiliary
+  Optional<String> getUriOverride();
+
+  /**
+   * An alternative identifier under which this CRS is known in a community (e.g. the AdV identifier
+   * `urn:adv:crs:ETRS89_UTM32` for EPSG:25832), declared on the entries of the `additionalCrs`
+   * option of the CRS building block. Unlike `uriOverride`, which echoes the identifier a request
+   * used, the alternative URI is only used when a feature encoding renders CRS identifiers on the
+   * wire (e.g. the GML `srsName` with `srsNameStyle: TEMPLATE`) and when decoding such identifiers
+   * on input. Auxiliary, i.e., excluded from `equals()`/`hashCode()`: instances differing only in
+   * this attribute represent the same CRS.
+   */
+  @Value.Auxiliary
+  Optional<String> getAlternativeUri();
 
   @JsonIgnore
   @Value.Lazy
@@ -132,6 +153,9 @@ public interface EpsgCrs {
   @JsonIgnore
   @Value.Lazy
   default String toUriString() {
+    if (getUriOverride().isPresent()) {
+      return getUriOverride().get();
+    }
     if (Objects.equals(this, OgcCrs.CRS84)) {
       return OgcCrs.CRS84_URI;
     }
@@ -141,12 +165,18 @@ public interface EpsgCrs {
     return String.format("http://www.opengis.net/def/crs/EPSG/0/%d", getCode());
   }
 
+  /**
+   * Returns all registered URIs of this CRS: the canonical URI plus, in the case of CRS84, the
+   * "OGC/0/CRS84" alias URI. Unlike {@code toUriStrings()}, the list does not decompose a compound
+   * CRS into its components, it lists the identifiers of this CRS.
+   */
   @JsonIgnore
   @Value.Lazy
-  default Optional<String> toAlternativeUriString() {
-    return Objects.equals(this, OgcCrs.CRS84)
-        ? Optional.of(OgcCrs.CRS84_URI_NEW)
-        : Optional.empty();
+  default List<String> allUris() {
+    if (Objects.equals(this, OgcCrs.CRS84)) {
+      return List.of(OgcCrs.CRS84_URI, OgcCrs.CRS84_URI_NEW);
+    }
+    return List.of(toUriString());
   }
 
   @JsonIgnore

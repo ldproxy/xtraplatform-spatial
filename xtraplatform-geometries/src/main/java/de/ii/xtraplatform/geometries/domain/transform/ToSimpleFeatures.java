@@ -51,10 +51,10 @@ public class ToSimpleFeatures implements GeometryTransformer {
           maxDeviation.orElseGet(
               () -> {
                 double[][] minMax = geometry.accept(new MinMaxDeriver());
-                return (Math.sqrt(
+                return Math.sqrt(
                         Math.pow(
                             minMax[1][0] - minMax[0][0],
-                            2 + Math.pow(minMax[1][1] - minMax[0][1], 2))))
+                            2 + Math.pow(minMax[1][1] - minMax[0][1], 2)))
                     / 1000.0;
               });
       return LineString.of(

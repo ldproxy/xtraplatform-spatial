@@ -21,6 +21,7 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlParseException;
 import de.ii.xtraplatform.cql.domain.CqlToText;
 import de.ii.xtraplatform.cql.domain.CqlVisitorExtractParameters;
+import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.TemporalFunction;
 import de.ii.xtraplatform.cql.domain.TemporalLiteral;
 import de.ii.xtraplatform.cql.infra.CqlTextParser;
@@ -29,6 +30,8 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import io.dropwizard.jackson.Jackson;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
@@ -36,14 +39,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class CqlImpl implements Cql {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CqlImpl.class);
@@ -69,58 +71,59 @@ public class CqlImpl implements Cql {
   }
 
   @Override
-  public Cql2Expression read(String cql, Format format) throws CqlParseException {
+  public Cql2Expression read(String cql, Format format) {
     return read(cql, format, OgcCrs.CRS84, false);
   }
 
   @Override
-  public Cql2Expression read(String cql, Format format, EpsgCrs crs) throws CqlParseException {
+  public Cql2Expression read(String cql, Format format, EpsgCrs crs) {
     return read(cql, format, crs, false);
   }
 
   @Override
-  public Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters)
-      throws CqlParseException {
-    switch (format) {
-      case TEXT:
-        return cqlTextParser.parse(cql, crs);
-      case JSON:
-        cqlJsonMapper.setInjectableValues(
-            new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
-        try {
-          Cql2Expression expression = cqlJsonMapper.readValue(cql, Cql2Expression.class);
-
-          // parameters are a CQL2-JSON extension used in stored queries; they must not appear in
-          // normal CQL2 expressions
-          if (!allowParameters
-              && !expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
-            throw new CqlParseException(
-                "Parameters are not allowed in CQL2 filter expressions, except in stored queries.");
-          }
-
-          return expression;
-        } catch (IOException e) {
-          throw new CqlParseException(e.getMessage());
-        }
+  public Cql2Expression read(String cql, Format format, EpsgCrs crs, boolean allowParameters) {
+    if (format == Format.TEXT) {
+      return cqlTextParser.parse(cql, crs);
     }
 
-    throw new IllegalStateException();
+    if (format == Format.JSON) {
+      cqlJsonMapper.setInjectableValues(
+          new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
+      try {
+        Cql2Expression expression = cqlJsonMapper.readValue(cql, Cql2Expression.class);
+
+        // parameters are a CQL2-JSON extension used in stored queries; they must not appear in
+        // normal CQL2 expressions
+        if (!allowParameters
+            && !expression.accept(new CqlVisitorExtractParameters(Map.of()), true).isEmpty()) {
+          throw new CqlParseException(
+              "Parameters are not allowed in CQL2 filter expressions, except in stored queries.");
+        }
+
+        return expression;
+      } catch (IOException e) {
+        throw new CqlParseException(e.getMessage(), e);
+      }
+    }
+
+    throw new IllegalStateException(String.format("Unsupported CQL format: %s", format));
   }
 
   @Override
   public String write(Cql2Expression cql, Format format) {
-    switch (format) {
-      case TEXT:
-        return cql.accept(new CqlToText(), true);
-      case JSON:
-        try {
-          return cqlJsonMapper.writeValueAsString(cql);
-        } catch (IOException e) {
-          throw new IllegalStateException();
-        }
+    if (format == Format.TEXT) {
+      return cql.accept(new CqlToText(), true);
     }
 
-    throw new IllegalStateException();
+    if (format == Format.JSON) {
+      try {
+        return cqlJsonMapper.writeValueAsString(cql);
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed to write CQL JSON.", e);
+      }
+    }
+
+    throw new IllegalStateException(String.format("Unsupported CQL format: %s", format));
   }
 
   @Override
@@ -133,7 +136,16 @@ public class CqlImpl implements Cql {
 
   @Override
   public void checkTypes(Cql2Expression cqlPredicate, Map<String, String> propertyTypes) {
-    CqlTypeAndFunctionChecker visitor = new CqlTypeAndFunctionChecker(propertyTypes, this);
+    checkTypes(cqlPredicate, propertyTypes, List.of());
+  }
+
+  @Override
+  public void checkTypes(
+      Cql2Expression cqlPredicate,
+      Map<String, String> propertyTypes,
+      List<CustomFunction> customFunctions) {
+    CqlTypeAndFunctionChecker visitor =
+        new CqlTypeAndFunctionChecker(propertyTypes, this, customFunctions);
 
     cqlPredicate.accept(visitor, true);
   }
@@ -150,7 +162,9 @@ public class CqlImpl implements Cql {
         new CqlCoordinateChecker(crsTransformerFactory, crsInfo, filterCrs, nativeCrs);
 
     cqlPredicate.accept(visitor, true);
-    LOGGER.debug("Coordinate validation took {}ms.", System.currentTimeMillis() - start);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Coordinate validation took {}ms.", System.currentTimeMillis() - start);
+    }
   }
 
   @Override
@@ -180,8 +194,8 @@ public class CqlImpl implements Cql {
     @Override
     public List<String> convert(Interval value) {
       return ImmutableList.of(
-          value.getStart() == Instant.MIN ? ".." : value.getStart().toString(),
-          value.getEnd() == Instant.MAX ? ".." : value.getEnd().toString());
+          Instant.MIN.equals(value.getStart()) ? ".." : value.getStart().toString(),
+          Instant.MAX.equals(value.getEnd()) ? ".." : value.getEnd().toString());
     }
   }
 

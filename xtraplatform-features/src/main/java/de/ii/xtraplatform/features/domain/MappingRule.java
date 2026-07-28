@@ -59,14 +59,14 @@ public interface MappingRule {
   @Value.Lazy
   default String getSourceParent() {
     return hasSourceParent()
-        ? getSource().substring(0, maskPathAttributes(getSource()).lastIndexOf("/"))
+        ? getSource().substring(0, maskPathAttributes(getSource()).lastIndexOf('/'))
         : "";
   }
 
   @JsonIgnore
   @Value.Lazy
   default String getTargetParent() {
-    return getTarget().contains(".") ? getTarget().substring(0, getTarget().lastIndexOf(".")) : "$";
+    return getTarget().contains(".") ? getTarget().substring(0, getTarget().lastIndexOf('.')) : "$";
   }
 
   @JsonIgnore

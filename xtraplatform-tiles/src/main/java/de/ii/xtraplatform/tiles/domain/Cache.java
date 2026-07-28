@@ -7,9 +7,12 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 /**
@@ -104,9 +107,13 @@ public interface Cache extends WithTmsLevels, WithTilesetTmsLevels {
    * @default false
    * @since v4.6
    */
-  @Value.Default
-  default boolean getSeededOnly() {
-    return false;
+  @Nullable
+  Boolean getSeededOnly();
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isSeededOnly() {
+    return Objects.equals(getSeededOnly(), Boolean.TRUE);
   }
 
   /**

@@ -11,8 +11,9 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 @JsonDeserialize(builder = ImmutableSCrosses.Builder.class)
-public interface SCrosses extends BinarySpatialOperation, CqlNode {
+public interface SCrosses extends BinarySpatialOperation {
 
   String TYPE = "s_crosses";
 

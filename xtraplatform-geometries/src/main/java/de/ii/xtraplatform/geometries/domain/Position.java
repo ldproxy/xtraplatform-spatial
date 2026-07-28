@@ -8,8 +8,8 @@
 package de.ii.xtraplatform.geometries.domain;
 
 import com.google.common.base.Preconditions;
+import jakarta.validation.constraints.NotNull;
 import java.util.Arrays;
-import javax.validation.constraints.NotNull;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -27,27 +27,24 @@ public abstract class Position {
     return ImmutablePosition.builder().axes(axes).coordinates(coordinates).build();
   }
 
-  public static Position of(Axes axes, double[] coordinates) {
+  public static Position of(Axes axes, double... coordinates) {
     return ImmutablePosition.builder().axes(axes).coordinates(coordinates).build();
   }
 
   public static Position ofXY(double x, double y) {
-    return ImmutablePosition.builder().axes(Axes.XY).coordinates(new double[] {x, y}).build();
+    return of(Axes.XY, x, y);
   }
 
   public static Position ofXYZ(double x, double y, double z) {
-    return ImmutablePosition.builder().axes(Axes.XYZ).coordinates(new double[] {x, y, z}).build();
+    return of(Axes.XYZ, x, y, z);
   }
 
   public static Position ofXYM(double x, double y, double m) {
-    return ImmutablePosition.builder().axes(Axes.XYM).coordinates(new double[] {x, y, m}).build();
+    return of(Axes.XYM, x, y, m);
   }
 
   public static Position ofXYZM(double x, double y, double z, double m) {
-    return ImmutablePosition.builder()
-        .axes(Axes.XYZM)
-        .coordinates(new double[] {x, y, z, m})
-        .build();
+    return of(Axes.XYZM, x, y, z, m);
   }
 
   @Value.Derived
@@ -71,6 +68,13 @@ public abstract class Position {
           && Arrays.equals(getCoordinates(), other.getCoordinates());
     }
     return false;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = getAxes().hashCode();
+    result = 31 * result + Arrays.hashCode(getCoordinates());
+    return result;
   }
 
   @Value.Derived
@@ -109,11 +113,14 @@ public abstract class Position {
   public void check() {
     Preconditions.checkState(
         getCoordinates().length == getAxes().size(),
-        "Position must have %d coordinates, but got %d.",
+        "Position must have %d coordinates for axes %s, but got %d: %s",
         getAxes().size(),
-        getCoordinates().length);
+        getAxes(),
+        getCoordinates().length,
+        Arrays.toString(getCoordinates()));
     Preconditions.checkState(
         isEmpty() || Arrays.stream(getCoordinates()).noneMatch(Double::isNaN),
-        "Position must not have NaN coordinates unless it is EMPTY.");
+        "Position must not have NaN coordinates unless it is EMPTY, got: %s",
+        Arrays.toString(getCoordinates()));
   }
 }

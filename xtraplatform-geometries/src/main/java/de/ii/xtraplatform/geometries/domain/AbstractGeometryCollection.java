@@ -19,6 +19,7 @@ public interface AbstractGeometryCollection<T extends Geometry<?>> extends Geome
     return getValue().isEmpty();
   }
 
+  @Override
   @Value.Default
   default Axes getAxes() {
     if (isEmpty()) {

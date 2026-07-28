@@ -32,6 +32,7 @@ import org.locationtech.jts.geom.CoordinateSequenceFactory;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class GeometryEncoderJts implements GeometryVisitor<org.locationtech.jts.geom.Geometry> {
 
   private final GeometryFactory geometryFactory;

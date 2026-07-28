@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.graphql.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocMarker;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEncodingEnabled;
@@ -51,10 +50,8 @@ public interface FeatureProviderGraphQlData
 
   @Value.Check
   default FeatureProviderGraphQlData initNestedDefault() {
-    /*
-     workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
-    */
+    // NOTE: workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // remove when fixed
     if (Objects.isNull(getConnectionInfo()) || Objects.isNull(getConnectionInfo().getUri())) {
       ImmutableFeatureProviderGraphQlData.Builder builder =
           new ImmutableFeatureProviderGraphQlData.Builder().from(this);
@@ -82,8 +79,7 @@ public interface FeatureProviderGraphQlData
   }
 
   abstract class Builder
-      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderGraphQlData.Builder>
-      implements EntityDataBuilder<FeatureProviderDataV2> {
+      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderGraphQlData.Builder> {
 
     public abstract ImmutableFeatureProviderGraphQlData.Builder connectionInfo(
         ConnectionInfoGraphQlHttp connectionInfo);

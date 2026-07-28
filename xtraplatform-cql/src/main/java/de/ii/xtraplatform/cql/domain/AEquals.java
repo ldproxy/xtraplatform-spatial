@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableAEquals.Builder.class)
-public interface AEquals extends BinaryArrayOperation, CqlNode {
+@FunctionalInterface
+public interface AEquals extends BinaryArrayOperation {
 
   String TYPE = "a_equals";
 

@@ -15,6 +15,8 @@ public interface FeatureSchemaBase<T extends FeatureSchemaBase<T>> extends Schem
 
   Optional<String> getObjectType();
 
+  Optional<String> getOriginObjectType();
+
   Optional<String> getUnit();
 
   Optional<String> getConstantValue();

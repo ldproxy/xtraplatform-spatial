@@ -17,12 +17,6 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableJsonSchemaConstant.Builder.class)
 public abstract class JsonSchemaConstant extends JsonSchema {
 
-  // either a string, number, integer, boolean
-  @JsonProperty("const")
-  public abstract Object getConstant();
-
-  public abstract static class Builder extends JsonSchema.Builder {}
-
   @SuppressWarnings("UnstableApiUsage")
   public static final Funnel<JsonSchemaConstant> FUNNEL =
       (from, into) -> {
@@ -40,4 +34,10 @@ public abstract class JsonSchemaConstant extends JsonSchema {
           into.putBoolean((Boolean) from.getConstant());
         }
       };
+
+  // either a string, number, integer, boolean
+  @JsonProperty("const")
+  public abstract Object getConstant();
+
+  public abstract static class Builder extends JsonSchema.Builder {}
 }

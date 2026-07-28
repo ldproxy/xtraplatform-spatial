@@ -12,7 +12,8 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableIsNull.Builder.class)
-public interface IsNull extends UnaryOperation<Scalar>, CqlNode {
+@FunctionalInterface
+public interface IsNull extends UnaryOperation<Scalar> {
 
   String TYPE = "isNull";
   String TEXT = "IS NULL";
