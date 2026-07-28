@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.sql.domain;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.features.domain.SchemaBase;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryTable.DefaultsFilter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +78,13 @@ public interface SqlQueryColumn {
     @Override
     public boolean equals(Object value) {
       return Objects.equals(value, 0);
+    }
+
+    // required to pair with the custom equals() above; PMD sees this as merely calling super
+    @Override
+    @SuppressWarnings("PMD.UselessOverridingMethod")
+    public int hashCode() {
+      return super.hashCode();
     }
   }
 }

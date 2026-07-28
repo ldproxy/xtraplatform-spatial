@@ -17,26 +17,23 @@ import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureTokenStatsCollector.class);
-
   private final Builder builder;
   private final EpsgCrs crs;
-  private int axis = 0;
   private int dim = 2;
-  private Double xmin = null;
-  private Double ymin = null;
-  private Double xmax = null;
-  private Double ymax = null;
+  private Double xmin;
+  private Double ymin;
+  private Double xmax;
+  private Double ymax;
   private String start = "";
   private String end = "";
 
   public FeatureTokenStatsCollector(Builder builder, EpsgCrs crs) {
+    super();
     this.builder = builder;
     this.crs = crs;
   }
@@ -71,38 +68,41 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
         return ZonedDateTime.parse(temporal).toInstant().toEpochMilli();
       }
       return LocalDate.parse(temporal).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
-    } catch (Throwable e) {
+    } catch (DateTimeParseException e) {
       return null;
     }
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    if (Objects.nonNull(context.value())) {
-      String value = context.value();
+    String value = context.value();
 
-      if (hasRole(context, Role.PRIMARY_INSTANT)) {
-        if (start.isEmpty() || value.compareTo(start) < 0) {
-          this.start = value;
-        }
-        if (end.isEmpty() || value.compareTo(end) > 0) {
-          this.end = value;
-        }
-      } else if (hasRole(context, Role.PRIMARY_INTERVAL_START)) {
-        if (start.isEmpty() || value.compareTo(start) < 0) {
-          this.start = value;
-        }
-      } else if (hasRole(context, Role.PRIMARY_INTERVAL_END)) {
-        if (end.isEmpty() || value.compareTo(end) > 0) {
-          this.end = value;
-        }
+    if (Objects.isNull(value)) {
+      super.onValue(context);
+      return;
+    }
+
+    if (hasRole(context, Role.PRIMARY_INSTANT)) {
+      if (start.isEmpty() || value.compareTo(start) < 0) {
+        this.start = value;
       }
+      if (end.isEmpty() || value.compareTo(end) > 0) {
+        this.end = value;
+      }
+    } else if (hasRole(context, Role.PRIMARY_INTERVAL_START)
+        && (start.isEmpty() || value.compareTo(start) < 0)) {
+      this.start = value;
+    } else if (hasRole(context, Role.PRIMARY_INTERVAL_END)
+        && (end.isEmpty() || value.compareTo(end) > 0)) {
+      this.end = value;
     }
 
     super.onValue(context);
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public void onGeometry(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     // Only the primary geometry feeds the spatial extent: secondary geometry properties may
     // store positions in a different CRS (position variants), which must not be interpreted in

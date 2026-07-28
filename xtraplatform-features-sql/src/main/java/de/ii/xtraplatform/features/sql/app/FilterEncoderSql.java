@@ -40,7 +40,6 @@ import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
-import de.ii.xtraplatform.cql.domain.LogicalOperation;
 import de.ii.xtraplatform.cql.domain.Not;
 import de.ii.xtraplatform.cql.domain.Operand;
 import de.ii.xtraplatform.cql.domain.Property;
@@ -129,6 +128,17 @@ public class FilterEncoderSql {
   private static final String JSON_SUB_DECODER = "JSON";
   private static final String REGEX_STRIP_QUOTES = "^\"|\"$";
   private static final String HALF_BOUNDED_MIN = "'..'";
+  private static final String FORMAT_OPERATOR_VALUE = " %s %s";
+  private static final String DUMMY_PLACEHOLDER = "DUMMY";
+  private static final String FORMAT_VALUE_OPERATOR_VALUE = "%s %s %s";
+  private static final String SQL_SELECT_START = "(SELECT";
+  private static final String FORMAT_INTERVAL = "(%s,%s)";
+  private static final String ERROR_ARRAY_BOTH_PROPERTIES =
+      "Array predicates with property references on both sides are not supported.";
+  private static final String REGEX_STRIP_BRACKETS = "\\[|\\]";
+  private static final String SQL_TRUE = "1=1";
+  private static final String SQL_FALSE = "1=0";
+  private static final String FORMAT_ARRAY_IN_GROUP_BY = " IN %1$s GROUP BY %2$s.%3$s";
 
   private final EpsgCrs nativeCrs;
   private final SqlDialect sqlDialect;
@@ -979,13 +989,14 @@ public class FilterEncoderSql {
     }
 
     private String reduceSelectToColumn(String expression) {
-      if (expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2))
+      if (expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2)) {
         return String.format(
             expression.contains(SQL_WHERE)
                 ? expression.substring(expression.indexOf(SQL_WHERE) + 7, expression.length() - 1)
                 : expression,
             "",
             "");
+      }
       return expression;
     }
 
@@ -1031,7 +1042,8 @@ public class FilterEncoderSql {
       return ImmutableList.of(mainExpression, secondExpression);
     }
 
-    private List<String> processTernary(List<Operand> operands, List<String> children) {
+    @SuppressWarnings("PMD.CognitiveComplexity")
+    private List<String> processTernary(List<String> children) {
       // The three operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
       // be used as the basis (mainExpression). If another operand is
@@ -1045,8 +1057,12 @@ public class FilterEncoderSql {
       boolean op2hasSelect = operandHasSelect(secondExpression);
       boolean op3hasSelect = operandHasSelect(thirdExpression);
       if (op1hasSelect) {
-        if (op2hasSelect) secondExpression = reduceSelectToColumn(children.get(1));
-        if (op3hasSelect) thirdExpression = reduceSelectToColumn(children.get(2));
+        if (op2hasSelect) {
+          secondExpression = reduceSelectToColumn(children.get(1));
+        }
+        if (op3hasSelect) {
+          thirdExpression = reduceSelectToColumn(children.get(2));
+        }
       } else {
         // the unusual case that a literal is on the left side
         if (op2hasSelect && !op3hasSelect) {
@@ -1103,7 +1119,7 @@ public class FilterEncoderSql {
 
       List<String> expressions = processBinary(children);
 
-      String operation = String.format(" %s %s", operator, expressions.get(1));
+      String operation = String.format(FORMAT_OPERATOR_VALUE, operator, expressions.get(1));
       return String.format(expressions.get(0), "", operation);
     }
 
@@ -1116,11 +1132,12 @@ public class FilterEncoderSql {
       // we may need to change the second expression
       String secondExpression = expressions.get(1);
 
-      String string = sqlDialect.applyToString("DUMMY");
-      String functionStart = string.substring(0, string.indexOf("DUMMY"));
-      String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
+      String string = sqlDialect.applyToString(DUMMY_PLACEHOLDER);
+      String functionStart = string.substring(0, string.indexOf(DUMMY_PLACEHOLDER));
+      String functionEnd = string.substring(string.indexOf(DUMMY_PLACEHOLDER) + 5);
 
-      String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
+      String operation =
+          String.format(FORMAT_VALUE_OPERATOR_VALUE, functionEnd, operator, secondExpression);
       return String.format(expressions.get(0), functionStart, operation);
     }
 
@@ -1137,7 +1154,9 @@ public class FilterEncoderSql {
       // mainExpression is either a literal value or a SELECT expression
       String operation =
           String.format(
-              " %s %s", operator, String.join(", ", children.subList(1, children.size())));
+              FORMAT_OPERATOR_VALUE,
+              operator,
+              String.join(", ", children.subList(1, children.size())));
       return String.format(mainExpression, "", operation);
     }
 
@@ -1146,17 +1165,19 @@ public class FilterEncoderSql {
       String operator = SCALAR_OPERATORS.get(isNull.getClass());
 
       String mainExpression = children.get(0);
-      if (!operandHasSelect(mainExpression)) {
+      if (operandHasSelect(mainExpression)) {
+        if (mainExpression.contains(SQL_SELECT_START)) {
+          // The property needs a join, so the operand is an EXISTS-style semi-join
+          // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
+          // column for NULL inside that subquery can never match: a feature without related
+          // rows contributes no subquery rows at all. "Property has no value" is the negation
+          // of "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is
+          // never null, so the negation is exact.
+          return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
+        }
+      } else {
         // special case of a literal, we need to build the SQL expression
         mainExpression = String.format(PLACEHOLDER_PAIR, mainExpression);
-      } else if (mainExpression.contains("(SELECT")) {
-        // The property needs a join, so the operand is an EXISTS-style semi-join
-        // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
-        // column for NULL inside that subquery can never match: a feature without related rows
-        // contributes no subquery rows at all. "Property has no value" is the negation of
-        // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
-        // null, so the negation is exact.
-        return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -1168,10 +1189,7 @@ public class FilterEncoderSql {
     public String visit(Between between, List<String> children) {
       String operator = SCALAR_OPERATORS.get(between.getClass());
 
-      Scalar op1 = between.getValue().get();
-      Scalar op2 = between.getLower().get();
-      Scalar op3 = between.getUpper().get();
-      List<String> expressions = processTernary(ImmutableList.of(op1, op2, op3), children);
+      List<String> expressions = processTernary(children);
 
       String operation =
           String.format(" %s %s AND %s", operator, expressions.get(1), expressions.get(2));
@@ -1181,54 +1199,58 @@ public class FilterEncoderSql {
     @Override
     public String visit(BinaryTemporalOperation temporalOperation, List<String> children) {
       String operator = sqlDialect.getTemporalOperator(temporalOperation.getTemporalOperator());
-      if (Objects.isNull(operator))
+      if (Objects.isNull(operator)) {
         throw new IllegalStateException(
             String.format("unexpected temporal operator: %s", temporalOperation.getClass()));
+      }
 
-      Temporal op1 = (Temporal) temporalOperation.getArgs().get(0);
-      Temporal op2 = (Temporal) temporalOperation.getArgs().get(1);
+      Temporal op1 = temporalOperation.getArgs().get(0);
+      Temporal op2 = temporalOperation.getArgs().get(1);
 
+      List<String> resolvedChildren = children;
+
+      // if op1 is a Function, nothing to do here, this was handled in the interval() function
       if (op1 instanceof Property) {
         // need to change "column" to "(column,column)"
-        children =
+        resolvedChildren =
             ImmutableList.of(
-                replaceColumnWithInterval(children.get(0), reduceSelectToColumn(children.get(0))),
-                children.get(1));
+                replaceColumnWithInterval(
+                    resolvedChildren.get(0), reduceSelectToColumn(resolvedChildren.get(0))),
+                resolvedChildren.get(1));
       } else if (op1 instanceof TemporalLiteral) {
         // need to construct "(start, end)" where start and end are identical for an instant and end
         // is exclusive otherwise
-        children =
+        resolvedChildren =
             ImmutableList.of(
                 String.format(
                     "(%s, %s)",
                     getStartAsString((TemporalLiteral) op1),
                     getEndExclusiveAsString((TemporalLiteral) op1)),
-                children.get(1));
-      } else if (op1 instanceof Function) {
-        // nothing to do here, this was handled in the interval() function
+                resolvedChildren.get(1));
       }
 
+      // if op2 is a Function, nothing to do here, this was handled in the interval() function
       if (op2 instanceof Property) {
         // need to change "column" to "(column,column)"
-        children =
+        resolvedChildren =
             ImmutableList.of(
-                children.get(0),
-                replaceColumnWithInterval(children.get(1), reduceSelectToColumn(children.get(1))));
-      } else if (op2 instanceof TemporalLiteral) {
-        if (((TemporalLiteral) op2).getType() == Function.class) {
-          // nothing to do, this was handled in the temporal literal
-        } else {
-          // we have a Java interval and need to construct "(start, end)" where start and end are
-          // identical for an instant and end is exclusive otherwise
-          children = ImmutableList.of(children.get(0), getInterval((TemporalLiteral) op2));
-        }
-      } else if (op2 instanceof Function) {
-        // nothing to do here, this was handled in the interval() function
+                resolvedChildren.get(0),
+                replaceColumnWithInterval(
+                    resolvedChildren.get(1), reduceSelectToColumn(resolvedChildren.get(1))));
+      } else if (op2 instanceof TemporalLiteral
+          && ((TemporalLiteral) op2).getType() != Function.class) {
+        // we have a Java interval and need to construct "(start, end)" where start and end are
+        // identical for an instant and end is exclusive otherwise; if it is a Function, nothing to
+        // do, this was handled in the temporal literal
+        resolvedChildren =
+            ImmutableList.of(resolvedChildren.get(0), getInterval((TemporalLiteral) op2));
       }
 
-      List<String> expressions = processBinary(children);
+      List<String> expressions = processBinary(resolvedChildren);
       return String.format(
-          expressions.get(0), "", String.format(" %s %s", operator, expressions.get(1)));
+          expressions.get(0),
+          "",
+          String.format(FORMAT_OPERATOR_VALUE, operator, expressions.get(1)));
     }
 
     /**
@@ -1239,7 +1261,8 @@ public class FilterEncoderSql {
      * @return PostgreSQL interval
      */
     private String getInterval(TemporalLiteral literal) {
-      return String.format("(%s,%s)", getStartAsString(literal), getEndExclusiveAsString(literal));
+      return String.format(
+          FORMAT_INTERVAL, getStartAsString(literal), getEndExclusiveAsString(literal));
     }
 
     private Object getStart(TemporalLiteral literal) {
@@ -1262,10 +1285,11 @@ public class FilterEncoderSql {
 
     private String getStartAsString(TemporalLiteral literal) {
       Object start = getStart(literal);
-      if (start instanceof Instant && start == Instant.MIN)
+      if (start instanceof Instant && start == Instant.MIN) {
         return sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      else if (start instanceof LocalDate)
+      } else if (start instanceof LocalDate) {
         return sqlDialect.applyToDateLiteral(DateTimeFormatter.ISO_DATE.format((LocalDate) start));
+      }
       return sqlDialect.applyToDatetimeLiteral(start.toString());
     }
 
@@ -1289,10 +1313,11 @@ public class FilterEncoderSql {
 
     private String getEndExclusiveAsString(TemporalLiteral literal) {
       Object end = getEndExclusive(literal);
-      if (end instanceof Instant && end == Instant.MAX)
+      if (end instanceof Instant && end == Instant.MAX) {
         return sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
-      else if (end instanceof LocalDate)
+      } else if (end instanceof LocalDate) {
         return sqlDialect.applyToDateLiteral(DateTimeFormatter.ISO_DATE.format((LocalDate) end));
+      }
       return sqlDialect.applyToDatetimeLiteral(end.toString());
     }
 
@@ -1319,11 +1344,15 @@ public class FilterEncoderSql {
     @Override
     public String visit(TemporalLiteral temporalLiteral, List<String> children) {
       if (temporalLiteral.getType() == Instant.class) {
-        Instant instant = ((Instant) temporalLiteral.getValue());
+        Instant instant = (Instant) temporalLiteral.getValue();
         String literal;
-        if (instant == Instant.MIN) literal = sqlDialect.applyToInstantMin();
-        else if (instant == Instant.MAX) literal = sqlDialect.applyToInstantMax();
-        else literal = ((Instant) temporalLiteral.getValue()).toString();
+        if (instant == Instant.MIN) {
+          literal = sqlDialect.applyToInstantMin();
+        } else if (instant == Instant.MAX) {
+          literal = sqlDialect.applyToInstantMax();
+        } else {
+          literal = instant.toString();
+        }
         return sqlDialect.applyToDatetimeLiteral(literal);
       } else if (temporalLiteral.getType() == Interval.class) {
         // this can only occur in the T_INTERSECTS() operator
@@ -1338,7 +1367,7 @@ public class FilterEncoderSql {
         Operand arg2 = interval.getArgs().get(1);
         assert arg2 instanceof TemporalLiteral;
         return String.format(
-            "(%s,%s)",
+            FORMAT_INTERVAL,
             getStartAsString((TemporalLiteral) arg1),
             getEndExclusiveAsString((TemporalLiteral) arg2));
       } else if (temporalLiteral.getType() == LocalDate.class) {
@@ -1365,15 +1394,13 @@ public class FilterEncoderSql {
           Polygon.of(
               List.of(
                   PositionList.of(
-                      Axes.XY,
-                      new double[] {
-                        c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0),
-                        c.get(3), c.get(0), c.get(1)
-                      })));
+                      Axes.XY, c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0),
+                      c.get(3), c.get(0), c.get(1))));
       return visit(GeometryNode.of(polygon), ImmutableList.of());
     }
 
     @Override
+    @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
     public String visit(BinaryArrayOperation arrayOperation, List<String> children) {
       // The two operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
@@ -1387,10 +1414,8 @@ public class FilterEncoderSql {
       boolean notInverse = true;
       if (op1hasSelect) {
         if (op2hasSelect) {
-          // TODO
-          throw new IllegalArgumentException(
-              "Array predicates with property references on both sides are not supported.");
-          // secondExpression = reduceSelectToColumn(children.get(1));
+          // not yet supported; would need reduceSelectToColumn to combine both sides
+          throw new IllegalArgumentException(ERROR_ARRAY_BOTH_PROPERTIES);
         }
       } else {
         // the unusual case that a literal is on the left side
@@ -1403,35 +1428,33 @@ public class FilterEncoderSql {
         } else {
           // literal op literal, we can decide here
           List<String> firstOp =
-              ARRAY_SPLITTER.splitToList(mainExpression.replaceAll("\\[|\\]", ""));
+              ARRAY_SPLITTER.splitToList(mainExpression.replaceAll(REGEX_STRIP_BRACKETS, ""));
           List<String> secondOp =
-              ARRAY_SPLITTER.splitToList(secondExpression.replaceAll("\\[|\\]", ""));
+              ARRAY_SPLITTER.splitToList(secondExpression.replaceAll(REGEX_STRIP_BRACKETS, ""));
           switch (arrayOperation.getArrayOperator()) {
             case A_CONTAINS:
               // each item of the second array must be in the first array
-              return secondOp.stream()
-                      .allMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              return secondOp.stream().allMatch(item -> firstOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
             case A_EQUALS:
               // items must be identical
-              if (firstOp.size() != secondOp.size()) return "1=0";
-              return secondOp.stream()
-                      .allMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              if (firstOp.size() != secondOp.size()) {
+                return SQL_FALSE;
+              }
+              return secondOp.stream().allMatch(item -> firstOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
             case A_OVERLAPS:
               // at least one common element
-              return secondOp.stream()
-                      .anyMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              return secondOp.stream().anyMatch(item -> firstOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
             case A_CONTAINEDBY:
               // each item of the first array must be in the second array
-              return firstOp.stream()
-                      .allMatch(item -> secondOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              return firstOp.stream().allMatch(item -> secondOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
           }
           throw new IllegalArgumentException(
               "unsupported array operator: " + arrayOperation.getArrayOperator());
@@ -1439,9 +1462,8 @@ public class FilterEncoderSql {
       }
 
       if (op1hasSelect && op2hasSelect) {
-        // TODO property op property
-        throw new IllegalArgumentException(
-            "Array predicates with property references on both sides are not supported.");
+        // property op property is not supported
+        throw new IllegalArgumentException(ERROR_ARRAY_BOTH_PROPERTIES);
       }
 
       // property op literal
@@ -1465,8 +1487,10 @@ public class FilterEncoderSql {
           String arrayQuery =
               elementCount == 1
                   ? String.format(
-                      " IN %1$s GROUP BY %2$s.%3$s",
-                      secondExpression, aliases.get(0), rootSchema.getSortKey().get())
+                      FORMAT_ARRAY_IN_GROUP_BY,
+                      secondExpression,
+                      aliases.get(0),
+                      rootSchema.getSortKey().get())
                   : String.format(
                       " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
                       secondExpression,
@@ -1488,8 +1512,10 @@ public class FilterEncoderSql {
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
           String arrayQuery =
               String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s",
-                  secondExpression, aliases.get(0), rootSchema.getSortKey().get());
+                  FORMAT_ARRAY_IN_GROUP_BY,
+                  secondExpression,
+                  aliases.get(0),
+                  rootSchema.getSortKey().get());
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -1547,18 +1573,12 @@ public class FilterEncoderSql {
     }
 
     @Override
-    public String visit(LogicalOperation logicalOperation, List<String> children) {
-      String operator = LOGICAL_OPERATORS.get(logicalOperation.getClass());
-
-      return super.visit(logicalOperation, children);
-    }
-
-    @Override
+    @SuppressWarnings("PMD.CognitiveComplexity")
     public String visit(Not not, List<String> children) {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
       String operation = children.get(0);
-      if (operation.contains("(SELECT")) {
+      if (operation.contains(SQL_SELECT_START)) {
         // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
         // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
         // negation into the subquery, negating the inner predicate (exists a related row that
@@ -1568,7 +1588,7 @@ public class FilterEncoderSql {
         // null, so NOT (...) is the exact logical negation.
         return String.format("%s (%s)", operator, operation);
       }
-      Integer pos = null;
+      int pos = -1;
       Cql2Expression arg = not.getArgs().get(0);
       if (arg instanceof In) {
         // replace last IN with NOT IN
@@ -1582,9 +1602,7 @@ public class FilterEncoderSql {
       } else if (arg instanceof IsNull) {
         // replace last IS NULL with IS NOT NULL
         pos = operation.lastIndexOf(" IS NULL");
-        if (pos == -1) {
-          pos = null;
-        } else {
+        if (pos != -1) {
           pos += 3;
         }
       } else if (arg instanceof BinaryScalarOperation
@@ -1593,18 +1611,18 @@ public class FilterEncoderSql {
           || arg instanceof BinaryTemporalOperation) {
         // replace last WHERE with WHERE NOT
         pos = operation.lastIndexOf(SQL_WHERE);
-        if (pos == -1) {
-          pos = null;
-        } else {
+        if (pos != -1) {
           pos += 6;
         }
       }
 
-      if (pos != null) {
+      if (pos != -1) {
         int length = operation.length();
         return String.format(
-            "%s %s %s",
-            operation.substring(0, pos), operator, operation.substring(pos + 1, length));
+            FORMAT_VALUE_OPERATOR_VALUE,
+            operation.substring(0, pos),
+            operator,
+            operation.substring(pos + 1, length));
       }
 
       return super.visit(not, children);
@@ -1612,11 +1630,11 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BooleanValue2 booleanValue, List<String> children) {
-      return Boolean.TRUE.equals(booleanValue.getValue()) ? "1=1" : "1=0";
+      return Boolean.TRUE.equals(booleanValue.getValue()) ? SQL_TRUE : SQL_FALSE;
     }
   }
 
-  private class CqlToSqlNested extends CqlToSql {
+  private final class CqlToSqlNested extends CqlToSql {
 
     private final SchemaSql schema;
     private final boolean isUserFilter;
@@ -1631,10 +1649,10 @@ public class FilterEncoderSql {
               .map(element -> element.replaceAll("\\{.*?\\}", "").replaceAll("\\[.*?\\]", ""))
               .collect(Collectors.toList());
       this.allowedColumnPrefixes = new ArrayList<>();
-      String current = "";
-      for (int i = 0; i < parentTables.size(); i++) {
-        current += parentTables.get(i) + ".";
-        allowedColumnPrefixes.add(current);
+      StringBuilder current = new StringBuilder();
+      for (String parentTable : parentTables) {
+        current.append(parentTable).append('.');
+        allowedColumnPrefixes.add(current.toString());
       }
     }
 
@@ -1664,6 +1682,7 @@ public class FilterEncoderSql {
     }
   }
 
+  @SuppressWarnings("PMD.TooManyMethods")
   private class CqlToSql2 extends CqlToText {
 
     private final SqlQueryMapping mapping;
@@ -1846,7 +1865,9 @@ public class FilterEncoderSql {
       boolean ignoreInstanceFilter = true;
       Optional<Cql2Expression> userFilter;
       Optional<SqlQuerySchema> userFilterTable = Optional.empty();
-      if (!property.getNestedFilters().isEmpty()) {
+      if (property.getNestedFilters().isEmpty()) {
+        userFilter = Optional.empty();
+      } else {
         Optional<Entry<String, Cql2Expression>> nestedFilter =
             property.getNestedFilters().entrySet().stream().findFirst();
         userFilter = nestedFilter.map(Entry::getValue);
@@ -1861,8 +1882,6 @@ public class FilterEncoderSql {
               Optional.ofNullable(getTableColumn(userFilterPropertyName, false, false))
                   .map(de.ii.xtraplatform.base.domain.util.Tuple::first);
         }
-      } else {
-        userFilter = Optional.empty();
       }
 
       String join =
@@ -1874,7 +1893,9 @@ public class FilterEncoderSql {
               ignoreInstanceFilter,
               false,
               FilterEncoderSql.this);
-      if (!join.isEmpty()) join += " ";
+      if (!join.isEmpty()) {
+        join += " ";
+      }
 
       // When the predicate needs no sub-table join, its operand is a column reachable directly from
       // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
@@ -1920,7 +1941,7 @@ public class FilterEncoderSql {
       }
       if (operand instanceof Property) {
         return ((Property) operand).getName();
-      } else if (operand instanceof de.ii.xtraplatform.cql.domain.Function) {
+      } else if (operand instanceof Function) {
         return operand.accept(this);
       }
       throw new IllegalArgumentException("unsupported nested filter");
@@ -1932,18 +1953,21 @@ public class FilterEncoderSql {
       String end = children.get(1);
 
       // process special values for a half-bounded interval
-      if (HALF_BOUNDED_MIN.equals(start))
+      if (HALF_BOUNDED_MIN.equals(start)) {
         start = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      if (HALF_BOUNDED_MIN.equals(end))
+      }
+      if (HALF_BOUNDED_MIN.equals(end)) {
         end = sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
+      }
 
       Operand arg1 = interval.getArgs().get(0);
       Operand arg2 = interval.getArgs().get(1);
       if (arg1 instanceof Property && arg2 instanceof Property) {
         String startColumn = reduceToColumn(start);
         String endColumn = reduceToColumn(end);
-        if (startColumn.equals(endColumn))
+        if (startColumn.equals(endColumn)) {
           return String.format(start, PLACEHOLDER_1_OPEN, ", " + endColumn + PLACEHOLDER_2_CLOSE);
+        }
         startColumn =
             String.format(
                 FORMAT_COALESCE,
@@ -1996,7 +2020,7 @@ public class FilterEncoderSql {
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Casei casei, List<String> children) {
       if (casei.getValue() instanceof ScalarLiteral) {
-        return children.get(0).toLowerCase();
+        return children.get(0).toLowerCase(Locale.ROOT);
       }
       if (children.get(0).contains(PLACEHOLDER_1) && children.get(0).contains(PLACEHOLDER_2)) {
         return String.format(children.get(0), "%1$sLOWER(", PLACEHOLDER_2_CLOSE);
@@ -2007,8 +2031,9 @@ public class FilterEncoderSql {
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Accenti accenti, List<String> children) {
       if (accenti.getValue() instanceof ScalarLiteral) {
-        if (Objects.nonNull(accentiCollation))
+        if (Objects.nonNull(accentiCollation)) {
           return String.format(FORMAT_COLLATE, children.get(0), accentiCollation);
+        }
         throw new IllegalArgumentException(ERROR_ACCENTI_UNSUPPORTED);
       }
       if (Objects.nonNull(accentiCollation)) {
@@ -2023,7 +2048,7 @@ public class FilterEncoderSql {
     }
 
     @Override
-    public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+    public String visit(Function function, List<String> children) {
       Optional<String> customExpression = renderCustomFunction(function, children);
       if (customExpression.isPresent()) {
         return customExpression.get();
@@ -2038,13 +2063,14 @@ public class FilterEncoderSql {
     }
 
     private String reduceSelectToColumn(String expression) {
-      if (expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2))
+      if (expression.contains(PLACEHOLDER_1) && expression.contains(PLACEHOLDER_2)) {
         return String.format(
             expression.contains(SQL_WHERE)
                 ? expression.substring(expression.indexOf(SQL_WHERE) + 7, expression.length() - 1)
                 : expression,
             "",
             "");
+      }
       return expression;
     }
 
@@ -2062,7 +2088,7 @@ public class FilterEncoderSql {
       return expression.contains(PLACEHOLDER_1);
     }
 
-    private List<String> processBinary(List<? extends Operand> operands, List<String> children) {
+    private List<String> processBinary(List<String> children) {
       // The two operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
       // be used as the basis (mainExpression). If the other operand is
@@ -2090,7 +2116,8 @@ public class FilterEncoderSql {
       return ImmutableList.of(mainExpression, secondExpression);
     }
 
-    private List<String> processTernary(List<Operand> operands, List<String> children) {
+    @SuppressWarnings("PMD.CognitiveComplexity")
+    private List<String> processTernary(List<String> children) {
       // The three operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
       // be used as the basis (mainExpression). If another operand is
@@ -2104,8 +2131,12 @@ public class FilterEncoderSql {
       boolean op2hasSelect = operandHasSelect(secondExpression);
       boolean op3hasSelect = operandHasSelect(thirdExpression);
       if (op1hasSelect) {
-        if (op2hasSelect) secondExpression = reduceSelectToColumn(children.get(1));
-        if (op3hasSelect) thirdExpression = reduceSelectToColumn(children.get(2));
+        if (op2hasSelect) {
+          secondExpression = reduceSelectToColumn(children.get(1));
+        }
+        if (op3hasSelect) {
+          thirdExpression = reduceSelectToColumn(children.get(2));
+        }
       } else {
         // the unusual case that a literal is on the left side
         if (op2hasSelect && !op3hasSelect) {
@@ -2153,9 +2184,9 @@ public class FilterEncoderSql {
 
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
-      List<String> expressions = processBinary(scalarOperation.getArgs(), children);
+      List<String> expressions = processBinary(children);
 
-      String operation = String.format(" %s %s", operator, expressions.get(1));
+      String operation = String.format(FORMAT_OPERATOR_VALUE, operator, expressions.get(1));
       return String.format(expressions.get(0), "", operation);
     }
 
@@ -2257,16 +2288,17 @@ public class FilterEncoderSql {
     public String visit(Like like, List<String> children) {
       String operator = SCALAR_OPERATORS.get(like.getClass());
 
-      List<String> expressions = processBinary(like.getArgs(), children);
+      List<String> expressions = processBinary(children);
 
       // we may need to change the second expression
       String secondExpression = expressions.get(1);
 
-      String string = sqlDialect.applyToString("DUMMY");
-      String functionStart = string.substring(0, string.indexOf("DUMMY"));
-      String functionEnd = string.substring(string.indexOf("DUMMY") + 5);
+      String string = sqlDialect.applyToString(DUMMY_PLACEHOLDER);
+      String functionStart = string.substring(0, string.indexOf(DUMMY_PLACEHOLDER));
+      String functionEnd = string.substring(string.indexOf(DUMMY_PLACEHOLDER) + 5);
 
-      String operation = String.format("%s %s %s", functionEnd, operator, secondExpression);
+      String operation =
+          String.format(FORMAT_VALUE_OPERATOR_VALUE, functionEnd, operator, secondExpression);
       return String.format(expressions.get(0), functionStart, operation);
     }
 
@@ -2283,7 +2315,9 @@ public class FilterEncoderSql {
       // mainExpression is either a literal value or a SELECT expression
       String operation =
           String.format(
-              " %s %s", operator, String.join(", ", children.subList(1, children.size())));
+              FORMAT_OPERATOR_VALUE,
+              operator,
+              String.join(", ", children.subList(1, children.size())));
       return String.format(mainExpression, "", operation);
     }
 
@@ -2292,17 +2326,19 @@ public class FilterEncoderSql {
       String operator = SCALAR_OPERATORS.get(isNull.getClass());
 
       String mainExpression = children.get(0);
-      if (!operandHasSelect(mainExpression)) {
+      if (operandHasSelect(mainExpression)) {
+        if (mainExpression.contains(SQL_SELECT_START)) {
+          // The property needs a join, so the operand is an EXISTS-style semi-join
+          // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
+          // column for NULL inside that subquery can never match: a feature without related
+          // rows contributes no subquery rows at all. "Property has no value" is the negation
+          // of "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is
+          // never null, so the negation is exact.
+          return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
+        }
+      } else {
         // special case of a literal, we need to build the SQL expression
         mainExpression = String.format(PLACEHOLDER_PAIR, mainExpression);
-      } else if (mainExpression.contains("(SELECT")) {
-        // The property needs a join, so the operand is an EXISTS-style semi-join
-        // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
-        // column for NULL inside that subquery can never match: a feature without related rows
-        // contributes no subquery rows at all. "Property has no value" is the negation of
-        // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
-        // null, so the negation is exact.
-        return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -2314,10 +2350,7 @@ public class FilterEncoderSql {
     public String visit(Between between, List<String> children) {
       String operator = SCALAR_OPERATORS.get(between.getClass());
 
-      Scalar op1 = between.getValue().get();
-      Scalar op2 = between.getLower().get();
-      Scalar op3 = between.getUpper().get();
-      List<String> expressions = processTernary(ImmutableList.of(op1, op2, op3), children);
+      List<String> expressions = processTernary(children);
 
       String operation =
           String.format(" %s %s AND %s", operator, expressions.get(1), expressions.get(2));
@@ -2327,54 +2360,58 @@ public class FilterEncoderSql {
     @Override
     public String visit(BinaryTemporalOperation temporalOperation, List<String> children) {
       String operator = sqlDialect.getTemporalOperator(temporalOperation.getTemporalOperator());
-      if (Objects.isNull(operator))
+      if (Objects.isNull(operator)) {
         throw new IllegalStateException(
             String.format("unexpected temporal operator: %s", temporalOperation.getClass()));
+      }
 
-      Temporal op1 = (Temporal) temporalOperation.getArgs().get(0);
-      Temporal op2 = (Temporal) temporalOperation.getArgs().get(1);
+      Temporal op1 = temporalOperation.getArgs().get(0);
+      Temporal op2 = temporalOperation.getArgs().get(1);
 
+      List<String> resolvedChildren = children;
+
+      // if op1 is a Function, nothing to do here, this was handled in the interval() function
       if (op1 instanceof Property) {
         // need to change "column" to "(column,column)"
-        children =
+        resolvedChildren =
             ImmutableList.of(
-                replaceColumnWithInterval(children.get(0), reduceSelectToColumn(children.get(0))),
-                children.get(1));
+                replaceColumnWithInterval(
+                    resolvedChildren.get(0), reduceSelectToColumn(resolvedChildren.get(0))),
+                resolvedChildren.get(1));
       } else if (op1 instanceof TemporalLiteral) {
         // need to construct "(start, end)" where start and end are identical for an instant and end
         // is exclusive otherwise
-        children =
+        resolvedChildren =
             ImmutableList.of(
                 String.format(
                     "(%s, %s)",
                     getStartAsString((TemporalLiteral) op1),
                     getEndExclusiveAsString((TemporalLiteral) op1)),
-                children.get(1));
-      } else if (op1 instanceof Function) {
-        // nothing to do here, this was handled in the interval() function
+                resolvedChildren.get(1));
       }
 
+      // if op2 is a Function, nothing to do here, this was handled in the interval() function
       if (op2 instanceof Property) {
         // need to change "column" to "(column,column)"
-        children =
+        resolvedChildren =
             ImmutableList.of(
-                children.get(0),
-                replaceColumnWithInterval(children.get(1), reduceSelectToColumn(children.get(1))));
-      } else if (op2 instanceof TemporalLiteral) {
-        if (((TemporalLiteral) op2).getType() == Function.class) {
-          // nothing to do, this was handled in the temporal literal
-        } else {
-          // we have a Java interval and need to construct "(start, end)" where start and end are
-          // identical for an instant and end is exclusive otherwise
-          children = ImmutableList.of(children.get(0), getInterval((TemporalLiteral) op2));
-        }
-      } else if (op2 instanceof Function) {
-        // nothing to do here, this was handled in the interval() function
+                resolvedChildren.get(0),
+                replaceColumnWithInterval(
+                    resolvedChildren.get(1), reduceSelectToColumn(resolvedChildren.get(1))));
+      } else if (op2 instanceof TemporalLiteral
+          && ((TemporalLiteral) op2).getType() != Function.class) {
+        // we have a Java interval and need to construct "(start, end)" where start and end are
+        // identical for an instant and end is exclusive otherwise; if it is a Function, nothing to
+        // do, this was handled in the temporal literal
+        resolvedChildren =
+            ImmutableList.of(resolvedChildren.get(0), getInterval((TemporalLiteral) op2));
       }
 
-      List<String> expressions = processBinary(ImmutableList.of(op1, op2), children);
+      List<String> expressions = processBinary(resolvedChildren);
       return String.format(
-          expressions.get(0), "", String.format(" %s %s", operator, expressions.get(1)));
+          expressions.get(0),
+          "",
+          String.format(FORMAT_OPERATOR_VALUE, operator, expressions.get(1)));
     }
 
     /**
@@ -2385,7 +2422,8 @@ public class FilterEncoderSql {
      * @return PostgreSQL interval
      */
     private String getInterval(TemporalLiteral literal) {
-      return String.format("(%s,%s)", getStartAsString(literal), getEndExclusiveAsString(literal));
+      return String.format(
+          FORMAT_INTERVAL, getStartAsString(literal), getEndExclusiveAsString(literal));
     }
 
     private Object getStart(TemporalLiteral literal) {
@@ -2408,10 +2446,11 @@ public class FilterEncoderSql {
 
     private String getStartAsString(TemporalLiteral literal) {
       Object start = getStart(literal);
-      if (start instanceof Instant && start == Instant.MIN)
+      if (start instanceof Instant && start == Instant.MIN) {
         return sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMin());
-      else if (start instanceof LocalDate)
+      } else if (start instanceof LocalDate) {
         return sqlDialect.applyToDateLiteral(DateTimeFormatter.ISO_DATE.format((LocalDate) start));
+      }
       return sqlDialect.applyToDatetimeLiteral(start.toString());
     }
 
@@ -2435,10 +2474,11 @@ public class FilterEncoderSql {
 
     private String getEndExclusiveAsString(TemporalLiteral literal) {
       Object end = getEndExclusive(literal);
-      if (end instanceof Instant && end == Instant.MAX)
+      if (end instanceof Instant && end == Instant.MAX) {
         return sqlDialect.applyToDatetimeLiteral(sqlDialect.applyToInstantMax());
-      else if (end instanceof LocalDate)
+      } else if (end instanceof LocalDate) {
         return sqlDialect.applyToDateLiteral(DateTimeFormatter.ISO_DATE.format((LocalDate) end));
+      }
       return sqlDialect.applyToDatetimeLiteral(end.toString());
     }
 
@@ -2451,7 +2491,7 @@ public class FilterEncoderSql {
 
       String match = sqlDialect.getSpatialOperatorMatch(spatialOperation.getSpatialOperator());
 
-      List<String> expressions = processBinary(spatialOperation.getArgs(), children);
+      List<String> expressions = processBinary(children);
 
       return String.format(
           expressions.get(0),
@@ -2465,11 +2505,15 @@ public class FilterEncoderSql {
     @Override
     public String visit(TemporalLiteral temporalLiteral, List<String> children) {
       if (temporalLiteral.getType() == Instant.class) {
-        Instant instant = ((Instant) temporalLiteral.getValue());
+        Instant instant = (Instant) temporalLiteral.getValue();
         String literal;
-        if (instant == Instant.MIN) literal = sqlDialect.applyToInstantMin();
-        else if (instant == Instant.MAX) literal = sqlDialect.applyToInstantMax();
-        else literal = ((Instant) temporalLiteral.getValue()).toString();
+        if (instant == Instant.MIN) {
+          literal = sqlDialect.applyToInstantMin();
+        } else if (instant == Instant.MAX) {
+          literal = sqlDialect.applyToInstantMax();
+        } else {
+          literal = instant.toString();
+        }
         return sqlDialect.applyToDatetimeLiteral(literal);
       } else if (temporalLiteral.getType() == Interval.class) {
         // this can only occur in the T_INTERSECTS() operator
@@ -2484,7 +2528,7 @@ public class FilterEncoderSql {
         Operand arg2 = interval.getArgs().get(1);
         assert arg2 instanceof TemporalLiteral;
         return String.format(
-            "(%s,%s)",
+            FORMAT_INTERVAL,
             getStartAsString((TemporalLiteral) arg1),
             getEndExclusiveAsString((TemporalLiteral) arg2));
       } else if (temporalLiteral.getType() == LocalDate.class) {
@@ -2511,15 +2555,13 @@ public class FilterEncoderSql {
           Polygon.of(
               List.of(
                   PositionList.of(
-                      Axes.XY,
-                      new double[] {
-                        c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0),
-                        c.get(3), c.get(0), c.get(1)
-                      })));
+                      Axes.XY, c.get(0), c.get(1), c.get(2), c.get(1), c.get(2), c.get(3), c.get(0),
+                      c.get(3), c.get(0), c.get(1))));
       return visit(GeometryNode.of(polygon), ImmutableList.of());
     }
 
     @Override
+    @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
     public String visit(BinaryArrayOperation arrayOperation, List<String> children) {
       // The two operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
@@ -2534,8 +2576,7 @@ public class FilterEncoderSql {
       if (op1hasSelect) {
         if (op2hasSelect) {
           // TODO
-          throw new IllegalArgumentException(
-              "Array predicates with property references on both sides are not supported.");
+          throw new IllegalArgumentException(ERROR_ARRAY_BOTH_PROPERTIES);
           // secondExpression = reduceSelectToColumn(children.get(1));
         }
       } else {
@@ -2549,35 +2590,33 @@ public class FilterEncoderSql {
         } else {
           // literal op literal, we can decide here
           List<String> firstOp =
-              ARRAY_SPLITTER.splitToList(mainExpression.replaceAll("\\[|\\]", ""));
+              ARRAY_SPLITTER.splitToList(mainExpression.replaceAll(REGEX_STRIP_BRACKETS, ""));
           List<String> secondOp =
-              ARRAY_SPLITTER.splitToList(secondExpression.replaceAll("\\[|\\]", ""));
+              ARRAY_SPLITTER.splitToList(secondExpression.replaceAll(REGEX_STRIP_BRACKETS, ""));
           switch (arrayOperation.getArrayOperator()) {
             case A_CONTAINS:
               // each item of the second array must be in the first array
-              return secondOp.stream()
-                      .allMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              return secondOp.stream().allMatch(item -> firstOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
             case A_EQUALS:
               // items must be identical
-              if (firstOp.size() != secondOp.size()) return "1=0";
-              return secondOp.stream()
-                      .allMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              if (firstOp.size() != secondOp.size()) {
+                return SQL_FALSE;
+              }
+              return secondOp.stream().allMatch(item -> firstOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
             case A_OVERLAPS:
               // at least one common element
-              return secondOp.stream()
-                      .anyMatch(item -> firstOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              return secondOp.stream().anyMatch(item -> firstOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
             case A_CONTAINEDBY:
               // each item of the first array must be in the second array
-              return firstOp.stream()
-                      .allMatch(item -> secondOp.stream().anyMatch(item2 -> item.equals(item2)))
-                  ? "1=1"
-                  : "1=0";
+              return firstOp.stream().allMatch(item -> secondOp.stream().anyMatch(item::equals))
+                  ? SQL_TRUE
+                  : SQL_FALSE;
           }
           throw new IllegalArgumentException(
               "unsupported array operator: " + arrayOperation.getArrayOperator());
@@ -2586,8 +2625,7 @@ public class FilterEncoderSql {
 
       if (op1hasSelect && op2hasSelect) {
         // TODO property op property
-        throw new IllegalArgumentException(
-            "Array predicates with property references on both sides are not supported.");
+        throw new IllegalArgumentException(ERROR_ARRAY_BOTH_PROPERTIES);
       }
 
       // property op literal
@@ -2613,8 +2651,10 @@ public class FilterEncoderSql {
           String arrayQuery =
               elementCount == 1
                   ? String.format(
-                      " IN %1$s GROUP BY %2$s.%3$s",
-                      secondExpression, aliases.get(0), mapping.getMainTable().getSortKey())
+                      FORMAT_ARRAY_IN_GROUP_BY,
+                      secondExpression,
+                      aliases.get(0),
+                      mapping.getMainTable().getSortKey())
                   : String.format(
                       " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
                       secondExpression,
@@ -2636,8 +2676,10 @@ public class FilterEncoderSql {
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
           String arrayQuery =
               String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s",
-                  secondExpression, aliases.get(0), mapping.getMainTable().getSortKey());
+                  FORMAT_ARRAY_IN_GROUP_BY,
+                  secondExpression,
+                  aliases.get(0),
+                  mapping.getMainTable().getSortKey());
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -2695,18 +2737,12 @@ public class FilterEncoderSql {
     }
 
     @Override
-    public String visit(LogicalOperation logicalOperation, List<String> children) {
-      String operator = LOGICAL_OPERATORS.get(logicalOperation.getClass());
-
-      return super.visit(logicalOperation, children);
-    }
-
-    @Override
+    @SuppressWarnings("PMD.CognitiveComplexity")
     public String visit(Not not, List<String> children) {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
       String operation = children.get(0);
-      if (operation.contains("(SELECT")) {
+      if (operation.contains(SQL_SELECT_START)) {
         // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
         // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
         // negation into the subquery, negating the inner predicate (exists a related row that
@@ -2716,7 +2752,7 @@ public class FilterEncoderSql {
         // null, so NOT (...) is the exact logical negation.
         return String.format("%s (%s)", operator, operation);
       }
-      Integer pos = null;
+      int pos = -1;
       Cql2Expression arg = not.getArgs().get(0);
       if (arg instanceof In) {
         // replace last IN with NOT IN
@@ -2730,9 +2766,7 @@ public class FilterEncoderSql {
       } else if (arg instanceof IsNull) {
         // replace last IS NULL with IS NOT NULL
         pos = operation.lastIndexOf(" IS NULL");
-        if (pos == -1) {
-          pos = null;
-        } else {
+        if (pos != -1) {
           pos += 3;
         }
       } else if (arg instanceof BinaryScalarOperation
@@ -2741,18 +2775,18 @@ public class FilterEncoderSql {
           || arg instanceof BinaryTemporalOperation) {
         // replace last WHERE with WHERE NOT
         pos = operation.lastIndexOf(SQL_WHERE);
-        if (pos == -1) {
-          pos = null;
-        } else {
+        if (pos != -1) {
           pos += 6;
         }
       }
 
-      if (pos != null) {
+      if (pos != -1) {
         int length = operation.length();
         return String.format(
-            "%s %s %s",
-            operation.substring(0, pos), operator, operation.substring(pos + 1, length));
+            FORMAT_VALUE_OPERATOR_VALUE,
+            operation.substring(0, pos),
+            operator,
+            operation.substring(pos + 1, length));
       }
 
       return super.visit(not, children);
@@ -2760,11 +2794,11 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BooleanValue2 booleanValue, List<String> children) {
-      return Boolean.TRUE.equals(booleanValue.getValue()) ? "1=1" : "1=0";
+      return Boolean.TRUE.equals(booleanValue.getValue()) ? SQL_TRUE : SQL_FALSE;
     }
   }
 
-  private class CqlToSqlNested2 extends CqlToSql2 {
+  private final class CqlToSqlNested2 extends CqlToSql2 {
 
     private final List<? extends SqlQueryTable> tablePath;
     private final boolean isUserFilter;
@@ -2778,10 +2812,10 @@ public class FilterEncoderSql {
       List<String> parentTables =
           tablePath.subList(0, tablePath.size() - 1).stream().map(SqlQueryTable::getName).toList();
       this.allowedColumnPrefixes = new ArrayList<>();
-      String current = "";
-      for (int i = 0; i < parentTables.size(); i++) {
-        current += parentTables.get(i) + ".";
-        allowedColumnPrefixes.add(current);
+      StringBuilder current = new StringBuilder();
+      for (String parentTable : parentTables) {
+        current.append(parentTable).append('.');
+        allowedColumnPrefixes.add(current.toString());
       }
     }
 
@@ -2823,29 +2857,9 @@ public class FilterEncoderSql {
       return String.format(PLACEHOLDER_PAIR, qualifiedColumn);
     }
 
-    // TODO: columns do not have to be defined in the mapping
-    // TODO: how to handle table prefixes?
-    private de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, Integer> getTableColumn(
-        String column, boolean hasPrefix, String prefix) {
-      for (int i = tablePath.size() - 1; i >= 0; i--) {
-        SqlQueryTable table = tablePath.get(i);
-        if (table instanceof SqlQuerySchema) {
-          SqlQuerySchema schema = (SqlQuerySchema) table;
-          /*if (schema.getColumnNames().contains(column)) {
-            return de.ii.xtraplatform.base.domain.util.Tuple.of(
-                schema, schema.getColumnNames().indexOf(column));
-          }*/
-        }
-      }
-
-      throw new IllegalStateException("unknown table column: " + column);
-    }
-
     private String getQualifiedColumn(String propertyName) {
       boolean hasPrefix = propertyName.contains(".");
       String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf('.') + 1) : "";
-      String column =
-          hasPrefix ? propertyName.substring(propertyName.lastIndexOf('.') + 1) : propertyName;
 
       if (hasPrefix && !allowedColumnPrefixes.contains(prefix)) {
         throw new IllegalStateException(
@@ -2858,6 +2872,8 @@ public class FilterEncoderSql {
               ? aliases.get(allowedColumnPrefixes.indexOf(prefix))
               : aliases.get(aliases.size() - 1);
 
+      String column =
+          hasPrefix ? propertyName.substring(propertyName.lastIndexOf('.') + 1) : propertyName;
       return String.format(FORMAT_QUALIFIED_COLUMN, alias, column);
     }
   }

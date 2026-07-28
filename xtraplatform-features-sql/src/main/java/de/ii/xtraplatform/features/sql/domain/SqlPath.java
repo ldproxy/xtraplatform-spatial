@@ -107,6 +107,7 @@ public interface SqlPath extends SourcePath {
                 + getFilterString().map(filterString -> "{filter=" + filterString + "}").orElse("");
   }
 
+  @Override
   @Value.Derived
   default List<String> getParentPath() {
     return getParentTables().stream().map(SqlPath::asPath).collect(Collectors.toList());
@@ -123,9 +124,8 @@ public interface SqlPath extends SourcePath {
   default boolean parentsIntersect(List<? extends SourcePath> parents) {
     List<String> fullParentPath =
         parents.stream().flatMap(p -> p.getFullPath().stream()).collect(Collectors.toList());
-    boolean intersects = MappedSchemaDeriver.intersects(fullParentPath, getParentPath());
 
-    return intersects;
+    return MappedSchemaDeriver.intersects(fullParentPath, getParentPath());
   }
 
   @Override
@@ -152,9 +152,12 @@ public interface SqlPath extends SourcePath {
     int start = fullParentPath.indexOf(getParentTables().get(0).asPath());
 
     for (int i = 0; i < getParentTables().size(); i++) {
-      if (fullParentPath.size() > start
-          && Objects.equals(fullParentPath.get(start++), getParentTables().get(i).asPath())) {
-        continue;
+      if (fullParentPath.size() > start) {
+        int currentStart = start;
+        start++;
+        if (Objects.equals(fullParentPath.get(currentStart), getParentTables().get(i).asPath())) {
+          continue;
+        }
       }
       newParentTables.add(getParentTables().get(i));
     }

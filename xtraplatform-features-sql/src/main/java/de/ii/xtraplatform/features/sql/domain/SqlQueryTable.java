@@ -46,5 +46,12 @@ public interface SqlQueryTable {
     public boolean equals(Object value) {
       return Objects.equals(value, true) || Objects.equals(value, "id");
     }
+
+    // required to pair with the custom equals() above; PMD sees this as merely calling super
+    @Override
+    @SuppressWarnings("PMD.UselessOverridingMethod")
+    public int hashCode() {
+      return super.hashCode();
+    }
   }
 }

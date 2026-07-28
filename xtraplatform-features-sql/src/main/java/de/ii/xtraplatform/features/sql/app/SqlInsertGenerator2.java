@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.sql.app;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
-import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
@@ -31,24 +30,17 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author zahnen
  */
 public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SqlInsertGenerator2.class);
+  private static final String FORMAT_QUALIFIED_COLUMN = "%s.%s";
 
-  private final EpsgCrs nativeCrs;
-  private final CrsTransformerFactory crsTransformerFactory;
   private final SqlPathDefaults sqlOptions;
 
-  public SqlInsertGenerator2(
-      EpsgCrs nativeCrs, CrsTransformerFactory crsTransformerFactory, SqlPathDefaults sqlOptions) {
-    this.nativeCrs = nativeCrs;
-    this.crsTransformerFactory = crsTransformerFactory;
+  public SqlInsertGenerator2(SqlPathDefaults sqlOptions) {
     this.sqlOptions = sqlOptions;
   }
 
@@ -57,6 +49,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public Supplier<Tuple<String, Consumer<String>>> createInsert(
       FeatureDataSql feature,
       SqlQuerySchema schema,
@@ -111,27 +104,29 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
 
     List<String> sortKeys = new ArrayList<>();
 
-    if (parentRelation.isPresent()) {
-      // TODO: is this merged?
-      if (schema.isOne2One()
-          && Objects.equals(
-              parentRelation.get().getSortKey(), parentRelation.get().getSourceField())) {
-        // TODO fullPath, sortKey
-        sortKeys.add(
-            0,
-            String.format(
-                "%s.%s", parentRelation.get().getName(), parentRelation.get().getSortKey()));
-        if (!columns2.contains(primaryKey)) {
-          columns2.add(0, primaryKey);
-        }
-
-      } else if (schema.isOne2N()) {
-        sortKeys.add(
-            0,
-            String.format(
-                "%s.%s", parentRelation.get().getName(), parentRelation.get().getSourceField()));
-        columns2.add(0, parentRelation.get().getTargetField());
+    // TODO: is this merged?
+    if (parentRelation.isPresent()
+        && schema.isOne2One()
+        && Objects.equals(
+            parentRelation.get().getSortKey(), parentRelation.get().getSourceField())) {
+      // TODO fullPath, sortKey
+      sortKeys.add(
+          0,
+          String.format(
+              FORMAT_QUALIFIED_COLUMN,
+              parentRelation.get().getName(),
+              parentRelation.get().getSortKey()));
+      if (!columns2.contains(primaryKey)) {
+        columns2.add(0, primaryKey);
       }
+    } else if (parentRelation.isPresent() && schema.isOne2N()) {
+      sortKeys.add(
+          0,
+          String.format(
+              FORMAT_QUALIFIED_COLUMN,
+              parentRelation.get().getName(),
+              parentRelation.get().getSourceField()));
+      columns2.add(0, parentRelation.get().getTargetField());
     }
 
     String tableName = schema.getName();
@@ -177,10 +172,10 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
               valueOverrides,
               schema.getStaticInserts());
 
-      if (!values.isEmpty()) {
-        values = "VALUES (" + values + ")";
-      } else {
+      if (values.isEmpty()) {
         values = "DEFAULT VALUES";
+      } else {
+        values = "VALUES (" + values + ")";
       }
 
       String query =
@@ -220,9 +215,11 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     String columnNames =
         String.format("%s,%s", joins.get(0).getTargetField(), joins.get(1).getSourceField());
     String sourceIdColumn =
-        String.format("%s.%s", joins.get(0).getName(), joins.get(0).getSourceField());
+        String.format(
+            FORMAT_QUALIFIED_COLUMN, joins.get(0).getName(), joins.get(0).getSourceField());
     String targetIdColumn =
-        String.format("%s.%s", joins.get(1).getTarget(), joins.get(1).getTargetField());
+        String.format(
+            FORMAT_QUALIFIED_COLUMN, joins.get(1).getTarget(), joins.get(1).getTargetField());
 
     Optional<SqlRowData> parentRow =
         feature.getRow(schema.getParentPath(), parentRows.subList(0, 1));
@@ -275,7 +272,9 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     String column = joins.get(0).getSourceField();
     String columnKey = joins.get(0).getTargetField();
     String idColumn = schema.getSortKey(); // TODO: primary key
-    String idKey = String.format("%s.%s", table, joins.get(0).getSortKey()); // TODO: primary key
+    String idKey =
+        String.format(
+            FORMAT_QUALIFIED_COLUMN, table, joins.get(0).getSortKey()); // TODO: primary key
 
     Optional<SqlRowData> parentRow =
         feature.getRow(schema.getParentPath(), parentRows.subList(0, 1));

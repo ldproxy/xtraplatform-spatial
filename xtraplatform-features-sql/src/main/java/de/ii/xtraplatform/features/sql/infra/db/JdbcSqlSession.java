@@ -26,9 +26,13 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CyclomaticComplexity")
 class JdbcSqlSession implements SqlSession {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JdbcSqlSession.class);
+
+  private static final String ERROR_SESSION_CLOSED = "SQL session is closed";
+  private static final String ERROR_STATEMENT_CONTEXT = " — statement: ";
 
   // Safety cap on accumulated batch size — pathological feature shouldn't grow unbounded.
   private static final int MAX_BATCH_SIZE = 1000;
@@ -56,12 +60,17 @@ class JdbcSqlSession implements SqlSession {
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.UseTryWithResources",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity"
+  })
   public String run(
       List<Supplier<String>> statements,
       List<Consumer<String>> idConsumers,
       Optional<String> featureId) {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     String firstGeneratedId = null;
     Statement batchStmt = null;
@@ -84,7 +93,7 @@ class JdbcSqlSession implements SqlSession {
             batchStmt.addBatch(sql);
           } catch (SQLException e) {
             throw new IllegalStateException(
-                "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+                "Mutation statement failed: " + e.getMessage() + ERROR_STATEMENT_CONTEXT + sql, e);
           }
           batchedSql.add(sql);
           batchedConsumers.add(consumer);
@@ -121,7 +130,7 @@ class JdbcSqlSession implements SqlSession {
           }
         } catch (SQLException e) {
           throw new IllegalStateException(
-              "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+              "Mutation statement failed: " + e.getMessage() + ERROR_STATEMENT_CONTEXT + sql, e);
         }
       }
 
@@ -143,7 +152,7 @@ class JdbcSqlSession implements SqlSession {
   @Override
   public List<String> runReturning(String sql) {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
       LOGGER.debug(MARKER.SQL, "Executing statement: {}", sql);
@@ -163,14 +172,14 @@ class JdbcSqlSession implements SqlSession {
       return ids;
     } catch (SQLException e) {
       throw new IllegalStateException(
-          "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+          "Mutation statement failed: " + e.getMessage() + ERROR_STATEMENT_CONTEXT + sql, e);
     }
   }
 
   @Override
   public List<String> execute(List<String> statements) {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     List<String> warnings = new ArrayList<>();
     for (String sql : statements) {
@@ -186,7 +195,9 @@ class JdbcSqlSession implements SqlSession {
         // Expected, configuration-driven failure (e.g. a check function RAISE EXCEPTION) — carry
         // the warnings collected so far so they survive the failure path.
         throw new FeatureMutationHookException(
-            "Hook statement failed: " + e.getMessage() + " — statement: " + sql, e, warnings);
+            "Hook statement failed: " + e.getMessage() + ERROR_STATEMENT_CONTEXT + sql,
+            e,
+            warnings);
       }
     }
     return warnings;
@@ -215,7 +226,9 @@ class JdbcSqlSession implements SqlSession {
       }
       statement.clearWarnings();
     } catch (SQLException e) {
-      LOGGER.debug("Reading SQL warnings failed: {}", e.getMessage());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Reading SQL warnings failed: {}", e.getMessage());
+      }
     }
   }
 
@@ -262,7 +275,7 @@ class JdbcSqlSession implements SqlSession {
   @Override
   public void savepoint() {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     if (activeSavepoint != null) {
       throw new IllegalStateException("A savepoint is already active on this SQL session");
@@ -275,9 +288,10 @@ class JdbcSqlSession implements SqlSession {
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public void releaseSavepoint() {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     if (activeSavepoint == null) {
       throw new IllegalStateException("No savepoint is active on this SQL session");
@@ -292,9 +306,10 @@ class JdbcSqlSession implements SqlSession {
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public void rollbackToSavepoint() {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     if (activeSavepoint == null) {
       throw new IllegalStateException("No savepoint is active on this SQL session");
@@ -312,7 +327,7 @@ class JdbcSqlSession implements SqlSession {
   @Override
   public void commit() {
     if (finalised) {
-      throw new IllegalStateException("SQL session is closed");
+      throw new IllegalStateException(ERROR_SESSION_CLOSED);
     }
     try {
       connection.commit();
@@ -332,7 +347,9 @@ class JdbcSqlSession implements SqlSession {
     try {
       connection.rollback();
     } catch (SQLException e) {
-      LOGGER.warn("Rollback failed: {}", e.getMessage());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn("Rollback failed: {}", e.getMessage());
+      }
     } finally {
       finalised = true;
       releaseConnection();
@@ -341,10 +358,10 @@ class JdbcSqlSession implements SqlSession {
 
   @Override
   public void close() {
-    if (!finalised) {
-      rollback();
-    } else {
+    if (finalised) {
       releaseConnection();
+    } else {
+      rollback();
     }
   }
 
@@ -355,7 +372,9 @@ class JdbcSqlSession implements SqlSession {
         connection.close();
       }
     } catch (SQLException e) {
-      LOGGER.debug("Connection close failed: {}", e.getMessage());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Connection close failed: {}", e.getMessage());
+      }
     }
   }
 }

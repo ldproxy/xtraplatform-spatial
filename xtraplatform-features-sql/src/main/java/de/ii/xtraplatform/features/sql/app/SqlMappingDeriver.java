@@ -22,7 +22,6 @@ import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGenera
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryJoin;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryMapping;
-import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySchema;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySchema.Builder;
 import de.ii.xtraplatform.features.sql.domain.SqlPath;
 import de.ii.xtraplatform.features.sql.domain.SqlPath.JoinType;
@@ -39,6 +38,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
 public class SqlMappingDeriver {
 
   private final SqlPathParser pathParser;
@@ -49,6 +49,12 @@ public class SqlMappingDeriver {
     this.queryGeneration = queryGeneration;
   }
 
+  @SuppressWarnings({
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   public List<SqlQueryMapping> derive(List<MappingRule> mappingRules, FeatureSchema schema) {
     List<SqlQuerySchema> schemas = new ArrayList<>();
     List<List<String>> previous = new ArrayList<>();
@@ -145,6 +151,7 @@ public class SqlMappingDeriver {
     return mappings;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private void addToMapping(
       FeatureSchema schema,
       MappingRule tableRule,
@@ -242,6 +249,7 @@ public class SqlMappingDeriver {
     }
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void addToMapping(
       FeatureSchema schema,
       ImmutableSqlQueryMapping.Builder mapping,
@@ -253,32 +261,33 @@ public class SqlMappingDeriver {
       SqlQuerySchema querySchema,
       boolean isWritable) {
     if ("$".equals(column.getTarget())) {
-      if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
-        List<FeatureSchema> connectedSchemas =
-            includeSchema
-                ? getConnectedSchemas(schema, column1.getPathSegment(), "", false)
-                : List.of();
+      if (!column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
+        return;
+      }
 
-        for (FeatureSchema p : connectedSchemas) {
-          if (isWritable) {
-            mapping.putWritableTables(p.getFullPathAsString(), querySchema);
-            mapping.putWritableColumns(p.getFullPathAsString(), column1);
-            seenWritableProperties.add(p.getFullPathAsString());
-          }
-          if (!seenProperties.contains(p.getFullPathAsString())) {
-            mapping.putValueTables(p.getFullPathAsString(), querySchema);
-            mapping.putValueColumns(p.getFullPathAsString(), column1);
-            mapping.putValueSchemas(p.getFullPathAsString(), p);
-            seenProperties.add(p.getFullPathAsString());
-          }
+      List<FeatureSchema> connectedSchemas =
+          includeSchema
+              ? getConnectedSchemas(schema, column1.getPathSegment(), "", false)
+              : List.of();
+
+      for (FeatureSchema p : connectedSchemas) {
+        if (isWritable) {
+          mapping.putWritableTables(p.getFullPathAsString(), querySchema);
+          mapping.putWritableColumns(p.getFullPathAsString(), column1);
+          seenWritableProperties.add(p.getFullPathAsString());
+        }
+        if (!seenProperties.contains(p.getFullPathAsString())) {
+          mapping.putValueTables(p.getFullPathAsString(), querySchema);
+          mapping.putValueColumns(p.getFullPathAsString(), column1);
+          mapping.putValueSchemas(p.getFullPathAsString(), p);
+          seenProperties.add(p.getFullPathAsString());
         }
       }
     } else {
       String target = column.getTarget();
-      FeatureSchema propertySchema = null;
 
       if (includeSchema) {
-        propertySchema =
+        FeatureSchema propertySchema =
             schema.getAllNestedProperties().stream()
                 .filter(property -> matches(column, property))
                 .findFirst()
@@ -391,25 +400,22 @@ public class SqlMappingDeriver {
       List<List<String>> previous) {
     SqlPath sqlPath = pathParser.parseFullTablePath(table.getSource());
 
-    ImmutableSqlQuerySchema querySchema =
-        new Builder()
-            .name(sqlPath.getName())
-            .pathSegment(sqlPath.asPath())
-            .sortKey(sqlPath.getSortKey())
-            .sortKeyUnique(sqlPath.getSortKeyUnique())
-            .primaryKey(sqlPath.getPrimaryKey())
-            .filter(sqlPath.getFilter().map(expr -> (Operation<?>) expr))
-            .columns(columns.stream().map(column -> getColumn(schema, column)).toList())
-            .filterColumns(
-                filterColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
-            .writableColumns(
-                writableColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
-            .relations(getJoins(sqlPath, previous))
-            .staticInserts(sqlPath.getStaticInserts())
-            .role(table.getRole())
-            .build();
-
-    return querySchema;
+    return new Builder()
+        .name(sqlPath.getName())
+        .pathSegment(sqlPath.asPath())
+        .sortKey(sqlPath.getSortKey())
+        .sortKeyUnique(sqlPath.getSortKeyUnique())
+        .primaryKey(sqlPath.getPrimaryKey())
+        .filter(sqlPath.getFilter().map(expr -> (Operation<?>) expr))
+        .columns(columns.stream().map(column -> getColumn(schema, column)).toList())
+        .filterColumns(
+            filterColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
+        .writableColumns(
+            writableColumnRules.stream().map(column1 -> getColumn(schema, column1)).toList())
+        .relations(getJoins(sqlPath, previous))
+        .staticInserts(sqlPath.getStaticInserts())
+        .role(table.getRole())
+        .build();
   }
 
   private static List<SqlQueryJoin> getJoins(SqlPath path, List<List<String>> previous) {
@@ -492,6 +498,7 @@ public class SqlMappingDeriver {
     return false;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private Map<SqlQueryColumn.Operation, String[]> getColumnOperations(
       MappingRule column, SqlPath sqlPath, Optional<FeatureSchema> propertySchema) {
     Map<SqlQueryColumn.Operation, String[]> operations = new LinkedHashMap<>();
@@ -501,7 +508,7 @@ public class SqlMappingDeriver {
           SqlQueryColumn.Operation.CONSTANT, new String[] {sqlPath.getConstantValue().get()});
     }
 
-    if (sqlPath.getGenerated().isPresent() && sqlPath.getGenerated().get() == false) {
+    if (sqlPath.getGenerated().isPresent() && !sqlPath.getGenerated().get()) {
       operations.put(SqlQueryColumn.Operation.DO_NOT_GENERATE, new String[] {});
     }
 

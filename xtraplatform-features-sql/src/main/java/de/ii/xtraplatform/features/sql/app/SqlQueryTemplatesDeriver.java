@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class SqlQueryTemplatesDeriver {
 
   private static final String SKEY = "SKEY";
@@ -87,6 +88,7 @@ public class SqlQueryTemplatesDeriver {
         .build();
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   MetaQueryTemplate createMetaQueryTemplate(SqlQuerySchema schema, SqlQueryMapping mapping) {
     return (limit,
         offset,
@@ -109,14 +111,14 @@ public class SqlQueryTemplatesDeriver {
               ? virtualTables.get(schema.getName())
               : schema.getName();
       String table = String.format("%s A", tableName);
-      String columns = "";
+      StringBuilder columns = new StringBuilder();
 
       for (int i = 0; i < additionalSortKeys.size(); i++) {
         SortKey sortKey = additionalSortKeys.get(i);
 
-        columns += getSortColumn("A", sortKey, i) + ", ";
+        columns.append(getSortColumn("A", sortKey, i)).append(", ");
       }
-      columns += getSkeyColumn("A", schema, "", false);
+      columns.append(getSkeyColumn("A", schema, "", false));
       String orderBy = getOrderBy(additionalSortKeys);
       String minMaxColumns = getMinMaxColumns(additionalSortKeys);
 
@@ -124,7 +126,13 @@ public class SqlQueryTemplatesDeriver {
           withNumberReturned
               ? String.format(
                   "SELECT %6$s, count(*) AS numberReturned FROM (SELECT %2$s FROM %1$s%5$s ORDER BY %3$s%4$s)%7$s",
-                  table, columns, orderBy, limitAndOffsetSql, where, minMaxColumns, asIds)
+                  table,
+                  columns.toString(),
+                  orderBy,
+                  limitAndOffsetSql,
+                  where,
+                  minMaxColumns,
+                  asIds)
               : sqlDialect.applyToNoTable(
                   String.format(
                       "SELECT NULL AS minKey, NULL AS maxKey, %s AS numberReturned",
@@ -232,7 +240,7 @@ public class SqlQueryTemplatesDeriver {
     String paging = pagingClause.filter(p -> join.isEmpty()).orElse("");
 
     if (!join.isEmpty() && pagingClause.isPresent()) {
-      String where2 = " WHERE ";
+      StringBuilder where2 = new StringBuilder(" WHERE ");
       List<String> aliasesNested = AliasGenerator.getAliases(schema, where.isEmpty() ? 1 : 2);
       String orderBy =
           IntStream.range(0, sortFields.size())
@@ -249,7 +257,7 @@ public class SqlQueryTemplatesDeriver {
               .map(sortField -> sortField.replace("A.", aliasesNested.get(0) + "."))
               .map(sortField -> sortField.replaceAll(" AS \\w+", ""))
               .collect(Collectors.joining(","));
-      where2 +=
+      where2.append(
           String.format(
               "(A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s%4$s ORDER BY %5$s%6$s))",
               mainTableName,
@@ -259,9 +267,9 @@ public class SqlQueryTemplatesDeriver {
                   .replace("(A.", "(" + aliasesNested.get(0) + ".")
                   .replace(" A.", " " + aliasesNested.get(0) + "."),
               orderBy,
-              pagingClause.get());
+              pagingClause.get()));
 
-      where = where2;
+      where = where2.toString();
     }
 
     String orderBy =
@@ -288,16 +296,10 @@ public class SqlQueryTemplatesDeriver {
    * as constrained by the id list and let the SQL generator skip the surrogate-key range guard.
    */
   private static boolean containsIdFilter(Cql2Expression expr) {
-    if (expr instanceof In && ((In) expr).isIdFilter()) {
-      return true;
-    }
-    if (expr instanceof And) {
-      return ((And) expr)
-          .getArgs().stream()
-              .anyMatch(
-                  arg -> arg instanceof Cql2Expression && containsIdFilter((Cql2Expression) arg));
-    }
-    return false;
+    return (expr instanceof In && ((In) expr).isIdFilter())
+        || (expr instanceof And
+            && ((And) expr)
+                .getArgs().stream().anyMatch(SqlQueryTemplatesDeriver::containsIdFilter));
   }
 
   private Optional<String> toWhereClause(
@@ -309,16 +311,16 @@ public class SqlQueryTemplatesDeriver {
     StringBuilder filter = new StringBuilder();
 
     if (minMaxKeys.isPresent() && additionalSortKeys.isEmpty()) {
-      filter.append("(");
+      filter.append('(');
       addMinMaxFilter(filter, alias, keyField, minMaxKeys.get().first(), minMaxKeys.get().second());
-      filter.append(")");
+      filter.append(')');
     }
 
     if (additionalFilter.isPresent()) {
       if (minMaxKeys.isPresent() && additionalSortKeys.isEmpty()) {
         filter.append(" AND ");
       }
-      filter.append("(").append(additionalFilter.get()).append(")");
+      filter.append('(').append(additionalFilter.get()).append(')');
     }
 
     if (filter.length() == 0) {
@@ -332,13 +334,13 @@ public class SqlQueryTemplatesDeriver {
       StringBuilder whereClause, String alias, String keyField, Object minKey, Object maxKey) {
     return whereClause
         .append(alias)
-        .append(".")
+        .append('.')
         .append(keyField)
         .append(" >= ")
         .append(formatLiteral(minKey))
         .append(" AND ")
         .append(alias)
-        .append(".")
+        .append('.')
         .append(keyField)
         .append(" <= ")
         .append(formatLiteral(maxKey));
@@ -382,27 +384,27 @@ public class SqlQueryTemplatesDeriver {
   private List<String> getSortFields(
       SqlQuerySchema schema, List<String> aliases, List<SortKey> additionalSortKeys) {
 
-    final int[] i = {0};
     Stream<String> customSortKeys =
-        additionalSortKeys.stream().map(sortKey -> getSortColumn(aliases.get(0), sortKey, i[0]++));
+        IntStream.range(0, additionalSortKeys.size())
+            .mapToObj(i -> getSortColumn(aliases.get(0), additionalSortKeys.get(i), i));
 
-    if (!schema.getRelations().isEmpty()) {
-      ListIterator<String> aliasesIterator = aliases.listIterator();
-
-      List<String> parentSortKeys = List.of();
-
-      return Stream.of(
-              customSortKeys,
-              parentSortKeys.stream(),
-              getSortKeys(schema.asTablePath(), aliasesIterator, false, parentSortKeys.size())
-                  .stream())
-          .flatMap(s -> s)
-          .collect(Collectors.toList());
-    } else {
+    if (schema.getRelations().isEmpty()) {
       return Stream.concat(
               customSortKeys, Stream.of(getSkeyColumn(aliases.get(0), schema, "", true)))
           .collect(Collectors.toList());
     }
+
+    ListIterator<String> aliasesIterator = aliases.listIterator();
+
+    List<String> parentSortKeys = List.of();
+
+    return Stream.of(
+            customSortKeys,
+            parentSortKeys.stream(),
+            getSortKeys(schema.asTablePath(), aliasesIterator, false, parentSortKeys.size())
+                .stream())
+        .flatMap(s -> s)
+        .collect(Collectors.toList());
   }
 
   private Optional<String> getFilter(
@@ -427,37 +429,40 @@ public class SqlQueryTemplatesDeriver {
   }
 
   private String getOrderBy(List<SortKey> sortKeys) {
-    String orderBy = "";
+    StringBuilder orderBy = new StringBuilder(32);
 
     for (int i = 0; i < sortKeys.size(); i++) {
       SortKey sortKey = sortKeys.get(i);
 
-      orderBy +=
-          CSKEY
-              + "_"
-              + i
-              + (sortKey.getDirection() == Direction.DESCENDING ? " DESC" : "")
-              + nullOrder
-              + ", ";
+      orderBy
+          .append(CSKEY)
+          .append('_')
+          .append(i)
+          .append(sortKey.getDirection() == Direction.DESCENDING ? " DESC" : "")
+          .append(nullOrder)
+          .append(", ");
     }
 
-    orderBy += SKEY;
+    orderBy.append(SKEY);
 
-    return orderBy;
+    return orderBy.toString();
   }
 
   private String getMinMaxColumns(List<SortKey> sortKeys) {
-    String minMaxKeys = "";
+    StringBuilder minMaxKeys = new StringBuilder(48);
 
-    if (!sortKeys.isEmpty()) {
-      minMaxKeys += "NULL AS minKey, ";
-      minMaxKeys += "NULL AS maxKey";
+    if (sortKeys.isEmpty()) {
+      minMaxKeys
+          .append("MIN(")
+          .append(SKEY)
+          .append(") AS minKey, MAX(")
+          .append(SKEY)
+          .append(") AS maxKey");
     } else {
-      minMaxKeys += "MIN(" + SKEY + ") AS minKey, ";
-      minMaxKeys += "MAX(" + SKEY + ") AS maxKey";
+      minMaxKeys.append("NULL AS minKey, NULL AS maxKey");
     }
 
-    return minMaxKeys;
+    return minMaxKeys.toString();
   }
 
   private List<String> getSortKeys(

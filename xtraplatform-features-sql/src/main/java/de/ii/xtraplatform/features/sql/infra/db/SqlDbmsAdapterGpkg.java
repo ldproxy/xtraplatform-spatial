@@ -43,6 +43,7 @@ import org.sqlite.SQLiteDataSource;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
 
   public static final String ID = "GPKG";
@@ -76,22 +77,22 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
   public DataSource createDataSource(String providerId, ConnectionInfoSql connectionInfo) {
     Path source = Path.of(connectionInfo.getDatabase());
 
-    if (!source.isAbsolute()) {
-      Optional<Path> localPath = Optional.empty();
-      try {
-        localPath = featuresStore.asLocalPath(source, false);
-      } catch (IOException e) {
-        // continue
-      }
-      if (localPath.isPresent()) {
-        source = localPath.get();
-      } else {
-        throw new IllegalStateException("GPKG database not found: " + source);
-      }
-    } else {
+    if (source.isAbsolute()) {
       throw new IllegalStateException(
           "GPKG database reference must be a path relative to resources/features. Found: "
               + source);
+    }
+
+    Optional<Path> localPath = Optional.empty();
+    try {
+      localPath = featuresStore.asLocalPath(source, false);
+    } catch (IOException e) {
+      // continue
+    }
+    if (localPath.isPresent()) {
+      source = localPath.get();
+    } else {
+      throw new IllegalStateException("GPKG database not found: " + source);
     }
 
     if (!spatiaLiteInitialized && Objects.nonNull(spatiaLiteLoader)) {
@@ -108,7 +109,7 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
             SQLiteConnection connection = super.getConnection(username, password);
 
             if (Objects.nonNull(spatiaLiteLoader)) {
-              try (var statement = connection.createStatement()) {
+              try (Statement statement = connection.createStatement()) {
                 // connection was created a few milliseconds before, so set query timeout is omitted
                 // (we assume it will succeed)
                 statement.execute(
@@ -181,31 +182,32 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
                 "SELECT f_table_name AS \"%s\", f_geometry_column AS \"%s\", coord_dimension AS \"%s\", srid AS \"%s\", geometry_type AS \"%s\" FROM geometry_columns;",
                 GeoInfo.TABLE, GeoInfo.COLUMN, GeoInfo.DIMENSION, GeoInfo.SRID, GeoInfo.TYPE);
 
-    Statement stmt = connection.createStatement();
-    ResultSet rs = stmt.executeQuery(query);
-    Map<String, GeoInfo> result = new LinkedHashMap<>();
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(query)) {
+      Map<String, GeoInfo> result = new LinkedHashMap<>();
 
-    while (rs.next()) {
-      String table = rs.getString(GeoInfo.TABLE);
-      String tableKey = table.toLowerCase(Locale.ROOT);
-      String schemaTableKey = String.format("%s.%s", "main", table).toLowerCase(Locale.ROOT);
-      GeoInfo geoInfo =
-          ImmutableGeoInfo.of(
-              null,
-              table,
-              rs.getString(GeoInfo.COLUMN),
-              rs.getString(GeoInfo.DIMENSION),
-              rs.getString(GeoInfo.SRID),
-              forceAxisOrder((DbInfoGpkg) dbInfo).name(),
-              rs.getString(GeoInfo.TYPE));
+      while (rs.next()) {
+        String table = rs.getString(GeoInfo.TABLE);
+        String tableKey = table.toLowerCase(Locale.ROOT);
+        String schemaTableKey = String.format("%s.%s", "main", table).toLowerCase(Locale.ROOT);
+        GeoInfo geoInfo =
+            ImmutableGeoInfo.of(
+                null,
+                table,
+                rs.getString(GeoInfo.COLUMN),
+                rs.getString(GeoInfo.DIMENSION),
+                rs.getString(GeoInfo.SRID),
+                forceAxisOrder((DbInfoGpkg) dbInfo).name(),
+                rs.getString(GeoInfo.TYPE));
 
-      // keep a normalized table-only key as canonical lookup key
-      result.put(tableKey, geoInfo);
-      // additionally provide normalized schema.table compatibility key
-      result.put(schemaTableKey, geoInfo);
+        // keep a normalized table-only key as canonical lookup key
+        result.put(tableKey, geoInfo);
+        // additionally provide normalized schema.table compatibility key
+        result.put(schemaTableKey, geoInfo);
+      }
+
+      return result;
     }
-
-    return result;
   }
 
   @Override
@@ -218,12 +220,15 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
     String query =
         "SELECT sqlite_version(),spatialite_version(),CASE CheckSpatialMetaData() WHEN 4 THEN 'GPKG' WHEN 3 THEN 'SPATIALITE' ELSE 'UNSUPPORTED' END;";
 
-    Statement stmt = connection.createStatement();
-    ResultSet rs = stmt.executeQuery(query);
-    rs.next();
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(query)) {
+      if (!rs.next()) {
+        throw new SQLException("Could not determine GeoPackage/SpatiaLite version info.");
+      }
 
-    return ImmutableDbInfoGpkg.of(
-        rs.getString(1), rs.getString(2), SpatialMetadata.valueOf(rs.getString(3)));
+      return ImmutableDbInfoGpkg.of(
+          rs.getString(1), rs.getString(2), SpatialMetadata.valueOf(rs.getString(3)));
+    }
   }
 
   @Override
