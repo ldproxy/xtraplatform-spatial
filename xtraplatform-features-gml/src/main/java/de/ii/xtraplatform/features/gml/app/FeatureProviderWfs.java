@@ -38,7 +38,6 @@ import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector.QueryOptions;
 import de.ii.xtraplatform.features.domain.FeatureProviderDataV2;
-import de.ii.xtraplatform.features.domain.FeatureQueries;
 import de.ii.xtraplatform.features.domain.FeatureQueriesPassThrough;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureQueryEncoder;
@@ -111,15 +110,11 @@ import org.threeten.extra.Interval;
           value = FeatureProviderWfs.PROVIDER_SUB_TYPE)
     },
     data = FeatureProviderWfsData.class)
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureProviderWfs
     extends AbstractFeatureProvider<
         byte[], String, FeatureProviderConnector.QueryOptions, FeatureSchema>
-    implements FeatureProvider,
-        FeatureQueries,
-        FeatureCrs,
-        FeatureExtents,
-        FeatureMetadata,
-        FeatureQueriesPassThrough {
+    implements FeatureCrs, FeatureExtents, FeatureMetadata, FeatureQueriesPassThrough {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderWfs.class);
 
@@ -184,11 +179,9 @@ public class FeatureProviderWfs
 
   @Override
   protected Map<String, List<FeatureSchema>> getSourceSchemas() {
-    Map<String, List<FeatureSchema>> types =
-        getData().getTypes().entrySet().stream()
-            .map(entry -> new SimpleImmutableEntry<>(entry.getKey(), List.of(entry.getValue())))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    return types;
+    return getData().getTypes().entrySet().stream()
+        .map(entry -> new SimpleImmutableEntry<>(entry.getKey(), List.of(entry.getValue())))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
@@ -275,7 +268,7 @@ public class FeatureProviderWfs
           .exceptionally(throwable -> -1L)
           .toCompletableFuture()
           .join();
-    } catch (Throwable e) {
+    } catch (Throwable e) { // NOPMD AvoidCatchingThrowable
       // continue
     }
 
@@ -321,7 +314,7 @@ public class FeatureProviderWfs
           .exceptionally(throwable -> Optional.empty())
           .toCompletableFuture()
           .join();
-    } catch (Throwable e) {
+    } catch (Throwable e) { // NOPMD AvoidCatchingThrowable
       // continue
     }
 

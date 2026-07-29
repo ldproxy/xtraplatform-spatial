@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
-@SuppressWarnings("PMD.TooManyMethods")
 public class WfsCapabilitiesAnalyzer extends AbstractFeatureProviderMetadataConsumer {
 
   private final XMLNamespaceNormalizer namespaceNormalizer;

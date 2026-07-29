@@ -22,7 +22,7 @@ import org.xml.sax.InputSource;
 /**
  * @author zahnen
  */
-@SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public class WFSCapabilitiesParser {
 
   private final FeatureProviderMetadataConsumer metadataConsumer;
@@ -38,7 +38,7 @@ public class WFSCapabilitiesParser {
     try {
       InputSource is = new InputSource(inputStream);
       parse(is);
-    } catch (Exception ex) {
+    } catch (Exception ex) { // NOPMD AvoidCatchingGenericException
       // TODO: move to analyzer for XtraProxy
       // LOGGER.error(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
       // throw new SchemaParseException(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
@@ -219,16 +219,22 @@ public class WFSCapabilitiesParser {
 
     while (keywordsChild.readerAccessible()) {
 
-      if (keywordsChild.getCurrEvent().hasText()
-          && keywordsChild.getCurrEvent() != SMEvent.IGNORABLE_WS) {
-        String keywords = keywordsChild.getText().trim();
-        if (!keywords.isEmpty()) {
-          if (isFeatureType) {
-            metadataConsumer.analyzeFeatureTypeKeywords(featureTypeName, keywords.split(","));
-          } else {
-            metadataConsumer.analyzeKeywords(keywords.split(","));
-          }
-        }
+      if (!keywordsChild.getCurrEvent().hasText()
+          || keywordsChild.getCurrEvent() == SMEvent.IGNORABLE_WS) {
+        keywordsChild = keywordsChild.advance();
+        continue;
+      }
+
+      String keywords = keywordsChild.getText().trim();
+      if (keywords.isEmpty()) {
+        keywordsChild = keywordsChild.advance();
+        continue;
+      }
+
+      if (isFeatureType) {
+        metadataConsumer.analyzeFeatureTypeKeywords(featureTypeName, keywords.split(","));
+      } else {
+        metadataConsumer.analyzeKeywords(keywords.split(","));
       }
 
       keywordsChild = keywordsChild.advance();
@@ -483,7 +489,6 @@ public class WFSCapabilitiesParser {
     return url;
   }
 
-  @SuppressWarnings("PMD.CognitiveComplexity")
   private void parseParameterOrConstraint(
       OWS.OPERATION operation, boolean isConstraint, SMInputCursor cursor)
       throws XMLStreamException {
@@ -491,30 +496,33 @@ public class WFSCapabilitiesParser {
     OWS.VOCABULARY parameterName =
         OWS.findKey(cursor.getAttrValue(OWS.getWord(OWS.VOCABULARY.NAME_ATTRIBUTE)));
 
-    if (parameterName != OWS.VOCABULARY.NOT_A_WORD) {
+    if (parameterName == OWS.VOCABULARY.NOT_A_WORD) {
+      return;
+    }
 
-      SMInputCursor parameterChild = cursor.descendantElementCursor().advance();
+    SMInputCursor parameterChild = cursor.descendantElementCursor().advance();
 
-      while (parameterChild.readerAccessible()) {
-        if (parameterChild.getCurrEvent() == SMEvent.START_ELEMENT) {
-          OWS.VOCABULARY paramKey = OWS.findKey(parameterChild.getLocalName());
-          if (paramKey == OWS.VOCABULARY.VALUE || paramKey == OWS.VOCABULARY.DEFAULT_VALUE) {
-            if (isConstraint) {
-              metadataConsumer.analyzeOperationConstraint(
-                  operation.toString(),
-                  parameterName.toString(),
-                  parameterChild.collectDescendantText());
-            } else {
-              metadataConsumer.analyzeOperationParameter(
-                  operation.toString(),
-                  parameterName.toString(),
-                  parameterChild.collectDescendantText());
-            }
-          }
-        }
-
+    while (parameterChild.readerAccessible()) {
+      if (parameterChild.getCurrEvent() != SMEvent.START_ELEMENT) {
         parameterChild = parameterChild.advance();
+        continue;
       }
+
+      OWS.VOCABULARY paramKey = OWS.findKey(parameterChild.getLocalName());
+      if (paramKey != OWS.VOCABULARY.VALUE && paramKey != OWS.VOCABULARY.DEFAULT_VALUE) {
+        parameterChild = parameterChild.advance();
+        continue;
+      }
+
+      if (isConstraint) {
+        metadataConsumer.analyzeOperationConstraint(
+            operation.toString(), parameterName.toString(), parameterChild.collectDescendantText());
+      } else {
+        metadataConsumer.analyzeOperationParameter(
+            operation.toString(), parameterName.toString(), parameterChild.collectDescendantText());
+      }
+
+      parameterChild = parameterChild.advance();
     }
   }
 

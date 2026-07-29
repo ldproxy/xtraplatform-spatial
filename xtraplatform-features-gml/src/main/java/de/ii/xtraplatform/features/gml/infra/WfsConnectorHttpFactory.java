@@ -81,6 +81,7 @@ public class WfsConnectorHttpFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface FactoryAssisted {
     WfsConnectorHttp create(String providerId, ConnectionInfoWfsHttp connectionInfo);
   }

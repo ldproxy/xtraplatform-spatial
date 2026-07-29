@@ -77,6 +77,7 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FilterEncoderWfs {
 
   private final Cql cql;
@@ -137,12 +138,12 @@ public class FilterEncoderWfs {
             });
   }
 
-  @SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
+  @SuppressWarnings("PMD.GodClass")
   class CqlToFes implements CqlVisitor<FesExpression> {
 
     private final FeatureSchema schema;
 
-    public CqlToFes(FeatureSchema schema) {
+    CqlToFes(FeatureSchema schema) {
       this.schema = schema;
     }
 

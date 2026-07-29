@@ -147,20 +147,22 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
   public void stop() {}
 
   private Optional<Metadata> crawlMetadata() {
+    Optional<Metadata> result = Optional.empty();
+    Optional<Throwable> error = Optional.empty();
+
     try (InputStream inputStream = runWfsOperation(new GetCapabilities())) {
       WfsCapabilitiesAnalyzer metadataConsumer = new WfsCapabilitiesAnalyzer();
       WFSCapabilitiesParser gmlSchemaParser =
           new WFSCapabilitiesParser(metadataConsumer, STAX_FACTORY);
       gmlSchemaParser.parse(inputStream);
 
-      this.connectionError = Optional.empty();
-
-      return Optional.of(metadataConsumer.getMetadata());
-    } catch (IOException | RuntimeException e) {
-      this.connectionError = Optional.of(e);
+      result = Optional.of(metadataConsumer.getMetadata());
+    } catch (IOException | RuntimeException e) { // NOPMD AvoidCatchingGenericException
+      error = Optional.of(e);
     }
 
-    return Optional.empty();
+    this.connectionError = error;
+    return result;
   }
 
   @Override

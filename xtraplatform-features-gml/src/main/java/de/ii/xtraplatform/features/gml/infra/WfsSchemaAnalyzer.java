@@ -29,7 +29,7 @@ import javax.xml.namespace.QName;
 @SuppressWarnings("PMD.GodClass")
 class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
 
-  public static final String GML_NS_URI = GML.getNS(GML.VERSION._2_1_1);
+  static final String GML_NS_URI = GML.getNS(GML.VERSION._2_1_1);
 
   private final Set<String> mappedPaths;
   private final XMLNamespaceNormalizer namespaceNormalizer;
@@ -70,7 +70,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
         .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  public List<FeatureSchema> getFeatureTypes() {
+  List<FeatureSchema> getFeatureTypes() {
     return mappingBuilder.getFeatureTypes();
   }
 
@@ -81,6 +81,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
 
   @Override
   public void analyzeFeatureType(String nsUri, String localName) {
+    String currentPrefixedName = namespaceNormalizer.getQualifiedName(nsUri, localName);
     QName currentQualifiedName = namespaceNormalizer.getQName(nsUri, localName);
 
     mappedPaths.clear();
@@ -92,7 +93,6 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
       return;
     }
 
-    String currentPrefixedName = namespaceNormalizer.getQualifiedName(nsUri, localName);
     String currentLocalName = typeIds.get(currentQualifiedName);
     this.skip = false;
 
@@ -112,8 +112,8 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
         namespaceNormalizer.getNamespacePrefix(nsUri), "@" + localName, depth + 1, false);
 
     if (depth == 0
-        && ("id".equals(localName) && nsUri.startsWith(GML_NS_URI) || "fid".equals(localName))) {
-      // if (!isPathMapped(path)) {
+        && (("id".equals(localName) && nsUri.startsWith(GML_NS_URI)) || "fid".equals(localName))) {
+      // if (!isPathMapped(currentPath.toString())) {
       mappingBuilder.addValue(
           "id", currentPath.asList(), FeatureSchema.Type.STRING, FeatureSchema.Role.ID);
       // }
@@ -144,9 +144,9 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     String path = currentPath.toString();
 
     // skip first level gml properties
-    if (nsUri.startsWith(GML_NS_URI)
+    if ((nsUri.startsWith(GML_NS_URI)
             && (path.startsWith(namespaceNormalizer.getNamespacePrefix(nsUri) + ":")
-                || mappingBuilder.getPrev().filter(FeatureSchema::isSpatial).isPresent())
+                || mappingBuilder.getPrev().filter(FeatureSchema::isSpatial).isPresent()))
         || skip) {
       return;
     }
@@ -196,6 +196,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     // }
   }
 
+  @SuppressWarnings("PMD.NPathComplexity")
   private Optional<Type> getPropertyType(
       String type,
       boolean isMultiple,
@@ -204,7 +205,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
       boolean isObject,
       int pathLength) {
     boolean isObj =
-        (isComplex || isObject) && pathLength % 2 == 0 || Objects.equals(type, "ReferenceType");
+        ((isComplex || isObject) && pathLength % 2 == 0) || Objects.equals(type, "ReferenceType");
 
     if ((isMultiple || isParentMultiple) && isObj) {
       return Optional.of(FeatureSchema.Type.OBJECT_ARRAY);

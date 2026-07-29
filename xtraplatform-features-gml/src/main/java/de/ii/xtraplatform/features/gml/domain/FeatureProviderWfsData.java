@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.gml.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.entities.domain.maptobuilder.encoding.BuildableMapEncodingEnabled;
@@ -78,8 +77,7 @@ public interface FeatureProviderWfsData
   }
 
   abstract class Builder
-      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderWfsData.Builder>
-      implements EntityDataBuilder<FeatureProviderDataV2> {
+      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderWfsData.Builder> {
 
     public abstract ImmutableFeatureProviderWfsData.Builder connectionInfo(
         ConnectionInfoWfsHttp connectionInfo);

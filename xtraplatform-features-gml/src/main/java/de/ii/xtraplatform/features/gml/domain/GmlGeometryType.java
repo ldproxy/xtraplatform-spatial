@@ -43,7 +43,7 @@ public enum GmlGeometryType {
   }
 
   public static GmlGeometryType fromString(String type) {
-    for (GmlGeometryType v : GmlGeometryType.values()) {
+    for (GmlGeometryType v : values()) {
       if (v.toString().equals(type)
           || v.elementStringRepresentation != null && v.elementStringRepresentation.equals(type)) {
         return v;
@@ -53,7 +53,7 @@ public enum GmlGeometryType {
   }
 
   public static boolean contains(String type) {
-    for (GmlGeometryType v : GmlGeometryType.values()) {
+    for (GmlGeometryType v : values()) {
       if (v.toString().equals(type)) {
         return true;
       }

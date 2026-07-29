@@ -34,6 +34,7 @@ import java.net.URI;
 import java.util.Map;
 import javax.xml.namespace.QName;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureQueryEncoderWfs implements FeatureQueryEncoder<String, QueryOptions> {
 
   private final Map<String, FeatureSchema> featureSchemas;

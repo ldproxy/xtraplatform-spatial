@@ -15,13 +15,13 @@ import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.protocol.BasicHttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ public class OGCEntityResolver implements EntityResolver {
   private static final Logger LOGGER = LoggerFactory.getLogger(OGCEntityResolver.class);
   private final Map<String, String> uris = new HashMap<>();
   private CloseableHttpClient untrustedSslHttpClient;
-  private final boolean useBasicAuth;
+  private boolean useBasicAuth;
   private String user;
   private String password;
 
@@ -49,9 +49,7 @@ public class OGCEntityResolver implements EntityResolver {
     this.useBasicAuth = true;
   }
 
-  public OGCEntityResolver() {
-    this.useBasicAuth = false;
-  }
+  public OGCEntityResolver() {}
 
   @Override
   @SuppressWarnings({
@@ -69,17 +67,20 @@ public class OGCEntityResolver implements EntityResolver {
       LOGGER.debug("resolving protected schema: {}", systemId);
       HttpGet httpGet = new HttpGet(systemId);
 
-      String basicAuth = new String(Base64.encodeBase64((user + ":" + password).getBytes()));
+      String basicAuth =
+          new String(
+              Base64.encodeBase64((user + ":" + password).getBytes(StandardCharsets.UTF_8)),
+              StandardCharsets.UTF_8);
       httpGet.addHeader("Authorization", "Basic " + basicAuth);
 
       try (CloseableHttpResponse response =
           untrustedSslHttpClient.execute(httpGet, new BasicHttpContext())) {
         String stringFromStream =
-            CharStreams.toString(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
+            CharStreams.toString(
+                new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
         InputSource is = new InputSource(new StringReader(stringFromStream));
         is.setSystemId(systemId);
 
-        EntityUtils.consumeQuietly(response.getEntity());
         return is;
 
       } catch (IOException ex) {
@@ -152,9 +153,9 @@ public class OGCEntityResolver implements EntityResolver {
       }
 
       // A4I workarounds
-      InputSource a4i = handleA4IWorkaround(systemId);
-      if (a4i != null) {
-        return a4i;
+      InputSource a4iWorkaround = resolveInspireFeatureDownloadWorkaround(systemId);
+      if (a4iWorkaround != null) {
+        return a4iWorkaround;
       }
     }
 
@@ -171,10 +172,11 @@ public class OGCEntityResolver implements EntityResolver {
     return null;
   }
 
-  private InputSource handleA4IWorkaround(String systemId) {
+  private InputSource resolveInspireFeatureDownloadWorkaround(String systemId) {
     if (!systemId.contains("/exts/InspireFeatureDownload/service")) {
       return null;
     }
+
     String url = systemId;
     // workaround for A4I 10.1 SP1 (Patch1) blank encoding bug in GET parameters
     if (url.contains("OUTPUT_FORMAT=")) {
@@ -183,9 +185,11 @@ public class OGCEntityResolver implements EntityResolver {
       String out = url.substring(start, end).replaceAll("%20", "");
       url = url.substring(0, start) + out + url.substring(end);
     }
+
     if (url.equals(systemId)) {
       return null;
     }
+
     LOGGER.debug("original systemId: {}", systemId);
     LOGGER.debug("changed systemId: {}", url);
     return new InputSource(url);
@@ -215,7 +219,7 @@ public class OGCEntityResolver implements EntityResolver {
         }
       }
 
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       return false;
     }
     return false;

@@ -21,7 +21,6 @@ public class FesTemporalLiteral extends FesExpression {
   protected final String beginPosition;
   protected final String endPosition;
 
-  @SuppressWarnings("PMD.NullAssignment")
   public FesTemporalLiteral(String position) {
     super();
     this.position = position;
@@ -29,7 +28,6 @@ public class FesTemporalLiteral extends FesExpression {
     this.endPosition = null;
   }
 
-  @SuppressWarnings("PMD.NullAssignment")
   public FesTemporalLiteral(String beginPosition, String endPosition) {
     super();
     this.position = null;

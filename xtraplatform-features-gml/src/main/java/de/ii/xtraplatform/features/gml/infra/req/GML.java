@@ -33,7 +33,7 @@ public class GML extends VersionedVocabulary {
     }
 
     public static VERSION fromString(String version) {
-      for (VERSION v : VERSION.values()) {
+      for (VERSION v : values()) {
         if (v.toString().equals(version)) {
           return v;
         }
@@ -46,13 +46,13 @@ public class GML extends VersionedVocabulary {
       String normalized = value.toLowerCase(java.util.Locale.ROOT);
 
       if (normalized.contains("gml2")) {
-        return VERSION._2_1_1;
+        return _2_1_1;
       } else if (normalized.contains("text/xml") && normalized.contains("subtype=gml/3.1.1")) {
-        return VERSION._3_1_1;
+        return _3_1_1;
       } else if (normalized.contains("text/xml") && normalized.contains("subtype=gml/3.2.1")) {
-        return VERSION._3_2_1_OLD;
+        return _3_2_1_OLD;
       } else if (normalized.contains("application/gml+xml") && normalized.contains("version=3.2")) {
-        return VERSION._3_2_1;
+        return _3_2_1;
       }
 
       return null;
