@@ -21,6 +21,7 @@ public class WfsClientBasicFactoryDefault implements WfsClientBasicFactory {
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidThrowingRawExceptionTypes")
   public WfsClientBasic create(
       String providerType, String providerId, ConnectionInfoWfsHttp connectionInfo) {
     WfsConnector connector =
@@ -29,17 +30,14 @@ public class WfsClientBasicFactoryDefault implements WfsClientBasicFactory {
     if (!connector.isConnected()) {
       connectorFactory.disposeConnector(connector);
 
-      RuntimeException connectionError =
-          connector
-              .getConnectionError()
-              .map(
-                  throwable ->
-                      throwable instanceof RuntimeException
-                          ? (RuntimeException) throwable
-                          : new RuntimeException(throwable))
-              .orElse(new IllegalStateException("unknown reason"));
-
-      throw connectionError;
+      throw connector
+          .getConnectionError()
+          .map(
+              throwable ->
+                  throwable instanceof RuntimeException
+                      ? (RuntimeException) throwable
+                      : new RuntimeException(throwable))
+          .orElse(new IllegalStateException("unknown reason"));
     }
 
     return connector;

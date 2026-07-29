@@ -26,8 +26,8 @@ public class FeatureStorePathParserWfs implements FeatureStorePathParser {
   @Override
   public List<FeatureStoreInstanceContainer> parse(FeatureSchema schema) {
 
-    LinkedHashMap<String, ImmutableFeatureStoreInstanceContainer.Builder>
-        instanceContainerBuilders = new LinkedHashMap<>();
+    Map<String, ImmutableFeatureStoreInstanceContainer.Builder> instanceContainerBuilders =
+        new LinkedHashMap<>();
 
     String instanceContainerName = schema.getName();
 

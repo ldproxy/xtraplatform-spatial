@@ -15,13 +15,13 @@ import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.protocol.BasicHttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,9 +35,9 @@ import org.xml.sax.SAXException;
 public class OGCEntityResolver implements EntityResolver {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OGCEntityResolver.class);
-  private Map<String, String> uris = new HashMap();
+  private final Map<String, String> uris = new HashMap<>();
   private CloseableHttpClient untrustedSslHttpClient;
-  private boolean useBasicAuth = false;
+  private boolean useBasicAuth;
   private String user;
   private String password;
 
@@ -52,35 +52,40 @@ public class OGCEntityResolver implements EntityResolver {
   public OGCEntityResolver() {}
 
   @Override
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity"
+  })
   public InputSource resolveEntity(String publicId, String systemId)
       throws SAXException, IOException {
 
     // TODO: temporary basic auth hack
     // protected schema files
     if (systemId != null && systemId.startsWith("https://") && useBasicAuth) {
-      CloseableHttpResponse response = null;
       LOGGER.debug("resolving protected schema: {}", systemId);
-      try {
-        HttpGet httpGet = new HttpGet(systemId);
+      HttpGet httpGet = new HttpGet(systemId);
 
-        String basic_auth = new String(Base64.encodeBase64((user + ":" + password).getBytes()));
-        httpGet.addHeader("Authorization", "Basic " + basic_auth);
+      String basicAuth =
+          new String(
+              Base64.encodeBase64((user + ":" + password).getBytes(StandardCharsets.UTF_8)),
+              StandardCharsets.UTF_8);
+      httpGet.addHeader("Authorization", "Basic " + basicAuth);
 
-        response = untrustedSslHttpClient.execute(httpGet, new BasicHttpContext());
+      try (CloseableHttpResponse response =
+          untrustedSslHttpClient.execute(httpGet, new BasicHttpContext())) {
         String stringFromStream =
-            CharStreams.toString(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
+            CharStreams.toString(
+                new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
         InputSource is = new InputSource(new StringReader(stringFromStream));
         is.setSystemId(systemId);
 
         return is;
 
       } catch (IOException ex) {
-        ex.printStackTrace();
-        throw new IllegalStateException("Error parsing application schema. " + ex.getMessage());
-      } finally {
-        if (response != null) {
-          EntityUtils.consumeQuietly(response.getEntity());
-        }
+        LOGGER.error("Error parsing application schema.", ex);
+        throw new IllegalStateException("Error parsing application schema. " + ex.getMessage(), ex);
       }
     }
 
@@ -115,6 +120,8 @@ public class OGCEntityResolver implements EntityResolver {
                 "http://www.aixm.aero/gallery/content/public/schema/5.1/AIXM_Features.xsd");
           }
           break;
+        default:
+          break;
       }
     }
 
@@ -146,21 +153,9 @@ public class OGCEntityResolver implements EntityResolver {
       }
 
       // A4I workarounds
-      if (systemId.contains("/exts/InspireFeatureDownload/service")) {
-        String url = systemId;
-        // workaround for A4I 10.1 SP1 (Patch1) blank encoding bug in GET parameters
-        if (url.contains("OUTPUT_FORMAT=")) {
-          int start = url.indexOf("OUTPUT_FORMAT=") + 13;
-          int end = url.indexOf('&', start);
-          String out = url.substring(start, end).replaceAll("%20", "");
-          url = url.substring(0, start) + out + url.substring(end);
-        }
-
-        if (!url.equals(systemId)) {
-          LOGGER.debug("original systemId: {}", systemId);
-          LOGGER.debug("changed systemId: {}", url);
-          return new InputSource(url);
-        }
+      InputSource a4iWorkaround = resolveInspireFeatureDownloadWorkaround(systemId);
+      if (a4iWorkaround != null) {
+        return a4iWorkaround;
       }
     }
 
@@ -175,6 +170,29 @@ public class OGCEntityResolver implements EntityResolver {
     }
 
     return null;
+  }
+
+  private InputSource resolveInspireFeatureDownloadWorkaround(String systemId) {
+    if (!systemId.contains("/exts/InspireFeatureDownload/service")) {
+      return null;
+    }
+
+    String url = systemId;
+    // workaround for A4I 10.1 SP1 (Patch1) blank encoding bug in GET parameters
+    if (url.contains("OUTPUT_FORMAT=")) {
+      int start = url.indexOf("OUTPUT_FORMAT=") + 13;
+      int end = url.indexOf('&', start);
+      String out = url.substring(start, end).replaceAll("%20", "");
+      url = url.substring(0, start) + out + url.substring(end);
+    }
+
+    if (url.equals(systemId)) {
+      return null;
+    }
+
+    LOGGER.debug("original systemId: {}", systemId);
+    LOGGER.debug("changed systemId: {}", url);
+    return new InputSource(url);
   }
 
   private InputSource getSchemaFromBundle(String publicId, String schemaPath) throws IOException {
@@ -201,7 +219,7 @@ public class OGCEntityResolver implements EntityResolver {
         }
       }
 
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       return false;
     }
     return false;

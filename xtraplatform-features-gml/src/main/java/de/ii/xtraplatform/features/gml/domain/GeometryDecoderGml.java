@@ -46,7 +46,38 @@ import java.util.Set;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.TooManyMethods",
+  "PMD.CyclomaticComplexity",
+  "PMD.CouplingBetweenObjects"
+})
 public class GeometryDecoderGml extends AbstractGeometryDecoder {
+
+  private final Deque<Frame> stack = new ArrayDeque<>();
+  private final Map<String, EpsgCrs> srsNameMappings;
+  private final Set<String> verticalSrsNames;
+  private boolean waitingForInput;
+  private Geometry<?> result;
+
+  /**
+   * The verbatim {@code srsName} attribute of the outermost geometry element of the current decode,
+   * or {@code null} when none was present. Unlike the resolved {@link EpsgCrs} this distinguishes
+   * application-profile forms that map to the same EPSG code (e.g. the AdV realizations {@code
+   * urn:adv:crs:DE_DHDN_3GK3_HE100} and {@code …HE120}).
+   */
+  private String rawSrsName;
+
+  /**
+   * Set when {@link #rawSrsName} is one of {@link #verticalSrsNames}: the "geometry" is a 1D
+   * position (a single number in {@code gml:pos}, e.g. a height in a German height reference
+   * system), which has no representation in the geometry model. The coordinate text is captured
+   * verbatim in {@link #verticalValue} and no {@link Geometry} is built; {@code decode} returns
+   * empty with {@code waitingForInput == false} once the subtree is consumed.
+   */
+  private boolean verticalMode;
+
+  private String verticalValue;
 
   private enum Kind {
     POINT,
@@ -123,35 +154,13 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     OptionalInt srsDimension = OptionalInt.empty();
 
     double[] coords;
+
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     StringBuilder textBuffer = new StringBuilder();
+
     final List<Geometry<?>> children = new ArrayList<>();
     boolean sawInterior; // for Solid: detect inner shell
   }
-
-  private final Deque<Frame> stack = new ArrayDeque<>();
-  private final Map<String, EpsgCrs> srsNameMappings;
-  private final Set<String> verticalSrsNames;
-  private boolean waitingForInput = false;
-  private Geometry<?> result;
-
-  /**
-   * The verbatim {@code srsName} attribute of the outermost geometry element of the current decode,
-   * or {@code null} when none was present. Unlike the resolved {@link EpsgCrs} this distinguishes
-   * application-profile forms that map to the same EPSG code (e.g. the AdV realizations {@code
-   * urn:adv:crs:DE_DHDN_3GK3_HE100} and {@code …HE120}).
-   */
-  private String rawSrsName;
-
-  /**
-   * Set when {@link #rawSrsName} is one of {@link #verticalSrsNames}: the "geometry" is a 1D
-   * position (a single number in {@code gml:pos}, e.g. a height in a German height reference
-   * system), which has no representation in the geometry model. The coordinate text is captured
-   * verbatim in {@link #verticalValue} and no {@link Geometry} is built; {@code decode} returns
-   * empty with {@code waitingForInput == false} once the subtree is consumed.
-   */
-  private boolean verticalMode;
-
-  private String verticalValue;
 
   public GeometryDecoderGml() {
     this(Map.of());
@@ -173,6 +182,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
    *     {@link #getVerticalValue()}) instead of being decoded into a {@link Geometry}.
    */
   public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
+    super();
     this.srsNameMappings = srsNameMappings == null ? Map.of() : srsNameMappings;
     this.verticalSrsNames = verticalSrsNames == null ? Set.of() : verticalSrsNames;
   }
@@ -191,6 +201,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     return Optional.ofNullable(verticalValue);
   }
 
+  @SuppressWarnings("PMD.NullAssignment")
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
       Optional<EpsgCrs> crs,
@@ -204,6 +215,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     return decode(parser, crs, srsDimension, false);
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NullAssignment"})
   public Optional<Geometry<?>> decode(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
       Optional<EpsgCrs> defaultCrs,
@@ -256,6 +268,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     throw new IOException("Unexpected end of XML stream, no complete geometry found.");
   }
 
+  @SuppressWarnings("PMD.AvoidDeeplyNestedIfStmts")
   public Optional<Geometry<?>> continueDecoding(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
       Optional<EpsgCrs> defaultCrs,
@@ -297,6 +310,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   }
 
   /** Returns true when the started element is a coordinate text element. */
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private boolean handleStart(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser,
       String localName,
@@ -403,6 +417,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
   }
 
   /** Adds {@code geom} to the nearest non-transparent ancestor in the stack. */
+  @SuppressWarnings("PMD.AvoidBranchingStatementAsLastInLoop")
   private void contributeToConsumer(Geometry<?> geom) {
     Iterator<Frame> it = stack.iterator();
     while (it.hasNext()) {
@@ -417,6 +432,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     result = geom;
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static boolean isTransparent(Kind kind) {
     return switch (kind) {
       case POINT_MEMBER,
@@ -448,6 +464,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
    * rings, surface patches, and curve segments — none of those typically carry a srsName attribute
    * themselves, but they must still inherit one for the built primitive.
    */
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static boolean isObject(Kind kind) {
     return switch (kind) {
       case POINT,
@@ -477,6 +494,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     };
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static Kind classify(String localName) {
     return switch (localName) {
       case "Point" -> Kind.POINT;
@@ -540,6 +558,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     return OptionalInt.empty();
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static Optional<EpsgCrs> parseSrsName(
       AsyncXMLStreamReader<AsyncByteArrayFeeder> parser, Map<String, EpsgCrs> srsNameMappings) {
     String srsName = parser.getAttributeValue(null, "srsName");
@@ -554,14 +573,14 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       try {
         return Optional.of(
             EpsgCrs.of(Integer.parseInt(srsName.substring(srsName.lastIndexOf(':') + 1))));
-      } catch (Exception e) {
+      } catch (Exception e) { // NOPMD AvoidCatchingGenericException
         // fall through
       }
     } else if (srsName.startsWith("http://www.opengis.net/def/crs/EPSG/0/")) {
       try {
         return Optional.of(
             EpsgCrs.of(Integer.parseInt(srsName.substring(srsName.lastIndexOf('/') + 1))));
-      } catch (Exception e) {
+      } catch (Exception e) { // NOPMD AvoidCatchingGenericException
         // fall through
       }
     } else if ("http://www.opengis.net/def/crs/OGC/0/CRS84".equals(srsName)
@@ -653,6 +672,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   // -- builders --------------------------------------------------------------
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private Geometry<?> buildGeometry(Frame f) throws IOException {
     return switch (f.kind) {
       case POINT -> buildPoint(f);
@@ -715,7 +735,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     try {
       expanded = Circles.expandCircleToClosed(c);
     } catch (IllegalArgumentException colinear) {
-      throw new IOException("Invalid <gml:Circle>: " + colinear.getMessage());
+      throw new IOException("Invalid <gml:Circle>: " + colinear.getMessage(), colinear);
     }
     return CircularString.of(PositionList.of(axes, expanded), f.crs);
   }
@@ -728,10 +748,8 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
     Axes axes = axesOf(f);
     // If srsDimension wasn't declared explicitly anywhere in scope, heuristically pick 3D when
     // total coordinate count is divisible by 3 but not by 2. Otherwise default 2D.
-    if (f.srsDimension.isEmpty()) {
-      if (c.length % 2 != 0 && c.length % 3 == 0) {
-        axes = Axes.XYZ;
-      }
+    if (f.srsDimension.isEmpty() && c.length % 2 != 0 && c.length % 3 == 0) {
+      axes = Axes.XYZ;
     }
     PositionList pl = PositionList.of(axes, c);
     return curved ? CircularString.of(pl, f.crs) : LineString.of(pl, f.crs);
@@ -742,6 +760,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
    * multiple curveMembers becomes a CompoundCurve even if every member is linear, since merging
    * separate primitive Curves into one LineString would erase the input's primitive structure.
    */
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private Curve<?> buildRing(Frame f) throws IOException {
     if (f.children.isEmpty()) {
       throw new IOException("Empty <gml:Ring>.");

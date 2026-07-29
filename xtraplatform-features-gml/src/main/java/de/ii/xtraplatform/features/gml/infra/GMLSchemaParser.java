@@ -40,7 +40,7 @@ import org.xml.sax.SAXParseException;
 /**
  * @author zahnen
  */
-@SuppressWarnings("PMD.GodClass")
+@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class GMLSchemaParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GMLSchemaParser.class);
@@ -84,7 +84,7 @@ public class GMLSchemaParser {
         analyzer.analyzeSuccess();
       }
 
-    } catch (Exception ex) {
+    } catch (Exception ex) { // NOPMD AvoidCatchingGenericException
       LOGGER.error("Error parsing application schema. {}", ex);
 
       for (FeatureProviderSchemaConsumer analyzer : analyzers) {
@@ -100,12 +100,7 @@ public class GMLSchemaParser {
     parse(is, elements, true, tracker);
   }
 
-  @SuppressWarnings({
-    "PMD.NcssCount",
-    "PMD.CognitiveComplexity",
-    "PMD.CyclomaticComplexity",
-    "PMD.NPathComplexity"
-  })
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private void parse(
       InputSource is,
       Map<String, List<String>> elements,
@@ -479,7 +474,7 @@ public class GMLSchemaParser {
     }
   }
 
-  private class GMLSchemaParserErrorHandler implements ErrorHandler {
+  private final class GMLSchemaParserErrorHandler implements ErrorHandler {
 
     @Override
     public void warning(SAXParseException exception) throws SAXException {

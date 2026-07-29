@@ -17,7 +17,7 @@ import javax.xml.namespace.QName;
 /**
  * @author fischer
  */
-@SuppressWarnings({"PMD.GodClass", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.GodClass")
 public class XMLNamespaceNormalizer {
 
   private Map<String, String> namespaces;
@@ -68,7 +68,8 @@ public class XMLNamespaceNormalizer {
 
     for (Map.Entry<String, String> ns : namespaces.entrySet()) {
       if (ns.getKey() != null && ns.getKey().length() > 5) {
-        String pre = ns.getKey().substring(0, 5) + shortcount++;
+        String pre = ns.getKey().substring(0, 5) + shortcount;
+        shortcount++;
         shortNamespaces.put(pre, ns.getValue());
       }
     }
@@ -110,7 +111,8 @@ public class XMLNamespaceNormalizer {
     if (effectivePrefix != null
         && effectivePrefix.length() > 5
         && !shortNamespaces.containsValue(namespaceURI)) {
-      String pre = effectivePrefix.substring(0, 5) + shortcount++;
+      String pre = effectivePrefix.substring(0, 5) + shortcount;
+      shortcount++;
       shortNamespaces.put(pre, namespaceURI);
     }
   }
@@ -125,7 +127,8 @@ public class XMLNamespaceNormalizer {
       } else if (nextToLast.find()) {
         prefix = nextToLast.group(1);
       } else {
-        prefix = "ns" + nscount++;
+        prefix = "ns" + nscount;
+        nscount++;
       }
       addNamespace(prefix, namespaceURI);
     }

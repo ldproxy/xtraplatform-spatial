@@ -36,7 +36,7 @@ public class FES extends VersionedVocabulary {
     }
 
     public static VERSION fromString(String version) {
-      for (VERSION v : VERSION.values()) {
+      for (VERSION v : values()) {
         if (v.toString().equals(version)) {
           return v;
         }

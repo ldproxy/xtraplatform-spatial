@@ -88,7 +88,7 @@ public class WfsRequestEncoder {
             ? this.urls.get(operation.toString()).get(method)
             : this.urls.get("default").get(method);
 
-    if (uri == null && WFS.METHOD.GET.equals(method)) {
+    if (uri == null && method == WFS.METHOD.GET) {
       return this.urls.get("default").get(method);
     }
 

@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * @author fischer
  */
-@SuppressWarnings("PMD.FieldNamingConventions")
+@SuppressWarnings({"PMD.FieldNamingConventions", "PMD.ExcessivePublicCount"})
 public class OWS extends VersionedVocabulary {
 
   public enum VERSION {
@@ -43,7 +43,7 @@ public class OWS extends VersionedVocabulary {
     }
 
     public static VERSION fromString(String version) {
-      for (VERSION v : VERSION.values()) {
+      for (VERSION v : values()) {
         if (v.toString().equals(version)) {
           return v;
         }
@@ -79,7 +79,7 @@ public class OWS extends VersionedVocabulary {
     }
 
     public static OPERATION fromString(String type) {
-      for (OPERATION v : OPERATION.values()) {
+      for (OPERATION v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }
@@ -103,7 +103,7 @@ public class OWS extends VersionedVocabulary {
     }
 
     public static METHOD fromString(String type) {
-      for (METHOD v : METHOD.values()) {
+      for (METHOD v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }

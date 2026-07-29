@@ -42,13 +42,13 @@ public class VersionedVocabulary {
   protected static void addWord(Enum v, Enum w, String s) {
     Class c = v.getDeclaringClass().getEnclosingClass();
     if (!vocabulary.containsKey(c)) {
-      vocabulary.put(c, new HashMap<Enum, Map<Enum, String>>());
+      vocabulary.put(c, new HashMap<>());
     }
     if (!vocabulary.get(c).containsKey(v)) {
-      vocabulary.get(c).put(v, new HashMap<Enum, String>());
+      vocabulary.get(c).put(v, new HashMap<>());
     }
     for (Map.Entry<Enum, Map<Enum, String>> e : vocabulary.get(c).entrySet()) {
-      if (e.getKey().equals(v) || e.getKey().compareTo(v) > 0) {
+      if (e.getKey() == v || e.getKey().compareTo(v) > 0) {
         vocabulary.get(c).get(e.getKey()).put(w, s);
       }
     }

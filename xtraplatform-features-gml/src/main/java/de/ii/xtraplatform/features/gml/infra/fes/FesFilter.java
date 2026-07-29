@@ -53,7 +53,7 @@ public class FesFilter extends FesExpression {
   }
 
   @Override
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public Map<String, String> toKVP(VERSION version, XMLNamespaceNormalizer nsStore) {
     // check if the first level expression is BBOX
     try {

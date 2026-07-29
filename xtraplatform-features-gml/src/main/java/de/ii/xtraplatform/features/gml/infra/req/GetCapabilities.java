@@ -20,7 +20,6 @@ public class GetCapabilities implements WfsOperation {
 
   private final WFS.VERSION version;
 
-  @SuppressWarnings("PMD.NullAssignment")
   public GetCapabilities() {
     this.version = null;
   }

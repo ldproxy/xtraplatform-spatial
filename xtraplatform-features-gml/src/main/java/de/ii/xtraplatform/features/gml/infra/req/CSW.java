@@ -17,7 +17,7 @@ import org.apache.hc.core5.net.URIBuilder;
 /**
  * @author zahnen
  */
-@SuppressWarnings("PMD.FieldNamingConventions")
+@SuppressWarnings({"PMD.FieldNamingConventions", "PMD.ExcessivePublicCount"})
 public class CSW extends VersionedVocabulary {
 
   public enum VERSION {
@@ -42,7 +42,7 @@ public class CSW extends VersionedVocabulary {
     }
 
     public static VERSION fromString(String version) {
-      for (VERSION v : VERSION.values()) {
+      for (VERSION v : values()) {
         if (v.toString().equals(version)) {
           return v;
         }
@@ -93,7 +93,7 @@ public class CSW extends VersionedVocabulary {
     }
 
     public static OPERATION fromString(String type) {
-      for (OPERATION v : OPERATION.values()) {
+      for (OPERATION v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }
@@ -117,7 +117,7 @@ public class CSW extends VersionedVocabulary {
     }
 
     public static METHOD fromString(String type) {
-      for (METHOD v : METHOD.values()) {
+      for (METHOD v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }
@@ -261,7 +261,7 @@ public class CSW extends VersionedVocabulary {
       if (inUri.getQuery() != null && !inUri.getQuery().isEmpty()) {
         for (String inParam : inUri.getQuery().split("&")) {
           String[] param = inParam.split("=");
-          if (!CSW.hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
+          if (!hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
             outUri.addParameter(param[0], param[1]);
           }
         }

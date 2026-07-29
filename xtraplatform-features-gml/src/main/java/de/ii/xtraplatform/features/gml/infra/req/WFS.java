@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author fischer
  */
-@SuppressWarnings("PMD.FieldNamingConventions")
+@SuppressWarnings({"PMD.FieldNamingConventions", "PMD.ExcessivePublicCount"})
 public class WFS extends VersionedVocabulary {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WFS.class);
@@ -54,7 +54,7 @@ public class WFS extends VersionedVocabulary {
     }
 
     public static VERSION fromString(String version) {
-      for (VERSION v : VERSION.values()) {
+      for (VERSION v : values()) {
         if (v.toString().equals(version)) {
           return v;
         }
@@ -109,7 +109,7 @@ public class WFS extends VersionedVocabulary {
     }
 
     public static OPERATION fromString(String type) {
-      for (OPERATION v : OPERATION.values()) {
+      for (OPERATION v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }
@@ -135,7 +135,7 @@ public class WFS extends VersionedVocabulary {
 
     @JsonCreator
     public static METHOD fromString(String type) {
-      for (METHOD v : METHOD.values()) {
+      for (METHOD v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }
@@ -355,12 +355,13 @@ public class WFS extends VersionedVocabulary {
       if (inUri.getQuery() != null && !inUri.getQuery().isEmpty()) {
         for (String inParam : inUri.getQuery().split("&")) {
           String[] param = inParam.split("=");
-          if (!WFS.hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
-            if (param.length >= 2) {
-              outUri.addParameter(param[0], param[1]);
-            } else {
-              LOGGER.debug("SINGLE {}", param[0]);
-            }
+          if (hasKVPKey(param[0].toUpperCase(Locale.ROOT))) {
+            continue;
+          }
+          if (param.length >= 2) {
+            outUri.addParameter(param[0], param[1]);
+          } else {
+            LOGGER.debug("SINGLE {}", param[0]);
           }
         }
       }

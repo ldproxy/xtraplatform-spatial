@@ -14,7 +14,6 @@ import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.AutoEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ConnectorFactory;
 import de.ii.xtraplatform.features.domain.FeatureProviderDataV2;
@@ -36,8 +35,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @AutoBind
 public class FeatureProviderWfsFactory
-    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderWfs>
-    implements EntityFactory {
+    extends AbstractEntityFactory<FeatureProviderDataV2, FeatureProviderWfs> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureProviderWfsFactory.class);
 
@@ -127,7 +125,7 @@ public class FeatureProviderWfsFactory
 
       return data;
 
-    } catch (Throwable e) {
+    } catch (Throwable e) { // NOPMD AvoidCatchingThrowable
       LogContext.error(
           LOGGER, e, "Feature provider with id '{}' could not be started", data.getId());
     }
@@ -136,6 +134,7 @@ public class FeatureProviderWfsFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface ProviderWfsFactoryAssisted
       extends FactoryAssisted<FeatureProviderDataV2, FeatureProviderWfs> {
     @Override

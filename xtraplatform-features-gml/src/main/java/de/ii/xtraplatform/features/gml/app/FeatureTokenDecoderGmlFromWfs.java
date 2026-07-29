@@ -40,7 +40,7 @@ import javax.xml.stream.XMLStreamException;
  *
  * @author zahnen
  */
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings("PMD.GodClass")
 public class FeatureTokenDecoderGmlFromWfs
     extends FeatureTokenDecoder<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>> {
@@ -52,16 +52,19 @@ public class FeatureTokenDecoderGmlFromWfs
   private final FeatureQuery featureQuery;
   private final Map<String, SchemaMapping> mappings;
   private final List<QName> featureTypes;
+
+  @SuppressWarnings("PMD.AvoidStringBufferField")
   private final StringBuilder buffer;
+
   private final GmlMultiplicityTracker multiplicityTracker;
   private final boolean passThrough;
   private final GeometryDecoderGml geometryDecoder;
 
   private boolean isBuffering;
-  private int depth = 0;
-  private int featureDepth = 0;
-  private boolean inFeature = false;
-  private boolean inGeometry = false;
+  private int depth;
+  private int featureDepth;
+  private boolean inFeature;
+  private boolean inGeometry;
   private Optional<EpsgCrs> crs = Optional.empty();
   private OptionalInt srsDimension = OptionalInt.empty();
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
@@ -73,6 +76,7 @@ public class FeatureTokenDecoderGmlFromWfs
       FeatureQuery query,
       Map<String, SchemaMapping> mappings,
       boolean passThrough) {
+    super();
     this.namespaceNormalizer = new XMLNamespaceNormalizer(namespaces);
     this.featureSchema = featureSchema;
     this.featureQuery = query;
@@ -86,7 +90,7 @@ public class FeatureTokenDecoderGmlFromWfs
     try {
       this.parser = new InputFactoryImpl().createAsyncFor(new byte[0]);
     } catch (XMLStreamException e) {
-      throw new IllegalStateException("Could not create GML decoder: " + e.getMessage());
+      throw new IllegalStateException("Could not create GML decoder: " + e.getMessage(), e);
     }
   }
 
@@ -110,7 +114,7 @@ public class FeatureTokenDecoderGmlFromWfs
   }
 
   // for unit tests
-  void parse(String data) throws Exception {
+  void parse(String data) {
     byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8);
     feedInput(dataBytes);
     cleanup();
@@ -129,7 +133,14 @@ public class FeatureTokenDecoderGmlFromWfs
     }
   }
 
-  @SuppressWarnings("PMD.CyclomaticComplexity")
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.SwitchDensity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   protected boolean advanceParser() {
 
     boolean feedMeMore = false;
@@ -201,21 +212,23 @@ public class FeatureTokenDecoderGmlFromWfs
             getDownstream().onStart(context);
           } else if ("Envelope".equals(parser.getLocalName()) && depth == 2) {
             String srsName = parser.getAttributeValue(null, "srsName");
+            Optional<EpsgCrs> parsedCrs = Optional.empty();
             if (srsName != null && !srsName.isEmpty()) {
               try {
-                crs = Optional.of(EpsgCrs.fromString(srsName));
+                parsedCrs = Optional.of(EpsgCrs.fromString(srsName));
               } catch (IllegalArgumentException e) {
-                crs = Optional.empty();
+                parsedCrs = Optional.empty();
               }
-            } else {
-              crs = Optional.empty();
             }
+            crs = parsedCrs;
+            OptionalInt parsedSrsDimension;
             try {
-              srsDimension =
+              parsedSrsDimension =
                   OptionalInt.of(Integer.parseInt(parser.getAttributeValue(null, "srsDimension")));
             } catch (NumberFormatException e) {
-              srsDimension = OptionalInt.empty();
+              parsedSrsDimension = OptionalInt.empty();
             }
+            srsDimension = parsedSrsDimension;
           } else if (matchesFeatureType(parser.getNamespaceURI(), parser.getLocalName())
               || matchesFeatureType(parser.getLocalName())) {
             inFeature = true;
@@ -359,11 +372,9 @@ public class FeatureTokenDecoderGmlFromWfs
           break;
 
         case XMLStreamConstants.CHARACTERS:
-          if (inFeature) {
-            if (!parser.isWhiteSpace()) {
-              this.isBuffering = true;
-              buffer.append(parser.getText());
-            }
+          if (inFeature && !parser.isWhiteSpace()) {
+            this.isBuffering = true;
+            buffer.append(parser.getText());
           }
           break;
 
@@ -374,7 +385,7 @@ public class FeatureTokenDecoderGmlFromWfs
         default:
           // advanceParser(in);
       }
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       throw new IllegalArgumentException("Could not parse GML: " + e.getMessage(), e);
     }
     return feedMeMore;

@@ -78,8 +78,7 @@ public class FesPolygonExpression extends FesExpression {
       StringBuilder c = new StringBuilder();
       for (List<Double> ring : rings) {
         for (Double d : ring) {
-          c.append(d);
-          c.append(' ');
+          c.append(d).append(' ');
         }
       }
 

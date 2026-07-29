@@ -26,9 +26,10 @@ import java.util.Optional;
 import java.util.Set;
 import javax.xml.namespace.QName;
 
+@SuppressWarnings("PMD.GodClass")
 class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
 
-  public static final String GML_NS_URI = GML.getNS(GML.VERSION._2_1_1);
+  static final String GML_NS_URI = GML.getNS(GML.VERSION._2_1_1);
 
   private final Set<String> mappedPaths;
   private final XMLNamespaceNormalizer namespaceNormalizer;
@@ -69,7 +70,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
         .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  public List<FeatureSchema> getFeatureTypes() {
+  List<FeatureSchema> getFeatureTypes() {
     return mappingBuilder.getFeatureTypes();
   }
 
@@ -99,6 +100,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void analyzeAttribute(
       String nsUri, String localName, String type, boolean required, int depth) {
     // only first level gml:ids
@@ -111,8 +113,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
 
     if (depth == 0
         && (("id".equals(localName) && nsUri.startsWith(GML_NS_URI)) || "fid".equals(localName))) {
-      String path = currentPath.toString();
-      // if (!isPathMapped(path)) {
+      // if (!isPathMapped(currentPath.toString())) {
       mappingBuilder.addValue(
           "id", currentPath.asList(), FeatureSchema.Type.STRING, FeatureSchema.Role.ID);
       // }
@@ -128,6 +129,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void analyzeProperty(
       String nsUri,
       String localName,
@@ -150,7 +152,6 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     }
 
     boolean isMultiple = maxOccurs > 1 || maxOccurs == -1;
-    boolean isRequired = minOccurs > 0;
 
     // if (!isPathMapped(path)) {
     Optional<FeatureSchema.Type> propertyType =
@@ -195,6 +196,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     // }
   }
 
+  @SuppressWarnings("PMD.NPathComplexity")
   private Optional<Type> getPropertyType(
       String type,
       boolean isMultiple,
@@ -246,6 +248,7 @@ class WfsSchemaAnalyzer implements FeatureProviderSchemaConsumer {
     }*/
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private FeatureSchema.Type getFeatureSchemaType(GmlType dataType) {
     switch (dataType) {
       case BOOLEAN:
