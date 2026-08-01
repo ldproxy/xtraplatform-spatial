@@ -10,15 +10,24 @@ package de.ii.xtraplatform.features.domain;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 
 /**
- * Drops features whose id has already been emitted. The tokens of a feature are buffered until its
- * id property arrives; the feature is then either replayed or discarded as a whole. Duplicates can
- * only arise when multiple queries of a multi-query select the same feature.
+ * Drops features that have already been emitted. The tokens of a feature are buffered until its
+ * dedup key is complete; the feature is then either replayed or discarded as a whole. Duplicates
+ * can only arise when multiple queries of a multi-query select the same feature.
+ *
+ * <p>The dedup key is the feature id plus, on types with a primary interval, the interval start
+ * value. This keeps the versions of a versioned feature apart, which share the feature id and
+ * differ in the interval start. A primary interval does not imply versioning, but on non-versioned
+ * types every occurrence of an id carries the same interval start, so the extended key does not
+ * change the outcome there. On types with a primary interval the decision is deferred until both
+ * values have arrived, or until the feature ends if no interval start value is present.
  */
 public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer {
 
@@ -37,13 +46,19 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   private final Queue<Boolean> inArrayQueue;
   private final Queue<Boolean> inObjectQueue;
 
+  private final Map<String, Boolean> typeHasPrimaryInterval;
+
   private boolean buffering;
   private boolean dropping;
   private String currentType;
+  private boolean expectIntervalStart;
+  private String idValue;
+  private String intervalStartValue;
 
   public FeatureTokenTransformerDeduplicate(boolean idsArePerType) {
     this.seen = new PackedIdSet(MAX_FEATURES);
     this.idsArePerType = idsArePerType;
+    this.typeHasPrimaryInterval = new HashMap<>();
     this.tokenQueue = new LinkedList<>();
     this.pathQueue = new LinkedList<>();
     this.schemaIndexQueue = new LinkedList<>();
@@ -61,8 +76,17 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     this.currentType =
         Objects.nonNull(context.mapping()) ? context.mapping().getTargetSchema().getName() : null;
+    this.expectIntervalStart =
+        Objects.nonNull(context.mapping())
+            && typeHasPrimaryInterval.computeIfAbsent(
+                Objects.requireNonNullElse(currentType, ""),
+                ignore ->
+                    context.mapping().getTargetSchema().getAllNestedFeatureProperties().stream()
+                        .anyMatch(SchemaBase::isPrimaryIntervalStart));
     this.buffering = true;
     this.dropping = false;
+    this.idValue = null;
+    this.intervalStartValue = null;
 
     buffer(context, FeatureTokenType.FEATURE);
   }
@@ -74,8 +98,17 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
       return;
     }
     if (buffering) {
-      // a feature without an id is always emitted
-      flush(context);
+      if (Objects.nonNull(idValue)) {
+        // the expected interval start value never arrived, decide on the id alone
+        decide(context);
+        if (dropping) {
+          this.dropping = false;
+          return;
+        }
+      } else {
+        // a feature without an id is always emitted
+        flush(context);
+      }
     }
 
     super.onFeatureEnd(context);
@@ -149,24 +182,39 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
     if (buffering) {
       buffer(context, FeatureTokenType.VALUE);
 
-      if (context.schema().filter(SchemaBase::isId).isPresent()
-          && Objects.nonNull(context.value())) {
-        String key =
-            idsArePerType && Objects.nonNull(currentType)
-                ? currentType + ":" + context.value()
-                : context.value();
-
-        if (seen.add(key)) {
-          flush(context);
-        } else {
-          clear();
-          this.dropping = true;
-          this.buffering = false;
+      if (Objects.nonNull(context.value())) {
+        if (Objects.isNull(idValue) && context.schema().filter(SchemaBase::isId).isPresent()) {
+          this.idValue = context.value();
+        } else if (expectIntervalStart
+            && Objects.isNull(intervalStartValue)
+            && context.schema().filter(SchemaBase::isPrimaryIntervalStart).isPresent()) {
+          this.intervalStartValue = context.value();
         }
+      }
+
+      if (Objects.nonNull(idValue)
+          && (!expectIntervalStart || Objects.nonNull(intervalStartValue))) {
+        decide(context);
       }
       return;
     }
     super.onValue(context);
+  }
+
+  private void decide(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    String key =
+        idsArePerType && Objects.nonNull(currentType) ? currentType + ":" + idValue : idValue;
+    if (Objects.nonNull(intervalStartValue)) {
+      key = key + ":" + intervalStartValue;
+    }
+
+    if (seen.add(key)) {
+      flush(context);
+    } else {
+      clear();
+      this.dropping = true;
+      this.buffering = false;
+    }
   }
 
   private void buffer(
