@@ -161,6 +161,7 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
     // FeatureTokenTransformerCompositeId) into the rebuilt context that downstream sees.
     newContext.setPropertyLinks(context.propertyLinks());
     newContext.setCanonicalFeatureId(context.canonicalFeatureId());
+    newContext.setFeatureVersionStart(context.featureVersionStart());
 
     downstream.onFeatureStart(newContext);
     downstream.bufferStart();
@@ -179,6 +180,7 @@ public class FeatureTokenTransformerMappings extends FeatureTokenTransformer {
     // placeholder) see the up-to-date values.
     newContext.setPropertyLinks(context.propertyLinks());
     newContext.setCanonicalFeatureId(context.canonicalFeatureId());
+    newContext.setFeatureVersionStart(context.featureVersionStart());
 
     downstream.bufferStop(true);
 

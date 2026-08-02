@@ -100,6 +100,16 @@ public interface FeatureEventHandler<
     @Nullable
     String canonicalFeatureId();
 
+    /**
+     * Raw {@code PRIMARY_INTERVAL_START} value of the current feature, captured together with
+     * {@link #canonicalFeatureId()} when a profile rewrites the id token to a version-unique
+     * composite. Encoders that link to the feature address the version as {@code
+     * .../items/<canonicalFeatureId>?datetime=<featureVersionStart>} instead of using the composite
+     * id in the URL path.
+     */
+    @Nullable
+    String featureVersionStart();
+
     @Value.Lazy
     default Optional<T> schema() {
       if (Objects.isNull(mapping())) {
@@ -435,6 +445,8 @@ public interface FeatureEventHandler<
     ModifiableContext<T, U> setPropertyLinks(Iterable<? extends PropertyLink> propertyLinks);
 
     ModifiableContext<T, U> setCanonicalFeatureId(@Nullable String canonicalFeatureId);
+
+    ModifiableContext<T, U> setFeatureVersionStart(@Nullable String featureVersionStart);
   }
 
   /**
