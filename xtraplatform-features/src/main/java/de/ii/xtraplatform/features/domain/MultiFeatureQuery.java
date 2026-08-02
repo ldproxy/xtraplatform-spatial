@@ -21,6 +21,12 @@ public interface MultiFeatureQuery extends Query {
   List<SubQuery> getQueries();
 
   /**
+   * Query extensions that apply to the whole multi-query, e.g. pre-format token transformers
+   * contributed by profiles (see the equivalent {@link FeatureQuery#getExtensions()}).
+   */
+  List<FeatureQueryExtension> getExtensions();
+
+  /**
    * If enabled, a feature that is selected by more than one query is only included in the response
    * once.
    */

@@ -127,6 +127,16 @@ public class FeatureStreamImpl implements FeatureStream {
     return List.of();
   }
 
+  private static List<FeatureQueryExtension> getExtensions(Query query) {
+    if (query instanceof FeatureQuery) {
+      return ((FeatureQuery) query).getExtensions();
+    }
+    if (query instanceof MultiFeatureQuery) {
+      return ((MultiFeatureQuery) query).getExtensions();
+    }
+    return List.of();
+  }
+
   @Override
   public CompletionStage<Result> runWith(
       Sink<Object> sink,
@@ -154,11 +164,9 @@ public class FeatureStreamImpl implements FeatureStream {
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
           // any format-specific transformation
-          if (query instanceof FeatureQuery) {
-            for (FeatureQueryExtension ext : ((FeatureQuery) query).getExtensions()) {
-              if (ext instanceof FeatureTokenTransformerExtension) {
-                source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
-              }
+          for (FeatureQueryExtension ext : getExtensions(query)) {
+            if (ext instanceof FeatureTokenTransformerExtension) {
+              source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
             }
           }
           source =
@@ -258,11 +266,9 @@ public class FeatureStreamImpl implements FeatureStream {
           // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
           // the same pre-format slot so they see raw provider values and can mutate tokens before
           // any format-specific transformation
-          if (query instanceof FeatureQuery) {
-            for (FeatureQueryExtension ext : ((FeatureQuery) query).getExtensions()) {
-              if (ext instanceof FeatureTokenTransformerExtension) {
-                source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
-              }
+          for (FeatureQueryExtension ext : getExtensions(query)) {
+            if (ext instanceof FeatureTokenTransformerExtension) {
+              source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
             }
           }
           source =
