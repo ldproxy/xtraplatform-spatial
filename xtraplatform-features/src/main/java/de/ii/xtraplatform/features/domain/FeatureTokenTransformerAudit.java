@@ -91,16 +91,20 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
 
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    if (!includePropertyValues) {
+    if (!includePropertyValues && !propertyNames.isEmpty()) {
       featureHolder.put("properties", new ArrayList<>(propertyNames));
     }
-    featureList.add(new LinkedHashMap<>(featureHolder));
+    if (!featureHolder.isEmpty()) {
+      featureList.add(new LinkedHashMap<>(featureHolder));
+    }
     logAllProperties = false;
 
     super.onFeatureEnd(context);
   }
 
   public void appendToLog() {
-    auditLog.setTarget(requestId, Map.of("features", featureList));
+    if (!featureList.isEmpty()) {
+      auditLog.setTarget(requestId, Map.of("features", featureList));
+    }
   }
 }
