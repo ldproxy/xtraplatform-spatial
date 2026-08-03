@@ -142,7 +142,7 @@ public class FeatureStreamImpl implements FeatureStream {
       Sink<Object> sink,
       Map<String, PropertyTransformations> propertyTransformations,
       CompletableFuture<CollectionMetadata> onCollectionMetadata,
-      Optional<String> requestId) {
+      Optional<String> auditLogId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
@@ -195,13 +195,9 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           FeatureTokenTransformerAudit auditTransformer = null;
-          if (stepAudit) {
-            if (requestId.isEmpty()) {
-              LOGGER.error("Audit logging not possible, no request-id provided!");
-            } else if (auditLog.logIsAvailable(requestId.get())) {
-              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
-              source = source.via(auditTransformer);
-            }
+          if (stepAudit && auditLogId.isPresent() && auditLog.logIsAvailable(auditLogId.get())) {
+            auditTransformer = new FeatureTokenTransformerAudit(auditLogId.get(), auditLog);
+            source = source.via(auditTransformer);
           }
           final Runnable finishAuditLog =
               auditTransformer != null ? auditTransformer::appendToLog : () -> {};
@@ -244,7 +240,7 @@ public class FeatureStreamImpl implements FeatureStream {
       SinkReduced<Object, X> sink,
       Map<String, PropertyTransformations> propertyTransformations,
       CompletableFuture<CollectionMetadata> onCollectionMetadata,
-      Optional<String> requestId) {
+      Optional<String> auditLogId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
@@ -296,13 +292,9 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           FeatureTokenTransformerAudit auditTransformer = null;
-          if (stepAudit) {
-            if (requestId.isEmpty()) {
-              LOGGER.error("Audit logging not possible, no request-id provided!");
-            } else if (auditLog.logIsAvailable(requestId.get())) {
-              auditTransformer = new FeatureTokenTransformerAudit(requestId.get(), auditLog);
-              source = source.via(auditTransformer);
-            }
+          if (stepAudit && auditLogId.isPresent() && auditLog.logIsAvailable(auditLogId.get())) {
+            auditTransformer = new FeatureTokenTransformerAudit(auditLogId.get(), auditLog);
+            source = source.via(auditTransformer);
           }
           final Runnable finishAuditLog =
               auditTransformer != null ? auditTransformer::appendToLog : () -> {};
