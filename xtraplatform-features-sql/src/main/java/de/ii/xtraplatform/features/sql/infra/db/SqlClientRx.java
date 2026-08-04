@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.sql.infra.db;
 
 import com.google.common.collect.ImmutableList;
 import com.zaxxer.hikari.pool.ProxyConnection;
+import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -194,25 +194,9 @@ public class SqlClientRx implements SqlClient {
                     })
         .collect(Collectors.toList());*/
 
-    int[] i = {0};
-    BiFunction<ResultSet, String, String> mapper =
-        (slickRow, previousId) -> {
-          LOGGER.debug("QUERY {}", i[0]);
-          // null not allowed as return value
-          String id = null;
-          try {
-            id = slickRow.getString(1);
-            LOGGER.debug("RETURNED {}", id);
-            idConsumers.get(i[0]).accept(id);
-            // LOGGER.debug("VALUES {}", values);
-            LOGGER.debug("");
-          } catch (SQLException e) {
-            e.printStackTrace();
-          }
-          i[0]++;
-
-          return previousId != null ? previousId : id;
-        };
+    // rxjava3-jdbc does not release the transacted connection when a statement stream is cancelled,
+    // which is what happens to all preceding statements when a later one fails, see the guard
+    MutationTransactionGuard guard = new MutationTransactionGuard();
 
     String first = statements.get(0).get();
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
@@ -220,11 +204,19 @@ public class SqlClientRx implements SqlClient {
     }
 
     Flowable<? extends Tx<?>> txFlowable =
-        session
-            .update(first)
-            .transacted()
-            .returnGeneratedKeys()
-            .get(resultSet -> mapper.apply(resultSet, null))
+        guard
+            .track(
+                session
+                    .update(first)
+                    .transacted()
+                    .returnGeneratedKeys()
+                    .get(
+                        resultSet -> {
+                          guard.capture(resultSet);
+                          return consumeId(resultSet, null, idConsumers, 0);
+                        })
+                    // the transacted connection is created when the statement stream is subscribed
+                    .doOnSubscribe(subscription -> guard.acquired()))
             .filter(tx -> !tx.isComplete());
 
     for (int j = 1; j < statements.size(); j++) {
@@ -237,20 +229,57 @@ public class SqlClientRx implements SqlClient {
                   LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
                 }
 
-                return tx.update(next)
-                    .returnGeneratedKeys()
-                    .get(
-                        resultSet ->
-                            mapper.apply(
-                                resultSet,
-                                tx.value() instanceof String ? (String) tx.value() : null))
+                // tx.update forks the transacted connection
+                guard.acquired();
+
+                return guard
+                    .track(
+                        tx.update(next)
+                            .returnGeneratedKeys()
+                            .get(
+                                resultSet -> {
+                                  guard.capture(resultSet);
+                                  return consumeId(
+                                      resultSet,
+                                      tx.value() instanceof String ? (String) tx.value() : null,
+                                      idConsumers,
+                                      finalJ);
+                                }))
                     .filter(tx2 -> !tx2.isComplete());
               });
     }
 
-    Flowable<String> flowable = txFlowable.map(tx -> featureId.orElse((String) tx.value()));
+    Flowable<String> flowable =
+        txFlowable
+            .map(tx -> featureId.orElse((String) tx.value()))
+            .doFinally(guard::releaseIfLeaked);
 
     return Reactive.Source.publisher(flowable);
+  }
+
+  private static String consumeId(
+      ResultSet resultSet, String previousId, List<Consumer<String>> idConsumers, int index) {
+    // null not allowed as return value
+    String id = null;
+
+    try {
+      id = resultSet.getString(1);
+
+      if (index < idConsumers.size()) {
+        Consumer<String> idConsumer = idConsumers.get(index);
+
+        if (Objects.nonNull(idConsumer)) {
+          idConsumer.accept(id);
+        }
+      } else if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn("No id consumer for mutation statement {}, returned id: {}", index, id);
+      }
+    } catch (SQLException e) {
+      LogContext.errorAsDebug(
+          LOGGER, e, "Could not read the id returned by mutation statement {}", index);
+    }
+
+    return previousId != null ? previousId : id;
   }
 
   @Override
@@ -265,26 +294,21 @@ public class SqlClientRx implements SqlClient {
             feature -> {
               List<Supplier<Tuple<String, Consumer<String>>>> m = mutations.apply(feature);
 
-              List<Supplier<String>> statements =
-                  m.stream()
-                      .map(
-                          queryFunction ->
-                              Objects.isNull(queryFunction.get().first())
-                                  ? null
-                                  : (Supplier<String>) () -> queryFunction.get().first())
-                      .filter(Objects::nonNull)
-                      .collect(Collectors.toList());
+              // both lists have to stay index aligned, the statements are resolved lazily since
+              // they may depend on ids returned by preceding statements
+              List<Supplier<String>> statements = new ArrayList<>();
+              List<Consumer<String>> idConsumers = new ArrayList<>();
 
-              List<Consumer<String>> idConsumers =
-                  m.stream()
-                      .map(
-                          queryFunction -> {
-                            // TODO
-                            Tuple<String, Consumer<String>> query = queryFunction.get();
-                            return query.second();
-                          })
-                      .filter(Objects::nonNull)
-                      .collect(Collectors.toList());
+              for (Supplier<Tuple<String, Consumer<String>>> queryFunction : m) {
+                Tuple<String, Consumer<String>> query = queryFunction.get();
+
+                if (Objects.isNull(query.first())) {
+                  continue;
+                }
+
+                statements.add(() -> queryFunction.get().first());
+                idConsumers.add(query.second());
+              }
 
               Optional<String> featureId =
                   feature
