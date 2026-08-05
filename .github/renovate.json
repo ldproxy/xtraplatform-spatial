@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["ldproxy/renovate-config:xtraplatform", "ldproxy/renovate-config:maintenance2(7.7,7.6)"],
+  "extends": ["ldproxy/renovate-config:xtraplatform", "ldproxy/renovate-config:maintenance2(8.0,7.7)"],
   "packageRules": [
     {
       "matchUpdateTypes": ["patch"],
