@@ -244,6 +244,11 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
               });
         }
 
+        // when no tileset of the job set has tiles to seed, no job was added and the total is still
+        // unknown; a total of zero makes the job set complete instead of leaving it in the queue,
+        // where it would never reach 100% and suppress every following seeding run
+        jobSet.getTotal().compareAndSet(-1, 0);
+
         if (jobSet.isDone()) {
           jobSet.getCleanup().ifPresent(jobQueue::push);
           return JobResult.success(); // early return
