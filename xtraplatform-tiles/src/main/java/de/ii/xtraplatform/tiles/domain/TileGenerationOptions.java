@@ -9,6 +9,7 @@ package de.ii.xtraplatform.tiles.domain;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 
 public interface TileGenerationOptions {
@@ -97,4 +98,30 @@ public interface TileGenerationOptions {
    * @since v4.3
    */
   List<String> getProfiles();
+
+  /**
+   * @langEn The width and height of a tile in the internal coordinate system that is used for the
+   *     coordinates in a vector tile. A higher value increases the geometric precision of the tiles
+   *     and reduces the simplification of the geometries, but it also increases the size of the
+   *     tiles. The value should be a power of 2. Renderers typically restrict the internal
+   *     precision, MapLibre for example normalizes all coordinates to a value of `8192`, so higher
+   *     values have no effect in such clients. Changing the value invalidates the content of
+   *     existing tile caches, the tiles have to be seeded again.
+   * @langDe Die Breite und Höhe einer Kachel in dem internen Koordinatensystem, das für die
+   *     Koordinaten in einer Vector Tile verwendet wird. Ein höherer Wert erhöht die geometrische
+   *     Genauigkeit der Kacheln und reduziert die Vereinfachung der Geometrien, erhöht aber auch
+   *     die Größe der Kacheln. Der Wert sollte eine Zweierpotenz sein. Renderer beschränken die
+   *     interne Genauigkeit üblicherweise, MapLibre normalisiert zum Beispiel alle Koordinaten auf
+   *     einen Wert von `8192`, höhere Werte haben in solchen Clients daher keinen Effekt. Eine
+   *     Änderung des Werts invalidiert den Inhalt bestehender Tile-Caches, die Kacheln müssen
+   *     erneut geseedet werden.
+   * @default 4096
+   * @since v4.9
+   */
+  @Nullable
+  Integer getTileExtent();
+
+  default int getTileExtentOrDefault(TileMatrixSetBase tileMatrixSet) {
+    return Objects.isNull(getTileExtent()) ? tileMatrixSet.getTileExtent() : getTileExtent();
+  }
 }
