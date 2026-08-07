@@ -22,6 +22,7 @@ public class FesPropertyIsLike extends FesExpression {
   private String escapeChar;
 
   public FesPropertyIsLike(FesLiteral left, FesLiteral right) {
+    super();
     this.left = replaceWildCard(left);
     this.right = replaceWildCard(right);
 
@@ -43,7 +44,7 @@ public class FesPropertyIsLike extends FesExpression {
   }
 
   @Override
-  public void toXML(VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(VERSION version, Element e, XMLDocument doc) {
 
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element ex = doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.LIKE));
@@ -54,8 +55,8 @@ public class FesPropertyIsLike extends FesExpression {
 
     e.appendChild(ex);
 
-    left.toXML(version, ex, doc);
-    right.toXML(version, ex, doc);
+    left.appendXml(version, ex, doc);
+    right.appendXml(version, ex, doc);
   }
 
   private static FesLiteral replaceWildCard(FesLiteral literal) {

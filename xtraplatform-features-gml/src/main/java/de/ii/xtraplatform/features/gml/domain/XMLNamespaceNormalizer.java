@@ -13,15 +13,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.namespace.QName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author fischer
  */
+@SuppressWarnings("PMD.GodClass")
 public class XMLNamespaceNormalizer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(XMLNamespaceNormalizer.class);
   private Map<String, String> namespaces;
   private int nscount;
   private int shortcount;
@@ -70,7 +68,8 @@ public class XMLNamespaceNormalizer {
 
     for (Map.Entry<String, String> ns : namespaces.entrySet()) {
       if (ns.getKey() != null && ns.getKey().length() > 5) {
-        String pre = ns.getKey().substring(0, 5) + shortcount++;
+        String pre = ns.getKey().substring(0, 5) + shortcount;
+        shortcount++;
         shortNamespaces.put(pre, ns.getValue());
       }
     }
@@ -83,13 +82,15 @@ public class XMLNamespaceNormalizer {
     addNamespace(prefix, namespaceURI);
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void addNamespace(String prefix, String namespaceURI) {
+    String effectivePrefix = prefix;
 
-    if (namespaces.containsKey(prefix)) {
-      prefix += "x";
+    if (namespaces.containsKey(effectivePrefix)) {
+      effectivePrefix += "x";
     }
 
-    if (prefix != null && prefix.isEmpty()) {
+    if (effectivePrefix != null && effectivePrefix.isEmpty()) {
       // defaultNamespaceURI = namespaceURI;
       // prefix = defaultNamespacePRE;
       // LOGGER.debug("Added Default-Namespace: {}, {}", prefix, namespaceURI);
@@ -101,14 +102,17 @@ public class XMLNamespaceNormalizer {
       if (namespaceURI.startsWith("http://www.opengis.net/gml")) {
         namespaces.put("gml", namespaceURI);
         // LOGGER.debug("Added gml Namespace: {}, {}", "gml", namespaceURI);
-      } else if (!namespaces.containsValue(namespaceURI) && prefix != null) {
-        namespaces.put(prefix, namespaceURI);
-        // LOGGER.debug("Added Namespace: {}, {}", prefix, namespaceURI);
+      } else if (!namespaces.containsValue(namespaceURI) && effectivePrefix != null) {
+        namespaces.put(effectivePrefix, namespaceURI);
+        // LOGGER.debug("Added Namespace: {}, {}", effectivePrefix, namespaceURI);
       }
     }
 
-    if (prefix != null && prefix.length() > 5 && !shortNamespaces.containsValue(namespaceURI)) {
-      String pre = prefix.substring(0, 5) + shortcount++;
+    if (effectivePrefix != null
+        && effectivePrefix.length() > 5
+        && !shortNamespaces.containsValue(namespaceURI)) {
+      String pre = effectivePrefix.substring(0, 5) + shortcount;
+      shortcount++;
       shortNamespaces.put(pre, namespaceURI);
     }
   }
@@ -123,7 +127,8 @@ public class XMLNamespaceNormalizer {
       } else if (nextToLast.find()) {
         prefix = nextToLast.group(1);
       } else {
-        prefix = "ns" + nscount++;
+        prefix = "ns" + nscount;
+        nscount++;
       }
       addNamespace(prefix, namespaceURI);
     }
@@ -140,12 +145,13 @@ public class XMLNamespaceNormalizer {
   */
 
   public String convertToShortForm(String longform) {
+    String shortForm = longform;
     for (Map.Entry<String, String> ns : namespaces.entrySet()) {
       if (ns != null && !ns.getValue().isEmpty()) {
-        longform = longform.replace(ns.getValue(), this.getNamespacePrefix(ns.getValue()));
+        shortForm = shortForm.replace(ns.getValue(), this.getNamespacePrefix(ns.getValue()));
       }
     }
-    return longform;
+    return shortForm;
   }
 
   /*

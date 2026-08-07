@@ -25,6 +25,7 @@ import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -90,6 +91,12 @@ import org.slf4j.LoggerFactory;
  * <adv:AX_LI_ProcessStep_Punktort_Description>}) still need explicit {@code xmlPaths} configuration
  * on the input profile. A known restriction of the GML building block.
  */
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.TooManyMethods",
+  "PMD.CyclomaticComplexity",
+  "PMD.CouplingBetweenObjects"
+})
 public class FeatureTokenDecoderGml
     extends FeatureTokenDecoderSimple<
         byte[], FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>> {
@@ -117,13 +124,13 @@ public class FeatureTokenDecoderGml
   private final AsyncXMLStreamReader<AsyncByteArrayFeeder> parser;
   private final XMLNamespaceNormalizer namespaceNormalizer;
   private final FeatureSchema featureSchema;
-  private final FeatureQuery featureQuery;
-  private final Map<String, SchemaMapping> mappings;
   private final List<QName> featureTypes;
   private final Optional<EpsgCrs> defaultCrs;
   private final Optional<String> nullValue;
   private final FeatureTokenDecoderGmlInputProfile inputProfile;
   private final GeometryDecoderGml geometryDecoder;
+
+  @SuppressWarnings("PMD.AvoidStringBufferField")
   private final StringBuilder buffer;
 
   /**
@@ -175,16 +182,16 @@ public class FeatureTokenDecoderGml
    */
   private final Map<String, List<XmlPathChain>> structuralChainsByOwnerPath;
 
-  private int depth = 0;
-  private boolean inFeature = false;
-  private boolean featureProcessed = false;
-  private boolean isBuffering = false;
+  private int depth;
+  private boolean inFeature;
+  private boolean featureProcessed;
+  private boolean isBuffering;
   private String currentArrayPath;
   private Optional<EpsgCrs> crs = Optional.empty();
   private Optional<EpsgCrs> featureGeometryCrs = Optional.empty();
-  private OptionalInt srsDimension = OptionalInt.empty();
+  private final OptionalInt srsDimension = OptionalInt.empty();
   private ModifiableContext<FeatureSchema, SchemaMapping> context;
-  private final ArrayDeque<Frame> frames = new ArrayDeque<>();
+  private final Deque<Frame> frames = new ArrayDeque<>();
 
   private FeatureTokenBufferSimple<
           FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
@@ -405,10 +412,9 @@ public class FeatureTokenDecoderGml
       Optional<EpsgCrs> headerCrs,
       Optional<String> nullValue,
       FeatureTokenDecoderGmlInputProfile inputProfile) {
+    super();
     this.namespaceNormalizer = new XMLNamespaceNormalizer(namespaces);
     this.featureSchema = featureSchema;
-    this.featureQuery = query;
-    this.mappings = mappings;
     this.featureTypes = featureTypes;
     this.defaultCrs = headerCrs.isPresent() ? headerCrs : Optional.of(storageCrs);
     this.nullValue = nullValue;
@@ -446,7 +452,7 @@ public class FeatureTokenDecoderGml
     try {
       this.parser = new InputFactoryImpl().createAsyncFor(new byte[0]);
     } catch (XMLStreamException e) {
-      throw new IllegalStateException("Could not create GML decoder: " + e.getMessage());
+      throw new IllegalStateException("Could not create GML decoder: " + e.getMessage(), e);
     }
   }
 
@@ -468,7 +474,9 @@ public class FeatureTokenDecoderGml
     List<String> chain = xmlPaths.get(path);
     if (chain == null) {
       String aliasPath = aliasFormPathByPropertyPath.get(path);
-      chain = aliasPath == null ? null : xmlPaths.get(aliasPath);
+      if (aliasPath != null) {
+        chain = xmlPaths.get(aliasPath);
+      }
     }
     return chain != null && chain.size() > 1;
   }
@@ -529,6 +537,7 @@ public class FeatureTokenDecoderGml
     return chains;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidInstantiatingObjectsInLoops"})
   private void collectStructuralChains(
       FeatureSchema owner, String ownerPath, Map<String, List<XmlPathChain>> chains) {
     for (FeatureSchema property : owner.getProperties()) {
@@ -536,7 +545,9 @@ public class FeatureTokenDecoderGml
       List<String> configured = inputProfile.getXmlPaths().get(path);
       if (configured == null) {
         String aliasPath = aliasFormPathByPropertyPath.get(path);
-        configured = aliasPath == null ? null : inputProfile.getXmlPaths().get(aliasPath);
+        if (aliasPath != null) {
+          configured = inputProfile.getXmlPaths().get(aliasPath);
+        }
       }
       if (configured != null && !configured.isEmpty()) {
         List<XmlPathSegment> segments =
@@ -585,7 +596,7 @@ public class FeatureTokenDecoderGml
       String defaultPrefix = inputProfile.getDefaultNamespace();
       namespaceUri =
           defaultPrefix == null || defaultPrefix.isEmpty()
-              ? null
+              ? null // NOPMD NullAssignment - null is the valid "unresolved" state here
               : namespaceNormalizer.getNamespaceURI(defaultPrefix);
     }
     return new XmlPathSegment(segment, namespaceUri, emptyElement, repeats);
@@ -601,7 +612,10 @@ public class FeatureTokenDecoderGml
   private List<XmlPathChain> matchStructuralChainStart(
       FeatureSchema owner, String wireLocalName, String wireNamespaceUri) {
     List<XmlPathChain> candidates =
-        structuralChainsByOwnerPath.get(owner == featureSchema ? "" : owner.getFullPathAsString());
+        structuralChainsByOwnerPath.get(
+            owner == featureSchema // NOPMD CompareObjectsWithEquals - identity check for the root
+                ? ""
+                : owner.getFullPathAsString());
     if (candidates == null) {
       return List.of();
     }
@@ -643,7 +657,7 @@ public class FeatureTokenDecoderGml
   }
 
   // for unit tests
-  void parse(String data) throws Exception {
+  void parse(String data) {
     byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8);
     feedInput(dataBytes);
     cleanup();
@@ -697,12 +711,19 @@ public class FeatureTokenDecoderGml
           // ignore: DTD, SPACE, NAMESPACE, NOTATION_DECLARATION, ENTITY_DECLARATION,
           // PROCESSING_INSTRUCTION, COMMENT, CDATA. ATTRIBUTE is implicit in START_ELEMENT.
       }
-    } catch (Exception e) {
+    } catch (Exception e) { // NOPMD AvoidCatchingGenericException
       throw new IllegalArgumentException("Could not parse GML: " + e.getMessage(), e);
     }
     return feedMeMore;
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.NullAssignment"
+  })
   private boolean onStartElement() throws XMLStreamException, java.io.IOException {
     if (geometryDecoder.isWaitingForInput()) {
       Optional<Geometry<?>> optGeometry =
@@ -1000,10 +1021,10 @@ public class FeatureTokenDecoderGml
     if (frame.pendingXlinkHrefValue == null
         && prop.getValueType().orElse(prop.getType()) == Type.STRING) {
       String raw = readRawXlinkHref();
-      frame.pendingXlinkHrefFallback =
-          raw == null
-              ? null
-              : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw).orElse(raw);
+      if (raw != null) {
+        frame.pendingXlinkHrefFallback =
+            applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw).orElse(raw);
+      }
     }
     frame.valueWrapped = isValueWrapped(prop);
     validateUom(prop);
@@ -1021,6 +1042,7 @@ public class FeatureTokenDecoderGml
   // Close the ARRAY a chain frame opened for a repeated innermost element. The path tracker may
   // have moved on to another property, so re-track the array property's own path first — that is
   // where ARRAY_END belongs.
+  @SuppressWarnings("PMD.NullAssignment")
   private void closeChainArray(Frame chain) {
     if (chain.openArrayChildPath != null) {
       context.pathTracker().track(chain.openArrayChildPath, chain.chainContainerPathDepth + 1);
@@ -1029,6 +1051,11 @@ public class FeatureTokenDecoderGml
     }
   }
 
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private void continueStructuralChain(Frame parent) {
     String wireLocalName = parser.getLocalName();
     String wireNamespaceUri = parser.getNamespaceURI() == null ? "" : parser.getNamespaceURI();
@@ -1131,6 +1158,14 @@ public class FeatureTokenDecoderGml
     frames.push(nested);
   }
 
+  @SuppressWarnings({
+    "PMD.NcssCount",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.NullAssignment",
+    "PMD.ConfusingTernary"
+  })
   private void onEndElement() throws XMLStreamException, java.io.IOException {
     if (geometryDecoder.isWaitingForInput()) {
       // The geometry decoder paused on EVENT_INCOMPLETE while reading a coordinate element's text
@@ -1529,13 +1564,15 @@ public class FeatureTokenDecoderGml
       if (prefix != null) {
         return namespaceNormalizer.getNamespaceURI(prefix);
       }
-    } else if (parent != featureSchema) {
+    } else if (parent
+        != featureSchema) { // NOPMD CompareObjectsWithEquals - identity check for the root
       Optional<String> parentObjectType = parent.getObjectType();
-      if (parentObjectType.isPresent()) {
-        String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
-        if (prefix != null) {
-          return namespaceNormalizer.getNamespaceURI(prefix);
-        }
+      String prefix =
+          parentObjectType.isPresent()
+              ? inputProfile.getObjectTypeNamespaces().get(parentObjectType.get())
+              : null;
+      if (prefix != null) {
+        return namespaceNormalizer.getNamespaceURI(prefix);
       }
     }
     String defaultPrefix = inputProfile.getDefaultNamespace();
@@ -1592,7 +1629,10 @@ public class FeatureTokenDecoderGml
         return href;
       }
       String raw = inputProfile.getCodelistUriTemplate();
-      template = raw == null ? null : raw.replace("{{codelistId}}", codelistId.get());
+      template =
+          raw == null
+              ? null // NOPMD NullAssignment - null is the valid "no template configured" state
+              : raw.replace("{{codelistId}}", codelistId.get());
     }
     Optional<String> reduced = applyReverseTemplate(template, href);
     if (reduced.isEmpty() && template != null && !template.isEmpty() && LOGGER.isWarnEnabled()) {
@@ -1607,10 +1647,8 @@ public class FeatureTokenDecoderGml
   }
 
   private static boolean shouldRouteXlinkHrefAsValue(FeatureSchema prop) {
-    if (prop.isFeatureRef()) {
-      return true;
-    }
-    return prop.getConstraints().flatMap(SchemaConstraints::getCodelist).isPresent();
+    return prop.isFeatureRef()
+        || prop.getConstraints().flatMap(SchemaConstraints::getCodelist).isPresent();
   }
 
   private static Optional<String> applyReverseTemplate(String template, String href) {
@@ -1831,6 +1869,7 @@ public class FeatureTokenDecoderGml
    * in both cases the verbatim srsName is emitted at the configured srsName property. The path
    * tracker is restored to the geometry property's own segment afterwards.
    */
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   private void emitGeometryOrVertical(Optional<Geometry<?>> optGeometry) {
     Frame frame = frames.peek();
     GmlGeometryVariants variants =
@@ -1839,10 +1878,11 @@ public class FeatureTokenDecoderGml
 
     // Coordinates whose srsName declares a false-easting difference (e.g. Gauss-Krüger without
     // the zone prefix) are shifted so the emitted geometry conforms to the mapped CRS.
+    Optional<Geometry<?>> geometry = optGeometry;
     if (optGeometry.isPresent() && rawSrsName != null && variants != null) {
       Double falseEastingDifference = variants.getShiftBySrsName().get(rawSrsName);
       if (falseEastingDifference != null && falseEastingDifference != 0) {
-        optGeometry =
+        geometry =
             Optional.of(
                 optGeometry
                     .get()
@@ -1853,16 +1893,16 @@ public class FeatureTokenDecoderGml
       }
     }
 
-    if (optGeometry.isPresent()) {
+    if (geometry.isPresent()) {
       String variantProperty =
           variants != null && rawSrsName != null ? variants.getBySrsName().get(rawSrsName) : null;
       if (variantProperty != null) {
         context.pathTracker().track(variantProperty, frame.pathDepth);
-        emitGeometry(optGeometry.get());
+        emitGeometry(geometry.get());
         emitSrsName(variants, rawSrsName, frame.pathDepth);
         context.pathTracker().track(frame.segment, frame.pathDepth);
       } else {
-        emitGeometry(optGeometry.get());
+        emitGeometry(geometry.get());
       }
       return;
     }

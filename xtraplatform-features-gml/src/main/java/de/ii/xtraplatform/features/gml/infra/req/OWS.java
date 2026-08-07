@@ -12,6 +12,7 @@ import java.util.Map;
 /**
  * @author fischer
  */
+@SuppressWarnings({"PMD.FieldNamingConventions", "PMD.ExcessivePublicCount"})
 public class OWS extends VersionedVocabulary {
 
   public enum VERSION {
@@ -22,8 +23,7 @@ public class OWS extends VersionedVocabulary {
     private final FES.VERSION filterVersion;
     private final GML.VERSION gmlVersion;
 
-    private VERSION(
-        String stringRepresentation, FES.VERSION filterVersion, GML.VERSION gmlVersion) {
+    VERSION(String stringRepresentation, FES.VERSION filterVersion, GML.VERSION gmlVersion) {
       this.stringRepresentation = stringRepresentation;
       this.filterVersion = filterVersion;
       this.gmlVersion = gmlVersion;
@@ -43,7 +43,7 @@ public class OWS extends VersionedVocabulary {
     }
 
     public static VERSION fromString(String version) {
-      for (VERSION v : VERSION.values()) {
+      for (VERSION v : values()) {
         if (v.toString().equals(version)) {
           return v;
         }
@@ -69,7 +69,7 @@ public class OWS extends VersionedVocabulary {
     NONE("");
     private final String stringRepresentation;
 
-    private OPERATION(String stringRepresentation) {
+    OPERATION(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -79,7 +79,7 @@ public class OWS extends VersionedVocabulary {
     }
 
     public static OPERATION fromString(String type) {
-      for (OPERATION v : OPERATION.values()) {
+      for (OPERATION v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }
@@ -93,7 +93,7 @@ public class OWS extends VersionedVocabulary {
     POST("POST");
     private final String stringRepresentation;
 
-    private METHOD(String stringRepresentation) {
+    METHOD(String stringRepresentation) {
       this.stringRepresentation = stringRepresentation;
     }
 
@@ -103,7 +103,7 @@ public class OWS extends VersionedVocabulary {
     }
 
     public static METHOD fromString(String type) {
-      for (METHOD v : METHOD.values()) {
+      for (METHOD v : values()) {
         if (v.toString().equals(type)) {
           return v;
         }

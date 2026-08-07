@@ -14,6 +14,7 @@ import de.ii.xtraplatform.features.gml.infra.req.FES;
 import de.ii.xtraplatform.features.gml.infra.req.FES.VERSION;
 import de.ii.xtraplatform.features.gml.infra.req.GML;
 import de.ii.xtraplatform.features.gml.infra.xml.XMLDocument;
+import java.util.Locale;
 import java.util.Map;
 import org.w3c.dom.Element;
 
@@ -23,12 +24,13 @@ public class FesBBox extends FesExpression {
   private final String geometryPath;
 
   public FesBBox(BoundingBox env, String geometryPath) {
+    super();
     this.geometryPath = geometryPath;
     this.env = env;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
 
     // LOGGER.debug("BBOX {} {}", FES.getNS(version), FES.getQN(version, FES.VOCABULARY.BBOX));
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
@@ -92,6 +94,7 @@ public class FesBBox extends FesExpression {
     String bbox = min + "," + max;
     bbox += "," + env.getEpsgCrs().toSimpleString();
 
-    return ImmutableMap.of(FES.getWord(version, FES.VOCABULARY.BBOX).toUpperCase(), bbox);
+    return ImmutableMap.of(
+        FES.getWord(version, FES.VOCABULARY.BBOX).toUpperCase(Locale.ROOT), bbox);
   }
 }

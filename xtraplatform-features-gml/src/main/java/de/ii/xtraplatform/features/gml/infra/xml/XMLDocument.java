@@ -69,7 +69,7 @@ public class XMLDocument {
 
   public void done() {
     for (String uri : nsn.xgetNamespaceUris()) {
-      this.doc.getDocumentElement().setAttribute("xmlns:" + uri + "", nsn.getNamespaceURI(uri));
+      this.doc.getDocumentElement().setAttribute("xmlns:" + uri, nsn.getNamespaceURI(uri));
     }
   }
 
@@ -91,7 +91,7 @@ public class XMLDocument {
       Writer out = new StringWriter();
       tf.transform(new DOMSource(doc), new StreamResult(out));
       return out.toString();
-    } catch (Exception ex) {
+    } catch (Exception ex) { // NOPMD AvoidCatchingGenericException
       LOGGER.error("Error serializing XMLDocument", ex);
     }
     return null;

@@ -14,17 +14,20 @@ import de.ii.xtraplatform.features.domain.ImmutableFeatureStoreInstanceContainer
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class FeatureStorePathParserWfs implements FeatureStorePathParser {
 
-  public FeatureStorePathParserWfs(Map<String, String> namespaces) {}
+  public FeatureStorePathParserWfs(Map<String, String> namespaces) {
+    Objects.requireNonNull(namespaces);
+  }
 
   @Override
   public List<FeatureStoreInstanceContainer> parse(FeatureSchema schema) {
 
-    LinkedHashMap<String, ImmutableFeatureStoreInstanceContainer.Builder>
-        instanceContainerBuilders = new LinkedHashMap<>();
+    Map<String, ImmutableFeatureStoreInstanceContainer.Builder> instanceContainerBuilders =
+        new LinkedHashMap<>();
 
     String instanceContainerName = schema.getName();
 

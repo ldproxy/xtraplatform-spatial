@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.gml.infra;
 
+import de.ii.xtraplatform.features.domain.BoundingBoxStrings;
 import de.ii.xtraplatform.features.domain.FeatureProviderMetadataConsumer;
 import de.ii.xtraplatform.features.gml.infra.req.OWS;
 import de.ii.xtraplatform.features.gml.infra.req.XLINK;
@@ -21,6 +22,7 @@ import org.xml.sax.InputSource;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public class WFSCapabilitiesParser {
 
   private final FeatureProviderMetadataConsumer metadataConsumer;
@@ -36,7 +38,7 @@ public class WFSCapabilitiesParser {
     try {
       InputSource is = new InputSource(inputStream);
       parse(is);
-    } catch (Exception ex) {
+    } catch (Exception ex) { // NOPMD AvoidCatchingGenericException
       // TODO: move to analyzer for XtraProxy
       // LOGGER.error(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
       // throw new SchemaParseException(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
@@ -45,6 +47,7 @@ public class WFSCapabilitiesParser {
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public void parse(InputSource is) {
 
     SMInputCursor root = null;
@@ -78,6 +81,8 @@ public class WFSCapabilitiesParser {
             break;
           case FEATURE_TYPE_LIST:
             parseFeatureTypeList(capabilitiesChild);
+            break;
+          default:
             break;
         }
 
@@ -125,11 +130,9 @@ public class WFSCapabilitiesParser {
 
       while (exceptionReportChild.readerAccessible()) {
 
-        switch (OWS.findKey(exceptionReportChild.getLocalName())) {
-          case EXCEPTION:
-            parseException(exceptionReportChild);
-            reportChildFound = true;
-            break;
+        if (OWS.findKey(exceptionReportChild.getLocalName()) == OWS.VOCABULARY.EXCEPTION) {
+          parseException(exceptionReportChild);
+          reportChildFound = true;
         }
 
         exceptionReportChild = exceptionReportChild.advance();
@@ -161,10 +164,8 @@ public class WFSCapabilitiesParser {
 
       while (exceptionChild.readerAccessible()) {
 
-        switch (OWS.findKey(exceptionChild.getLocalName())) {
-          case EXCEPTION_TEXT:
-            metadataConsumer.analyzeFailed(exceptionCode, exceptionChild.collectDescendantText());
-            break;
+        if (OWS.findKey(exceptionChild.getLocalName()) == OWS.VOCABULARY.EXCEPTION_TEXT) {
+          metadataConsumer.analyzeFailed(exceptionCode, exceptionChild.collectDescendantText());
         }
 
         exceptionChild = exceptionChild.advance();
@@ -204,6 +205,8 @@ public class WFSCapabilitiesParser {
         case SERVICE_TYPE_VERSION:
           metadataConsumer.analyzeVersion(serviceIdentificationChild.collectDescendantText());
           break;
+        default:
+          break;
       }
 
       serviceIdentificationChild = serviceIdentificationChild.advance();
@@ -216,16 +219,22 @@ public class WFSCapabilitiesParser {
 
     while (keywordsChild.readerAccessible()) {
 
-      if (keywordsChild.getCurrEvent().hasText()
-          && keywordsChild.getCurrEvent() != SMEvent.IGNORABLE_WS) {
-        String keywords = keywordsChild.getText().trim();
-        if (!keywords.isEmpty()) {
-          if (isFeatureType) {
-            metadataConsumer.analyzeFeatureTypeKeywords(featureTypeName, keywords.split(","));
-          } else {
-            metadataConsumer.analyzeKeywords(keywords.split(","));
-          }
-        }
+      if (!keywordsChild.getCurrEvent().hasText()
+          || keywordsChild.getCurrEvent() == SMEvent.IGNORABLE_WS) {
+        keywordsChild = keywordsChild.advance();
+        continue;
+      }
+
+      String keywords = keywordsChild.getText().trim();
+      if (keywords.isEmpty()) {
+        keywordsChild = keywordsChild.advance();
+        continue;
+      }
+
+      if (isFeatureType) {
+        metadataConsumer.analyzeFeatureTypeKeywords(featureTypeName, keywords.split(","));
+      } else {
+        metadataConsumer.analyzeKeywords(keywords.split(","));
       }
 
       keywordsChild = keywordsChild.advance();
@@ -246,6 +255,8 @@ public class WFSCapabilitiesParser {
           break;
         case SERVICE_CONTACT:
           parseServiceContact(serviceProviderChild);
+          break;
+        default:
           break;
       }
 
@@ -276,6 +287,8 @@ public class WFSCapabilitiesParser {
           break;
         case ROLE:
           metadataConsumer.analyzeServiceContactRole(serviceContactChild.collectDescendantText());
+          break;
+        default:
           break;
       }
 
@@ -308,6 +321,8 @@ public class WFSCapabilitiesParser {
           metadataConsumer.analyzeServiceContactInstructions(
               contactInfoChild.collectDescendantText());
           break;
+        default:
+          break;
       }
 
       contactInfoChild = contactInfoChild.advance();
@@ -319,13 +334,11 @@ public class WFSCapabilitiesParser {
 
     while (phoneChild.readerAccessible()) {
 
-      switch (OWS.findKey(phoneChild.getLocalName())) {
-        case VOICE:
-          metadataConsumer.analyzeServiceContactPhone(phoneChild.collectDescendantText());
-          break;
-        case FACSIMILE:
-          metadataConsumer.analyzeServiceContactFacsimile(phoneChild.collectDescendantText());
-          break;
+      OWS.VOCABULARY phoneKey = OWS.findKey(phoneChild.getLocalName());
+      if (phoneKey == OWS.VOCABULARY.VOICE) {
+        metadataConsumer.analyzeServiceContactPhone(phoneChild.collectDescendantText());
+      } else if (phoneKey == OWS.VOCABULARY.FACSIMILE) {
+        metadataConsumer.analyzeServiceContactFacsimile(phoneChild.collectDescendantText());
       }
 
       phoneChild = phoneChild.advance();
@@ -357,6 +370,8 @@ public class WFSCapabilitiesParser {
         case EMAIL:
           metadataConsumer.analyzeServiceContactEmail(addressChild.collectDescendantText());
           break;
+        default:
+          break;
       }
 
       addressChild = addressChild.advance();
@@ -382,6 +397,8 @@ public class WFSCapabilitiesParser {
         case EXTENDED_CAPABILITIES:
           parseExtendedCapabilities(operationsMetadataChild);
           break;
+        default:
+          break;
       }
 
       operationsMetadataChild = operationsMetadataChild.advance();
@@ -398,14 +415,14 @@ public class WFSCapabilitiesParser {
     }
 
     if (wfsOperation == OWS.OPERATION.NONE) {
-      cursor = cursor.childElementCursor().advance();
+      SMInputCursor childCursor = cursor.childElementCursor().advance();
 
-      while (cursor.readerAccessible()) {
-        if (OWS.OPERATION.fromString(cursor.getLocalName()) != OWS.OPERATION.NONE) {
-          parseOperation(cursor);
+      while (childCursor.readerAccessible()) {
+        if (OWS.OPERATION.fromString(childCursor.getLocalName()) != OWS.OPERATION.NONE) {
+          parseOperation(childCursor);
         }
 
-        cursor = cursor.advance();
+        childCursor = childCursor.advance();
       }
 
       return;
@@ -419,23 +436,7 @@ public class WFSCapabilitiesParser {
 
         switch (OWS.findKey(operationChild.getLocalName())) {
           case DCP:
-            SMInputCursor dcpChild = operationChild.descendantElementCursor().advance();
-
-            while (dcpChild.readerAccessible()) {
-              if (dcpChild.getCurrEvent() == SMEvent.START_ELEMENT) {
-                switch (OWS.findKey(dcpChild.getLocalName())) {
-                  case GET:
-                    metadataConsumer.analyzeOperationGetUrl(
-                        wfsOperation.toString(), parseUrl(dcpChild));
-                    break;
-                  case POST:
-                    metadataConsumer.analyzeOperationPostUrl(
-                        wfsOperation.toString(), parseUrl(dcpChild));
-                    break;
-                }
-              }
-              dcpChild = dcpChild.advance();
-            }
+            parseDcp(wfsOperation, operationChild);
             break;
           case PARAMETER:
             parseParameterOrConstraint(wfsOperation, false, operationChild);
@@ -452,10 +453,29 @@ public class WFSCapabilitiesParser {
                 operationChild.getAttrValue(
                     XLINK.getNS(XLINK.VERSION.DEFAULT), XLINK.getWord(XLINK.VOCABULARY.HREF)));
             break;
+          default:
+            break;
         }
 
         operationChild = operationChild.advance();
       }
+    }
+  }
+
+  private void parseDcp(OWS.OPERATION wfsOperation, SMInputCursor operationChild)
+      throws XMLStreamException {
+    SMInputCursor dcpChild = operationChild.descendantElementCursor().advance();
+
+    while (dcpChild.readerAccessible()) {
+      if (dcpChild.getCurrEvent() == SMEvent.START_ELEMENT) {
+        OWS.VOCABULARY dcpKey = OWS.findKey(dcpChild.getLocalName());
+        if (dcpKey == OWS.VOCABULARY.GET) {
+          metadataConsumer.analyzeOperationGetUrl(wfsOperation.toString(), parseUrl(dcpChild));
+        } else if (dcpKey == OWS.VOCABULARY.POST) {
+          metadataConsumer.analyzeOperationPostUrl(wfsOperation.toString(), parseUrl(dcpChild));
+        }
+      }
+      dcpChild = dcpChild.advance();
     }
   }
 
@@ -476,32 +496,33 @@ public class WFSCapabilitiesParser {
     OWS.VOCABULARY parameterName =
         OWS.findKey(cursor.getAttrValue(OWS.getWord(OWS.VOCABULARY.NAME_ATTRIBUTE)));
 
-    if (parameterName != OWS.VOCABULARY.NOT_A_WORD) {
+    if (parameterName == OWS.VOCABULARY.NOT_A_WORD) {
+      return;
+    }
 
-      SMInputCursor parameterChild = cursor.descendantElementCursor().advance();
+    SMInputCursor parameterChild = cursor.descendantElementCursor().advance();
 
-      while (parameterChild.readerAccessible()) {
-        if (parameterChild.getCurrEvent() == SMEvent.START_ELEMENT) {
-          switch (OWS.findKey(parameterChild.getLocalName())) {
-            case VALUE:
-            case DEFAULT_VALUE:
-              if (isConstraint) {
-                metadataConsumer.analyzeOperationConstraint(
-                    operation.toString(),
-                    parameterName.toString(),
-                    parameterChild.collectDescendantText());
-              } else {
-                metadataConsumer.analyzeOperationParameter(
-                    operation.toString(),
-                    parameterName.toString(),
-                    parameterChild.collectDescendantText());
-              }
-              break;
-          }
-        }
-
+    while (parameterChild.readerAccessible()) {
+      if (parameterChild.getCurrEvent() != SMEvent.START_ELEMENT) {
         parameterChild = parameterChild.advance();
+        continue;
       }
+
+      OWS.VOCABULARY paramKey = OWS.findKey(parameterChild.getLocalName());
+      if (paramKey != OWS.VOCABULARY.VALUE && paramKey != OWS.VOCABULARY.DEFAULT_VALUE) {
+        parameterChild = parameterChild.advance();
+        continue;
+      }
+
+      if (isConstraint) {
+        metadataConsumer.analyzeOperationConstraint(
+            operation.toString(), parameterName.toString(), parameterChild.collectDescendantText());
+      } else {
+        metadataConsumer.analyzeOperationParameter(
+            operation.toString(), parameterName.toString(), parameterChild.collectDescendantText());
+      }
+
+      parameterChild = parameterChild.advance();
     }
   }
 
@@ -531,38 +552,42 @@ public class WFSCapabilitiesParser {
 
     while (extendedCapabilitiesChild.readerAccessible()) {
 
-      switch (OWS.findKey(extendedCapabilitiesChild.getLocalName())) {
-        case EXTENDED_CAPABILITIES:
-          SMInputCursor extendedCapabilitiesChild2 =
-              extendedCapabilitiesChild.childElementCursor().advance();
-
-          while (extendedCapabilitiesChild2.readerAccessible()) {
-
-            switch (OWS.findKey(extendedCapabilitiesChild2.getLocalName())) {
-              case INSPIRE_METADATA_URL:
-                SMInputCursor inspireMetadataChild =
-                    extendedCapabilitiesChild2.childElementCursor().advance();
-
-                while (inspireMetadataChild.readerAccessible()) {
-
-                  switch (OWS.findKey(inspireMetadataChild.getLocalName())) {
-                    case INSPIRE_URL:
-                      metadataConsumer.analyzeInspireMetadataUrl(
-                          inspireMetadataChild.collectDescendantText());
-                      break;
-                  }
-
-                  inspireMetadataChild = inspireMetadataChild.advance();
-                }
-                break;
-            }
-
-            extendedCapabilitiesChild2 = extendedCapabilitiesChild2.advance();
-          }
-          break;
+      if (OWS.findKey(extendedCapabilitiesChild.getLocalName())
+          == OWS.VOCABULARY.EXTENDED_CAPABILITIES) {
+        parseExtendedCapabilitiesInner(extendedCapabilitiesChild);
       }
 
       extendedCapabilitiesChild = extendedCapabilitiesChild.advance();
+    }
+  }
+
+  private void parseExtendedCapabilitiesInner(SMInputCursor extendedCapabilitiesChild)
+      throws XMLStreamException {
+    SMInputCursor extendedCapabilitiesChild2 =
+        extendedCapabilitiesChild.childElementCursor().advance();
+
+    while (extendedCapabilitiesChild2.readerAccessible()) {
+
+      if (OWS.findKey(extendedCapabilitiesChild2.getLocalName())
+          == OWS.VOCABULARY.INSPIRE_METADATA_URL) {
+        parseInspireMetadataUrl(extendedCapabilitiesChild2);
+      }
+
+      extendedCapabilitiesChild2 = extendedCapabilitiesChild2.advance();
+    }
+  }
+
+  private void parseInspireMetadataUrl(SMInputCursor extendedCapabilitiesChild2)
+      throws XMLStreamException {
+    SMInputCursor inspireMetadataChild = extendedCapabilitiesChild2.childElementCursor().advance();
+
+    while (inspireMetadataChild.readerAccessible()) {
+
+      if (OWS.findKey(inspireMetadataChild.getLocalName()) == OWS.VOCABULARY.INSPIRE_URL) {
+        metadataConsumer.analyzeInspireMetadataUrl(inspireMetadataChild.collectDescendantText());
+      }
+
+      inspireMetadataChild = inspireMetadataChild.advance();
     }
   }
 
@@ -571,10 +596,8 @@ public class WFSCapabilitiesParser {
 
     while (featureTypeListChild.readerAccessible()) {
 
-      switch (OWS.findKey(featureTypeListChild.getLocalName())) {
-        case FEATURE_TYPE:
-          parseFeatureType(featureTypeListChild);
-          break;
+      if (OWS.findKey(featureTypeListChild.getLocalName()) == OWS.VOCABULARY.FEATURE_TYPE) {
+        parseFeatureType(featureTypeListChild);
       }
 
       featureTypeListChild = featureTypeListChild.advance();
@@ -622,6 +645,8 @@ public class WFSCapabilitiesParser {
         case METADATA_URL:
           parseMetadataUrl(featureTypeName, featureTypeChild);
           break;
+        default:
+          break;
       }
 
       featureTypeChild = featureTypeChild.advance();
@@ -645,13 +670,11 @@ public class WFSCapabilitiesParser {
 
       while (bboxChild.readerAccessible()) {
 
-        switch (OWS.findKey(bboxChild.getLocalName())) {
-          case LOWER_CORNER:
-            lowerCorner = bboxChild.getElemStringValue().trim().split(" ");
-            break;
-          case UPPER_CORNER:
-            upperCorner = bboxChild.getElemStringValue().trim().split(" ");
-            break;
+        OWS.VOCABULARY bboxKey = OWS.findKey(bboxChild.getLocalName());
+        if (bboxKey == OWS.VOCABULARY.LOWER_CORNER) {
+          lowerCorner = bboxChild.getElemStringValue().trim().split(" ");
+        } else if (bboxKey == OWS.VOCABULARY.UPPER_CORNER) {
+          upperCorner = bboxChild.getElemStringValue().trim().split(" ");
         }
 
         bboxChild = bboxChild.advance();
@@ -668,7 +691,8 @@ public class WFSCapabilitiesParser {
       }
     }
 
-    metadataConsumer.analyzeFeatureTypeBoundingBox(featureTypeName, xmin, ymin, xmax, ymax);
+    metadataConsumer.analyzeFeatureTypeBoundingBox(
+        featureTypeName, new BoundingBoxStrings(xmin, ymin, xmax, ymax));
   }
 
   private void parseMetadataUrl(String featureTypeName, SMInputCursor cursor)

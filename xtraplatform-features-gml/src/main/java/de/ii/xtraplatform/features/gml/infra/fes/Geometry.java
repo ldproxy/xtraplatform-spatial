@@ -12,13 +12,14 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 /**
  * @author fischer
  */
+@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 public abstract class Geometry {
 
   protected EpsgCrs crs;
   protected double[] coordinates;
 
   public double[] getCoordinates() {
-    return coordinates;
+    return coordinates == null ? null : coordinates.clone();
   }
 
   public EpsgCrs getCrs() {

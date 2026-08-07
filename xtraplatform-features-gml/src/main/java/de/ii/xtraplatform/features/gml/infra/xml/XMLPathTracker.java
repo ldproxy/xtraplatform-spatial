@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.gml.infra.xml;
 
 import com.google.common.base.Joiner;
-import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,13 +15,11 @@ import java.util.List;
  * @author zahnen
  */
 public class XMLPathTracker {
-  private List<String> localPath;
-  private List<String> path;
-  private List<String> noObjectPath;
-  private XMLNamespaceNormalizer nsStore;
+  private final List<String> localPath;
+  private final List<String> path;
+  private final List<String> noObjectPath;
   private final Joiner joiner;
   private final Joiner dotJoiner;
-  private final StringBuilder stringBuilder;
 
   private boolean multiple;
 
@@ -33,12 +30,6 @@ public class XMLPathTracker {
     this.noObjectPath = new ArrayList<>();
     this.joiner = Joiner.on('/').skipNulls();
     this.dotJoiner = Joiner.on('.').skipNulls();
-    this.stringBuilder = new StringBuilder();
-  }
-
-  public XMLPathTracker(XMLNamespaceNormalizer nsStore) {
-    this();
-    this.nsStore = nsStore;
   }
 
   public void track(int depth) {
@@ -69,7 +60,9 @@ public class XMLPathTracker {
 
   public void track(String nsuri, String localName, boolean isMultiple) {
     localPath.add(localName);
-    if (nsuri != null && localName != null) path.add(nsuri + ":" + localName);
+    if (nsuri != null && localName != null) {
+      path.add(nsuri + ":" + localName);
+    }
     if (localName != null
         && (!Character.isUpperCase(localName.charAt(0)) || noObjectPath.isEmpty())) {
       noObjectPath.add(localName + (isMultiple ? "[]" : ""));
@@ -96,8 +89,7 @@ public class XMLPathTracker {
 
   @Override
   public String toString() {
-    stringBuilder.setLength(0);
-    return joiner.appendTo(stringBuilder, path).toString();
+    return joiner.join(path);
   }
 
   public String toLocalPath() {

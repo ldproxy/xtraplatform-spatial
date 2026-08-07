@@ -33,12 +33,9 @@ import de.ii.xtraplatform.features.gml.infra.req.WfsQueryBuilder;
 import java.net.URI;
 import java.util.Map;
 import javax.xml.namespace.QName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureQueryEncoderWfs implements FeatureQueryEncoder<String, QueryOptions> {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureQueryEncoderWfs.class);
 
   private final Map<String, FeatureSchema> featureSchemas;
   private final XMLNamespaceNormalizer namespaceNormalizer;
@@ -71,8 +68,7 @@ public class FeatureQueryEncoderWfs implements FeatureQueryEncoder<String, Query
             connectionInfo.getNamespaces(),
             urls);
     this.nativeCrs = nativeCrs;
-    this.filterEncoder =
-        new FilterEncoderWfs(nativeCrs, crsTransformerFactory, cql, namespaceNormalizer);
+    this.filterEncoder = new FilterEncoderWfs(nativeCrs, crsTransformerFactory, cql);
   }
 
   // TODO: add cql2 classes
@@ -127,7 +123,7 @@ public class FeatureQueryEncoderWfs implements FeatureQueryEncoder<String, Query
       return encodeGetFeature(
           query, featureTypeName, featureSchemas.get(query.getType()), additionalQueryParameters);
     } catch (CqlParseException e) {
-      throw new IllegalArgumentException("Filter is invalid", e.getCause());
+      throw new IllegalArgumentException("Filter is invalid", e);
     }
   }
 
@@ -139,8 +135,7 @@ public class FeatureQueryEncoderWfs implements FeatureQueryEncoder<String, Query
       FeatureQuery query,
       QName featureTypeName,
       FeatureSchema featureSchema,
-      Map<String, String> additionalQueryParameters)
-      throws CqlParseException {
+      Map<String, String> additionalQueryParameters) {
     final String featureTypeNameFull =
         namespaceNormalizer.getQualifiedName(
             featureTypeName.getNamespaceURI(), featureTypeName.getLocalPart());

@@ -12,9 +12,10 @@ import java.util.Objects;
 /**
  * @author fischer
  */
+@SuppressWarnings("PMD.DataClass")
 public class Versions {
-  GML.VERSION gmlVersion = null;
-  WFS.VERSION wfsVersion = null;
+  GML.VERSION gmlVersion;
+  WFS.VERSION wfsVersion;
 
   public Versions() {}
 
