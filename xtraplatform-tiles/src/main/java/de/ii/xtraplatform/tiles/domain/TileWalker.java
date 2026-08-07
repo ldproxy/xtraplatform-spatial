@@ -26,6 +26,7 @@ public interface TileWalker extends Volatile2 {
       LimitsVisitor limitsVisitor)
       throws IOException;
 
+  @FunctionalInterface
   interface TileVisitor {
     void visit(
         String tileset,
@@ -37,6 +38,7 @@ public interface TileWalker extends Volatile2 {
         throws IOException;
   }
 
+  @FunctionalInterface
   interface LimitsVisitor {
     void visit(String tileset, TileMatrixSetBase tileMatrixSet, TileMatrixSetLimits limits)
         throws IOException;

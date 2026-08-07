@@ -40,6 +40,7 @@ public class TileEncoderMvt implements TileEncoder {
   }
 
   @Override
+  @SuppressWarnings("PMD.DoNotUseThreads")
   public byte[] combine(
       TileQuery tile, TileProviderFeaturesData data, ChainedTileProvider tileProvider)
       throws IOException {
@@ -53,11 +54,13 @@ public class TileEncoderMvt implements TileEncoder {
       TileQuery tileQuery = ImmutableTileQuery.builder().from(tile).tileset(tileset).build();
       TileResult layer = tileProvider.get(tileQuery);
 
-      int count = 1;
-      while (layer.isError() && count++ < 3) {
+      int count = 0;
+      while (layer.isError() && count < 3) {
+        count++;
         try {
           Thread.sleep(100);
-        } catch (Throwable ignore) {
+        } catch (InterruptedException ignore) {
+          Thread.currentThread().interrupt();
         }
         layer = tileProvider.get(tileQuery);
       }

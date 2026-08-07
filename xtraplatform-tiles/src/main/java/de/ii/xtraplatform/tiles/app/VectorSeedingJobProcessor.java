@@ -63,7 +63,6 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
   @Override
   public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
     TileSeedingJob seedingJob = getDetails(job, jobQueue);
-    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
 
     Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJob.getTileProvider());
     if (optionalTileProvider.isPresent()) {
@@ -74,55 +73,76 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
         return JobResult.error("Tile provider does not support seeding"); // early return
       }
       if (!tileProvider.seeding().isAvailable()) {
-        if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
-          LOGGER.trace(
-              MARKER.JOBS,
-              "Tile provider '{}' not available, suspending job ({})",
-              tileProvider.getId(),
-              job.getId());
-        }
-        tileProvider
-            .seeding()
-            .onStateChange(
-                (oldState, newState) -> {
-                  if (newState == State.AVAILABLE) {
-                    if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
-                      LOGGER.trace(
-                          MARKER.JOBS,
-                          "Tile provider '{}' became available, resuming job ({})",
-                          tileProvider.getId(),
-                          job.getId());
-                    }
-                    jobQueue.push(job);
-                  }
-                },
-                true);
-        return JobResult.onHold(); // early return
+        return suspendUntilAvailable(tileProvider, job, jobQueue);
       }
 
-      AtomicInteger last = new AtomicInteger(0);
-      Consumer<Integer> updateProgress =
-          (current) -> {
-            int delta = current - last.getAndSet(current);
-            Map<String, Object> detailParameters =
-                Map.of(
-                    "tileSet", seedingJob.getTileSet(),
-                    "tileMatrixSet", seedingJob.getTileMatrixSet(),
-                    "level", seedingJob.getSubMatrices().get(0).getLevel(),
-                    "delta", delta);
+      return runSeedingJob(tileProvider, seedingJob, job, jobSet, jobQueue);
+    }
 
-            jobQueue.updateJob(job, delta);
-            jobQueue.updateJobSet(jobSet, delta, detailParameters);
-          };
+    return JobResult.success();
+  }
 
-      try {
-        tileProvider.seeding().get().runSeeding(seedingJob, updateProgress);
-      } catch (IOException e) {
-        return JobResult.retry(e.getMessage());
-      } catch (Throwable e) {
-        updateProgress.accept(job.getTotal().get());
-        throw e;
-      }
+  private JobResult suspendUntilAvailable(
+      TileProvider tileProvider, Job job, JobQueueMin jobQueue) {
+    if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
+      LOGGER.trace(
+          MARKER.JOBS,
+          "Tile provider '{}' not available, suspending job ({})",
+          tileProvider.getId(),
+          job.getId());
+    }
+    tileProvider
+        .seeding()
+        .onStateChange(
+            (oldState, newState) -> {
+              if (newState == State.AVAILABLE) {
+                resumeJob(tileProvider, job, jobQueue);
+              }
+            },
+            true);
+    return JobResult.onHold();
+  }
+
+  private void resumeJob(TileProvider tileProvider, Job job, JobQueueMin jobQueue) {
+    if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
+      LOGGER.trace(
+          MARKER.JOBS,
+          "Tile provider '{}' became available, resuming job ({})",
+          tileProvider.getId(),
+          job.getId());
+    }
+    jobQueue.push(job);
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private JobResult runSeedingJob(
+      TileProvider tileProvider,
+      TileSeedingJob seedingJob,
+      Job job,
+      JobSet jobSet,
+      JobQueueMin jobQueue) {
+    AtomicInteger last = new AtomicInteger(0);
+    Consumer<Integer> updateProgress =
+        (current) -> {
+          int delta = current - last.getAndSet(current);
+          Map<String, Object> detailParameters =
+              Map.of(
+                  "tileSet", seedingJob.getTileSet(),
+                  "tileMatrixSet", seedingJob.getTileMatrixSet(),
+                  "level", seedingJob.getSubMatrices().get(0).getLevel(),
+                  "delta", delta);
+
+          jobQueue.updateJob(job, delta);
+          jobQueue.updateJobSet(jobSet, delta, detailParameters);
+        };
+
+    try {
+      tileProvider.seeding().get().runSeeding(seedingJob, updateProgress);
+    } catch (IOException e) {
+      return JobResult.retry(e.getMessage());
+    } catch (RuntimeException e) {
+      updateProgress.accept(job.getTotal().get());
+      throw e;
     }
 
     return JobResult.success();

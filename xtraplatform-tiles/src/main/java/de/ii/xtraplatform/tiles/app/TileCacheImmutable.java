@@ -23,12 +23,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TileCacheImmutable implements ChainedTileProvider, TileCache {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileCacheImmutable.class);
 
   private final TileWalker tileWalker;
   private final TileStore tileStore;

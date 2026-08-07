@@ -52,12 +52,10 @@ import java.util.Set;
 import java.util.function.Function;
 import javax.measure.Unit;
 import org.kortforsyningen.proj.Units;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileGeneratorFeatures extends AbstractVolatileComposed implements TileGenerator {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileGeneratorFeatures.class);
   private static final Map<
           MediaType, Function<TileGenerationContext, ? extends FeatureTokenEncoder<?>>>
       ENCODERS = ImmutableMap.of(FeatureEncoderMVT.FORMAT, FeatureEncoderMVT::new);
@@ -83,6 +81,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
   private final Map<String, TileBuilder> tileBuilderForProvider;
   private final boolean async;
 
+  @SuppressWarnings("PMD.ConstructorCallsOverridableMethod")
   public TileGeneratorFeatures(
       TileProviderFeaturesData data,
       CrsInfo crsInfo,
@@ -109,6 +108,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     }
   }
 
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   private void initAsync(VolatileRegistry volatileRegistry) {
     onVolatileStart();
 
@@ -144,6 +144,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     onVolatileStarted();
   }
 
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   private void init() {
     for (TilesetFeatures tileset : data.getTilesets().values()) {
       String featureProviderId =
@@ -225,6 +226,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public byte[] generateTile(TileQuery tileQuery) {
     if (!ENCODERS.containsKey(tileQuery.getMediaType())) {
       throw new IllegalArgumentException(
@@ -366,6 +368,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     };
   }
 
+  @Override
   public FeatureSchema getVectorSchema(String tilesetId, MediaType encoding) {
     TilesetFeatures tileset = data.getTilesets().get(tilesetId);
 

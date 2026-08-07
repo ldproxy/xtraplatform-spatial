@@ -98,7 +98,9 @@ public class TileMatrixSetRepositoryImpl extends AbstractVolatile
                       TileMatrixSetImpl.class, "/tilematrixsets/" + tileMatrixSetId + ".json"))
               .openStream();
     } catch (IllegalArgumentException e) {
-      LOGGER.debug("Tile matrix set '{}' not found: {}", tileMatrixSetId, e.getMessage());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Tile matrix set '{}' not found: {}", tileMatrixSetId, e.getMessage());
+      }
       return Optional.empty();
     } catch (IOException e) {
       LOGGER.error("Could not load tile matrix set '{}': {}", tileMatrixSetId, e.getMessage());

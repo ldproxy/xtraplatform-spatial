@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.TopologyException;
 
 class ClusterAnalysis {
 
@@ -23,6 +24,7 @@ class ClusterAnalysis {
   Map<MvtFeature, MvtFeature> inCluster = new HashMap<>();
   Set<MvtFeature> standalone = new HashSet<>();
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   static ClusterAnalysis analyse(List<MvtFeature> features, boolean boundary) {
     // determine clusters of connected features
     ClusterAnalysis clusterResult = new ClusterAnalysis();
@@ -36,7 +38,7 @@ class ClusterAnalysis {
         boolean clustered;
         try {
           clustered = boundary ? gi.getBoundary().intersects(gj.getBoundary()) : gi.intersects(gj);
-        } catch (Throwable ignore) {
+        } catch (TopologyException ignore) {
           // ignore feature
           continue;
         }

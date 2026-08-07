@@ -27,20 +27,42 @@ public interface TileSeedingJob extends JobDetails {
   String TYPE_MVT = TileSeedingJobSet.type("vector", "mvt");
   String TYPE_PNG = TileSeedingJobSet.type("raster", "png");
 
+  final class TileIdentifier {
+    private final String tileProvider;
+    private final String tileSet;
+    private final String tileMatrixSet;
+
+    public TileIdentifier(String tileProvider, String tileSet, String tileMatrixSet) {
+      this.tileProvider = tileProvider;
+      this.tileSet = tileSet;
+      this.tileMatrixSet = tileMatrixSet;
+    }
+
+    public String tileProvider() {
+      return tileProvider;
+    }
+
+    public String tileSet() {
+      return tileSet;
+    }
+
+    public String tileMatrixSet() {
+      return tileMatrixSet;
+    }
+  }
+
   static Job of(
       int priority,
-      String tileProvider,
-      String tileSet,
-      String tileMatrixSet,
+      TileIdentifier tile,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
       Optional<TileGenerationParameters> generationParameters,
       String jobSetId) {
     ImmutableTileSeedingJob details =
         new Builder()
-            .tileProvider(tileProvider)
-            .tileSet(tileSet)
-            .tileMatrixSet(tileMatrixSet)
+            .tileProvider(tile.tileProvider())
+            .tileSet(tile.tileSet())
+            .tileMatrixSet(tile.tileMatrixSet())
             .generationParameters(generationParameters)
             .encoding(FeatureEncoderMVT.FORMAT)
             .isReseed(isReseed)
@@ -52,18 +74,16 @@ public interface TileSeedingJob extends JobDetails {
 
   static Job raster(
       int priority,
-      String tileProvider,
-      String tileSet,
-      String tileMatrixSet,
+      TileIdentifier tile,
       boolean isReseed,
       Set<TileSubMatrix> subMatrices,
       String jobSetId,
       Map<String, String> storageInfo) {
     ImmutableTileSeedingJob details =
         new Builder()
-            .tileProvider(tileProvider)
-            .tileSet(tileSet)
-            .tileMatrixSet(tileMatrixSet)
+            .tileProvider(tile.tileProvider())
+            .tileSet(tile.tileSet())
+            .tileMatrixSet(tile.tileMatrixSet())
             .encoding(MediaType.valueOf("image/png"))
             .isReseed(isReseed)
             .addAllSubMatrices(subMatrices)

@@ -37,15 +37,27 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteException;
 
-public class TileStoreMbTiles implements TileStore {
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
+public final class TileStoreMbTiles implements TileStore {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileStoreMbTiles.class);
   public static final String MBTILES_SUFFIX = ".mbtiles";
+
+  private final String providerId;
+  private final ResourceStore rootStore;
+  private final Map<String, Map<String, TileGenerationSchema>> tileSchemas;
+  private final Map<String, MbtilesTileset> tileSets;
+  private final Optional<TileMatrixPartitions> partitions;
+  // the tile matrix set is only necessary for writable MBTiles files,
+  // i.e., caches that are used for seeding
+  private final Optional<TileMatrixSetRepository> tileMatrixSetRepository;
+  private final ReentrantLock lock = new ReentrantLock();
 
   static TileStoreReadOnly readOnly(Map<String, Path> tileSetSources) {
     Map<String, MbtilesTileset> tileSets =
@@ -59,6 +71,7 @@ public class TileStoreMbTiles implements TileStore {
     return new TileStoreMbTiles("", null, tileSets, Map.of(), Optional.empty(), Optional.empty());
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   static TileStore readWrite(
       ResourceStore rootStore,
       String providerId,
@@ -95,15 +108,6 @@ public class TileStoreMbTiles implements TileStore {
     return new TileStoreMbTiles(
         providerId, rootStore, tileSets, tileSchemas, partitions, tileMatrixSetRepository);
   }
-
-  private final String providerId;
-  private final ResourceStore rootStore;
-  private final Map<String, Map<String, TileGenerationSchema>> tileSchemas;
-  private final Map<String, MbtilesTileset> tileSets;
-  private final Optional<TileMatrixPartitions> partitions;
-  // the tile matrix set is only necessary for writable MBTiles files,
-  // i.e., caches that are used for seeding
-  private final Optional<TileMatrixSetRepository> tileMatrixSetRepository;
 
   private TileStoreMbTiles(
       String providerId,
@@ -156,16 +160,18 @@ public class TileStoreMbTiles implements TileStore {
       }
 
       return TileResult.found(content.get().readAllBytes());
-    } catch (SQLException e) {
-      if (e instanceof SQLiteException && ((SQLiteException) e).getResultCode().code == 776) {
+    } catch (SQLiteException e) {
+      if (e.getResultCode().code == 776) {
         return TileResult.notFound();
       }
+      return TileResult.error(e.getMessage());
+    } catch (SQLException e) {
       return TileResult.error(e.getMessage());
     }
   }
 
   @Override
-  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
     try {
       if (tileSets.containsKey(key(tile))) {
         return tileSets.get(key(tile)).tileIsEmpty(tile);
@@ -206,8 +212,10 @@ public class TileStoreMbTiles implements TileStore {
   }
 
   @Override
+  @SuppressWarnings("PMD.DoNotUseThreads")
   public void put(TileQuery tile, InputStream content) throws IOException {
-    synchronized (tileSets) {
+    lock.lock();
+    try {
       if (!tileSets.containsKey(key(tile))) {
         tileSets.put(
             key(tile),
@@ -221,12 +229,15 @@ public class TileStoreMbTiles implements TileStore {
                 false,
                 false));
       }
+    } finally {
+      lock.unlock();
     }
     MbtilesTileset tileset = tileSets.get(key(tile));
     boolean written = false;
     int count = 0;
     String reason = null;
-    while (!written && count++ < 3) {
+    while (!written && count < 3) {
+      count++;
       try {
         tileset.writeTile(tile, content.readAllBytes());
         written = true;
@@ -250,17 +261,15 @@ public class TileStoreMbTiles implements TileStore {
       }
     }
 
-    if (!written) {
-      if (LOGGER.isWarnEnabled()) {
-        LOGGER.warn(
-            "Failed to write tile {}/{}/{}/{} for tileset '{}'. Reason: {}.",
-            tile.getTileMatrixSet().getId(),
-            tile.getLevel(),
-            tile.getRow(),
-            tile.getCol(),
-            tile.getTileset(),
-            reason);
-      }
+    if (!written && LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "Failed to write tile {}/{}/{}/{} for tileset '{}'. Reason: {}.",
+          tile.getTileMatrixSet().getId(),
+          tile.getLevel(),
+          tile.getRow(),
+          tile.getCol(),
+          tile.getTileset(),
+          reason);
     }
   }
 
@@ -347,10 +356,11 @@ public class TileStoreMbTiles implements TileStore {
   @Override
   public void delete(String tileset, String tms, int level, int row, int col) throws IOException {
     try {
-      if (tileSets.containsKey(key(tileset, tms)))
+      if (tileSets.containsKey(key(tileset, tms))) {
         tileSets
             .get(key(tileset, tms))
             .deleteTile(level, row, getTmsRow(tms, level, row), col, false);
+      }
     } catch (SQLException | IOException e) {
       // ignore
     }
@@ -428,6 +438,7 @@ public class TileStoreMbTiles implements TileStore {
   }
 
   // TODO: minzoom, maxzoom, bounds, center
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private static MbtilesTileset createTileSet(
       ResourceStore rootStore,
       String name,
@@ -444,7 +455,7 @@ public class TileStoreMbTiles implements TileStore {
 
     try {
       filePath = rootStore.asLocalPath(relPath, true);
-    } catch (Throwable e) {
+    } catch (IOException e) {
       throw new IllegalStateException("Could not create MBTiles file.", e);
     }
 
@@ -472,7 +483,8 @@ public class TileStoreMbTiles implements TileStore {
       return new MbtilesTileset(filePath.get(), md, Optional.empty(), isRaster, strictlySeeded);
     } catch (FileAlreadyExistsException e) {
       throw new IllegalStateException(
-          "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.");
+          "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.",
+          e);
     }
   }
 

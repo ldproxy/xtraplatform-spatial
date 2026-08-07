@@ -20,6 +20,16 @@ public interface TileMatrixSetLimits {
 
   String XMLNS = "http://www.opengis.net/wmts/1.0";
 
+  @SuppressWarnings("UnstableApiUsage")
+  Funnel<TileMatrixSetLimits> FUNNEL =
+      (from, into) -> {
+        into.putString(from.getTileMatrix(), StandardCharsets.UTF_8);
+        into.putInt(from.getMinTileRow());
+        into.putInt(from.getMaxTileRow());
+        into.putInt(from.getMinTileCol());
+        into.putInt(from.getMaxTileCol());
+      };
+
   @JacksonXmlProperty(namespace = XMLNS, localName = "TileMatrix")
   String getTileMatrix();
 
@@ -55,14 +65,4 @@ public interface TileMatrixSetLimits {
 
     return (getMaxTileRow() - getMinTileRow() + 1) * numCols;
   }
-
-  @SuppressWarnings("UnstableApiUsage")
-  Funnel<TileMatrixSetLimits> FUNNEL =
-      (from, into) -> {
-        into.putString(from.getTileMatrix(), StandardCharsets.UTF_8);
-        into.putInt(from.getMinTileRow());
-        into.putInt(from.getMaxTileRow());
-        into.putInt(from.getMinTileCol());
-        into.putInt(from.getMaxTileCol());
-      };
 }

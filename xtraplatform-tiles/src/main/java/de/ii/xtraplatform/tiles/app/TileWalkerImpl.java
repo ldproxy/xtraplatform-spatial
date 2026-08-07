@@ -34,12 +34,14 @@ import java.util.Set;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileWalkerImpl extends AbstractVolatileComposed implements TileWalker {
 
   private final TileMatrixSetRepository tileMatrixSetRepository;
   private final CrsTransformerFactory crsTransformerFactory;
 
   @Inject
+  @SuppressWarnings("PMD.ConstructorCallsOverridableMethod")
   public TileWalkerImpl(
       TileMatrixSetRepository tileMatrixSetRepository,
       CrsTransformerFactory crsTransformerFactory,

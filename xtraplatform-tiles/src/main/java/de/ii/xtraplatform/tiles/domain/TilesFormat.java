@@ -13,7 +13,7 @@ public enum TilesFormat {
   MVT("pbf", "mvt", MediaType.valueOf("application/vnd.mapbox-vector-tile")),
   JPEG("jpg", "jpeg", MediaType.valueOf("image/jpeg")),
   PNG("png", "png", MediaType.valueOf("image/png")),
-  WebP("webp", "webp", MediaType.valueOf("image/webp")),
+  WEBP("webp", "webp", MediaType.valueOf("image/webp")),
   TIFF("tiff", "tiff", MediaType.valueOf("image/tiff"));
 
   private final String mbtilesString;
@@ -46,6 +46,7 @@ public enum TilesFormat {
     return this == MVT;
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public static TilesFormat of(String value) {
     switch (value) {
       case "mvt":
@@ -64,11 +65,12 @@ public enum TilesFormat {
       case "webp":
       case "WebP":
       case "WEBP":
-        return WebP;
+        return WEBP;
       case "tiff":
       case "TIFF":
         return TIFF;
+      default:
+        return null;
     }
-    return null;
   }
 }

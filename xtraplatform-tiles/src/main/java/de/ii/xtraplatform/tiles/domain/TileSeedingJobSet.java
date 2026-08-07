@@ -36,6 +36,12 @@ public interface TileSeedingJobSet extends JobSetDetails {
   String LABEL = "Tile cache seeding";
   List<Integer> INITIAL_LEVELS = IntStream.range(0, 24).map(i -> -1).boxed().toList();
 
+  String TILESET = "tileSet";
+  String TILE_MATRIX_SET = "tileMatrixSet";
+  String LEVEL = "level";
+  String COUNT = "count";
+  String DELTA = "delta";
+
   static String type(String... parts) {
     return String.join(":", TYPE, String.join(":", parts));
   }
@@ -107,19 +113,19 @@ public interface TileSeedingJobSet extends JobSetDetails {
 
   @Override
   default void init(Map<String, Object> parameters) {
-    if (parameters.containsKey("tileSet")
-        && parameters.containsKey("tileMatrixSet")
-        && parameters.containsKey("level")
-        && parameters.containsKey("count")) {
+    if (parameters.containsKey(TILESET)
+        && parameters.containsKey(TILE_MATRIX_SET)
+        && parameters.containsKey(LEVEL)
+        && parameters.containsKey(COUNT)) {
       init(
-          (String) parameters.get("tileSet"),
-          (String) parameters.get("tileMatrixSet"),
-          parameters.get("level") instanceof Integer
-              ? (Integer) parameters.get("level")
-              : Integer.parseInt((String) parameters.get("level")),
-          parameters.get("count") instanceof Integer
-              ? (Integer) parameters.get("count")
-              : Integer.parseInt((String) parameters.get("count")));
+          (String) parameters.get(TILESET),
+          (String) parameters.get(TILE_MATRIX_SET),
+          parameters.get(LEVEL) instanceof Integer
+              ? (Integer) parameters.get(LEVEL)
+              : Integer.parseInt((String) parameters.get(LEVEL)),
+          parameters.get(COUNT) instanceof Integer
+              ? (Integer) parameters.get(COUNT)
+              : Integer.parseInt((String) parameters.get(COUNT)));
     }
   }
 
@@ -127,36 +133,43 @@ public interface TileSeedingJobSet extends JobSetDetails {
   default Map<String, Object> initJson(Map<String, Object> params) {
     Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
 
-    if (params.containsKey("tileSet") && params.get("count") instanceof Integer) {
-      int delta = (Integer) params.get("count");
+    if (params.containsKey(TILESET) && params.get(COUNT) instanceof Integer) {
+      int delta = (Integer) params.get(COUNT);
       boolean isFirstTileset = Objects.equals(params.get("isFirstTileset"), true);
       int tilesetDelta = isFirstTileset ? 1 : 0;
 
       jsonPathUpdates.put(
-          "$.details.tileSets.%s.progress.total".formatted(params.get("tileSet")),
+          "$.details.tileSets.%s.progress.total".formatted(params.get(TILESET)),
           delta + tilesetDelta);
 
-      if (params.containsKey("tileMatrixSet")) {
-        if (isFirstTileset) {
-          jsonPathUpdates.put(
-              "$.details.tileSets.%s.progress.levels.%s"
-                  .formatted(params.get("tileSet"), params.get("tileMatrixSet")),
-              INITIAL_LEVELS);
-        }
-
-        if (params.containsKey("level")) {
-          int levelDelta = Objects.equals(params.get("isFirstLevel"), true) ? 1 : 0;
-
-          jsonPathUpdates.put(
-              "$.details.tileSets.%s.progress.levels.%s[%s]"
-                  .formatted(
-                      params.get("tileSet"), params.get("tileMatrixSet"), params.get("level")),
-              delta + levelDelta);
-        }
+      if (params.containsKey(TILE_MATRIX_SET)) {
+        initJsonLevels(params, jsonPathUpdates, delta, isFirstTileset);
       }
     }
 
     return jsonPathUpdates;
+  }
+
+  private void initJsonLevels(
+      Map<String, Object> params,
+      Map<String, Object> jsonPathUpdates,
+      int delta,
+      boolean isFirstTileset) {
+    if (isFirstTileset) {
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.levels.%s"
+              .formatted(params.get(TILESET), params.get(TILE_MATRIX_SET)),
+          INITIAL_LEVELS);
+    }
+
+    if (params.containsKey(LEVEL)) {
+      int levelDelta = Objects.equals(params.get("isFirstLevel"), true) ? 1 : 0;
+
+      jsonPathUpdates.put(
+          "$.details.tileSets.%s.progress.levels.%s[%s]"
+              .formatted(params.get(TILESET), params.get(TILE_MATRIX_SET), params.get(LEVEL)),
+          delta + levelDelta);
+    }
   }
 
   default void update(String tileSet, String tileMatrixSet, int level, int delta) {
@@ -173,19 +186,19 @@ public interface TileSeedingJobSet extends JobSetDetails {
 
   @Override
   default void update(Map<String, Object> parameters) {
-    if (parameters.containsKey("tileSet")
-        && parameters.containsKey("tileMatrixSet")
-        && parameters.containsKey("level")
-        && parameters.containsKey("delta")) {
+    if (parameters.containsKey(TILESET)
+        && parameters.containsKey(TILE_MATRIX_SET)
+        && parameters.containsKey(LEVEL)
+        && parameters.containsKey(DELTA)) {
       update(
-          (String) parameters.get("tileSet"),
-          (String) parameters.get("tileMatrixSet"),
-          parameters.get("level") instanceof Integer
-              ? (Integer) parameters.get("level")
-              : Integer.parseInt((String) parameters.get("level")),
-          parameters.get("delta") instanceof Integer
-              ? (Integer) parameters.get("delta")
-              : Integer.parseInt((String) parameters.get("delta")));
+          (String) parameters.get(TILESET),
+          (String) parameters.get(TILE_MATRIX_SET),
+          parameters.get(LEVEL) instanceof Integer
+              ? (Integer) parameters.get(LEVEL)
+              : Integer.parseInt((String) parameters.get(LEVEL)),
+          parameters.get(DELTA) instanceof Integer
+              ? (Integer) parameters.get(DELTA)
+              : Integer.parseInt((String) parameters.get(DELTA)));
     }
   }
 
@@ -193,21 +206,19 @@ public interface TileSeedingJobSet extends JobSetDetails {
   default Map<String, Object> updateJson(Map<String, Object> detailParameters) {
     Map<String, Object> jsonPathUpdates = new LinkedHashMap<>();
 
-    if (detailParameters.containsKey("tileSet")
-        && detailParameters.get("delta") instanceof Integer) {
-      int delta = (Integer) detailParameters.get("delta");
+    if (detailParameters.containsKey(TILESET) && detailParameters.get(DELTA) instanceof Integer) {
+      int delta = (Integer) detailParameters.get(DELTA);
 
       jsonPathUpdates.put(
-          "$.details.tileSets.%s.progress.current".formatted(detailParameters.get("tileSet")),
-          delta);
+          "$.details.tileSets.%s.progress.current".formatted(detailParameters.get(TILESET)), delta);
 
-      if (detailParameters.containsKey("tileMatrixSet") && detailParameters.containsKey("level")) {
+      if (detailParameters.containsKey(TILE_MATRIX_SET) && detailParameters.containsKey(LEVEL)) {
         jsonPathUpdates.put(
             "$.details.tileSets.%s.progress.levels.%s[%s]"
                 .formatted(
-                    detailParameters.get("tileSet"),
-                    detailParameters.get("tileMatrixSet"),
-                    detailParameters.get("level")),
+                    detailParameters.get(TILESET),
+                    detailParameters.get(TILE_MATRIX_SET),
+                    detailParameters.get(LEVEL)),
             -1 * delta);
       }
     }
@@ -222,7 +233,7 @@ public interface TileSeedingJobSet extends JobSetDetails {
 
       TilesetProgress progress = getTileSets().get(details.getTileSet()).getProgress();
 
-      progress.getCurrent().addAndGet(-(job.getCurrent().get()));
+      progress.getCurrent().addAndGet(-job.getCurrent().get());
 
       if (progress.getLevels().containsKey(details.getTileMatrixSet())) {
         int level = details.getSubMatrices().get(0).getLevel();
@@ -261,7 +272,7 @@ public interface TileSeedingJobSet extends JobSetDetails {
   interface TilesetProgress extends JobProgress {
     @JsonIgnore
     @Nullable
-    LinkedHashMap<String, AtomicIntegerArray> getLevels();
+    Map<String, AtomicIntegerArray> getLevels();
 
     @JsonProperty(value = "levels", access = Access.WRITE_ONLY)
     Map<String, List<Integer>> getLevelsInput();
@@ -288,19 +299,22 @@ public interface TileSeedingJobSet extends JobSetDetails {
     default TilesetProgress deser() {
       // Ensure that levels is initialized
       if (getLevels() == null) {
-        LinkedHashMap<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
+        Map<String, AtomicIntegerArray> levelsMap = new LinkedHashMap<>();
         for (Map.Entry<String, List<Integer>> entry : getLevelsInput().entrySet()) {
-          List<Integer> levelList = entry.getValue();
-          AtomicIntegerArray atomicArray = new AtomicIntegerArray(levelList.size());
-          for (int i = 0; i < levelList.size(); i++) {
-            atomicArray.set(i, levelList.get(i));
-          }
-          levelsMap.put(entry.getKey(), atomicArray);
+          levelsMap.put(entry.getKey(), toAtomicIntegerArray(entry.getValue()));
         }
 
         return new ImmutableTilesetProgress.Builder().from(this).levels(levelsMap).build();
       }
       return this;
+    }
+
+    private static AtomicIntegerArray toAtomicIntegerArray(List<Integer> levelList) {
+      AtomicIntegerArray atomicArray = new AtomicIntegerArray(levelList.size());
+      for (int i = 0; i < levelList.size(); i++) {
+        atomicArray.set(i, levelList.get(i));
+      }
+      return atomicArray;
     }
   }
 }

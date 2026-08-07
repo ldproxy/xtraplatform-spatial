@@ -24,13 +24,12 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 import org.locationtech.jts.precision.GeometryPrecisionReducer;
 import org.locationtech.jts.simplify.TopologyPreservingSimplifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class TileGeometryUtil {
+public final class TileGeometryUtil {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileGeometryUtil.class);
+  private TileGeometryUtil() {}
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public static Geometry getTileGeometry(
       Geometry geom,
       AffineTransformation affineTransformation,
@@ -57,40 +56,55 @@ public class TileGeometryUtil {
     // 1 convert to the tile coordinate system
     geom.apply(affineTransformation);
 
+    Geometry result = geom;
+
     // 2 fix invalid source geometries
-    if (!geom.isValid()) {
-      geom = new GeometryFixer(geom).getResult();
-      if (Objects.isNull(geom) || geom.isEmpty()) return null;
+    if (!result.isValid()) {
+      result = new GeometryFixer(result).getResult();
+      if (Objects.isNull(result) || result.isEmpty()) {
+        return null;
+      }
     }
 
     // 3 remove small rings or line strings (small in the context of the tile)
-    geom = removeSmallPieces(geom, minimumSizeInPixel);
-    if (Objects.isNull(geom) || geom.isEmpty()) return null;
+    result = removeSmallPieces(result, minimumSizeInPixel);
+    if (Objects.isNull(result) || result.isEmpty()) {
+      return null;
+    }
 
     // 4 simplify the geometry
-    geom = TopologyPreservingSimplifier.simplify(geom, 1.0 / precisionModel.getScale());
-    if (Objects.isNull(geom) || geom.isEmpty()) return null;
+    result = TopologyPreservingSimplifier.simplify(result, 1.0 / precisionModel.getScale());
+    if (Objects.isNull(result) || result.isEmpty()) {
+      return null;
+    }
 
     // 5 reduce the geometry to the tile grid
-    geom = GeometryPrecisionReducer.reducePointwise(geom, precisionModel);
-    if (Objects.isNull(geom) || geom.isEmpty()) return null;
+    result = GeometryPrecisionReducer.reducePointwise(result, precisionModel);
+    if (Objects.isNull(result) || result.isEmpty()) {
+      return null;
+    }
 
     // 6 if the resulting geometry is invalid, try to make it valid and ensure it is still aligned
     //   with the tile grid; give up, if it is still invalid after two attempts
-    int count = 0;
-    while (!geom.isValid() && count++ < 2) {
-      geom = GeometryFixer.fix(geom);
-      if (Objects.isNull(geom) || geom.isEmpty()) return null;
+    for (int count = 0; !result.isValid() && count < 2; count++) {
+      result = GeometryFixer.fix(result);
+      if (Objects.isNull(result) || result.isEmpty()) {
+        return null;
+      }
 
-      geom = GeometryPrecisionReducer.reducePointwise(geom, precisionModel);
-      if (Objects.isNull(geom) || geom.isEmpty()) return null;
+      result = GeometryPrecisionReducer.reducePointwise(result, precisionModel);
+      if (Objects.isNull(result) || result.isEmpty()) {
+        return null;
+      }
     }
 
     // 7 limit the coordinates to the tile with a buffer
-    geom = clipGeometry(geom, clipGeometry);
-    if (Objects.isNull(geom) || geom.isEmpty()) return null;
+    result = clipGeometry(result, clipGeometry);
+    if (Objects.isNull(result) || result.isEmpty()) {
+      return null;
+    }
 
-    return geom;
+    return result;
   }
 
   static List<Polygon> splitMultiPolygon(MultiPolygon geom) {
@@ -110,27 +124,28 @@ public class TileGeometryUtil {
   }
 
   private static Geometry clipGeometry(Geometry geometry, Geometry clipGeometry) {
+    Geometry result = geometry;
     try {
-      Geometry original = geometry;
-      geometry = clipGeometry.intersection(original);
+      result = clipGeometry.intersection(geometry);
 
       // sometimes an intersection is returned as an empty geometry.
       // going via wkt fixes the problem.
-      if (geometry.isEmpty() && original.intersects(clipGeometry)) {
-        Geometry originalViaWkt = new WKTReader().read(original.toText());
-        geometry = clipGeometry.intersection(originalViaWkt);
+      if (result.isEmpty() && geometry.intersects(clipGeometry)) {
+        Geometry originalViaWkt = new WKTReader().read(geometry.toText());
+        result = clipGeometry.intersection(originalViaWkt);
       }
 
     } catch (TopologyException | ParseException e) {
       // could not intersect or encode/decode WKT. original geometry will be used instead.
     }
-    return geometry;
+    return result;
   }
 
   private static Polygon removeSmallPieces(Polygon geom, double minimumSizeInPixel) {
-    if (geom.getArea() < minimumSizeInPixel * minimumSizeInPixel)
+    if (geom.getArea() < minimumSizeInPixel * minimumSizeInPixel) {
       // skip this feature, too small
       return null;
+    }
     List<LinearRing> holes = new ArrayList<>();
     boolean skipped = false;
     for (int i = 0; i < geom.getNumInteriorRing(); i++) {
@@ -138,7 +153,9 @@ public class TileGeometryUtil {
       if (geom.getFactory().createPolygon(hole).getArea()
           >= minimumSizeInPixel * minimumSizeInPixel) {
         holes.add(hole);
-      } else skipped = true;
+      } else {
+        skipped = true;
+      }
     }
 
     return skipped
@@ -146,6 +163,7 @@ public class TileGeometryUtil {
         : geom;
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private static Geometry removeSmallPieces(Geometry geom, double minimumSizeInPixel) {
     if (geom instanceof Polygon) {
       return removeSmallPieces((Polygon) geom, minimumSizeInPixel);
@@ -155,18 +173,21 @@ public class TileGeometryUtil {
       for (int i = 0; i < geom.getNumGeometries(); i++) {
         Polygon patch = (Polygon) geom.getGeometryN(i);
         Polygon newPolygon = removeSmallPieces(patch, minimumSizeInPixel);
-        if (Objects.nonNull(newPolygon)) {
-          patches.add(newPolygon);
-          if (!Objects.equals(patch, newPolygon)) changed = true;
-        } else {
+        if (Objects.isNull(newPolygon)) {
+          changed = true;
+          continue;
+        }
+        if (!Objects.equals(patch, newPolygon)) {
           changed = true;
         }
+        patches.add(newPolygon);
       }
       return changed ? geom.getFactory().createMultiPolygon(patches.toArray(Polygon[]::new)) : geom;
     } else if (geom instanceof LineString) {
-      if (geom.getLength() < minimumSizeInPixel)
+      if (geom.getLength() < minimumSizeInPixel) {
         // skip this feature, too small
         return null;
+      }
     } else if (geom instanceof MultiLineString) {
       List<LineString> segments = new ArrayList<>();
       boolean changed = false;

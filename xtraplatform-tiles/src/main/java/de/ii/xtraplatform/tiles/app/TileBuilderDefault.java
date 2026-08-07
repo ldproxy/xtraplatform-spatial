@@ -71,6 +71,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileBuilderDefault.class);
@@ -108,6 +109,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public byte[] getMvtData(
       TileQuery tileQuery,
       TilesetFeatures tileset,
@@ -138,7 +140,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
             .map(pt -> pt.mergeInto(baseTransformations))
             .orElse(baseTransformations);
 
-    try (Context timed = timers.get(featureProvider.getId()).time()) {
+    try (Context ignored = timers.get(featureProvider.getId()).time()) {
       FeatureQuery featureQuery =
           getFeatureQuery(
               tileQuery,
@@ -221,13 +223,16 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
       return result;
 
     } catch (CompletionException e) {
-      if (e.getCause() instanceof WebApplicationException) {
-        throw (WebApplicationException) e.getCause();
+      Throwable cause = e.getCause();
+      if (cause instanceof WebApplicationException) {
+        cause.addSuppressed(e);
+        throw (WebApplicationException) cause;
       }
-      throw new IllegalStateException("Feature stream error.", e.getCause());
+      throw new IllegalStateException("Feature stream error.", e);
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private FeatureQuery getFeatureQuery(
       TileQuery tile,
       TilesetFeatures tileset,
@@ -324,10 +329,12 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
       return maxAllowableOffsetTileMatrixSet / 111_333.0;
     }
 
-    LOGGER.warn(
-        "Tile generation: cannot convert between axis units '{}' and '{}'.",
-        tmsCrsUnit.getName(),
-        nativeCrsUnit.getName());
+    if (LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "Tile generation: cannot convert between axis units '{}' and '{}'.",
+          tmsCrsUnit.getName(),
+          nativeCrsUnit.getName());
+    }
     return 0;
   }
 }
