@@ -43,7 +43,8 @@ public class TileEncoderMvt implements TileEncoder {
   public byte[] combine(
       TileQuery tile, TileProviderFeaturesData data, ChainedTileProvider tileProvider)
       throws IOException {
-    TilesetFeatures combinedTileset = data.getTilesets().get(tile.getTileset());
+    TilesetFeatures combinedTileset =
+        data.getTilesets().get(tile.getTileset()).mergeDefaults(data.getTilesetDefaults());
     List<String> tilesets =
         getLayerTilesets(data, combinedTileset, tile.getGenerationParametersTransient());
     // the layers of the source tilesets are decoded to a normalized coordinate space, so a source
