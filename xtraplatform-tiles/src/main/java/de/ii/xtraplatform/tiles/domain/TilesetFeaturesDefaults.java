@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 /**
@@ -35,4 +37,10 @@ public interface TilesetFeaturesDefaults
   }
 
   abstract class Builder implements BuildableBuilder<TilesetFeaturesDefaults> {}
+
+  /**
+   * @langEn Optional fixed spatial extent for this tileset in native CRS.
+   * @langDe Optionaler fester räumlicher Extent für dieses Tileset im nativen CRS.
+   */
+  Optional<SpatialExtent> getExtent();
 }
