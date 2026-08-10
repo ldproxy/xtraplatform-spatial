@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.infra.db;
 
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
+import de.ii.xtraplatform.features.domain.FeatureMutationConstraintException;
 import de.ii.xtraplatform.features.domain.FeatureMutationHookException;
 import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import java.sql.Connection;
@@ -83,8 +84,7 @@ class JdbcSqlSession implements SqlSession {
             }
             batchStmt.addBatch(sql);
           } catch (SQLException e) {
-            throw new IllegalStateException(
-                "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+            throw mutationFailed("Mutation statement failed: ", sql, e);
           }
           batchedSql.add(sql);
           batchedConsumers.add(consumer);
@@ -120,8 +120,7 @@ class JdbcSqlSession implements SqlSession {
             firstGeneratedId = returnedId;
           }
         } catch (SQLException e) {
-          throw new IllegalStateException(
-              "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+          throw mutationFailed("Mutation statement failed: ", sql, e);
         }
       }
 
@@ -162,8 +161,7 @@ class JdbcSqlSession implements SqlSession {
       }
       return ids;
     } catch (SQLException e) {
-      throw new IllegalStateException(
-          "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+      throw mutationFailed("Mutation statement failed: ", sql, e);
     }
   }
 
@@ -229,6 +227,38 @@ class JdbcSqlSession implements SqlSession {
     return drained;
   }
 
+  /**
+   * Wrap a failed mutation statement. A rejection in SQLSTATE class 23 (integrity constraint
+   * violation — CHECK, foreign key, unique index, or a trigger raising one) is caused by the data
+   * the client sent, so it gets its own exception type that callers can report and log quietly;
+   * anything else stays an IllegalStateException and keeps its stack trace.
+   */
+  private static RuntimeException mutationFailed(String prefix, String sql, SQLException e) {
+    String message = prefix + e.getMessage() + " — statement: " + sql;
+    String sqlState = constraintSqlState(e);
+    return sqlState != null
+        ? new FeatureMutationConstraintException(message, e, sqlState)
+        : new IllegalStateException(message, e);
+  }
+
+  /**
+   * The SQLSTATE of the first integrity-constraint violation in the chain, or null. Iterating the
+   * SQLException itself walks both the causal chain and the next-exception chain, which matters for
+   * the batch path: executeBatch() reports a BatchUpdateException whose actual error is a
+   * next-exception, not a cause.
+   */
+  private static String constraintSqlState(SQLException e) {
+    for (Throwable t : e) {
+      if (t instanceof SQLException) {
+        String state = ((SQLException) t).getSQLState();
+        if (state != null && state.startsWith("23")) {
+          return state;
+        }
+      }
+    }
+    return null;
+  }
+
   private void flushBatch(
       Statement batchStmt, List<String> batchedSql, List<Consumer<String>> batchedConsumers) {
     if (batchedSql.isEmpty()) {
@@ -243,9 +273,7 @@ class JdbcSqlSession implements SqlSession {
       batchStmt.clearBatch();
       harvestWarnings(batchStmt);
     } catch (SQLException e) {
-      throw new IllegalStateException(
-          "Batched mutation failed: " + e.getMessage() + " — first statement: " + batchedSql.get(0),
-          e);
+      throw mutationFailed("Batched mutation failed: ", batchedSql.get(0), e);
     }
     // Preserve the per-statement consumer contract: each batched statement returns no id, so
     // call consumers with null in order (in practice these are no-ops for child/junction/FK
