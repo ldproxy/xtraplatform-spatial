@@ -9,6 +9,8 @@ package de.ii.xtraplatform.tiles.app;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.TileEncoder;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
@@ -18,16 +20,24 @@ import de.ii.xtraplatform.tiles.domain.TileResult;
 import jakarta.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 public class TileEncoders implements ChainedTileProvider {
-  private static final Map<MediaType, TileEncoder> ENCODERS =
-      ImmutableMap.of(FeatureEncoderMVT.FORMAT, new TileEncoderMvt());
+  private final Map<MediaType, TileEncoder> encoders;
   private final TileProviderFeaturesData data;
   private final ChainedTileProvider generatorProviderChain;
 
-  public TileEncoders(TileProviderFeaturesData data, ChainedTileProvider generatorProviderChain) {
+  public TileEncoders(
+      TileProviderFeaturesData data,
+      ChainedTileProvider generatorProviderChain,
+      Function<String, Optional<BoundingBox>> tilesetBounds,
+      CrsTransformerFactory crsTransformerFactory) {
     this.data = data;
     this.generatorProviderChain = generatorProviderChain;
+    this.encoders =
+        ImmutableMap.of(
+            FeatureEncoderMVT.FORMAT, new TileEncoderMvt(tilesetBounds, crsTransformerFactory));
   }
 
   @Override
@@ -48,14 +58,14 @@ public class TileEncoders implements ChainedTileProvider {
   }
 
   public boolean canEncode(MediaType mediaType) {
-    return ENCODERS.containsKey(mediaType);
+    return encoders.containsKey(mediaType);
   }
 
   public byte[] empty(MediaType mediaType, TileMatrixSetBase tms) {
-    return ENCODERS.get(mediaType).empty(tms);
+    return encoders.get(mediaType).empty(tms);
   }
 
   public byte[] combine(TileQuery tile) throws IOException {
-    return ENCODERS.get(tile.getMediaType()).combine(tile, data, generatorProviderChain);
+    return encoders.get(tile.getMediaType()).combine(tile, data, generatorProviderChain);
   }
 }
