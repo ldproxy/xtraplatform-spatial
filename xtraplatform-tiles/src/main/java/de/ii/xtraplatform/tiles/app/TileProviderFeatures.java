@@ -115,6 +115,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   static final String TILES_DIR_NAME = "tiles";
 
   private final TileGenerator tileGenerator;
+  private final CrsTransformerFactory crsTransformerFactory;
   private final Map<Type, Map<Storage, TileStore>> tileStores;
   private final List<TileCache> generatorCaches;
   private final List<TileCache> combinerCaches;
@@ -149,6 +150,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
     this.tileMatrixSetRepository = Optional.of(tileMatrixSetRepository);
     this.dataDir = appContext.getDataDir().toString();
+    this.crsTransformerFactory = crsTransformerFactory;
     this.tileGenerator =
         new TileGeneratorFeatures(
             data,
@@ -226,7 +228,9 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
 
     this.generatorProviderChain = current;
 
-    this.tileEncoders = new TileEncoders(getData(), generatorProviderChain);
+    this.tileEncoders =
+        new TileEncoders(
+            getData(), generatorProviderChain, this::getTilesetBounds, crsTransformerFactory);
     current = tileEncoders;
 
     for (int i = 0; i < getData().getCaches().size(); i++) {
@@ -545,6 +549,14 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   @Override
   public Optional<TilesetMetadata> getMetadata(String tilesetId) {
     return Optional.ofNullable(metadata.get(tilesetId));
+  }
+
+  /**
+   * The area in which the tileset may have data, that is the spatial extent of the feature types of
+   * its layers. Empty, if the extent is unknown.
+   */
+  private Optional<BoundingBox> getTilesetBounds(String tileset) {
+    return getMetadata(tileset).flatMap(TilesetMetadata::getBounds);
   }
 
   @Override
