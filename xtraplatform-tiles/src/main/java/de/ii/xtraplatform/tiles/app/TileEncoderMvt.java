@@ -30,12 +30,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import no.ecc.vectortile.VectorTileDecoder;
 import no.ecc.vectortile.VectorTileEncoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TileEncoderMvt implements TileEncoder {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileEncoderMvt.class);
 
   private final Function<String, Optional<BoundingBox>> tilesetBounds;
   private final CrsTransformerFactory crsTransformerFactory;
@@ -87,17 +83,19 @@ public class TileEncoderMvt implements TileEncoder {
       }
 
       if (layer.isError()) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn(
-              "Failure to get layer '{}' of combined vector tile {}/{}/{}/{} (format '{}'), the layer will be ignored. Reason: {}",
-              tileset,
-              tileQuery.getTileMatrixSet().getId(),
-              tileQuery.getLevel(),
-              tileQuery.getRow(),
-              tileQuery.getCol(),
-              tileQuery.getMediaType().toString(),
-              layer.getError().orElse("unknown"));
-        }
+        // failing to get a layer has to fail the combined tile: a tile with a silently
+        // dropped layer would be cached and served as if it were complete
+        throw new IllegalStateException(
+            String.format(
+                "Failure to get layer '%s' of combined vector tile %s/%s/%s/%s (format '%s')."
+                    + " Reason: %s",
+                tileset,
+                tileQuery.getTileMatrixSet().getId(),
+                tileQuery.getLevel(),
+                tileQuery.getRow(),
+                tileQuery.getCol(),
+                tileQuery.getMediaType().toString(),
+                layer.getError().orElse("unknown")));
       } else if (layer.isAvailable()) {
         decoder
             .decode(layer.getContent().get())
