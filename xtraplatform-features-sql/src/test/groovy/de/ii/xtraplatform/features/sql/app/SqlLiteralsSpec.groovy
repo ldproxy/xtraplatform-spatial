@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.app
 
 import de.ii.xtraplatform.features.domain.SchemaBase
+import de.ii.xtraplatform.features.domain.transform.EncryptedValues
 import spock.lang.Specification
 
 class SqlLiteralsSpec extends Specification {
@@ -90,5 +91,60 @@ class SqlLiteralsSpec extends Specification {
     def "unmapped column types fall back to a quoted literal rather than raw inlining"() {
         expect:
         SqlLiterals.forType(SchemaBase.Type.FEATURE_REF, "abc'; DROP") == "'abc''; DROP'"
+    }
+
+    def "values for encrypted columns are rejected by the plain literal renderer"() {
+        when: 'a value for an encrypted column reaches forType'
+        SqlLiterals.forType(type, "Mustermann")
+
+        then: 'it is rejected instead of being inlined as plaintext'
+        thrown(IllegalStateException)
+
+        where:
+        type << [SchemaBase.Type.ENCRYPTED, SchemaBase.Type.ENCRYPTED_ARRAY]
+    }
+
+    def "encrypted values are rendered as a bytea literal that decrypts to the plaintext"() {
+        given: 'an encryption key'
+        def key = (0..31).collect { it as byte } as byte[]
+        def encryption = new EncryptedValues(key)
+
+        when: 'a string value is rendered'
+        def literal = SqlLiterals.encrypted(encryption, SchemaBase.Type.STRING, "O'Brien, Jürgen", 'nof')
+
+        then: 'the literal is a quoted bytea hex value'
+        literal.startsWith("'\\x")
+        literal.endsWith("'")
+
+        and: 'the hex value decrypts back to the plaintext'
+        def bytes = java.util.HexFormat.of().parseHex(literal.substring(3, literal.length() - 1))
+        encryption.decrypt(bytes, 'nof') == "O'Brien, Jürgen"
+    }
+
+    def "date values are normalized before encryption"() {
+        given: 'an encryption key'
+        def key = (0..31).collect { it as byte } as byte[]
+        def encryption = new EncryptedValues(key)
+
+        when: 'a canonical date value is rendered and decrypted'
+        def literal = SqlLiterals.encrypted(encryption, SchemaBase.Type.DATE, '1957-06-30', 'geb')
+        def bytes = java.util.HexFormat.of().parseHex(literal.substring(3, literal.length() - 1))
+
+        then: 'the stored plaintext is the canonical ISO date'
+        encryption.decrypt(bytes, 'geb') == '1957-06-30'
+
+        when: 'a non-ISO date value is rendered'
+        SqlLiterals.encrypted(encryption, SchemaBase.Type.DATE, '30.06.1957', 'geb')
+
+        then: 'it is rejected as a client error'
+        thrown(IllegalArgumentException)
+    }
+
+    def "a null value for an encrypted column is rendered as SQL NULL"() {
+        given: 'an encryption key'
+        def key = (0..31).collect { it as byte } as byte[]
+
+        expect:
+        SqlLiterals.encrypted(new EncryptedValues(key), SchemaBase.Type.STRING, null, 'nof') == 'NULL'
     }
 }

@@ -77,6 +77,20 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
   @JsonDeserialize(converter = ZoneIdFromString.class)
   Optional<ZoneId> getNativeTimeZone();
 
+  /**
+   * @langEn The symmetric key for properties of type `ENCRYPTED` or `ENCRYPTED_ARRAY`, encoded as
+   *     Base64. The decoded key must be 32 bytes long (AES-256). It is recommended to reference an
+   *     environment variable, e.g. `${DB_ENCRYPTION_KEY}`, instead of storing the key in the
+   *     configuration.
+   * @langDe Der symmetrische Schlüssel für Eigenschaften vom Typ `ENCRYPTED` oder
+   *     `ENCRYPTED_ARRAY`, kodiert als Base64. Der dekodierte Schlüssel muss 32 Bytes lang sein
+   *     (AES-256). Es wird empfohlen, eine Umgebungsvariable zu referenzieren, z.B.
+   *     `${DB_ENCRYPTION_KEY}`, statt den Schlüssel in der Konfiguration zu speichern.
+   * @since v4.9
+   * @default null
+   */
+  Optional<String> getEncryptionKey();
+
   @DocIgnore
   Optional<String> getDefaultLanguage();
 

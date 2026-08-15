@@ -59,7 +59,7 @@ class VersionedMutationSqlSpec extends Specification {
         sqlSession = Mock(SqlSession)
         Map<String, List<SqlQueryMapping>> mappings = [(FEATURE_TYPE): [buildMapping()]]
         session = new SqlMutationSession(
-                sqlSession, mappings, null, null, null, Optional.empty(), null)
+                sqlSession, mappings, null, null, null, Optional.empty(), null, Optional.empty())
     }
 
     def 'Insert pre-flight: assertNoConflictingVersion SQL is a plain id-existence check'() {

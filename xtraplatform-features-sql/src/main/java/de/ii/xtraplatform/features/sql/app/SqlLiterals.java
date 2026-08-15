@@ -8,7 +8,9 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import de.ii.xtraplatform.features.domain.SchemaBase;
+import de.ii.xtraplatform.features.domain.transform.EncryptedValues;
 import java.math.BigDecimal;
+import java.util.HexFormat;
 import java.util.Locale;
 
 /**
@@ -36,6 +38,12 @@ final class SqlLiterals {
         return number(value);
       case BOOLEAN:
         return bool(value);
+      case ENCRYPTED:
+      case ENCRYPTED_ARRAY:
+        // Values for encrypted columns must be rendered with encrypted(), never quoted as-is —
+        // the quoted plaintext would be silently accepted by the bytea column.
+        throw new IllegalStateException(
+            "the value of an encrypted property reached the SQL encoder unencrypted");
       case STRING:
       case DATE:
       case DATETIME:
@@ -45,6 +53,16 @@ final class SqlLiterals {
         // raw input reach the statement unescaped.
         return string(value);
     }
+  }
+
+  static String encrypted(
+      EncryptedValues encryption, SchemaBase.Type valueType, String value, String propertyName) {
+    if (value == null) {
+      return "NULL";
+    }
+    byte[] encryptedValue =
+        encryption.encrypt(encryption.normalize(value, valueType, propertyName));
+    return "'\\x" + HexFormat.of().formatHex(encryptedValue) + "'";
   }
 
   static String string(String value) {
