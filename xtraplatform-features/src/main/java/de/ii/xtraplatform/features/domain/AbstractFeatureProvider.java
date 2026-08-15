@@ -30,6 +30,8 @@ import de.ii.xtraplatform.features.domain.FeatureStream.ResultBase;
 import de.ii.xtraplatform.features.domain.ImmutableSchemaMapping.Builder;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
+import de.ii.xtraplatform.features.domain.transform.EncryptedValues;
+import de.ii.xtraplatform.features.domain.transform.FeatureTokenTransformerDecrypt;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
 import de.ii.xtraplatform.features.domain.transform.WithScope;
@@ -212,6 +214,18 @@ public abstract class AbstractFeatureProvider<
       LOGGER.error(
           "Feature provider with id '{}' could not be started: {}", getId(), runnerError.get());
       // TODO: volatile defective
+      return false;
+    }
+
+    Optional<String> encryptionError =
+        EncryptedValues.validateEncryptedProperties(
+            getData().getTypes().values(),
+            getData().getEncryptionKey(),
+            supportsEncryptedProperties());
+
+    if (encryptionError.isPresent()) {
+      LOGGER.error(
+          "Feature provider with id '{}' could not be started: {}", getId(), encryptionError.get());
       return false;
     }
 
@@ -503,8 +517,22 @@ public abstract class AbstractFeatureProvider<
     return getDecoder(query, Map.of());
   }
 
+  /**
+   * Whether this provider type supports properties of type ENCRYPTED or ENCRYPTED_ARRAY. Provider
+   * startup fails when such properties are declared but not supported.
+   */
+  protected boolean supportsEncryptedProperties() {
+    return false;
+  }
+
   protected List<FeatureTokenTransformer> getDecoderTransformers() {
-    return ImmutableList.of();
+    return getData()
+        .getEncryptionKey()
+        .map(
+            key ->
+                List.<FeatureTokenTransformer>of(
+                    new FeatureTokenTransformerDecrypt(EncryptedValues.parseKey(key))))
+        .orElse(ImmutableList.of());
   }
 
   protected Map<String, Codelist> getCodelists() {

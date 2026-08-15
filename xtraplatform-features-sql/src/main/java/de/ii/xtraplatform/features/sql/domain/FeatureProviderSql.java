@@ -77,6 +77,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
+import de.ii.xtraplatform.features.domain.transform.EncryptedValues;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
@@ -1266,7 +1267,19 @@ public class FeatureProviderSql
         getNativeCrs(),
         crsTransformerFactory,
         getData().getNativeTimeZone(),
-        getStreamRunner());
+        getStreamRunner(),
+        getEncryption());
+  }
+
+  @Override
+  protected boolean supportsEncryptedProperties() {
+    return true;
+  }
+
+  private Optional<EncryptedValues> getEncryption() {
+    return getData()
+        .getEncryptionKey()
+        .map(key -> new EncryptedValues(EncryptedValues.parseKey(key)));
   }
 
   @Override
@@ -1359,7 +1372,8 @@ public class FeatureProviderSql
                     getNativeCrs(),
                     crsTransformerFactory,
                     getData().getNativeTimeZone(),
-                    partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
+                    partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty(),
+                    getEncryption()))
             .via(Transformer.map(feature -> feature));
 
     if (partial) {

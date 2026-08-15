@@ -123,6 +123,8 @@ public interface FeatureSchema
    * - `VALUE_ARRAY` for a list of simple values.
    * - `FEATURE_REF` for a reference to another feature or external resource.
    * - `FEATURE_REF_ARRAY` for a list of references to others features or external resources.
+   * - `ENCRYPTED` for an encrypted value, the logical type is declared in `valueType`.
+   * - `ENCRYPTED_ARRAY` for a list of encrypted values, the logical type is declared in `valueType`.
    * </code>
    *     <p>
    * @langDe Der Datentyp des Schemaobjekts. Der Standardwert ist `STRING`, sofern nicht auch die
@@ -135,6 +137,8 @@ public interface FeatureSchema
    * - `VALUE_ARRAY`für eine Liste von einfachen Werten.
    * - `FEATURE_REF` für einen Verweis auf ein anderes Feature oder eine externe Ressource.
    * - `FEATURE_REF_ARRAY` für eine Liste von Verweisen auf andere Features oder externe Ressourcen.
+   * - `ENCRYPTED` für einen verschlüsselten Wert, der logische Typ wird in `valueType` angegeben.
+   * - `ENCRYPTED_ARRAY` für eine Liste von verschlüsselten Werten, der logische Typ wird in `valueType` angegeben.
    * </code>
    *     <p>
    * @default STRING/OBJECT
@@ -196,10 +200,12 @@ public interface FeatureSchema
   Optional<Role> getRole();
 
   /**
-   * @langEn Only needed when `type` is `VALUE_ARRAY`. Possible values: `FLOAT`, `INTEGER`,
-   *     `STRING`, `BOOLEAN`, `DATETIME`, `DATE`
-   * @langDe Wird nur benötigt, wenn `type` auf `VALUE_ARRAY` gesetzt ist. Mögliche Werte: `FLOAT`,
-   *     `INTEGER`, `STRING`, `BOOLEAN`, `DATETIME`, `DATE`
+   * @langEn Only needed when `type` is `VALUE_ARRAY`, `ENCRYPTED` or `ENCRYPTED_ARRAY`. Possible
+   *     values: `FLOAT`, `INTEGER`, `STRING`, `BOOLEAN`, `DATETIME`, `DATE`. For `ENCRYPTED` and
+   *     `ENCRYPTED_ARRAY` this is the logical type of the decrypted values.
+   * @langDe Wird nur benötigt, wenn `type` auf `VALUE_ARRAY`, `ENCRYPTED` oder `ENCRYPTED_ARRAY`
+   *     gesetzt ist. Mögliche Werte: `FLOAT`, `INTEGER`, `STRING`, `BOOLEAN`, `DATETIME`, `DATE`.
+   *     Bei `ENCRYPTED` und `ENCRYPTED_ARRAY` ist dies der logische Typ der entschlüsselten Werte.
    * @default STRING
    */
   @Override
@@ -506,6 +512,8 @@ public interface FeatureSchema
         && !isMultiSource()
         && !isInternal()
         && !Objects.equals(getType(), Type.UNKNOWN)
+        && !Objects.equals(getType(), Type.ENCRYPTED)
+        && !Objects.equals(getType(), Type.ENCRYPTED_ARRAY)
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
 
@@ -521,6 +529,7 @@ public interface FeatureSchema
         && !isInternal()
         && !Objects.equals(getType(), Type.BOOLEAN)
         && !Objects.equals(getType(), Type.UNKNOWN)
+        && !Objects.equals(getType(), Type.ENCRYPTED)
         && !getExcludedScopes().contains(Scope.SORTABLE);
   }
 

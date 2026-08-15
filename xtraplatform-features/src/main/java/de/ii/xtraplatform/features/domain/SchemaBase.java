@@ -105,6 +105,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     OBJECT_ARRAY,
     FEATURE_REF,
     FEATURE_REF_ARRAY,
+    ENCRYPTED,
+    ENCRYPTED_ARRAY,
     UNKNOWN
   }
 
@@ -262,6 +264,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   default boolean queryable() {
     return !isObject()
         && !Objects.equals(getType(), Type.UNKNOWN)
+        && !Objects.equals(getType(), Type.ENCRYPTED)
+        && !Objects.equals(getType(), Type.ENCRYPTED_ARRAY)
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
 
@@ -274,6 +278,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
         && !isArray()
         && !Objects.equals(getType(), Type.BOOLEAN)
         && !Objects.equals(getType(), Type.UNKNOWN)
+        && !Objects.equals(getType(), Type.ENCRYPTED)
         && !getExcludedScopes().contains(Scope.SORTABLE);
   }
 
@@ -712,7 +717,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   default boolean isArray() {
     return getType() == Type.OBJECT_ARRAY
         || getType() == Type.VALUE_ARRAY
-        || getType() == Type.FEATURE_REF_ARRAY;
+        || getType() == Type.FEATURE_REF_ARRAY
+        || getType() == Type.ENCRYPTED_ARRAY;
   }
 
   @JsonIgnore
@@ -760,6 +766,13 @@ public interface SchemaBase<T extends SchemaBase<T>> {
             && (getRefType().isPresent()
                 || getRefUriTemplate().isPresent()
                 || getRefKeyTemplate().isPresent()));
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isEncrypted() {
+    return getType() == Type.ENCRYPTED || getType() == Type.ENCRYPTED_ARRAY;
   }
 
   @JsonIgnore
