@@ -36,6 +36,9 @@ public class TileEncoderMvt implements TileEncoder {
   private final Function<String, Optional<BoundingBox>> tilesetBounds;
   private final CrsTransformerFactory crsTransformerFactory;
 
+  private final Function<String, Optional<BoundingBox>> tilesetBounds;
+  private final CrsTransformerFactory crsTransformerFactory;
+
   public TileEncoderMvt(
       Function<String, Optional<BoundingBox>> tilesetBounds,
       CrsTransformerFactory crsTransformerFactory) {
