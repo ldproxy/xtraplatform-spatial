@@ -184,7 +184,7 @@ class JdbcSqlSession implements SqlSession {
         // Expected, configuration-driven failure (e.g. a check function RAISE EXCEPTION) — carry
         // the warnings collected so far so they survive the failure path.
         throw new FeatureMutationHookException(
-            "Hook statement failed: " + e.getMessage() + " — statement: " + sql, e, warnings);
+            "Hook statement failed: " + primaryMessage(e), e, warnings);
       }
     }
     return warnings;
@@ -234,11 +234,30 @@ class JdbcSqlSession implements SqlSession {
    * anything else stays an IllegalStateException and keeps its stack trace.
    */
   private static RuntimeException mutationFailed(String prefix, String sql, SQLException e) {
-    String message = prefix + e.getMessage() + " — statement: " + sql;
     String sqlState = constraintSqlState(e);
-    return sqlState != null
-        ? new FeatureMutationConstraintException(message, e, sqlState)
-        : new IllegalStateException(message, e);
+    if (sqlState != null) {
+      // Reported back to the client: keep the rejection itself, leave out the database's call
+      // context and the failing statement. Both are noise for the client and would disclose
+      // internal schema, function names and every attribute value of the statement; the statement
+      // is still available in the SQL debug log.
+      return new FeatureMutationConstraintException(prefix + primaryMessage(e), e, sqlState);
+    }
+    return new IllegalStateException(prefix + e.getMessage() + " — statement: " + sql, e);
+  }
+
+  /**
+   * The primary message of a database error, without the call context the driver appends to {@link
+   * SQLException#getMessage()}. PostgreSQL primary messages are single-line while the context
+   * follows on its own lines, so cutting at the first line break is independent of the server's
+   * message locale (the context label is localised, e.g. {@code CONTEXT:} / {@code Wobei:}).
+   */
+  private static String primaryMessage(SQLException e) {
+    String message = e.getMessage();
+    if (message == null) {
+      return e.getClass().getSimpleName();
+    }
+    int lineBreak = message.indexOf('\n');
+    return (lineBreak < 0 ? message : message.substring(0, lineBreak)).trim();
   }
 
   /**
