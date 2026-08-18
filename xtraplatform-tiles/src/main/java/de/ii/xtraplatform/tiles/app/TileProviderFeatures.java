@@ -64,7 +64,7 @@ import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileSeeding;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
+import de.ii.xtraplatform.tiles.domain.TileSeedingPartialJob;
 import de.ii.xtraplatform.tiles.domain.TileStore;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
@@ -790,15 +790,15 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   }
 
   @Override
-  public void setupSeeding(TileSeedingJobSet jobSet) throws IOException {
+  public void setupSeeding(TileSeedingJob jobSet) throws IOException {
     for (Tuple<TileCache, String> cache : getCaches(jobSet)) {
       cache.first().setupSeeding(jobSet, cache.second());
     }
   }
 
   @Override
-  public void cleanupSeeding(TileSeedingJobSet jobSet) throws IOException {
-    LOGGER.debug("{}: cleaning up tile caches", TileSeedingJobSet.LABEL);
+  public void cleanupSeeding(TileSeedingJob jobSet) throws IOException {
+    LOGGER.debug("{}: cleaning up tile caches", TileSeedingJob.LABEL);
 
     for (Tuple<TileCache, String> cache : getCaches(jobSet)) {
       cache.first().cleanupSeeding(jobSet, cache.second());
@@ -807,7 +807,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
     // TODO: cleanup all orphaned tiles that are not within current cache limits
   }
 
-  private List<Tuple<TileCache, String>> getCaches(TileSeedingJobSet jobSet) {
+  private List<Tuple<TileCache, String>> getCaches(TileSeedingJob jobSet) {
     List<Tuple<TileCache, String>> result = new ArrayList<>();
     Set<TileCache> done = new LinkedHashSet<>();
 
@@ -839,7 +839,8 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
   }
 
   @Override
-  public void runSeeding(TileSeedingJob job, Consumer<Integer> updateProgress) throws IOException {
+  public void runSeeding(TileSeedingPartialJob job, Consumer<Integer> updateProgress)
+      throws IOException {
     if (!metadata.containsKey(job.getTileSet())) {
       LOGGER.warn("Tileset with name '{}' not found", job.getTileSet());
       return;
@@ -855,7 +856,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       LOGGER.debug(
           MARKER.JOBS,
           "{}: {} {} tiles (Tileset: {}, TileMatrixSet: {}, Scope: {}, Encoding: {})",
-          TileSeedingJobSet.LABEL,
+          TileSeedingJob.LABEL,
           action,
           job.getNumberOfTiles(),
           job.getTileSet(),
@@ -890,7 +891,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       LOGGER.debug(
           MARKER.JOBS,
           "{}: finished {} {} tiles in {} (Tileset: {}, TileMatrixSet: {}, Scope: {}, Encoding: {})",
-          TileSeedingJobSet.LABEL,
+          TileSeedingJob.LABEL,
           action,
           job.getNumberOfTiles(),
           pretty(duration),
