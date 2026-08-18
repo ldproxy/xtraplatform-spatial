@@ -9,90 +9,95 @@ package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import de.ii.xtraplatform.jobs.domain.Job;
-import de.ii.xtraplatform.jobs.domain.Job.JobDetails;
-import de.ii.xtraplatform.tiles.app.FeatureEncoderMVT;
+import com.google.common.collect.ImmutableMap;
+import de.ii.xtralink.jobs.JobConfiguration;
+import de.ii.xtraplatform.jobs.domain.JobProgress;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSeedingJob.Builder;
-import jakarta.ws.rs.core.MediaType;
+import de.ii.xtraplatform.xtralink.domain.JobContext.JobContextEntity;
+import de.ii.xtraplatform.xtralink.domain.JobInputs;
+import de.ii.xtraplatform.xtralink.domain.Jobs;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTileSeedingJob.Builder.class)
-public interface TileSeedingJob extends JobDetails {
+public interface TileSeedingJob extends JobInputs {
 
-  String TYPE_MVT = TileSeedingJobSet.type("vector", "mvt");
-  String TYPE_PNG = TileSeedingJobSet.type("raster", "png");
+  String TYPE = "tile-seeding";
+  String TYPE_SETUP = type("setup");
+  String TYPE_CLEANUP = type("cleanup");
+  String LABEL = "Tile cache seeding";
 
-  static Job of(
-      int priority,
-      String tileProvider,
-      String tileSet,
-      String tileMatrixSet,
-      boolean isReseed,
-      Set<TileSubMatrix> subMatrices,
-      Optional<TileGenerationParameters> generationParameters,
-      String jobSetId) {
-    ImmutableTileSeedingJob details =
-        new Builder()
-            .tileProvider(tileProvider)
-            .tileSet(tileSet)
-            .tileMatrixSet(tileMatrixSet)
-            .generationParameters(generationParameters)
-            .encoding(FeatureEncoderMVT.FORMAT)
-            .isReseed(isReseed)
-            .addAllSubMatrices(subMatrices)
-            .build();
-
-    return Job.of(TYPE_MVT, priority, details, jobSetId, (int) details.getNumberOfTiles());
+  static String type(String... parts) {
+    return String.join(":", TYPE, String.join(":", parts));
   }
 
-  static Job raster(
-      int priority,
+  static JobConfiguration of(
       String tileProvider,
-      String tileSet,
-      String tileMatrixSet,
-      boolean isReseed,
-      Set<TileSubMatrix> subMatrices,
-      String jobSetId,
-      Map<String, String> storageInfo) {
-    ImmutableTileSeedingJob details =
+      Map<String, TileGenerationParameters> tileSets,
+      boolean reseed,
+      int priority) {
+    ImmutableTileSeedingJob tileSeedingJob =
         new Builder()
             .tileProvider(tileProvider)
-            .tileSet(tileSet)
-            .tileMatrixSet(tileMatrixSet)
-            .encoding(MediaType.valueOf("image/png"))
-            .isReseed(isReseed)
-            .addAllSubMatrices(subMatrices)
-            .storage(storageInfo)
+            .tileSets(TilesetDetailsXL.of(tileSets))
+            .isReseed(reseed)
             .build();
-
-    return Job.of(TYPE_PNG, priority, details, jobSetId, (int) details.getNumberOfTiles());
+    return Jobs.create(
+        TYPE,
+        priority,
+        LABEL,
+        String.format(" (Tilesets: %s)", tileSets.keySet()),
+        tileSeedingJob,
+        new JobContextEntity(tileProvider),
+        tileSeedingJob.getTileSets().entrySet().stream()
+            .collect(
+                ImmutableMap.toImmutableMap(Map.Entry::getKey, e -> e.getValue().getProgress2())));
   }
 
   String getTileProvider();
 
-  String getTileSet();
+  Map<String, TilesetDetailsXL> getTileSets();
 
-  Optional<TileGenerationParameters> getGenerationParameters();
-
-  String getTileMatrixSet();
-
-  MediaType getEncoding();
+  @JsonIgnore
+  @Value.Lazy
+  default Map<String, TileGenerationParameters> getTileSetParameters() {
+    return getTileSets().entrySet().stream()
+        .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, e -> e.getValue().getParameters()));
+  }
 
   boolean isReseed();
 
-  Map<String, String> getStorage();
+  @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTilesetDetailsXL.Builder.class)
+  interface TilesetDetailsXL {
 
-  List<TileSubMatrix> getSubMatrices();
+    static Map<String, TilesetDetailsXL> of(Map<String, TileGenerationParameters> tilesets) {
+      return tilesets.entrySet().stream()
+          .collect(
+              ImmutableMap.toImmutableMap(
+                  Map.Entry::getKey, e -> TilesetDetailsXL.of(e.getValue())));
+    }
 
-  @Value.Derived
-  @Value.Auxiliary
-  @JsonIgnore
-  default long getNumberOfTiles() {
-    return getSubMatrices().stream().mapToLong(TileSubMatrix::getNumberOfTiles).sum();
+    static TilesetDetailsXL of(TileGenerationParameters parameters) {
+      return new ImmutableTilesetDetailsXL.Builder()
+          .parameters(parameters)
+          .progress2(new ImmutableTilesetProgressXL2.Builder().build())
+          .build();
+    }
+
+    TileGenerationParameters getParameters();
+
+    @Nullable
+    @JsonIgnore
+    TilesetProgressXL2 getProgress2();
+  }
+
+  @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTilesetProgressXL2.Builder.class)
+  interface TilesetProgressXL2 extends JobProgress {
+    Map<String, List<Integer>> getLevels();
   }
 }

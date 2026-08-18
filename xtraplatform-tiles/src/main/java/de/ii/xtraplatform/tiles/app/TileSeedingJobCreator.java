@@ -8,27 +8,31 @@
 package de.ii.xtraplatform.tiles.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
+import de.ii.xtralink.jobs.Job;
+import de.ii.xtralink.jobs.JobResult;
+import de.ii.xtralink.jobs.PartialJob;
+import de.ii.xtralink.jobs.PartialJobConfiguration;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
-import de.ii.xtraplatform.jobs.domain.Job;
-import de.ii.xtraplatform.jobs.domain.JobProcessor;
-import de.ii.xtraplatform.jobs.domain.JobQueueMin;
-import de.ii.xtraplatform.jobs.domain.JobResult;
-import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
+import de.ii.xtraplatform.tiles.domain.TileSeedingPartialJob;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
+import de.ii.xtraplatform.xtralink.domain.JobContext.JobContextNone;
+import de.ii.xtraplatform.xtralink.domain.JobProcessing;
+import de.ii.xtraplatform.xtralink.domain.JobProcessor;
+import de.ii.xtraplatform.xtralink.domain.JobProcessorBase;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -37,13 +41,14 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.AmountFormats;
 
 @Singleton
-@AutoBind
-public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJobSet> {
+@AutoBind(interfaces = JobProcessorBase.class)
+public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobContextNone> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileSeedingJobCreator.class);
 
@@ -57,8 +62,8 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   }
 
   @Override
-  public String getJobType() {
-    return TileSeedingJobSet.TYPE_SETUP;
+  public Set<String> getKinds() {
+    return Set.of(TileSeedingJob.TYPE_SETUP, TileSeedingJob.TYPE_CLEANUP);
   }
 
   @Override
@@ -68,14 +73,16 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
   }
 
   @Override
-  public int getConcurrency(JobSet jobSet) {
-    return concurrency;
-  }
+  public JobResult process(PartialJob partialJob, Job jobSet, JobProcessing jobs) throws Exception {
+    boolean isCleanup = TileSeedingJob.TYPE_CLEANUP.equals(partialJob.kind());
+    TileSeedingJob seedingJobSet = getInputs(jobSet, jobs);
 
-  @Override
-  public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
-    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
-    boolean isCleanup = getDetails(job, jobQueue);
+    final int[] progressTotal = {0};
+    Map<String, Map<String, List<Integer>>> progressDetails = new LinkedHashMap<>();
+    for (String tileSet : seedingJobSet.getTileSets().keySet()) {
+      Map<String, List<Integer>> tileMatrixSetProgress = new LinkedHashMap<>();
+      progressDetails.put(tileSet, tileMatrixSetProgress);
+    }
 
     Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJobSet.getTileProvider());
     if (optionalTileProvider.isPresent()) {
@@ -83,7 +90,7 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
       if (!tileProvider.seeding().isSupported()) {
         LOGGER.error("Tile provider does not support seeding: {}", tileProvider.getId());
-        return JobResult.error("Tile provider does not support seeding"); // early return
+        return jobs.failure("Tile provider does not support seeding");
       }
 
       try {
@@ -91,25 +98,21 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
         if (isCleanup) {
           tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
 
-          long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
-          List<String> errors = jobSet.getErrors().get();
+          long duration = Instant.now().toEpochMilli() - jobSet.startedAt();
+          List<String> errors = jobSet.errors();
 
           if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
             LOGGER.warn(
                 MARKER.JOBS,
                 "{} had {} errors{}",
-                jobSet.getLabel(),
+                jobSet.label(),
                 errors.size(),
-                jobSet.getDescription().orElse(""));
+                jobSet.description());
 
             if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
               for (String error : errors) {
                 LOGGER.debug(
-                    MARKER.JOBS,
-                    "{} error: {}{}",
-                    jobSet.getLabel(),
-                    error,
-                    jobSet.getDescription().orElse(""));
+                    MARKER.JOBS, "{} error: {}{}", jobSet.label(), error, jobSet.description());
               }
             }
           }
@@ -118,19 +121,19 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
             LOGGER.info(
                 MARKER.JOBS,
                 "{} finished in {}{}",
-                jobSet.getLabel(),
-                pretty(duration),
-                jobSet.getDescription().orElse(""));
+                jobSet.label(),
+                prettyDuration(duration),
+                jobSet.description());
           }
 
-          return JobResult.success(); // early return
+          return jobs.success();
         }
 
         if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
           LOGGER.info(
               MARKER.JOBS,
               "{} scheduled (Tilesets: {})",
-              jobSet.getLabel(),
+              jobSet.label(),
               seedingJobSet.getTileSets().keySet());
         }
 
@@ -172,8 +175,6 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
 
         boolean allRaster = true;
         boolean someRaster = false;
-        Set<String> tilesets = new HashSet<>();
-        Set<Integer> levels = new HashSet<>();
 
         for (String tileSet : seedingJobSet.getTileSets().keySet()) {
           Map<String, Set<TileMatrixSetLimits>> tileMatrixSets =
@@ -198,109 +199,87 @@ public class TileSeedingJobCreator implements JobProcessor<Boolean, TileSeedingJ
                     });
 
                 for (TileSubMatrix subMatrix : subMatrices) {
-                  Job job2 =
+                  PartialJobConfiguration partial =
                       isRaster
-                          ? TileSeedingJob.raster(
-                              jobSet.getPriority(),
+                          ? TileSeedingPartialJob.raster(
+                              jobSet.priority(),
                               tileProvider.getId(),
                               tileSet,
                               tileMatrixSet,
                               seedingJobSet.isReseed(),
                               Set.of(subMatrix),
-                              jobSet.getId(),
+                              jobSet.id(),
                               tileProvider
                                   .seeding()
                                   .get()
                                   .getRasterStorageInfo(tileSet, tileMatrixSet, subMatrix))
-                          : TileSeedingJob.of(
-                              jobSet.getPriority(),
+                          : TileSeedingPartialJob.of(
+                              jobSet.priority(),
                               tileProvider.getId(),
                               tileSet,
                               tileMatrixSet,
                               seedingJobSet.isReseed(),
                               Set.of(subMatrix),
                               Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
-                              jobSet.getId());
+                              jobSet.id());
 
-                  jobQueue.initJobSet(
-                      jobSet,
-                      job2.getTotal().get(),
-                      Map.<String, Object>of(
-                          "tileSet",
-                          tileSet,
-                          "tileMatrixSet",
-                          tileMatrixSet,
-                          "level",
-                          subMatrix.getLevel(),
-                          "count",
-                          job2.getTotal().get(),
-                          "isFirstTileset",
-                          tilesets.add(tileSet),
-                          "isFirstLevel",
-                          levels.add(subMatrix.getLevel())));
+                  progressTotal[0] += partial.progress().total();
+                  List<Integer> progressLevels =
+                      progressDetails
+                          .get(tileSet)
+                          .computeIfAbsent(
+                              tileMatrixSet,
+                              k ->
+                                  IntStream.range(0, 24)
+                                      .mapToObj(i -> -1)
+                                      .collect(Collectors.toCollection(ArrayList::new)));
+                  int old = progressLevels.get(subMatrix.getLevel());
+                  int count = partial.progress().total();
+                  progressLevels.set(subMatrix.getLevel(), old == -1 ? count : old + count);
 
-                  jobQueue.push(job2);
+                  jobs.push(partial);
                 }
               });
         }
 
-        // when no tileset of the job set has tiles to seed, no job was added and the total is still
-        // unknown; a total of zero makes the job set complete instead of leaving it in the queue,
-        // where it would never reach 100% and suppress every following seeding run
-        jobSet.getTotal().compareAndSet(-1, 0);
-
-        if (jobSet.isDone()) {
-          jobSet.getCleanup().ifPresent(jobQueue::push);
-          return JobResult.success(); // early return
-        }
+        jobs.init(jobSet.id(), progressTotal[0], progressDetails);
 
         if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
           String processors =
               allRaster
                   ? "remote"
-                  : someRaster
-                      ? "remote and " + getConcurrency(jobSet) + " local"
-                      : getConcurrency(jobSet) + " local";
+                  : someRaster ? "remote and " + concurrency + " local" : concurrency + " local";
           LOGGER.debug(
               MARKER.JOBS,
               "{}: processing {} tiles with {} processors",
-              jobSet.getLabel(),
-              jobSet.getTotal().get(),
+              jobSet.label(),
+              progressTotal[0],
               processors);
         }
       } catch (IOException e) {
-        return JobResult.error(e.getMessage());
+        return jobs.failure(e.getMessage());
       }
     }
 
-    return JobResult.success();
+    return jobs.success();
   }
 
   @Override
-  public Class<Boolean> getDetailsType() {
-    return Boolean.class;
+  public Class<TileSeedingJob> getInputsClass() {
+    return TileSeedingJob.class;
   }
 
   @Override
-  public Class<TileSeedingJobSet> getSetDetailsType() {
-    return TileSeedingJobSet.class;
-  }
-
-  @Override
-  public Map<String, Class<?>> getJobTypes() {
-    return Map.of(
-        TileSeedingJobSet.TYPE,
-        TileSeedingJobSet.class,
-        TileSeedingJobSet.TYPE_SETUP,
-        Boolean.class);
+  public Class<JobContextNone> getPartialContextClass() {
+    return JobContextNone.class;
   }
 
   private Optional<TileProvider> getTileProvider(String id) {
     return entityRegistry.getEntity(TileProvider.class, id);
   }
 
-  private static String pretty(long seconds) {
-    Duration d = Duration.ofSeconds(seconds);
+  private static String prettyDuration(long millis) {
+    Duration d = millis > 1000 ? Duration.ofSeconds(millis / 1000) : Duration.ofMillis(millis);
     return AmountFormats.wordBased(d, Locale.ENGLISH);
   }
 }
