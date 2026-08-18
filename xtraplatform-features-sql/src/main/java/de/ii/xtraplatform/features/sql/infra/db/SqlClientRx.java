@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -50,6 +51,12 @@ import org.slf4j.LoggerFactory;
 public class SqlClientRx implements SqlClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlClientRx.class);
+
+  // Generous on purpose: this is not a query budget but a stall detector, so it has to sit
+  // well above the slowest legitimate gap between two rows (a count over a large table, a
+  // sub-query whose first row needs a full scan). Only an unbounded wait is the failure mode
+  // it exists to end.
+  private static final long READ_STALL_TIMEOUT_MINUTES = 10;
 
   private final Database session;
   private final SqlDbmsAdapter dbmsAdapter;
@@ -168,6 +175,28 @@ public class SqlClientRx implements SqlClient {
     if (options.isParallel()) {
       flowable = flowable.subscribeOn(Schedulers.io());
     }
+
+    // Safety net for a read that neither completes nor fails. A database error raised while the
+    // rows are being streamed is not delivered by the underlying library (see the issue linked
+    // above), so the stream can stall forever: no error is logged, no response is sent, and the
+    // connections the sub-query holds stay held until the client gives up. A connection lost
+    // mid-stream — a failover in a replicated cluster, for instance — looks exactly the same.
+    // The timeout is per element, not per stream, so a slow but progressing read is unaffected
+    // however long it runs in total; only a gap longer than the window ends the stream, with an
+    // error that does propagate. A database-side statement_timeout is no substitute: its error
+    // would be swallowed the same way.
+    flowable =
+        flowable.timeout(
+            READ_STALL_TIMEOUT_MINUTES,
+            TimeUnit.MINUTES,
+            Schedulers.computation(),
+            Flowable.error(
+                () ->
+                    new IllegalStateException(
+                        String.format(
+                            "The database delivered no row for %d minutes and the read was ended; "
+                                + "the statement is in the SQL debug log.",
+                            READ_STALL_TIMEOUT_MINUTES))));
 
     return Reactive.Source.publisher(flowable);
   }
