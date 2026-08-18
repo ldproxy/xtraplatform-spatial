@@ -205,6 +205,10 @@ public class FeatureStreamImpl implements FeatureStream {
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
 
+          if (query.getJobHook().isPresent()) {
+            source = source.via(new FeatureTokenTransformerProgress(query.getJobHook().get()));
+          }
+
           Reactive.BasicStream<?, Void> basicStream =
               sink instanceof Reactive.SinkTransformed
                   ? source.to((Reactive.SinkTransformed<Object, ?>) sink)
@@ -301,6 +305,10 @@ public class FeatureStreamImpl implements FeatureStream {
 
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
+
+          if (query.getJobHook().isPresent()) {
+            source = source.via(new FeatureTokenTransformerProgress(query.getJobHook().get()));
+          }
 
           Reactive.BasicStream<?, X> basicStream =
               sink instanceof Reactive.SinkReducedTransformed

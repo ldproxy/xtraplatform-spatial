@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureStream.PipelineSteps;
@@ -17,6 +18,10 @@ import org.immutables.value.Value;
 public interface Query {
 
   Optional<EpsgCrs> getCrs();
+
+  @JsonIgnore
+  @Value.Auxiliary
+  Optional<JobHook> getJobHook();
 
   @Value.Default
   default double getMaxAllowableOffset() {
