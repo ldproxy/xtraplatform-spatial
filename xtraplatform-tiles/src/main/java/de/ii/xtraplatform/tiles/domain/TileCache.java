@@ -28,7 +28,7 @@ public interface TileCache {
 
   Map<String, Map<String, Range<Integer>>> getTmsRanges();
 
-  default boolean canProcess(TileSeedingJob job) {
+  default boolean canProcess(TileSeedingPartialJob job) {
     return getTmsRanges().containsKey(job.getTileSet())
         && getTmsRanges().get(job.getTileSet()).containsKey(job.getTileMatrixSet())
         && job.getSubMatrices().stream()
@@ -40,20 +40,21 @@ public interface TileCache {
                         .contains(sub.getLevel()));
   }
 
-  default boolean canProcess(TileSeedingJobSet jobSet) {
+  default boolean canProcess(TileSeedingJob jobSet) {
     return jobSet.getTileSets().keySet().stream().allMatch(getTmsRanges()::containsKey);
   }
 
   boolean isSeeded();
 
-  void setupSeeding(TileSeedingJobSet jobSet, String tileSourceLabel) throws IOException;
+  void setupSeeding(TileSeedingJob jobSet, String tileSourceLabel) throws IOException;
 
-  void cleanupSeeding(TileSeedingJobSet jobSet, String tileSourceLabel) throws IOException;
+  void cleanupSeeding(TileSeedingJob jobSet, String tileSourceLabel) throws IOException;
 
-  void seed(TileSeedingJob job, String tileSourceLabel, Runnable updateProgress) throws IOException;
+  void seed(TileSeedingPartialJob job, String tileSourceLabel, Runnable updateProgress)
+      throws IOException;
 
   default void doSeed(
-      TileSeedingJob job,
+      TileSeedingPartialJob job,
       String tileSourceLabel,
       TileStore tileStore,
       ChainedTileProvider delegate,
@@ -112,7 +113,7 @@ public interface TileCache {
         });
   }
 
-  default void purge(TileSeedingJob job, String tileSourceLabel) throws IOException {}
+  default void purge(TileSeedingPartialJob job, String tileSourceLabel) throws IOException {}
 
   Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
       Map<String, ? extends GenerationParameters> tilesets) throws IOException;
