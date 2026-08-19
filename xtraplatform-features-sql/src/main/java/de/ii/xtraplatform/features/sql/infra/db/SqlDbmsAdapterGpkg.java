@@ -122,6 +122,12 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
         };
 
     ds.setLoadExtension(true);
+    // SQLite matches LIKE case-insensitively for ASCII characters unless told otherwise, which
+    // would make the CQL2 LIKE predicate behave differently here than on any other backend —
+    // CQL2 defines it as case-sensitive, and case-insensitive matching as CASEI(). Setting it on
+    // the data source applies the pragma to every connection it opens; it cannot be appended to
+    // getInitSql(), which is executed as a single statement.
+    ds.setCaseSensitiveLike(true);
     ds.setUrl(String.format("jdbc:sqlite:%s", source));
 
     return ds;
