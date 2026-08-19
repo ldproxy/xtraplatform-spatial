@@ -16,7 +16,7 @@ import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
+import de.ii.xtraplatform.tiles.domain.TileSeedingPartialJob;
 import de.ii.xtraplatform.tiles.domain.TileStore;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
 import java.io.ByteArrayInputStream;
@@ -112,15 +112,15 @@ public class TileCacheDynamic implements ChainedTileProvider, TileCache {
   }
 
   @Override
-  public void setupSeeding(TileSeedingJobSet jobSet, String tileSourceLabel) throws IOException {}
+  public void setupSeeding(TileSeedingJob jobSet, String tileSourceLabel) throws IOException {}
 
   @Override
-  public void cleanupSeeding(TileSeedingJobSet jobSet, String tileSourceLabel) throws IOException {
+  public void cleanupSeeding(TileSeedingJob jobSet, String tileSourceLabel) throws IOException {
     tileStore.tidyup();
   }
 
   @Override
-  public void seed(TileSeedingJob job, String tileSourceLabel, Runnable updateProgress)
+  public void seed(TileSeedingPartialJob job, String tileSourceLabel, Runnable updateProgress)
       throws IOException {
     if (!isSeeded) {
       return;
@@ -130,7 +130,7 @@ public class TileCacheDynamic implements ChainedTileProvider, TileCache {
   }
 
   @Override
-  public void purge(TileSeedingJob job, String tileSourceLabel) throws IOException {
+  public void purge(TileSeedingPartialJob job, String tileSourceLabel) throws IOException {
     if (!isSeeded) {
       return;
     }
@@ -145,7 +145,7 @@ public class TileCacheDynamic implements ChainedTileProvider, TileCache {
             // ignore
             LOGGER.debug(
                 "{}: error while purging cached tiles for {}, tileset {}, tile matrix {}. Reason: {}",
-                TileSeedingJobSet.LABEL,
+                TileSeedingJob.LABEL,
                 tileSourceLabel,
                 tileset,
                 limits.getTileMatrix(),

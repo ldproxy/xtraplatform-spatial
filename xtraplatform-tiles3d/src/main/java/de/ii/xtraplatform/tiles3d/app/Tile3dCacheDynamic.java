@@ -14,7 +14,7 @@ import de.ii.xtraplatform.tiles.domain.TileCache;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
+import de.ii.xtraplatform.tiles.domain.TileSeedingPartialJob;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
 import java.io.IOException;
 import java.util.Map;
@@ -50,13 +50,13 @@ public class Tile3dCacheDynamic implements TileCache {
   }
 
   @Override
-  public void setupSeeding(TileSeedingJobSet jobSet, String tileSourceLabel) throws IOException {}
+  public void setupSeeding(TileSeedingJob jobSet, String tileSourceLabel) throws IOException {}
 
   @Override
-  public void cleanupSeeding(TileSeedingJobSet jobSet, String tileSourceLabel) throws IOException {}
+  public void cleanupSeeding(TileSeedingJob jobSet, String tileSourceLabel) throws IOException {}
 
   @Override
-  public void seed(TileSeedingJob job, String tileSourceLabel, Runnable updateProgress)
+  public void seed(TileSeedingPartialJob job, String tileSourceLabel, Runnable updateProgress)
       throws IOException {}
 
   @Override
