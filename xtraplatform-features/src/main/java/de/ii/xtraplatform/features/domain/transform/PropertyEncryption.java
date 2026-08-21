@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain.transform;
 import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -34,11 +35,14 @@ public class PropertyEncryption {
   }
 
   public byte[] encrypt(String plaintext) {
-    return encryption.encrypt(plaintext);
+    return encryption.encrypt(plaintext.getBytes(StandardCharsets.UTF_8));
   }
 
   public String decrypt(byte[] encrypted, String propertyLabel) {
-    return encryption.decrypt(encrypted, String.format("for property '%s'", propertyLabel));
+    byte[] decrypted =
+        encryption.decrypt(encrypted, String.format("for property '%s'", propertyLabel));
+
+    return new String(decrypted, StandardCharsets.UTF_8);
   }
 
   public String normalize(String plaintext, Type valueType, String propertyLabel) {
