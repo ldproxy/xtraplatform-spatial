@@ -373,7 +373,7 @@ public class FeatureEncoderSql
                       isPatch && value.equals(nullValue.get())
                           ? SqlLiterals.string(value)
                           : SqlLiterals.encrypted(
-                              encryption.orElseThrow(FeatureEncoderSql::noEncryptionKey),
+                              encryption.orElseThrow(FeatureEncoderSql::encryptionNotEnabled),
                               logicalType,
                               value,
                               column.second().getName());
@@ -400,9 +400,9 @@ public class FeatureEncoderSql
             });
   }
 
-  private static IllegalStateException noEncryptionKey() {
+  private static IllegalStateException encryptionNotEnabled() {
     return new IllegalStateException(
-        "The provider has properties of type ENCRYPTED, but no encryptionKey is configured.");
+        "The provider has properties of type ENCRYPTED, but encryption is not enabled.");
   }
 
   @Override

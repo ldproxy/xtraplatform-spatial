@@ -68,8 +68,9 @@ public class PropertyEncryption {
 
   /**
    * Startup validation for a provider: encrypted properties require support by the provider type
-   * and a valid key, and a configured key must be well-formed even when no property uses it.
-   * Returns an error message, or empty if the configuration is valid.
+   * and enabled encryption. Returns an error message, or empty if the configuration is valid. A key
+   * that is configured but unusable leaves encryption disabled, so it surfaces here for every
+   * provider that declares encrypted properties.
    */
   public static Optional<String> validateEncryptedProperties(
       Collection<FeatureSchema> types, boolean encryptionEnabled, boolean supported) {

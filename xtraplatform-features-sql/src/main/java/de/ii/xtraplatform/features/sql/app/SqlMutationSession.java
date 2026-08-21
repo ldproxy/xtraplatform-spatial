@@ -1428,7 +1428,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
           encryption.orElseThrow(
               () ->
                   new IllegalStateException(
-                      "The provider has properties of type ENCRYPTED, but no encryptionKey is configured.")),
+                      "The provider has properties of type ENCRYPTED, but encryption is not enabled.")),
           SchemaBase.Type.valueOf(
               column.getOperationParameter(
                   SqlQueryColumn.Operation.ENCRYPT, SchemaBase.Type.STRING.name())),
