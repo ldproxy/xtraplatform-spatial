@@ -214,7 +214,7 @@ public class MappingRulesDeriver
     String target =
         schema.isFeature()
             ? ROOT_TARGET
-            : schema.getType() == Type.VALUE_ARRAY
+            : schema.getType() == Type.VALUE_ARRAY || schema.getType() == Type.ENCRYPTED_ARRAY
                 ? schema.getFullPathAsString() + VALUE_ARRAY_VALUE_SUFFIX
                 : schema.getFullPathAsString();
     Type type =
@@ -222,7 +222,7 @@ public class MappingRulesDeriver
             ? Type.OBJECT_ARRAY
             : (schema.getType() == Type.VALUE_ARRAY || schema.getType() == Type.VALUE)
                 ? schema.getValueType().orElse(Type.STRING)
-                : schema.getType();
+                : schema.getType() == Type.ENCRYPTED_ARRAY ? Type.ENCRYPTED : schema.getType();
 
     ImmutableMappingRule.Builder rule =
         new ImmutableMappingRule.Builder()

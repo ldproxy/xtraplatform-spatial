@@ -38,7 +38,7 @@ class SqlMutationSessionSpec extends Specification {
         // FeatureMutationsSql, CrsTransformerFactory, nativeCrs, nativeTimeZone and the Reactive
         // runner are only touched by the create/update code paths; null is safe for the lifecycle
         // and missing-type cases this spec covers.
-        return new SqlMutationSession(sqlSession, mappings, null, null, null, Optional.empty(), null)
+        return new SqlMutationSession(sqlSession, mappings, null, null, null, Optional.empty(), null, Optional.empty())
     }
 
     def 'commit delegates to the underlying SqlSession'() {

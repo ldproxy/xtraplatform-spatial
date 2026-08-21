@@ -138,7 +138,8 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
                     .forEach(
                         column ->
                             columnTypes.add(
-                                column.getType() == Type.GEOMETRY && isGeometryWkb()
+                                (column.getType() == Type.GEOMETRY && isGeometryWkb())
+                                        || column.getType() == Type.ENCRYPTED
                                     ? byte[].class
                                     : String.class)));
 
