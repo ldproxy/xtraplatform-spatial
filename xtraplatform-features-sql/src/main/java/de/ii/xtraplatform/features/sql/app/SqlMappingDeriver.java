@@ -561,6 +561,22 @@ public class SqlMappingDeriver {
       operations.put(SqlQueryColumn.Operation.DATE, format);
     }
 
+    if (column.getType() == Type.ENCRYPTED) {
+      if (sqlPath.isConnected()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Properties of type ENCRYPTED or ENCRYPTED_ARRAY are not supported in connected columns: %s",
+                column.getTarget()));
+      }
+      // The logical type of the plaintext (valueType) travels as the operation parameter, it is
+      // consumed by the write path to normalize the value before encryption.
+      operations.put(
+          SqlQueryColumn.Operation.ENCRYPT,
+          new String[] {
+            propertySchema.flatMap(FeatureSchema::getValueType).orElse(Type.STRING).name()
+          });
+    }
+
     return operations;
   }
 }
