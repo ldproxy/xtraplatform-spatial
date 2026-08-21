@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.domain
 
 import de.ii.xtraplatform.features.domain.SchemaBase.Type
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption
 import spock.lang.Specification
 
 class EncryptedTypeSpec extends Specification {
@@ -72,20 +73,17 @@ class EncryptedTypeSpec extends Specification {
                                      .sourcePath('nof'))
                              .build()]
         def validKey = Base64.encoder.encodeToString(new byte[32])
-        def validate = de.ii.xtraplatform.features.domain.transform.EncryptedValues.&validateEncryptedProperties
+        def validate = PropertyEncryption.&validateEncryptedProperties
 
         expect: 'an unsupported provider type is rejected'
-        validate(types, Optional.of(validKey), false).get().contains('does not support')
+        validate(types, true, false).get().contains('does not support')
 
         and: 'a missing key is rejected'
-        validate(types, Optional.empty(), true).get().contains('no encryptionKey')
-
-        and: 'a malformed key is rejected even without encrypted properties'
-        validate([], Optional.of('%%%'), true).isPresent()
+        validate(types, false, true).get().contains('encryption is not enabled')
 
         and: 'a valid configuration passes'
-        validate(types, Optional.of(validKey), true).isEmpty()
-        validate([], Optional.empty(), false).isEmpty()
+        validate(types, true, true).isEmpty()
+        validate([], false, false).isEmpty()
     }
 
     def 'an encrypted array gets the implicit value array wrap'() {

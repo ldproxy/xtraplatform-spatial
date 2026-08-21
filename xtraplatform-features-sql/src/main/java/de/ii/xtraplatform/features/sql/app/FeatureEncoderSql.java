@@ -16,7 +16,7 @@ import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
-import de.ii.xtraplatform.features.domain.transform.EncryptedValues;
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption;
 import de.ii.xtraplatform.features.json.domain.JsonBuilder;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
@@ -59,7 +59,7 @@ public class FeatureEncoderSql
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<ZoneId> timeZone;
   private final Optional<String> nullValue;
-  private final Optional<EncryptedValues> encryption;
+  private final Optional<PropertyEncryption> encryption;
   private Map<String, JsonBuilder> jsonColumns;
   private final boolean isPatch;
   private final boolean trace;
@@ -81,7 +81,7 @@ public class FeatureEncoderSql
       CrsTransformerFactory crsTransformerFactory,
       Optional<ZoneId> timeZone,
       Optional<String> nullValue,
-      Optional<EncryptedValues> encryption) {
+      Optional<PropertyEncryption> encryption) {
     this.mapping = mapping;
     this.inputCrs = inputCrs;
     this.crsTransformerFactory = crsTransformerFactory;

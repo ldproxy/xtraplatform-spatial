@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.gml.app;
 import com.google.common.collect.ImmutableList;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -143,6 +144,7 @@ public class FeatureProviderWfs
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      Encryption encryption,
       AuditLog auditLog,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
@@ -154,6 +156,7 @@ public class FeatureProviderWfs
         extensionRegistry,
         valueStore.forType(Codelist.class),
         auditLog,
+        encryption,
         data,
         volatileRegistry);
 

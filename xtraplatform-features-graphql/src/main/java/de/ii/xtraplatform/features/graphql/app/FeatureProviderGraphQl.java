@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.graphql.app;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -198,6 +199,7 @@ public class FeatureProviderGraphQl
       Reactive reactive,
       ValueStore valueStore,
       ProviderExtensionRegistry extensionRegistry,
+      Encryption encryption,
       AuditLog auditLog,
       VolatileRegistry volatileRegistry,
       @Assisted FeatureProviderDataV2 data) {
@@ -209,6 +211,7 @@ public class FeatureProviderGraphQl
         extensionRegistry,
         valueStore.forType(Codelist.class),
         auditLog,
+        encryption,
         data,
         volatileRegistry);
 

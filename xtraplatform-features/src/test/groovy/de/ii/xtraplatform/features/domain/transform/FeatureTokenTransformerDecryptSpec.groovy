@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.features.domain.transform
 
+import de.ii.xtraplatform.base.app.EncryptionImpl
+import de.ii.xtraplatform.base.domain.Encryption
 import de.ii.xtraplatform.features.domain.FeatureSchema
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
 import de.ii.xtraplatform.features.domain.SchemaBase
@@ -22,10 +24,11 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     static final byte[] KEY = (0..31).collect { it as byte } as byte[]
     static final byte[] OTHER_KEY = (32..63).collect { it as byte } as byte[]
+    static final PropertyEncryption ENCRYPTION = new PropertyEncryption(new EncryptionImpl(Base64.getEncoder().encodeToString(KEY)))
 
     def 'an encrypted string value is decrypted'() {
         given: 'a transformer and a ciphertext for a string property'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('nof', SchemaBase.Type.STRING)
 
         when: 'the value is decrypted'
@@ -37,7 +40,7 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'a date value is normalized to the ISO date format'() {
         given: 'a transformer and a ciphertext for a date property'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('geb', SchemaBase.Type.DATE)
 
         expect: 'a canonical date is passed through unchanged'
@@ -46,7 +49,7 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'a datetime value is normalized to the ISO datetime format'() {
         given: 'a transformer and a ciphertext for a datetime property'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('zpe', SchemaBase.Type.DATETIME)
 
         expect: 'a canonical datetime is passed through unchanged'
@@ -55,7 +58,7 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'a decrypted value that is not a valid date is rejected'() {
         given: 'a transformer and a non-ISO plaintext for a date property'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('geb', SchemaBase.Type.DATE)
 
         when: 'the value is decrypted'
@@ -68,7 +71,7 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'a tampered ciphertext is rejected'() {
         given: 'a transformer and a ciphertext with a flipped bit'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('nof', SchemaBase.Type.STRING)
         byte[] encrypted = Base64.decoder.decode(encrypt(KEY, 'Mustermann'))
         encrypted[encrypted.length - 1] = (byte) (encrypted[encrypted.length - 1] ^ 0x01)
@@ -83,7 +86,7 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'a ciphertext encrypted with a different key is rejected'() {
         given: 'a transformer and a ciphertext for another key'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('nof', SchemaBase.Type.STRING)
 
         when: 'the value is decrypted'
@@ -95,7 +98,7 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'stored values that are not valid ciphertexts are rejected'() {
         given: 'a transformer'
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('nof', SchemaBase.Type.STRING)
 
         when: 'the stored value is not Base64'
@@ -113,19 +116,19 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'the encryption key is validated'() {
         when: 'a valid Base64 key of 32 bytes is parsed'
-        def key = EncryptedValues.parseKey(Base64.encoder.encodeToString(KEY))
+        def key = EncryptionImpl.parseKey(Base64.encoder.encodeToString(KEY))
 
         then: 'the key is returned'
         key == KEY
 
         when: 'a key with the wrong length is parsed'
-        EncryptedValues.parseKey(Base64.encoder.encodeToString(new byte[16]))
+        EncryptionImpl.parseKey(Base64.encoder.encodeToString(new byte[16]))
 
         then: 'it is rejected'
         thrown(IllegalArgumentException)
 
         when: 'a key that is not Base64 is parsed'
-        EncryptedValues.parseKey('%%%')
+        EncryptionImpl.parseKey('%%%')
 
         then: 'it is rejected'
         thrown(IllegalArgumentException)
@@ -133,12 +136,11 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'a value encrypted with EncryptedValues decrypts to the same plaintext'() {
         given: 'the write-side encryption and the read-side transformer'
-        def encryption = new EncryptedValues(KEY)
-        def transformer = new FeatureTokenTransformerDecrypt(KEY)
+        def transformer = new FeatureTokenTransformerDecrypt(ENCRYPTION)
         def schema = encryptedSchema('nof', SchemaBase.Type.STRING)
 
         when: 'a value is encrypted and then decrypted'
-        def encrypted = Base64.encoder.encodeToString(encryption.encrypt('Müller-Lüdenscheidt, Jürgen'))
+        def encrypted = Base64.encoder.encodeToString(ENCRYPTION.encrypt('Müller-Lüdenscheidt, Jürgen'))
 
         then: 'the roundtrip restores the original value'
         transformer.decrypt(encrypted, schema) == 'Müller-Lüdenscheidt, Jürgen'

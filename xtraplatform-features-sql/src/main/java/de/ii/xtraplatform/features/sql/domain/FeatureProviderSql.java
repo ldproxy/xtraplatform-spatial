@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
@@ -77,7 +78,6 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
-import de.ii.xtraplatform.features.domain.transform.EncryptedValues;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
@@ -496,6 +496,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      Encryption encryption,
       AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     this(
@@ -511,6 +512,7 @@ public class FeatureProviderSql
         volatileRegistry,
         cache,
         scheduler,
+        encryption,
         auditLog,
         data,
         decoderFactories.getConnectorDecoders());
@@ -529,6 +531,7 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      Encryption encryption,
       AuditLog auditLog,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
@@ -540,6 +543,7 @@ public class FeatureProviderSql
         extensionRegistry,
         valueStore.forType(Codelist.class),
         auditLog,
+        encryption,
         data,
         volatileRegistry);
 
@@ -1268,18 +1272,12 @@ public class FeatureProviderSql
         crsTransformerFactory,
         getData().getNativeTimeZone(),
         getStreamRunner(),
-        getEncryption());
+        getPropertyEncryption());
   }
 
   @Override
   protected boolean supportsEncryptedProperties() {
     return true;
-  }
-
-  private Optional<EncryptedValues> getEncryption() {
-    return getData()
-        .getEncryptionKey()
-        .map(key -> new EncryptedValues(EncryptedValues.parseKey(key)));
   }
 
   @Override
@@ -1373,7 +1371,7 @@ public class FeatureProviderSql
                     crsTransformerFactory,
                     getData().getNativeTimeZone(),
                     partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty(),
-                    getEncryption()))
+                    getPropertyEncryption()))
             .via(Transformer.map(feature -> feature));
 
     if (partial) {

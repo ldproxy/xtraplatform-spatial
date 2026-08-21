@@ -7,7 +7,6 @@
  */
 package de.ii.xtraplatform.features.domain.transform;
 
-import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.FeatureTokenTransformer;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
@@ -19,14 +18,14 @@ import java.util.Optional;
 /**
  * Decrypts values of properties with type {@link Type#ENCRYPTED} or {@link Type#ENCRYPTED_ARRAY} on
  * the read path. The value in the token stream is expected to be the Base64 encoding of the stored
- * representation described in {@link EncryptedValues}.
+ * representation described in {@link PropertyEncryption}.
  */
 public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
 
-  private final EncryptedValues encryptedValues;
+  private final PropertyEncryption encryptedValues;
 
-  public FeatureTokenTransformerDecrypt(byte[] key) {
-    this.encryptedValues = new EncryptedValues(key);
+  public FeatureTokenTransformerDecrypt(PropertyEncryption encryptedValues) {
+    this.encryptedValues = encryptedValues;
   }
 
   @Override

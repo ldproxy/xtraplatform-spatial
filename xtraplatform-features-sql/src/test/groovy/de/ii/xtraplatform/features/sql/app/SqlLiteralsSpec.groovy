@@ -7,8 +7,9 @@
  */
 package de.ii.xtraplatform.features.sql.app
 
+import de.ii.xtraplatform.base.app.EncryptionImpl
 import de.ii.xtraplatform.features.domain.SchemaBase
-import de.ii.xtraplatform.features.domain.transform.EncryptedValues
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption
 import spock.lang.Specification
 
 class SqlLiteralsSpec extends Specification {
@@ -18,11 +19,11 @@ class SqlLiteralsSpec extends Specification {
         SqlLiterals.forType(SchemaBase.Type.STRING, value) == expected
 
         where:
-        value              || expected
-        "abc"              || "'abc'"
-        "O'Brien"          || "'O''Brien'"
+        value               || expected
+        "abc"               || "'abc'"
+        "O'Brien"           || "'O''Brien'"
         "'; DROP TABLE x--" || "'''; DROP TABLE x--'"
-        ""                 || "''"
+        ""                  || "''"
     }
 
     def "integer values are re-rendered from a parsed number"() {
@@ -30,13 +31,13 @@ class SqlLiteralsSpec extends Specification {
         SqlLiterals.forType(SchemaBase.Type.INTEGER, value) == expected
 
         where:
-        value    || expected
-        "42"     || "42"
-        "-7"     || "-7"
-        "+7"     || "7"
-        " 42 "   || "42"
-        "42.0"   || "42"
-        "1e3"    || "1000"
+        value  || expected
+        "42"   || "42"
+        "-7"   || "-7"
+        "+7"   || "7"
+        " 42 " || "42"
+        "42.0" || "42"
+        "1e3"  || "1000"
     }
 
     def "float values are re-rendered without scientific notation"() {
@@ -44,11 +45,11 @@ class SqlLiteralsSpec extends Specification {
         SqlLiterals.forType(SchemaBase.Type.FLOAT, value) == expected
 
         where:
-        value      || expected
-        "42"       || "42"
-        "3.14"     || "3.14"
-        "-0.5"     || "-0.5"
-        "1.5e-3"   || "0.0015"
+        value    || expected
+        "42"     || "42"
+        "3.14"   || "3.14"
+        "-0.5"   || "-0.5"
+        "1.5e-3" || "0.0015"
     }
 
     def "boolean values are normalized to the SQL keywords"() {
@@ -72,14 +73,14 @@ class SqlLiteralsSpec extends Specification {
         thrown(IllegalArgumentException)
 
         where:
-        type                     | value
-        SchemaBase.Type.INTEGER  | "0 WHERE 1=1; DROP TABLE x --"
-        SchemaBase.Type.INTEGER  | "42; DELETE FROM t"
-        SchemaBase.Type.INTEGER  | "42.5"
-        SchemaBase.Type.FLOAT    | "3.14 OR 1=1"
-        SchemaBase.Type.FLOAT    | "NaN); DROP"
-        SchemaBase.Type.BOOLEAN  | "true; DROP TABLE x"
-        SchemaBase.Type.INTEGER  | ""
+        type                    | value
+        SchemaBase.Type.INTEGER | "0 WHERE 1=1; DROP TABLE x --"
+        SchemaBase.Type.INTEGER | "42; DELETE FROM t"
+        SchemaBase.Type.INTEGER | "42.5"
+        SchemaBase.Type.FLOAT   | "3.14 OR 1=1"
+        SchemaBase.Type.FLOAT   | "NaN); DROP"
+        SchemaBase.Type.BOOLEAN | "true; DROP TABLE x"
+        SchemaBase.Type.INTEGER | ""
     }
 
     def "null values become the SQL NULL keyword"() {
@@ -107,7 +108,7 @@ class SqlLiteralsSpec extends Specification {
     def "encrypted values are rendered as a bytea literal that decrypts to the plaintext"() {
         given: 'an encryption key'
         def key = (0..31).collect { it as byte } as byte[]
-        def encryption = new EncryptedValues(key)
+        def encryption = new PropertyEncryption(new EncryptionImpl(Base64.getEncoder().encodeToString(key)))
 
         when: 'a string value is rendered'
         def literal = SqlLiterals.encrypted(encryption, SchemaBase.Type.STRING, "O'Brien, Jürgen", 'nof')
@@ -124,7 +125,7 @@ class SqlLiteralsSpec extends Specification {
     def "date values are normalized before encryption"() {
         given: 'an encryption key'
         def key = (0..31).collect { it as byte } as byte[]
-        def encryption = new EncryptedValues(key)
+        def encryption = new PropertyEncryption(new EncryptionImpl(Base64.getEncoder().encodeToString(key)))
 
         when: 'a canonical date value is rendered and decrypted'
         def literal = SqlLiterals.encrypted(encryption, SchemaBase.Type.DATE, '1957-06-30', 'geb')
@@ -143,8 +144,9 @@ class SqlLiteralsSpec extends Specification {
     def "a null value for an encrypted column is rendered as SQL NULL"() {
         given: 'an encryption key'
         def key = (0..31).collect { it as byte } as byte[]
+        def encryption = new PropertyEncryption(new EncryptionImpl(Base64.getEncoder().encodeToString(key)))
 
         expect:
-        SqlLiterals.encrypted(new EncryptedValues(key), SchemaBase.Type.STRING, null, 'nof') == 'NULL'
+        SqlLiterals.encrypted(encryption, SchemaBase.Type.STRING, null, 'nof') == 'NULL'
     }
 }

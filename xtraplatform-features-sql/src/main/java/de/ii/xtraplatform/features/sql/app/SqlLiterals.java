@@ -8,7 +8,7 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import de.ii.xtraplatform.features.domain.SchemaBase;
-import de.ii.xtraplatform.features.domain.transform.EncryptedValues;
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption;
 import java.math.BigDecimal;
 import java.util.HexFormat;
 import java.util.Locale;
@@ -56,7 +56,7 @@ final class SqlLiterals {
   }
 
   static String encrypted(
-      EncryptedValues encryption, SchemaBase.Type valueType, String value, String propertyName) {
+      PropertyEncryption encryption, SchemaBase.Type valueType, String value, String propertyName) {
     if (value == null) {
       return "NULL";
     }
