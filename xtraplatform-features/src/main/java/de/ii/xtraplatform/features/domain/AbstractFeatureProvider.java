@@ -688,13 +688,19 @@ public abstract class AbstractFeatureProvider<
                 null,
                 !(query instanceof FeatureQuery) || !((FeatureQuery) query).returnsSingleFeature());
 
+    // The property selection is expressed in the technical property names of the feature schema —
+    // that is what the queryables/presentables of an API are named after and what the "properties"
+    // and "exclude-properties" parameters accept. Prune before the transformation chain, because a
+    // rename in that chain (an explicit one, or the alias renames a format with useAlias injects)
+    // would otherwise have already replaced the names the selection is matched against, leaving
+    // only the properties whose name survives the rename unchanged.
     FeatureSchema schema =
         getData()
             .getTypes()
             .get(query.getType())
             .accept(withScope)
-            .accept(schemaTransformations)
-            .accept(new WithoutProperties(query.getFields(), query.skipGeometry()));
+            .accept(new WithoutProperties(query.getFields(), query.skipGeometry()))
+            .accept(schemaTransformations);
 
     return new Builder()
         .targetSchema(schema)

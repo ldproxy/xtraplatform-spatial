@@ -126,6 +126,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -1071,22 +1072,18 @@ public class FeatureProviderSql
           aggregateStatsReader.getSpatialExtent(queryMappings.get(typeName), is3dSupported());
 
       Optional<BoundingBox> extent =
-          extentGraph
-              .on(getStreamRunner())
-              .run()
-              .exceptionally(
-                  throwable -> {
-                    LogContext.errorAsWarn(LOGGER, throwable, "Cannot compute spatial extent");
-                    return Optional.empty();
-                  })
-              .toCompletableFuture()
-              .join();
+          extentGraph.on(getStreamRunner()).run().toCompletableFuture().join();
 
+      // only cache the result of a successful computation, a failure cached as "no extent"
+      // would silently persist, e.g. as empty tiles for the type
       cache.put(cacheValidator, extent.orElse(null), cacheKey);
 
       return extent;
     } catch (Throwable e) {
-      // continue
+      Throwable cause =
+          e instanceof CompletionException && Objects.nonNull(e.getCause()) ? e.getCause() : e;
+      LogContext.errorAsWarn(
+          LOGGER, cause, "Cannot compute spatial extent for type '{}'", typeName);
     }
 
     return Optional.empty();
@@ -1173,22 +1170,18 @@ public class FeatureProviderSql
           aggregateStatsReader.getTemporalExtent(queryMappings.get(typeName));
 
       Optional<Interval> extent =
-          extentGraph
-              .on(getStreamRunner())
-              .run()
-              .exceptionally(
-                  throwable -> {
-                    LogContext.errorAsWarn(LOGGER, throwable, "Cannot compute temporal extent");
-                    return Optional.empty();
-                  })
-              .toCompletableFuture()
-              .join();
+          extentGraph.on(getStreamRunner()).run().toCompletableFuture().join();
 
+      // only cache the result of a successful computation, a failure cached as "no extent"
+      // would silently persist
       cache.put(cacheValidator, extent.orElse(null), cacheKey);
 
       return extent;
     } catch (Throwable e) {
-      // continue
+      Throwable cause =
+          e instanceof CompletionException && Objects.nonNull(e.getCause()) ? e.getCause() : e;
+      LogContext.errorAsWarn(
+          LOGGER, cause, "Cannot compute temporal extent for type '{}'", typeName);
     }
 
     return Optional.empty();
@@ -1404,7 +1397,9 @@ public class FeatureProviderSql
                       || throwable instanceof JsonParseException) {
                     error =
                         new IllegalArgumentException(
-                            "Invalid feature data. You may be able to obtain more information about the problem by adding the header ‘Prefer: handling=strict’ to the request.",
+                            "Invalid feature data. You may be able to obtain more information about"
+                                + " the problem by adding the header ‘Prefer: handling=strict’ to"
+                                + " the request.",
                             throwable);
                     LogContext.errorAsDebug(LOGGER, throwable, "Error during feature mutation");
                   }
@@ -1595,7 +1590,8 @@ public class FeatureProviderSql
               }
 
               LOGGER.error(
-                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no expression is defined for dialect '{}' (available keys: {}).",
+                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no"
+                      + " expression is defined for dialect '{}' (available keys: {}).",
                   getId(),
                   function.getName(),
                   dialectKey,
