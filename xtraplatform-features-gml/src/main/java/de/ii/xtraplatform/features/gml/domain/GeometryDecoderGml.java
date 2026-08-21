@@ -130,6 +130,8 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
 
   private final Deque<Frame> stack = new ArrayDeque<>();
   private final Map<String, EpsgCrs> srsNameMappings;
+  // the coordinate reference systems that a srsName may resolve to; empty does not restrict them
+  private final List<EpsgCrs> supportedCrs;
   private final Set<String> verticalSrsNames;
   private boolean waitingForInput = false;
   private Geometry<?> result;
@@ -164,7 +166,7 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
    *     built-in parsers cannot handle.
    */
   public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings) {
-    this(srsNameMappings, Set.of());
+    this(srsNameMappings, Set.of(), List.of());
   }
 
   /**
@@ -173,8 +175,20 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
    *     {@link #getVerticalValue()}) instead of being decoded into a {@link Geometry}.
    */
   public GeometryDecoderGml(Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
+    this(srsNameMappings, verticalSrsNames, List.of());
+  }
+
+  /**
+   * @param supportedCrs the coordinate reference systems that a {@code srsName} attribute may
+   *     resolve to; an empty list does not restrict them
+   */
+  public GeometryDecoderGml(
+      Map<String, EpsgCrs> srsNameMappings,
+      Set<String> verticalSrsNames,
+      List<EpsgCrs> supportedCrs) {
     this.srsNameMappings = srsNameMappings == null ? Map.of() : srsNameMappings;
     this.verticalSrsNames = verticalSrsNames == null ? Set.of() : verticalSrsNames;
+    this.supportedCrs = supportedCrs == null ? List.of() : supportedCrs;
   }
 
   /** The verbatim srsName of the outermost geometry element of the last completed decode. */
@@ -353,7 +367,8 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
         this.rawSrsName = parser.getAttributeValue(null, "srsName");
         this.verticalMode = rawSrsName != null && verticalSrsNames.contains(rawSrsName);
       }
-      Optional<EpsgCrs> explicitCrs = parseSrsName(parser, srsNameMappings);
+      Optional<EpsgCrs> explicitCrs =
+          parseSrsName(parser, srsNameMappings).map(this::checkSupported);
       f.crs = explicitCrs.or(() -> defaultCrs).or(this::inheritedCrs);
       OptionalInt dim = parseSrsDimension(parser);
       if (dim.isEmpty()) {
@@ -538,6 +553,22 @@ public class GeometryDecoderGml extends AbstractGeometryDecoder {
       }
     }
     return OptionalInt.empty();
+  }
+
+  /**
+   * A coordinate reference system declared on a geometry must be one of the supported ones. Only
+   * the code is compared, the axis order is a property of the encoding, not of the coordinate
+   * reference system.
+   */
+  private EpsgCrs checkSupported(EpsgCrs crs) {
+    if (!supportedCrs.isEmpty()
+        && supportedCrs.stream().noneMatch(supported -> supported.getCode() == crs.getCode())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The coordinate reference system '%s' in a 'srsName' attribute is not supported here. Supported coordinate reference systems: %s.",
+              crs.toUriString(), supportedCrs.stream().map(EpsgCrs::toUriString).toList()));
+    }
+    return crs;
   }
 
   private static Optional<EpsgCrs> parseSrsName(

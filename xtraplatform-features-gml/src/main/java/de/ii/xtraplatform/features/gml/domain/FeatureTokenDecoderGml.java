@@ -420,7 +420,8 @@ public class FeatureTokenDecoderGml
     Map<String, EpsgCrs> srsNameMappings = new LinkedHashMap<>(inputProfile.getSrsNameMappings());
     Set<String> verticalSrsNames = new HashSet<>();
     collectVariantReferenceSystems(featureSchema, srsNameMappings, verticalSrsNames);
-    this.geometryDecoder = new GeometryDecoderGml(srsNameMappings, verticalSrsNames);
+    this.geometryDecoder =
+        new GeometryDecoderGml(srsNameMappings, verticalSrsNames, inputProfile.getSupportedCrs());
     this.buffer = new StringBuilder();
 
     List<String> wrappers = new ArrayList<>(2);
