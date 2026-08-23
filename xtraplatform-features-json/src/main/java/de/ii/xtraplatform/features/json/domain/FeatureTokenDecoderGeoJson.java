@@ -18,6 +18,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerReadOnly;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -29,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 // NOPMD - TODO: how to handle name collisions for id, geometry, or place
 @SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
@@ -46,6 +48,7 @@ public class FeatureTokenDecoderGeoJson
   private final EpsgCrs crs;
   private final Axes axes;
   private final GeometryDecoderJson geometryDecoder;
+  private final Set<String> readOnlyProperties;
 
   private boolean started;
   private int depth = -1;
@@ -70,7 +73,12 @@ public class FeatureTokenDecoderGeoJson
       downstream;
 
   public FeatureTokenDecoderGeoJson(Optional<String> nullValue, EpsgCrs crs, Axes axes) {
-    this(nullValue, crs, axes, List.of());
+    this(nullValue, crs, axes, List.of(), Set.of());
+  }
+
+  public FeatureTokenDecoderGeoJson(
+      Optional<String> nullValue, EpsgCrs crs, Axes axes, List<EpsgCrs> supportedCrs) {
+    this(nullValue, crs, axes, supportedCrs, Set.of());
   }
 
   /**
@@ -78,8 +86,13 @@ public class FeatureTokenDecoderGeoJson
    *     document may declare; an empty list does not restrict them
    */
   public FeatureTokenDecoderGeoJson(
-      Optional<String> nullValue, EpsgCrs crs, Axes axes, List<EpsgCrs> supportedCrs) {
+      Optional<String> nullValue,
+      EpsgCrs crs,
+      Axes axes,
+      List<EpsgCrs> supportedCrs,
+      Set<String> readOnlyProperties) {
     super();
+    this.readOnlyProperties = readOnlyProperties;
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
@@ -95,7 +108,9 @@ public class FeatureTokenDecoderGeoJson
   @Override
   protected void init() {
     this.context = createContext();
-    this.downstream = new FeatureTokenBufferSimple<>(getDownstream(), context);
+    this.downstream =
+        new FeatureTokenBufferSimple<>(
+            FeatureEventHandlerReadOnly.of(getDownstream(), readOnlyProperties), context);
   }
 
   @Override
