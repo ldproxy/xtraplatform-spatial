@@ -15,18 +15,62 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
+
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(FeatureTokenTransformerMetadata.class);
+
+  // Accepts the timestamp forms that the feature providers deliver: a date, a date and time with
+  // 'T' or a space as separator, an optional fraction of a second with any number of digits, and an
+  // optional time-zone offset in any of the ISO forms ('Z', '+HH', '+HHmm', '+HH:MM').
+  private static final DateTimeFormatter FLEXIBLE_PARSER =
+      new DateTimeFormatterBuilder()
+          .append(DateTimeFormatter.ISO_LOCAL_DATE)
+          .optionalStart()
+          .optionalStart()
+          .appendLiteral('T')
+          .optionalEnd()
+          .optionalStart()
+          .appendLiteral(' ')
+          .optionalEnd()
+          .appendValue(ChronoField.HOUR_OF_DAY, 2)
+          .appendLiteral(':')
+          .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+          .optionalStart()
+          .appendLiteral(':')
+          .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+          .optionalEnd()
+          .optionalStart()
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+          .optionalEnd()
+          .optionalEnd()
+          .optionalStart()
+          .appendOffsetId()
+          .optionalEnd()
+          .optionalStart()
+          .appendOffset("+HHmm", "Z")
+          .optionalEnd()
+          .optionalStart()
+          .appendOffset("+HH", "Z")
+          .optionalEnd()
+          .toFormatter();
 
   private final Consumer<Instant> lastModifiedSetter;
   private final Consumer<BoundingBox> spatialExtentSetter;
   private final Consumer<Tuple<Instant, Instant>> temporalExtentSetter;
+  // the time zone of the provider, applied to values without a time zone
+  private final ZoneId defaultTimeZone;
   private Optional<EpsgCrs> crs;
   private double[][] minMax = null;
   private String start = "";
@@ -34,16 +78,20 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   private boolean isSingleFeature = false;
   private String lastModified = "";
 
-  public FeatureTokenTransformerMetadata(ImmutableResult.Builder resultBuilder) {
+  public FeatureTokenTransformerMetadata(
+      ImmutableResult.Builder resultBuilder, ZoneId defaultTimeZone) {
     this.lastModifiedSetter = resultBuilder::lastModified;
     this.spatialExtentSetter = resultBuilder::spatialExtent;
     this.temporalExtentSetter = resultBuilder::temporalExtent;
+    this.defaultTimeZone = defaultTimeZone;
   }
 
-  public <X> FeatureTokenTransformerMetadata(ImmutableResultReduced.Builder<X> resultBuilder) {
+  public <X> FeatureTokenTransformerMetadata(
+      ImmutableResultReduced.Builder<X> resultBuilder, ZoneId defaultTimeZone) {
     this.lastModifiedSetter = resultBuilder::lastModified;
     this.spatialExtentSetter = resultBuilder::spatialExtent;
     this.temporalExtentSetter = resultBuilder::temporalExtent;
+    this.defaultTimeZone = defaultTimeZone;
   }
 
   @Override
@@ -89,28 +137,40 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
     } catch (Throwable ignore) {
     }
 
-    try {
-      if (!lastModified.isEmpty()) {
-        lastModifiedSetter.accept(Instant.parse(lastModified));
+    if (!lastModified.isEmpty()) {
+      try {
+        // the value may be without a time zone, if it has not been normalized by a DATE_FORMAT
+        // transformation (which is applied to every DATETIME property that has no other
+        // transformation)
+        lastModifiedSetter.accept(parseTemporal(lastModified));
+      } catch (Throwable e) {
+        // the last modification time is used for conditional requests, so a value that cannot be
+        // parsed must not be ignored silently
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn(
+              "Could not parse the last modification time '{}' of the feature, the value is ignored. Reason: {}",
+              lastModified,
+              e.getMessage());
+        }
       }
-    } catch (Throwable ignore) {
     }
 
     super.onEnd(context);
   }
 
   // The primary instant/interval properties may be DATETIME or DATE; a date is interpreted as
-  // start of day UTC.
-  private static Instant parseTemporal(String value) {
+  // start of day. A value without a time zone is interpreted in the time zone of the provider
+  // ("nativeTimeZone", UTC unless configured otherwise).
+  private Instant parseTemporal(String value) {
     TemporalAccessor ta =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss[.SSS]][X]")
-            .parseBest(value, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
+        FLEXIBLE_PARSER.parseBest(
+            value, OffsetDateTime::from, LocalDateTime::from, LocalDate::from);
     if (ta instanceof OffsetDateTime) {
       return ((OffsetDateTime) ta).toInstant();
     } else if (ta instanceof LocalDateTime) {
-      return ((LocalDateTime) ta).toInstant(ZoneOffset.UTC);
+      return ((LocalDateTime) ta).atZone(defaultTimeZone).toInstant();
     }
-    return ((LocalDate) ta).atStartOfDay(ZoneOffset.UTC).toInstant();
+    return ((LocalDate) ta).atStartOfDay(defaultTimeZone).toInstant();
   }
 
   @Override

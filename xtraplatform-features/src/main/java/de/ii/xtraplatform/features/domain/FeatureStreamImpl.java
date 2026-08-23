@@ -191,7 +191,10 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           if (stepMetadata) {
-            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+            source =
+                source.via(
+                    new FeatureTokenTransformerMetadata(
+                        resultBuilder, data.getNativeTimeZone().orElse(ZoneId.of("UTC"))));
           }
 
           FeatureTokenTransformerAudit auditTransformer = null;
@@ -288,7 +291,10 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerWeakETag(resultBuilder));
           }
           if (stepMetadata) {
-            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+            source =
+                source.via(
+                    new FeatureTokenTransformerMetadata(
+                        resultBuilder, data.getNativeTimeZone().orElse(ZoneId.of("UTC"))));
           }
 
           FeatureTokenTransformerAudit auditTransformer = null;

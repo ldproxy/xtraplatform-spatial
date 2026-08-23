@@ -582,7 +582,8 @@ public class FeatureProviderSql
             ? dbmsAdapters.get(getData().getConnectionInfo().getDialect()).getDefaultSchemas()
             : getData().getConnectionInfo().getSchemas();
     this.sourceSchemaValidator =
-        new SourceSchemaValidatorSql(validationSchemas, this::getSqlClient);
+        new SourceSchemaValidatorSql(
+            validationSchemas, getData().getNativeTimeZone(), this::getSqlClient);
 
     this.pathParser3 = createPathParser3(getData().getSourcePathDefaults(), cql, subdecoders);
 
