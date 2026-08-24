@@ -27,4 +27,8 @@ public interface SqlClientBasic {
   default Map<String, GeoInfo> getGeoInfo() throws SQLException {
     return getDbmsAdapter().getGeoInfo(getConnection(), getDbInfo());
   }
+
+  default Map<String, String> getSpatialIndexes() throws SQLException {
+    return getDbmsAdapter().getSpatialIndexes(this);
+  }
 }

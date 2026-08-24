@@ -206,6 +206,43 @@ public class SqlDialectGpkg implements SqlDialect {
     return value.replaceAll("'", "''");
   }
 
+  /**
+   * GeoPackage keeps the bounding boxes of a geometry column in an R-Tree, a virtual table named
+   * {@code rtree_<table>_<column>}. SQLite cannot infer from a spatial operator that such a table
+   * is relevant, so unless the query names it, the operator is evaluated for every row of the
+   * table. The predicate returned here names it, which turns the table scan into an index lookup.
+   *
+   * <p>The R-Tree stores the bounding boxes as 32-bit floats, rounded outwards, so the lookup never
+   * discards a geometry that the exact predicate would have matched.
+   */
+  @Override
+  public Optional<String> getSpatialIndexPredicate(
+      String table, String column, String alias, String keyColumn, double[] min, double[] max) {
+    if (min.length < 2 || max.length < 2) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        String.format(
+            "%s.%s IN (SELECT id FROM %s WHERE maxx >= %s AND minx <= %s AND maxy >= %s AND miny <= %s)",
+            alias,
+            quoteIdentifier(keyColumn),
+            quoteIdentifier(String.format("rtree_%s_%s", table, column)),
+            toNumericLiteral(min[0]),
+            toNumericLiteral(max[0]),
+            toNumericLiteral(min[1]),
+            toNumericLiteral(max[1])));
+  }
+
+  private static String quoteIdentifier(String identifier) {
+    return String.format("\"%s\"", identifier.replace("\"", "\"\""));
+  }
+
+  private static String toNumericLiteral(double value) {
+    // Double.toString is independent of the default locale, unlike String.format("%f", ...)
+    return Double.toString(value);
+  }
+
   @Override
   public String applyToExpression(
       String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
