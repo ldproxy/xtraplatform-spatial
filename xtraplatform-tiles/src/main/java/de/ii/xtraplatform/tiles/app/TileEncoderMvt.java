@@ -52,10 +52,14 @@ public class TileEncoderMvt implements TileEncoder {
   public byte[] combine(
       TileQuery tile, TileProviderFeaturesData data, ChainedTileProvider tileProvider)
       throws IOException {
-    TilesetFeatures combinedTileset = data.getTilesets().get(tile.getTileset());
+    TilesetFeatures combinedTileset =
+        data.getTilesets().get(tile.getTileset()).mergeDefaults(data.getTilesetDefaults());
     List<String> tilesets =
         getLayerTilesets(data, combinedTileset, tile.getGenerationParametersTransient());
-    VectorTileEncoder encoder = new VectorTileEncoder(tile.getTileMatrixSet().getTileExtent());
+    // the layers of the source tilesets are decoded to a normalized coordinate space, so a source
+    // tileset with a different tile extent is rescaled to the tile extent of the combined tileset
+    VectorTileEncoder encoder =
+        new VectorTileEncoder(combinedTileset.getTileExtentOrDefault(tile.getTileMatrixSet()));
     VectorTileDecoder decoder = new VectorTileDecoder();
     Optional<BoundingBox> tileBounds = getTileBounds(tile);
 
