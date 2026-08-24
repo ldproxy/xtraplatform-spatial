@@ -11,7 +11,6 @@ import com.google.common.base.Splitter;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
-import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
 import de.ii.xtraplatform.features.sql.infra.db.SqlDbmsAdapterGpkg;
 import java.time.Instant;
@@ -19,7 +18,6 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
@@ -30,8 +28,6 @@ public class SqlDialectGpkg implements SqlDialect {
   public String getId() {
     return SqlDbmsAdapterGpkg.ID;
   }
-
-  private QueryGeneratorSettings settings;
 
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
@@ -241,21 +237,5 @@ public class SqlDialectGpkg implements SqlDialect {
   private static String toNumericLiteral(double value) {
     // Double.toString is independent of the default locale, unlike String.format("%f", ...)
     return Double.toString(value);
-  }
-
-  @Override
-  public String applyToExpression(
-      String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
-    if (!subDecoderPaths.isEmpty()) {
-      String expression =
-          subDecoderPaths.values().iterator().next().replaceAll("\\$(?:t|T|table)\\$", table);
-      if (spatial && settings.getGeometryAsWkb()) {
-        expression = applyToWkb(expression, false, false);
-      } else if (spatial) {
-        expression = applyToWkt(expression, false, false);
-      }
-      return String.format("(%s) AS %s", expression, name);
-    }
-    return SqlDialect.super.applyToExpression(table, name, subDecoderPaths, spatial);
   }
 }

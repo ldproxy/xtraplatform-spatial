@@ -19,6 +19,61 @@ class SqlDialectGpkgSpec extends Specification {
         dialect = new SqlDialectGpkg()
     }
 
+    def 'a sub-decoder expression without a geometry is passed through'() {
+
+        given:
+        def paths = Map.of("0", 'json_extract($T$.props, \'$.name\')')
+
+        when:
+        String actual = dialect.applyToExpression("A", "name", paths, Optional.empty(), false, false)
+
+        then: 'the table placeholder is resolved and the expression is aliased'
+        actual == "(json_extract(A.props, '\$.name')) AS name"
+    }
+
+    def 'a geometry expression is wrapped in the configured encoding'() {
+
+        given:
+        def paths = Map.of("0", 'ST_GeomFromText($T$.wkt)')
+
+        when:
+        String actual = dialect.applyToExpression("A", "geom", paths, Optional.of(operation), false, false)
+
+        then:
+        actual == expected
+
+        where:
+        operation                    || expected
+        SqlQueryColumn.Operation.WKB || "(ST_AsBinary(ST_GeomFromText(A.wkt))) AS geom"
+        SqlQueryColumn.Operation.WKT || "(ST_AsText(ST_GeomFromText(A.wkt))) AS geom"
+    }
+
+    def 'forcePolygonCCW reaches the wrapping of a geometry expression'() {
+
+        given:
+        def paths = Map.of("0", 'ST_GeomFromText($T$.wkt)')
+
+        when:
+        String actual = dialect.applyToExpression("A", "geom", paths, Optional.of(operation), true, false)
+
+        then:
+        actual == expected
+
+        where:
+        operation                    || expected
+        SqlQueryColumn.Operation.WKB || "(ST_AsBinary(ST_ForcePolygonCCW(ST_GeomFromText(A.wkt)))) AS geom"
+        SqlQueryColumn.Operation.WKT || "(ST_AsText(ST_ForcePolygonCCW(ST_GeomFromText(A.wkt)))) AS geom"
+    }
+
+    def 'without sub-decoder paths the column name is returned unchanged'() {
+
+        when:
+        String actual = dialect.applyToExpression("A", "name", Map.of(), Optional.empty(), false, false)
+
+        then:
+        actual == "name"
+    }
+
     def 'the spatial index predicate names the r-tree and the key column'() {
 
         when:

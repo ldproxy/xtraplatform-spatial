@@ -1947,7 +1947,8 @@ public class FilterEncoderSql {
           .filter("EXPRESSION"::equals)
           .isPresent()) {
         String columnResolved =
-            SqlQueryColumnOperations.getQualifiedColumnResolved(alias, column, sqlDialect);
+            SqlQueryColumnOperations.getQualifiedColumnResolved(
+                alias, column, sqlDialect, Set.of(Operation.WKB, Operation.WKT), false);
 
         return columnResolved.replace("AS " + column.getName(), "");
       }

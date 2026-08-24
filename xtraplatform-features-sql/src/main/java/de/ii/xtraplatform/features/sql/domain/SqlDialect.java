@@ -169,9 +169,40 @@ public interface SqlDialect {
     return ImmutableSet.of();
   }
 
+  /**
+   * Renders a column that a sub-decoder produces from an expression: the {@code $T$} placeholders
+   * of the expression are resolved to {@code table}, a geometry is wrapped for output, and the
+   * result is aliased to {@code name}.
+   *
+   * @param geometryOperation {@link SqlQueryColumn.Operation#WKB} or {@link
+   *     SqlQueryColumn.Operation#WKT} when the expression yields a geometry that has to be wrapped
+   *     for output in that encoding, empty when it does not. The encoding is a per-provider setting
+   *     ({@code queryGeneration.geometryEncoding}) and a dialect is shared by all providers of its
+   *     DBMS, so it has to be passed in rather than held by the dialect.
+   * @param forcePolygonCCW whether the geometry has to be returned with counter-clockwise polygons
+   * @param linearizeCurves whether curves in the geometry have to be linearized
+   */
   default String applyToExpression(
-      String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
-    return name;
+      String table,
+      String name,
+      Map<String, String> subDecoderPaths,
+      Optional<SqlQueryColumn.Operation> geometryOperation,
+      boolean forcePolygonCCW,
+      boolean linearizeCurves) {
+    if (subDecoderPaths.isEmpty()) {
+      return name;
+    }
+
+    String expression =
+        subDecoderPaths.values().iterator().next().replaceAll("\\$(?:t|T|table)\\$", table);
+
+    if (geometryOperation.filter(SqlQueryColumn.Operation.WKB::equals).isPresent()) {
+      expression = applyToWkb(expression, forcePolygonCCW, linearizeCurves);
+    } else if (geometryOperation.filter(SqlQueryColumn.Operation.WKT::equals).isPresent()) {
+      expression = applyToWkt(expression, forcePolygonCCW, linearizeCurves);
+    }
+
+    return String.format("(%s) AS %s", expression, name);
   }
 
   Map<SpatialFunction, String> SPATIAL_OPERATORS =

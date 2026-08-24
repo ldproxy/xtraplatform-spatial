@@ -20,6 +20,7 @@ import de.ii.xtraplatform.cql.domain.SWithin
 import de.ii.xtraplatform.cql.domain.SpatialLiteral
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.features.domain.FeatureSchemaFixtures
+import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
 import de.ii.xtraplatform.features.domain.MappingOperationResolver
 import de.ii.xtraplatform.features.domain.MappingRuleFixtures
 import de.ii.xtraplatform.features.json.app.DecoderFactoryJson
@@ -27,9 +28,13 @@ import de.ii.xtraplatform.features.domain.SchemaBase
 import de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings
 import de.ii.xtraplatform.features.sql.domain.ImmutableSchemaSql
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryColumn
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryMapping
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySchema
 import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
 import de.ii.xtraplatform.features.sql.domain.SqlPathParser
+import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping
 import spock.lang.Shared
 import spock.lang.Specification
@@ -202,5 +207,47 @@ class FilterEncoderSqlSpatialIndexSpec extends Specification {
         then:
         actual == "(A.\"fid\" IN (SELECT id FROM \"rtree_unfaelle_point_geom\" WHERE maxx >= 7.0 AND minx <= 7.1 AND maxy >= 50.0 AND miny <= 50.1) AND " +
                 "ST_Intersects(A.geom, ST_GeomFromText('POLYGON((7.0 50.0,7.1 50.0,7.1 50.1,7.0 50.1,7.0 50.0))',4326)))"
+    }
+
+    def 'a geometry expression stays a geometry in a spatial predicate'() {
+
+        given: 'a WKB-encoded geometry that is derived from an expression'
+        def geometry = new ImmutableSqlQueryColumn.Builder()
+                .name("geom")
+                .pathSegment("geom")
+                .type(SchemaBase.Type.GEOMETRY)
+                .role(SchemaBase.Role.PRIMARY_GEOMETRY)
+                .operations(Map.of(
+                        SqlQueryColumn.Operation.CONNECTOR, ["EXPRESSION"] as String[],
+                        SqlQueryColumn.Operation.EXPRESSION, ["ST_Force2D(\$T\$.geom)"] as String[],
+                        SqlQueryColumn.Operation.WKB, [] as String[]))
+                .schemaIndex(0)
+                .build()
+        def table = new ImmutableSqlQuerySchema.Builder()
+                .name("airports")
+                .pathSegment("airports")
+                .addColumns(geometry)
+                .build()
+        def geometrySchema = new ImmutableFeatureSchema.Builder()
+                .name("geom")
+                .type(SchemaBase.Type.GEOMETRY)
+                .role(SchemaBase.Role.PRIMARY_GEOMETRY)
+                .build()
+        def mapping = new ImmutableSqlQueryMapping.Builder()
+                .addTables(table)
+                .putValueTables("geom", table)
+                .putValueColumns("geom", geometry)
+                .putValueSchemas("geom", geometrySchema)
+                .build()
+        def filterEncoder = encoder(new SqlDialectPgis(), Map.of())
+        def filter = SIntersects.of(Property.of("geom"),
+                SpatialLiteral.of(Bbox.of(7.0, 50.0, 7.1, 50.1, OgcCrs.CRS84)))
+
+        when:
+        String actual = filterEncoder.encode(filter, mapping)
+
+        then: 'the output-only WKB wrapper is not passed to ST_Intersects'
+        actual == "ST_Intersects((ST_Force2D(A.geom)) , " +
+                "ST_GeomFromText('POLYGON((7.0 50.0,7.1 50.0,7.1 50.1,7.0 50.1,7.0 50.0))',4326))"
     }
 }

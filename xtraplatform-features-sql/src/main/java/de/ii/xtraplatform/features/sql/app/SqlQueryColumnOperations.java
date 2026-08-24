@@ -14,6 +14,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public interface SqlQueryColumnOperations {
@@ -45,6 +46,10 @@ public interface SqlQueryColumnOperations {
       return "'%s' AS %s"
           .formatted(column.getOperationParameter(Operation.CONSTANT, ""), column.getName());
     }
+    boolean isForcePolygonCCW = ops.containsKey(Operation.FORCE_POLYGON_CCW);
+    boolean shouldLinearizeCurves =
+        ops.containsKey(Operation.LINEARIZE_CURVES) || forceLinearizeCurves;
+
     if (ops.containsKey(Operation.EXPRESSION)
         && !excludeOperations.contains(Operation.EXPRESSION)) {
       final int[] i = {0};
@@ -54,18 +59,14 @@ public interface SqlQueryColumnOperations {
           column.getOperationParameters(Operation.EXPRESSION).stream()
               .map(param -> Map.entry("" + i[0]++, param))
               .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)),
-          ops.containsKey(Operation.WKT));
+          geometryOperation(ops, excludeOperations),
+          isForcePolygonCCW,
+          shouldLinearizeCurves);
     }
     if (ops.containsKey(Operation.WKT) && !excludeOperations.contains(Operation.WKT)) {
-      boolean isForcePolygonCCW = ops.containsKey(Operation.FORCE_POLYGON_CCW);
-      boolean shouldLinearizeCurves =
-          ops.containsKey(Operation.LINEARIZE_CURVES) || forceLinearizeCurves;
       return sqlDialect.applyToWkt(name, isForcePolygonCCW, shouldLinearizeCurves);
     }
     if (ops.containsKey(Operation.WKB) && !excludeOperations.contains(Operation.WKB)) {
-      boolean isForcePolygonCCW = ops.containsKey(Operation.FORCE_POLYGON_CCW);
-      boolean shouldLinearizeCurves =
-          ops.containsKey(Operation.LINEARIZE_CURVES) || forceLinearizeCurves;
       return sqlDialect.applyToWkb(name, isForcePolygonCCW, shouldLinearizeCurves);
     }
     if (ops.containsKey(Operation.DATE) && !excludeOperations.contains(Operation.DATE)) {
@@ -75,6 +76,26 @@ public interface SqlQueryColumnOperations {
       return sqlDialect.applyToDatetime(name, column.getOperationParameter(Operation.DATETIME));
     }
     return name;
+  }
+
+  /**
+   * The encoding a geometry column has to be wrapped in for output, {@link Operation#WKB} or {@link
+   * Operation#WKT}, or empty when the column is not a geometry or the caller excluded the wrapping
+   * because it wraps the raw geometry itself.
+   *
+   * <p>A geometry column carries exactly one of the two, chosen by {@code
+   * queryGeneration.geometryEncoding}, so both have to be looked at — as every other consumer of
+   * these operations does.
+   */
+  private static Optional<Operation> geometryOperation(
+      Map<Operation, String[]> ops, Set<Operation> excludeOperations) {
+    if (ops.containsKey(Operation.WKB) && !excludeOperations.contains(Operation.WKB)) {
+      return Optional.of(Operation.WKB);
+    }
+    if (ops.containsKey(Operation.WKT) && !excludeOperations.contains(Operation.WKT)) {
+      return Optional.of(Operation.WKT);
+    }
+    return Optional.empty();
   }
 
   static SqlQueryColumn dateToDatetime(SqlQueryColumn column) {
