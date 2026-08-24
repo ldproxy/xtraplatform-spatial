@@ -21,7 +21,7 @@ import java.util.Set;
 public interface TileWalker extends Volatile2 {
 
   void walkTileSeedingJobLimits(
-      TileSeedingJob job,
+      TileSeedingPartialJob job,
       Map<String, Map<String, Range<Integer>>> tmsRanges,
       LimitsVisitor limitsVisitor)
       throws IOException;
@@ -65,7 +65,7 @@ public interface TileWalker extends Volatile2 {
       throws IOException;
 
   void walkTileSeedingJob(
-      TileSeedingJob job,
+      TileSeedingPartialJob job,
       Map<String, Map<String, Range<Integer>>> tmsRanges,
       TileVisitor tileVisitor)
       throws IOException;

@@ -18,6 +18,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerReadOnly;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -420,7 +421,8 @@ public class FeatureTokenDecoderGml
     Map<String, EpsgCrs> srsNameMappings = new LinkedHashMap<>(inputProfile.getSrsNameMappings());
     Set<String> verticalSrsNames = new HashSet<>();
     collectVariantReferenceSystems(featureSchema, srsNameMappings, verticalSrsNames);
-    this.geometryDecoder = new GeometryDecoderGml(srsNameMappings, verticalSrsNames);
+    this.geometryDecoder =
+        new GeometryDecoderGml(srsNameMappings, verticalSrsNames, inputProfile.getSupportedCrs());
     this.buffer = new StringBuilder();
 
     List<String> wrappers = new ArrayList<>(2);
@@ -629,7 +631,10 @@ public class FeatureTokenDecoderGml
   @Override
   protected void init() {
     this.context = createContext();
-    this.downstream = new FeatureTokenBufferSimple<>(getDownstream(), context);
+    this.downstream =
+        new FeatureTokenBufferSimple<>(
+            FeatureEventHandlerReadOnly.of(getDownstream(), inputProfile.getReadOnlyProperties()),
+            context);
   }
 
   @Override

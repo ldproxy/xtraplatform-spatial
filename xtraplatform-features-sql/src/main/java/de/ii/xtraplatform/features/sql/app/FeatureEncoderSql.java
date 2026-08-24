@@ -16,6 +16,7 @@ import de.ii.xtraplatform.features.domain.MappingRule.Scope;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption;
 import de.ii.xtraplatform.features.json.domain.JsonBuilder;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
@@ -58,6 +59,7 @@ public class FeatureEncoderSql
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<ZoneId> timeZone;
   private final Optional<String> nullValue;
+  private final Optional<PropertyEncryption> encryption;
   private Map<String, JsonBuilder> jsonColumns;
   private final boolean isPatch;
   private final boolean trace;
@@ -78,7 +80,8 @@ public class FeatureEncoderSql
       EpsgCrs nativeCrs,
       CrsTransformerFactory crsTransformerFactory,
       Optional<ZoneId> timeZone,
-      Optional<String> nullValue) {
+      Optional<String> nullValue,
+      Optional<PropertyEncryption> encryption) {
     this.mapping = mapping;
     this.inputCrs = inputCrs;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -86,6 +89,7 @@ public class FeatureEncoderSql
     this.nativeCrs = nativeCrs;
     this.timeZone = timeZone;
     this.nullValue = nullValue;
+    this.encryption = encryption;
     this.jsonColumns = new LinkedHashMap<>();
     this.isPatch = nullValue.isPresent();
     this.trace = LOGGER.isTraceEnabled();
@@ -334,9 +338,18 @@ public class FeatureEncoderSql
             column -> {
               String value = context.value();
 
-              if (timeZone.isPresent()
-                  && column.second().getType() == Type.DATETIME
-                  && Objects.nonNull(value)) {
+              Type columnType = column.second().getType();
+              boolean encrypted = columnType == Type.ENCRYPTED;
+              Type logicalType =
+                  encrypted
+                      ? Type.valueOf(
+                          column
+                              .second()
+                              .getOperationParameter(
+                                  SqlQueryColumn.Operation.ENCRYPT, Type.STRING.name()))
+                      : columnType;
+
+              if (timeZone.isPresent() && logicalType == Type.DATETIME && Objects.nonNull(value)) {
                 value = toTimeZone(context.pathAsString(), value, timeZone.get(), trace);
               }
 
@@ -351,11 +364,23 @@ public class FeatureEncoderSql
 
               // Numeric/boolean values are validated and re-rendered (never inlined as raw request
               // text); string/date values are quoted with quote-doubling. A null stays null so the
-              // downstream row renderer emits SQL NULL. See SqlLiterals.
-              value =
-                  Objects.nonNull(value)
-                      ? SqlLiterals.forType(column.second().getType(), value)
-                      : value;
+              // downstream row renderer emits SQL NULL. See SqlLiterals. Values for encrypted
+              // columns are normalized and encrypted; the patch null sentinel must stay
+              // recognizable for FeatureDataSql.patchWith and is quoted like a string.
+              if (Objects.nonNull(value)) {
+                if (encrypted) {
+                  value =
+                      isPatch && value.equals(nullValue.get())
+                          ? SqlLiterals.string(value)
+                          : SqlLiterals.encrypted(
+                              encryption.orElseThrow(FeatureEncoderSql::encryptionNotEnabled),
+                              logicalType,
+                              value,
+                              column.second().getName());
+                } else {
+                  value = SqlLiterals.forType(columnType, value);
+                }
+              }
 
               boolean junctionElement =
                   currentArrayJunctionTable != null
@@ -373,6 +398,11 @@ public class FeatureEncoderSql
             () -> {
               if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
             });
+  }
+
+  private static IllegalStateException encryptionNotEnabled() {
+    return new IllegalStateException(
+        "The provider has properties of type ENCRYPTED, but encryption is not enabled.");
   }
 
   @Override

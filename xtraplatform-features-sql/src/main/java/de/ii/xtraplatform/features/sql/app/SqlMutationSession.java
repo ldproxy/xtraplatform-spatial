@@ -20,6 +20,7 @@ import de.ii.xtraplatform.features.domain.ImmutableMutationResult;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.Tuple;
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption;
 import de.ii.xtraplatform.features.sql.domain.FeatureTokenStatsCollector;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryJoin;
@@ -65,6 +66,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
   private final EpsgCrs nativeCrs;
   private final CrsTransformerFactory crsTransformerFactory;
   private final Optional<ZoneId> nativeTimeZone;
+  private final Optional<PropertyEncryption> encryption;
   private final Reactive.Runner streamRunner;
 
   public SqlMutationSession(
@@ -74,7 +76,8 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       EpsgCrs nativeCrs,
       CrsTransformerFactory crsTransformerFactory,
       Optional<ZoneId> nativeTimeZone,
-      Reactive.Runner streamRunner) {
+      Reactive.Runner streamRunner,
+      Optional<PropertyEncryption> encryption) {
     this.sqlSession = sqlSession;
     this.queryMappings = queryMappings;
     this.featureMutationsSql = featureMutationsSql;
@@ -82,6 +85,7 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     this.crsTransformerFactory = crsTransformerFactory;
     this.nativeTimeZone = nativeTimeZone;
     this.streamRunner = streamRunner;
+    this.encryption = encryption;
   }
 
   @Override
@@ -1419,6 +1423,18 @@ public class SqlMutationSession implements FeatureTransactions.Session {
         || column.hasOperation(SqlQueryColumn.Operation.WKB)) {
       return encodeGeometryLiteral(column, value, crs);
     }
+    if (column.getType() == SchemaBase.Type.ENCRYPTED) {
+      return SqlLiterals.encrypted(
+          encryption.orElseThrow(
+              () ->
+                  new IllegalStateException(
+                      "The provider has properties of type ENCRYPTED, but encryption is not enabled.")),
+          SchemaBase.Type.valueOf(
+              column.getOperationParameter(
+                  SqlQueryColumn.Operation.ENCRYPT, SchemaBase.Type.STRING.name())),
+          value.asText(),
+          column.getName());
+    }
     // Numeric/boolean values are validated and re-rendered (never inlined as raw request text);
     // everything else is quoted. See SqlLiterals.
     return SqlLiterals.forType(column.getType(), value.asText());
@@ -1636,7 +1652,8 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                     nativeCrs,
                     crsTransformerFactory,
                     nativeTimeZone,
-                    partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
+                    partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty(),
+                    encryption))
             .via(Transformer.map(feature -> (FeatureDataSql) feature));
 
     if (partial) {

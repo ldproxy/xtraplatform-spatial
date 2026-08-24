@@ -10,7 +10,9 @@ package de.ii.xtraplatform.features.sql.infra.db;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.ValueTypeMapping;
+import java.sql.JDBCType;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -104,6 +106,34 @@ class SchemaInfo {
                     c.getColumnDataType().getDatabaseSpecificTypeName(),
                     Type.DATETIME))
         .isPresent();
+  }
+
+  /**
+   * Whether the column has a time zone, e.g. PostgreSQL {@code timestamptz}. Drivers differ in the
+   * JDBC type they report for such columns, so the database-specific type name is checked, too.
+   */
+  public boolean isColumnTemporalWithTimeZone(String table, String name) {
+    return getColumn(table, name)
+        .map(Column::getColumnDataType)
+        .filter(
+            t ->
+                Objects.equals(t.getJavaSqlType(), JDBCType.TIMESTAMP_WITH_TIMEZONE)
+                    || Objects.equals(t.getJavaSqlType(), JDBCType.TIME_WITH_TIMEZONE)
+                    || hasTimeZoneInName(t.getDatabaseSpecificTypeName())
+                    || hasTimeZoneInName(t.getName()))
+        .isPresent();
+  }
+
+  private static boolean hasTimeZoneInName(String typeName) {
+    if (Objects.isNull(typeName)) {
+      return false;
+    }
+    // "timestamptz"/"timetz" (PostgreSQL), "TIMESTAMP WITH TIME ZONE" and Oracle's
+    // "TIMESTAMP WITH LOCAL TIME ZONE"; "timestamp without time zone" must not match
+    String name = typeName.toLowerCase(Locale.ROOT);
+    return name.endsWith("tz")
+        || name.contains("with time zone")
+        || name.contains("with local time zone");
   }
 
   public Optional<Column> getColumn(String tableName, String columnName) {

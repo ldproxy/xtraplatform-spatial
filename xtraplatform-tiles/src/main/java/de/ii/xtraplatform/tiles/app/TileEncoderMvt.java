@@ -7,6 +7,10 @@
  */
 package de.ii.xtraplatform.tiles.app;
 
+import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.crs.domain.CrsTransformationException;
+import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileQuery;
 import de.ii.xtraplatform.tiles.domain.TileEncoder;
@@ -21,18 +25,23 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import no.ecc.vectortile.VectorTileDecoder;
 import no.ecc.vectortile.VectorTileEncoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TileEncoderMvt implements TileEncoder {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileEncoderMvt.class);
+  private final Function<String, Optional<BoundingBox>> tilesetBounds;
+  private final CrsTransformerFactory crsTransformerFactory;
 
-  public TileEncoderMvt() {}
+  public TileEncoderMvt(
+      Function<String, Optional<BoundingBox>> tilesetBounds,
+      CrsTransformerFactory crsTransformerFactory) {
+    this.tilesetBounds = tilesetBounds;
+    this.crsTransformerFactory = crsTransformerFactory;
+  }
 
   @Override
   public byte[] empty(TileMatrixSetBase tms) {
@@ -52,8 +61,15 @@ public class TileEncoderMvt implements TileEncoder {
     VectorTileEncoder encoder =
         new VectorTileEncoder(combinedTileset.getTileExtentOrDefault(tile.getTileMatrixSet()));
     VectorTileDecoder decoder = new VectorTileDecoder();
+    Optional<BoundingBox> tileBounds = getTileBounds(tile);
 
     for (String tileset : tilesets) {
+      // a tileset without data in the area of the tile cannot contribute a layer; without this
+      // check, a tile that is not in the cache, because it was not seeded, would be generated
+      if (isOutsideBounds(tileset, tileBounds)) {
+        continue;
+      }
+
       TileQuery tileQuery = ImmutableTileQuery.builder().from(tile).tileset(tileset).build();
       TileResult layer = tileProvider.get(tileQuery);
 
@@ -67,17 +83,19 @@ public class TileEncoderMvt implements TileEncoder {
       }
 
       if (layer.isError()) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn(
-              "Failure to get layer '{}' of combined vector tile {}/{}/{}/{} (format '{}'), the layer will be ignored. Reason: {}",
-              tileset,
-              tileQuery.getTileMatrixSet().getId(),
-              tileQuery.getLevel(),
-              tileQuery.getRow(),
-              tileQuery.getCol(),
-              tileQuery.getMediaType().toString(),
-              layer.getError().orElse("unknown"));
-        }
+        // failing to get a layer has to fail the combined tile: a tile with a silently
+        // dropped layer would be cached and served as if it were complete
+        throw new IllegalStateException(
+            String.format(
+                "Failure to get layer '%s' of combined vector tile %s/%s/%s/%s (format '%s')."
+                    + " Reason: %s",
+                tileset,
+                tileQuery.getTileMatrixSet().getId(),
+                tileQuery.getLevel(),
+                tileQuery.getRow(),
+                tileQuery.getCol(),
+                tileQuery.getMediaType().toString(),
+                layer.getError().orElse("unknown")));
       } else if (layer.isAvailable()) {
         decoder
             .decode(layer.getContent().get())
@@ -92,6 +110,26 @@ public class TileEncoderMvt implements TileEncoder {
     }
 
     return encoder.encode();
+  }
+
+  private Optional<BoundingBox> getTileBounds(TileQuery tile) {
+    try {
+      return Optional.of(tile.getBoundingBox(OgcCrs.CRS84, crsTransformerFactory));
+    } catch (CrsTransformationException e) {
+      // ignore, assume that all tilesets may have data
+      return Optional.empty();
+    }
+  }
+
+  private boolean isOutsideBounds(String tileset, Optional<BoundingBox> tileBounds) {
+    if (tileBounds.isEmpty()) {
+      return false;
+    }
+
+    return tilesetBounds
+        .apply(tileset)
+        .filter(bounds -> !BoundingBox.intersects(bounds, tileBounds.get()))
+        .isPresent();
   }
 
   private List<String> getLayerTilesets(

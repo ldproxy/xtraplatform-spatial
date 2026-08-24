@@ -236,19 +236,21 @@ public interface FeaturePropertyTokenSliceTransformer
   }
 
   default void checkArray(FeatureSchema schema) {
-    if (schema.getType() != Type.VALUE_ARRAY && schema.getType() != Type.OBJECT_ARRAY) {
+    if (schema.getType() != Type.VALUE_ARRAY
+        && schema.getType() != Type.OBJECT_ARRAY
+        && schema.getType() != Type.ENCRYPTED_ARRAY) {
       throw new IllegalArgumentException(
           String.format(
-              "Transformer %s can only be applied to VALUE_ARRAY or OBJECT_ARRAY, found: %s",
+              "Transformer %s can only be applied to VALUE_ARRAY, OBJECT_ARRAY or ENCRYPTED_ARRAY, found: %s",
               getType(), schema.getType()));
     }
   }
 
   default void checkValueArray(FeatureSchema schema) {
-    if (schema.getType() != Type.VALUE_ARRAY) {
+    if (schema.getType() != Type.VALUE_ARRAY && schema.getType() != Type.ENCRYPTED_ARRAY) {
       throw new IllegalArgumentException(
           String.format(
-              "Transformer %s can only be applied to VALUE_ARRAY, found: %s",
+              "Transformer %s can only be applied to VALUE_ARRAY or ENCRYPTED_ARRAY, found: %s",
               getType(), schema.getType()));
     }
   }

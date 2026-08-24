@@ -30,6 +30,7 @@ import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryDecoderWkt;
 import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -289,8 +290,12 @@ public class FeatureDecoderSql
           getDownstream().onGeometry(context);
         }
       } else {
+        Object value = sqlRow.getValues().get(i);
         context.setValueType(Type.STRING);
-        context.setValue((String) sqlRow.getValues().get(i));
+        context.setValue(
+            value instanceof byte[]
+                ? Base64.getEncoder().encodeToString((byte[]) value)
+                : (String) value);
         context.setSchemaIndex(sqlRow.getSchemaIndex(i));
 
         if (sqlRow.isSubDecoderColumn(i) && Objects.nonNull(context.value())) {

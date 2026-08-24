@@ -18,6 +18,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerReadOnly;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -26,8 +27,10 @@ import de.ii.xtraplatform.geometries.domain.Geometry;
 import de.ii.xtraplatform.geometries.domain.transcode.json.GeometryDecoderJson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 // NOPMD - TODO: how to handle name collisions for id, geometry, or place
 @SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
@@ -44,6 +47,8 @@ public class FeatureTokenDecoderGeoJson
   private final Optional<String> nullValue;
   private final EpsgCrs crs;
   private final Axes axes;
+  private final GeometryDecoderJson geometryDecoder;
+  private final Set<String> readOnlyProperties;
 
   private boolean started;
   private int depth = -1;
@@ -68,7 +73,26 @@ public class FeatureTokenDecoderGeoJson
       downstream;
 
   public FeatureTokenDecoderGeoJson(Optional<String> nullValue, EpsgCrs crs, Axes axes) {
+    this(nullValue, crs, axes, List.of(), Set.of());
+  }
+
+  public FeatureTokenDecoderGeoJson(
+      Optional<String> nullValue, EpsgCrs crs, Axes axes, List<EpsgCrs> supportedCrs) {
+    this(nullValue, crs, axes, supportedCrs, Set.of());
+  }
+
+  /**
+   * @param supportedCrs the coordinate reference systems that a {@code coordRefSys} member in the
+   *     document may declare; an empty list does not restrict them
+   */
+  public FeatureTokenDecoderGeoJson(
+      Optional<String> nullValue,
+      EpsgCrs crs,
+      Axes axes,
+      List<EpsgCrs> supportedCrs,
+      Set<String> readOnlyProperties) {
     super();
+    this.readOnlyProperties = readOnlyProperties;
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
@@ -78,12 +102,15 @@ public class FeatureTokenDecoderGeoJson
     this.nullValue = nullValue;
     this.crs = crs;
     this.axes = axes;
+    this.geometryDecoder = new GeometryDecoderJson(false, supportedCrs);
   }
 
   @Override
   protected void init() {
     this.context = createContext();
-    this.downstream = new FeatureTokenBufferSimple<>(getDownstream(), context);
+    this.downstream =
+        new FeatureTokenBufferSimple<>(
+            FeatureEventHandlerReadOnly.of(getDownstream(), readOnlyProperties), context);
   }
 
   @Override
@@ -146,7 +173,7 @@ public class FeatureTokenDecoderGeoJson
           if (geometryDepth == 0) {
             JsonNode geomNode = OBJECT_MAPPER.readTree(geometryBuffer.asParser());
             Geometry<?> geometry =
-                new GeometryDecoderJson().decode(geomNode, Optional.of(crs), Optional.of(axes));
+                geometryDecoder.decode(geomNode, Optional.of(crs), Optional.of(axes));
             context.setGeometry(geometry);
             context.pathTracker().track(geometryFieldName, 0);
             downstream.onGeometry(context);

@@ -187,6 +187,19 @@ public interface FeatureTokenDecoderGmlInputProfile {
    */
   Set<String> getObjectTypeSuffixedProperties();
 
+  /**
+   * The coordinate reference systems that a {@code srsName} attribute in the document may declare.
+   * An empty list does not restrict them; a value that resolves to another coordinate reference
+   * system is rejected.
+   */
+  List<EpsgCrs> getSupportedCrs();
+
+  /**
+   * The properties that the published schema specifies as read-only. A document that sets one of
+   * them is rejected; an empty set does not restrict the properties.
+   */
+  Set<String> getReadOnlyProperties();
+
   static FeatureTokenDecoderGmlInputProfile empty() {
     return ImmutableFeatureTokenDecoderGmlInputProfile.builder().build();
   }

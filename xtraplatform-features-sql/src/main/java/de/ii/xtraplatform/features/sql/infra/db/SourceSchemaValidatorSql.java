@@ -17,8 +17,12 @@ import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlRelation;
 import java.io.IOException;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -35,12 +39,17 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
       "%s: column '%s' in table '%s' should not be used as %s, neither a primary key nor a unique constraint can be found";
   public static final String COLUMN_CANNOT_BE_USED_AS =
       "%s: column '%s' in table '%s' cannot be used as %s";
+  public static final String COLUMN_WITH_TIME_ZONE =
+      "%s: column '%s' in table '%s' has a time zone, but 'nativeTimeZone' is set to '%s'. Values of such a column are read in UTC and would then be interpreted as '%s', which shifts them. 'nativeTimeZone' is only applied to values without a time zone; either set it to UTC or use a column without a time zone.";
 
   private final List<String> schemas;
+  private final Optional<ZoneId> nativeTimeZone;
   private Supplier<SqlClient> sqlClient;
 
-  public SourceSchemaValidatorSql(List<String> schemas, Supplier<SqlClient> sqlClient) {
+  public SourceSchemaValidatorSql(
+      List<String> schemas, Optional<ZoneId> nativeTimeZone, Supplier<SqlClient> sqlClient) {
     this.schemas = schemas;
+    this.nativeTimeZone = nativeTimeZone;
     this.sqlClient = sqlClient;
   }
 
@@ -213,11 +222,35 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
                             tableSchema.getName(),
                             "datetime"));
                   }
+
+                  if (attribute.isTemporal()
+                      && hasNonUtcTimeZone()
+                      && schemaInfo.isColumnTemporalWithTimeZone(
+                          tableSchema.getName(), attribute.getName())) {
+                    result.addWarnings(
+                        String.format(
+                            COLUMN_WITH_TIME_ZONE,
+                            String.format(
+                                "Potentially incorrect datetime values for property '%s' in type '%s'",
+                                attribute.getSourcePath().orElse("???"), typeName),
+                            attribute.getName(),
+                            tableSchema.getName(),
+                            nativeTimeZone.get(),
+                            nativeTimeZone.get()));
+                  }
                 }
               }
             });
 
     return result.build();
+  }
+
+  // The values of a column with a time zone are read in UTC (the time zone of every connection),
+  // so only a native time zone other than UTC changes their meaning.
+  private boolean hasNonUtcTimeZone() {
+    return nativeTimeZone
+        .filter(zone -> !Objects.equals(zone.getRules(), ZoneOffset.UTC.getRules()))
+        .isPresent();
   }
 
   private List<String> getAllUsedTables(List<SchemaSql> schemaSql) {
