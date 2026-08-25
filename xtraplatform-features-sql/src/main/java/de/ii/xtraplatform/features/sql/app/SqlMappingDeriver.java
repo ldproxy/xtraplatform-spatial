@@ -163,6 +163,10 @@ public class SqlMappingDeriver {
     schemas.add(querySchema);
     mapping.addTables(querySchema);
 
+    // the schema node that this table is mapped from; a sub-decoder column of the table holds the
+    // values of the properties of that node, which is the root schema only for the main table
+    FeatureSchema tableOwner = includeSchema ? getTableOwner(schema, tableRule) : null;
+
     if (!columnRules.isEmpty() || !writableColumnRules.isEmpty()) {
       previous.add(pathParser.parseTablePath(tableRule.getSource()).getFullPath());
     }
@@ -189,6 +193,7 @@ public class SqlMappingDeriver {
 
       addToMapping(
           schema,
+          tableOwner,
           mapping,
           seenProperties,
           seenWritableProperties,
@@ -208,6 +213,7 @@ public class SqlMappingDeriver {
 
       addToMapping(
           schema,
+          tableOwner,
           mapping,
           seenProperties,
           seenWritableProperties,
@@ -231,6 +237,7 @@ public class SqlMappingDeriver {
 
       addToMapping(
           schema,
+          tableOwner,
           mapping,
           seenProperties,
           seenWritableProperties,
@@ -244,6 +251,7 @@ public class SqlMappingDeriver {
 
   private void addToMapping(
       FeatureSchema schema,
+      FeatureSchema tableOwner,
       ImmutableSqlQueryMapping.Builder mapping,
       List<String> seenProperties,
       List<String> seenWritableProperties,
@@ -255,12 +263,12 @@ public class SqlMappingDeriver {
     if ("$".equals(column.getTarget())) {
       if (column1.hasOperation(SqlQueryColumn.Operation.CONNECTOR)) {
         List<FeatureSchema> connectedSchemas =
-            includeSchema
-                ? getConnectedSchemas(schema, column1.getPathSegment(), "", false)
+            includeSchema && Objects.nonNull(tableOwner)
+                ? getConnectedSchemas(tableOwner, column1.getPathSegment(), "", false)
                 : List.of();
 
         for (FeatureSchema p : connectedSchemas) {
-          if (isWritable) {
+          if (isWritable && !seenWritableProperties.contains(p.getFullPathAsString())) {
             mapping.putWritableTables(p.getFullPathAsString(), querySchema);
             mapping.putWritableColumns(p.getFullPathAsString(), column1);
             seenWritableProperties.add(p.getFullPathAsString());
@@ -289,7 +297,7 @@ public class SqlMappingDeriver {
 
         target = applyRename(column.getTarget(), propertySchema);
 
-        if (!seenProperties.contains(target)) {
+        if (!seenProperties.contains(target) && propertySchema.isValue()) {
           mapping.putValueSchemas(target, propertySchema);
         }
 
@@ -309,12 +317,27 @@ public class SqlMappingDeriver {
         mapping.putWritableColumns(target, column1);
         seenWritableProperties.add(target);
       }
-      if (!seenProperties.contains(target)) {
+      // only values can be filtered or sorted on; an object (e.g. a feature reference) must never
+      // claim a value target, otherwise it shadows the value that legitimately owns that target -
+      // the queryable of a feature reference, which is filtered against the id of the reference
+      if (!seenProperties.contains(target)
+          && (Objects.isNull(propertySchema) || propertySchema.isValue())) {
         mapping.putValueTables(target, querySchema);
         mapping.putValueColumns(target, column1);
         seenProperties.add(target);
       }
     }
+  }
+
+  private static FeatureSchema getTableOwner(FeatureSchema schema, MappingRule tableRule) {
+    if (Objects.equals(tableRule.getTarget(), ROOT_TARGET)) {
+      return schema;
+    }
+
+    return schema.getAllNestedProperties().stream()
+        .filter(property -> Objects.equals(property.getFullPathAsString(), tableRule.getTarget()))
+        .findFirst()
+        .orElse(schema);
   }
 
   private static String applyRename(String target, FeatureSchema schema) {
@@ -361,14 +384,16 @@ public class SqlMappingDeriver {
                       ? path.replace(connector + "/", "").replace(connector, "")
                       : pathInConnector + "." + path;
 
+              // always record the path, never rely on the name fallback in
+              // SqlQueryMapping.getPathInConnector: the property name is only the same as the path
+              // in the connector by convention (e.g. a feature reference title mapped to
+              // "[JSON]properties/name" is named "title")
               FeatureSchema schema =
-                  !inArray && pathInConnector.isEmpty()
-                      ? p
-                      : new ImmutableFeatureSchema.Builder()
-                          .from(p)
-                          .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
-                          .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
-                          .build();
+                  new ImmutableFeatureSchema.Builder()
+                      .from(p)
+                      .putAdditionalInfo(IN_CONNECTED_ARRAY, String.valueOf(inArray))
+                      .putAdditionalInfo(PATH_IN_CONNECTOR, newPathInConnector)
+                      .build();
 
               if (p.isValue()) {
                 return Stream.of(schema);
