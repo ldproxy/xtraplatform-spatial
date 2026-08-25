@@ -46,6 +46,7 @@ import de.ii.xtraplatform.cql.domain.Operand;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
+import de.ii.xtraplatform.cql.domain.SpatialFunction;
 import de.ii.xtraplatform.cql.domain.SpatialOperation;
 import de.ii.xtraplatform.cql.domain.Temporal;
 import de.ii.xtraplatform.cql.domain.TemporalLiteral;
@@ -71,6 +72,7 @@ import de.ii.xtraplatform.geometries.domain.Polygon;
 import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
+import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -108,6 +110,10 @@ public class FilterEncoderSql {
   private final String accentiCollation;
   private final Map<String, CustomFunction> customFunctions;
   private final java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver;
+  // geometry columns with a spatial index that the query has to name explicitly, keyed by
+  // "table.column" in lower case and mapped to the column the index is keyed on; see
+  // SqlDbmsAdapter.getSpatialIndexes
+  private final Map<String, String> spatialIndexes;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -148,6 +154,29 @@ public class FilterEncoderSql {
       List<CustomFunction> customFunctions,
       String accentiCollation,
       java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver) {
+    this(
+        nativeCrs,
+        sqlDialect,
+        crsTransformerFactory,
+        crsInfo,
+        cql,
+        customFunctions,
+        accentiCollation,
+        mappingResolver,
+        Map.of());
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation,
+      java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver,
+      Map<String, String> spatialIndexes) {
+    this.spatialIndexes = spatialIndexes;
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -164,6 +193,123 @@ public class FilterEncoderSql {
                         function -> function,
                         (left, right) -> right)));
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
+  }
+
+  /**
+   * Adds the spatial index predicate of the dialect to an exact spatial predicate, as a conjunct.
+   *
+   * <p>The conjunct is only added where it is implied by the exact predicate, so that it can change
+   * neither the result nor the meaning of the predicate under negation: the operator has to be one
+   * whose match implies that the bounding boxes intersect, the geometry has to be a column of the
+   * main table that a spatial index is known for, and the other operand has to be a geometry
+   * literal whose bounding box is known.
+   *
+   * @param literalEnvelopes the bounding boxes of the geometry literals of the filter being
+   *     encoded, keyed by the SQL they were encoded to
+   * @param acceleratedPredicates records the added conjunct, so that {@link
+   *     #withoutSpatialIndexPredicates} can drop it again under a negation
+   * @param geometryTableAndColumn resolves the table and column of the geometry operand, evaluated
+   *     only once everything else already matched
+   */
+  private String withSpatialIndexPredicate(
+      SpatialFunction operator,
+      List<String> children,
+      String mainExpression,
+      String predicate,
+      Map<String, double[][]> literalEnvelopes,
+      Map<String, String> acceleratedPredicates,
+      Supplier<Optional<Tuple<String, String>>> geometryTableAndColumn) {
+    if (spatialIndexes.isEmpty()
+        || !SqlDialect.SPATIAL_OPERATORS_IMPLYING_BBOX_INTERSECTION.contains(operator)
+        // Only the direct conjunct form of a property reference addresses the geometry as a column
+        // of the main table (see visit(Property)). In the semi-join form the geometry belongs to a
+        // joined table, where the predicate would have to go inside the subquery instead.
+        || !(mainExpression.startsWith("%1$s") && mainExpression.endsWith("%2$s"))) {
+      return predicate;
+    }
+
+    double[][] envelope =
+        children.stream()
+            .map(literalEnvelopes::get)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+
+    if (Objects.isNull(envelope)) {
+      return predicate;
+    }
+
+    return geometryTableAndColumn
+        .get()
+        .flatMap(
+            tableColumn ->
+                Optional.ofNullable(
+                        spatialIndexes.get(
+                            String.format("%s.%s", tableColumn.first(), tableColumn.second())
+                                .toLowerCase(Locale.ROOT)))
+                    .flatMap(
+                        keyColumn ->
+                            sqlDialect.getSpatialIndexPredicate(
+                                tableColumn.first(),
+                                tableColumn.second(),
+                                "A",
+                                keyColumn,
+                                envelope[0],
+                                envelope[1])))
+        .map(
+            indexPredicate -> {
+              String accelerated = String.format("(%s AND %s)", indexPredicate, predicate);
+              // remembered so that a negation can drop it again, see
+              // withoutSpatialIndexPredicates
+              acceleratedPredicates.put(accelerated, predicate);
+              return accelerated;
+            })
+        .orElse(predicate);
+  }
+
+  /**
+   * Removes the spatial index predicates that were added to the operand of a negation.
+   *
+   * <p>The conjunct is implied by the exact predicate for every row that has a geometry, so adding
+   * it changes nothing there, negated or not. A row whose geometry is NULL is the exception: it has
+   * no entry in the spatial index, so the conjunct is false for it, while the exact predicate is
+   * NULL. Both keep the row out of a positive result, but negated the one yields true and the other
+   * NULL. Dropping the conjunct under a negation keeps that case as it was.
+   */
+  private static String withoutSpatialIndexPredicates(
+      String expression, Map<String, String> acceleratedPredicates) {
+    String withoutIndexPredicates = expression;
+
+    for (Entry<String, String> accelerated : acceleratedPredicates.entrySet()) {
+      withoutIndexPredicates =
+          withoutIndexPredicates.replace(accelerated.getKey(), accelerated.getValue());
+    }
+
+    return withoutIndexPredicates;
+  }
+
+  /**
+   * The bounding box of a geometry literal, derived after the same transformation that {@link
+   * de.ii.xtraplatform.cql.domain.CqlToText} applies before encoding it, so that the bounding box
+   * is guaranteed to describe the geometry that ends up in the query. Null for an empty geometry.
+   */
+  private double[][] envelopeOf(GeometryNode geometry) {
+    return coordinatesTransformer
+        .apply(geometry.getGeometry(), geometry.getCrs().or(() -> geometry.getGeometry().getCrs()))
+        .accept(new MinMaxDeriver());
+  }
+
+  /**
+   * The column of a plain {@code A.<column>} reference. Anything else — a sub-decoder expression, a
+   * date function — is not a column that a spatial index could be looked up for.
+   */
+  private static Optional<String> plainColumnOfMainTable(String qualifiedColumn) {
+    if (!qualifiedColumn.startsWith("A.")
+        || qualifiedColumn.indexOf('(') >= 0
+        || qualifiedColumn.indexOf(' ') >= 0) {
+      return Optional.empty();
+    }
+    return Optional.of(qualifiedColumn.substring(2));
   }
 
   private Optional<String> renderCustomFunction(
@@ -617,6 +763,12 @@ public class FilterEncoderSql {
   private class CqlToSql extends CqlToText {
 
     private final SchemaSql rootSchema;
+    // bounding boxes of the geometry literals of the filter being encoded, keyed by the SQL they
+    // were encoded to; a visitor encodes a single filter, so this neither leaks nor is shared
+    private final Map<String, double[][]> literalEnvelopes = new LinkedHashMap<>();
+    // spatial predicates that a spatial index predicate was added to, mapped to the predicate
+    // without it
+    private final Map<String, String> acceleratedPredicates = new LinkedHashMap<>();
 
     private CqlToSql(SchemaSql rootSchema) {
       super(coordinatesTransformer);
@@ -1260,13 +1412,41 @@ public class FilterEncoderSql {
 
       List<String> expressions = processBinary(spatialOperation.getArgs(), children);
 
-      return String.format(
+      String predicate =
+          String.format(
+              expressions.get(0),
+              String.format("%s(", operator.first()),
+              operator
+                  .second()
+                  .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
+                  .orElse(String.format(", %s)%s", expressions.get(1), match)));
+
+      return withSpatialIndexPredicate(
+          spatialOperation.getSpatialOperator(),
+          children,
           expressions.get(0),
-          String.format("%s(", operator.first()),
-          operator
-              .second()
-              .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
-              .orElse(String.format(", %s)%s", expressions.get(1), match)));
+          predicate,
+          literalEnvelopes,
+          acceleratedPredicates,
+          () -> geometryTableAndColumn(spatialOperation));
+    }
+
+    /** The table and column of the geometry operand of a spatial predicate, if it is a column. */
+    private Optional<Tuple<String, String>> geometryTableAndColumn(
+        BinarySpatialOperation spatialOperation) {
+      return spatialOperation.getArgs().stream()
+          .filter(Property.class::isInstance)
+          .map(Property.class::cast)
+          .findFirst()
+          .flatMap(
+              property -> {
+                String propertyName = property.getName().replaceAll("^\"|\"$", "");
+                boolean allowColumnFallback = !propertyName.contains(".");
+                SchemaSql table = getTable(propertyName, false, allowColumnFallback);
+                return plainColumnOfMainTable(
+                        getQualifiedColumn(table, propertyName, "A", allowColumnFallback).first())
+                    .map(column -> Tuple.of(rootSchema.getName(), column));
+              });
     }
 
     @Override
@@ -1308,7 +1488,10 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(GeometryNode geometry, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      String expression =
+          sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      literalEnvelopes.computeIfAbsent(expression, ignore -> envelopeOf(geometry));
+      return expression;
     }
 
     @Override
@@ -1510,7 +1693,7 @@ public class FilterEncoderSql {
     public String visit(Not not, List<String> children) {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
-      String operation = children.get(0);
+      String operation = withoutSpatialIndexPredicates(children.get(0), acceleratedPredicates);
       if (operation.contains("(SELECT")) {
         // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
         // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
@@ -1560,7 +1743,9 @@ public class FilterEncoderSql {
             operation.substring(0, pos), operator, operation.substring(pos + 1, length));
       }
 
-      return super.visit(not, children);
+      // operation, not children: Not is unary, and operation is the operand with any spatial index
+      // predicate removed
+      return super.visit(not, ImmutableList.of(operation));
     }
 
     @Override
@@ -1627,6 +1812,13 @@ public class FilterEncoderSql {
     private CqlToSql2(SqlQueryMapping mapping) {
       this(mapping, null);
     }
+
+    // bounding boxes of the geometry literals of the filter being encoded, keyed by the SQL they
+    // were encoded to; a visitor encodes a single filter, so this neither leaks nor is shared
+    private final Map<String, double[][]> literalEnvelopes = new LinkedHashMap<>();
+    // spatial predicates that a spatial index predicate was added to, mapped to the predicate
+    // without it
+    private final Map<String, String> acceleratedPredicates = new LinkedHashMap<>();
 
     private CqlToSql2(SqlQueryMapping mapping, CteCollector collector) {
       super(coordinatesTransformer);
@@ -1755,7 +1947,8 @@ public class FilterEncoderSql {
           .filter("EXPRESSION"::equals)
           .isPresent()) {
         String columnResolved =
-            SqlQueryColumnOperations.getQualifiedColumnResolved(alias, column, sqlDialect);
+            SqlQueryColumnOperations.getQualifiedColumnResolved(
+                alias, column, sqlDialect, Set.of(Operation.WKB, Operation.WKT), false);
 
         return columnResolved.replace("AS " + column.getName(), "");
       }
@@ -2393,13 +2586,48 @@ public class FilterEncoderSql {
 
       List<String> expressions = processBinary(spatialOperation.getArgs(), children);
 
-      return String.format(
+      String predicate =
+          String.format(
+              expressions.get(0),
+              String.format("%s(", operator.first()),
+              operator
+                  .second()
+                  .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
+                  .orElse(String.format(", %s)%s", expressions.get(1), match)));
+
+      return withSpatialIndexPredicate(
+          spatialOperation.getSpatialOperator(),
+          children,
           expressions.get(0),
-          String.format("%s(", operator.first()),
-          operator
-              .second()
-              .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
-              .orElse(String.format(", %s)%s", expressions.get(1), match)));
+          predicate,
+          literalEnvelopes,
+          acceleratedPredicates,
+          () -> geometryTableAndColumn(spatialOperation));
+    }
+
+    /** The table and column of the geometry operand of a spatial predicate, if it is a column. */
+    private Optional<Tuple<String, String>> geometryTableAndColumn(
+        BinarySpatialOperation spatialOperation) {
+      return spatialOperation.getArgs().stream()
+          .filter(Property.class::isInstance)
+          .map(Property.class::cast)
+          .findFirst()
+          .flatMap(
+              property -> {
+                String propertyName = property.getName().replaceAll("^\"|\"$", "");
+                boolean allowColumnFallback = !propertyName.contains(".");
+                de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> table =
+                    getTableColumn(propertyName, false, allowColumnFallback);
+                return plainColumnOfMainTable(
+                        getQualifiedColumn(
+                                table.first(),
+                                table.second(),
+                                propertyName,
+                                "A",
+                                allowColumnFallback)
+                            .first())
+                    .map(column -> Tuple.of(mapping.getMainTable().getName(), column));
+              });
     }
 
     @Override
@@ -2441,7 +2669,10 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(GeometryNode geometry, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      String expression =
+          sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      literalEnvelopes.computeIfAbsent(expression, ignore -> envelopeOf(geometry));
+      return expression;
     }
 
     @Override
@@ -2645,7 +2876,7 @@ public class FilterEncoderSql {
     public String visit(Not not, List<String> children) {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
-      String operation = children.get(0);
+      String operation = withoutSpatialIndexPredicates(children.get(0), acceleratedPredicates);
       if (operation.contains("(SELECT")) {
         // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
         // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
@@ -2695,7 +2926,9 @@ public class FilterEncoderSql {
             operation.substring(0, pos), operator, operation.substring(pos + 1, length));
       }
 
-      return super.visit(not, children);
+      // operation, not children: Not is unary, and operation is the operand with any spatial index
+      // predicate removed
+      return super.visit(not, ImmutableList.of(operation));
     }
 
     @Override
