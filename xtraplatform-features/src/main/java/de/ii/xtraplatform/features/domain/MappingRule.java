@@ -109,4 +109,17 @@ public interface MappingRule {
         .matcher(path)
         .replaceAll(m -> "{" + "_".repeat(m.group(1).length()) + "}");
   }
+
+  /**
+   * Whether the last segment of the given source path is a sub-decoder column, that is {@code
+   * [CONNECTOR]column} (a join is {@code [sourceField=targetField]table} and has an {@code =}
+   * inside the brackets).
+   */
+  static boolean endsWithConnector(String path) {
+    String masked = maskPathAttributes(path);
+    String segment = path.substring(masked.lastIndexOf('/') + 1);
+    int end = segment.indexOf(']');
+
+    return segment.startsWith("[") && end > 1 && !segment.substring(1, end).contains("=");
+  }
 }

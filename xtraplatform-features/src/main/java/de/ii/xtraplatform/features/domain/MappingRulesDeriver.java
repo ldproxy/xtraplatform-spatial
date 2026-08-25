@@ -106,10 +106,16 @@ public class MappingRulesDeriver
           MappingRule tableRule =
               new ImmutableMappingRule.Builder()
                   .source(rule.getSourceParent())
+                  // a sub-decoder column (e.g. [JSON]properties) is not a property of the target
+                  // schema, it is the container whose values the following rules address. It must
+                  // always be ROOT_TARGET, otherwise it is taken for the enclosing object itself
+                  // and that object gets mapped to the container column.
                   .target(
-                      rule.getTarget().contains(".")
-                          ? rule.getTarget().substring(0, rule.getTarget().lastIndexOf("."))
-                          : ROOT_TARGET)
+                      MappingRule.endsWithConnector(rule.getSourceParent())
+                          ? ROOT_TARGET
+                          : rule.getTarget().contains(".")
+                              ? rule.getTarget().substring(0, rule.getTarget().lastIndexOf("."))
+                              : ROOT_TARGET)
                   .type(
                       rule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
                           ? Type.VALUE_ARRAY
