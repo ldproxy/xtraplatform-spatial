@@ -349,18 +349,4 @@ public class SqlDialectPgis implements SqlDialect {
   public String escapeString(String value) {
     return value.replaceAll("'", "''");
   }
-
-  @Override
-  public String applyToExpression(
-      String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
-    if (!subDecoderPaths.isEmpty()) {
-      String expression =
-          subDecoderPaths.values().iterator().next().replaceAll("\\$(?:t|T|table)\\$", table);
-      if (spatial) {
-        expression = applyToWkt(expression, false, false);
-      }
-      return String.format("(%s) AS %s", expression, name);
-    }
-    return SqlDialect.super.applyToExpression(table, name, subDecoderPaths, spatial);
-  }
 }
