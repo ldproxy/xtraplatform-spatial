@@ -113,6 +113,7 @@ import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
+import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
@@ -606,7 +607,8 @@ public class FeatureProviderSql
             type ->
                 Optional.ofNullable(queryMappings.get(type))
                     .filter(mappings -> mappings.size() == 1)
-                    .map(mappings -> mappings.get(0)));
+                    .map(mappings -> mappings.get(0)),
+            getSpatialIndexes());
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
@@ -658,6 +660,24 @@ public class FeatureProviderSql
     this.pathParser2 = createPathParser2(getData().getSourcePathDefaults(), cql);
 
     return true;
+  }
+
+  /**
+   * The geometry columns with a spatial index that the query generator has to name explicitly to
+   * make use of. Without it, spatial queries keep working, only without the index, so a failure to
+   * determine it is logged and does not keep the provider from starting.
+   */
+  private Map<String, String> getSpatialIndexes() {
+    try {
+      return getSqlClient().getSpatialIndexes();
+    } catch (SQLException | RuntimeException e) {
+      LogContext.errorAsWarn(
+          LOGGER,
+          e,
+          "Could not determine the spatial indexes of the feature provider with id '{}'. Spatial queries will not use a spatial index.",
+          getId());
+      return Map.of();
+    }
   }
 
   @Override
