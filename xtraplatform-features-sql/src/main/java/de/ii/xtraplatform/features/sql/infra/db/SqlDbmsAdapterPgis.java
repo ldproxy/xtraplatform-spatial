@@ -12,6 +12,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.crs.domain.EpsgCrs.Force;
+import de.ii.xtraplatform.features.sql.app.PkcsAwareSslSocketFactory;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.ImmutableGeoInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
@@ -106,6 +107,7 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
                   break;
                 case "sslkey":
                   ds.setSslKey(String.valueOf(value));
+                  ds.setSslfactory(PkcsAwareSslSocketFactory.class.getName());
                   break;
                 case "sslrootcert":
                   ds.setSslRootCert(String.valueOf(value));
