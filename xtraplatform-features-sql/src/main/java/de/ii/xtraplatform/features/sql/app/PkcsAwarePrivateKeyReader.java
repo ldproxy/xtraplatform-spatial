@@ -75,8 +75,8 @@ public final class PkcsAwarePrivateKeyReader {
       throw new IllegalArgumentException(
           "%s is an encrypted private key and needs a passphrase".formatted(pemFile));
     }
-    if (LOGGER.isDebugEnabled() && format.needsWrappingInPkcs8()) {
-      LOGGER.debug("{} is {}, wrapped in PKCS#8 for the JCE", pemFile, format);
+    if (LOGGER.isTraceEnabled() && format.needsWrappingInPkcs8()) {
+      LOGGER.trace("{} is {}, wrapped in PKCS#8 for the JCE", pemFile, format);
     }
 
     PrivateKey key = new JcaPEMKeyConverter().getPrivateKey(privateKeyInfo(pem, pemFile));

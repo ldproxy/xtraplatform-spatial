@@ -92,28 +92,31 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
         .getDriverOptions()
         .forEach(
             (key, value) -> {
+              if (Strings.isNullOrEmpty(key) || Strings.isNullOrEmpty(value)) {
+                return;
+              }
               switch (key) {
                 case "gssEncMode":
-                  ds.setGssEncMode(String.valueOf(value));
+                  ds.setGssEncMode(value);
                   break;
                 case "ssl":
                   ds.setSsl(Objects.equals(value, "true"));
                   break;
                 case "sslmode":
-                  ds.setSslMode(String.valueOf(value));
+                  ds.setSslMode(value);
                   break;
                 case "sslcert":
-                  ds.setSslCert(String.valueOf(value));
+                  ds.setSslCert(value);
                   break;
                 case "sslkey":
-                  ds.setSslKey(String.valueOf(value));
+                  ds.setSslKey(value);
                   ds.setSslfactory(PkcsAwareSslSocketFactory.class.getName());
                   break;
                 case "sslrootcert":
-                  ds.setSslRootCert(String.valueOf(value));
+                  ds.setSslRootCert(value);
                   break;
                 case "sslpassword":
-                  ds.setSslPassword(String.valueOf(value));
+                  ds.setSslPassword(value);
                   break;
               }
             });
