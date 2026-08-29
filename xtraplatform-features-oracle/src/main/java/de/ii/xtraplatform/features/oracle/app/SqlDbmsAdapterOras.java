@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,11 +125,6 @@ public class SqlDbmsAdapterOras implements SqlDbmsAdapter {
   @Override
   public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
     return Optional.empty();
-  }
-
-  @Override
-  public DatabaseType getRxType() {
-    return DatabaseType.ORACLE;
   }
 
   @Override
