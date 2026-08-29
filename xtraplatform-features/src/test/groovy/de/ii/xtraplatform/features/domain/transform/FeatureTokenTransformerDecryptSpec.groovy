@@ -116,19 +116,19 @@ class FeatureTokenTransformerDecryptSpec extends Specification {
 
     def 'the encryption key is validated'() {
         when: 'a valid Base64 key of 32 bytes is parsed'
-        def key = EncryptionImpl.parseKey(Base64.encoder.encodeToString(KEY))
+        def key = EncryptionImpl.parseKeyBase64(Base64.encoder.encodeToString(KEY))
 
         then: 'the key is returned'
         key == KEY
 
         when: 'a key with the wrong length is parsed'
-        EncryptionImpl.parseKey(Base64.encoder.encodeToString(new byte[16]))
+        EncryptionImpl.parseKeyBase64(Base64.encoder.encodeToString(new byte[16]))
 
         then: 'it is rejected'
         thrown(IllegalArgumentException)
 
         when: 'a key that is not Base64 is parsed'
-        EncryptionImpl.parseKey('%%%')
+        EncryptionImpl.parseKeyBase64('%%%')
 
         then: 'it is rejected'
         thrown(IllegalArgumentException)
