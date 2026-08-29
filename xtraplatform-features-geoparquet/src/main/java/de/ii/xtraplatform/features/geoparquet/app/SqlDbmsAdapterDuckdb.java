@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -249,11 +248,6 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
   @Override
   public List<String> getDefaultSchemas() {
     return List.of();
-  }
-
-  @Override
-  public DatabaseType getRxType() {
-    return DatabaseType.OTHER;
   }
 
   @Override

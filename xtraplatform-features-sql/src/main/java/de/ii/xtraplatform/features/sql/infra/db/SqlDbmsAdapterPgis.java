@@ -35,7 +35,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.slf4j.Logger;
@@ -142,11 +141,6 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
       return Optional.of(String.format("SET search_path TO %s,public; %s", schemas, initSql));
     }
     return Optional.of(initSql);
-  }
-
-  @Override
-  public DatabaseType getRxType() {
-    return DatabaseType.POSTGRES;
   }
 
   @Override

@@ -38,7 +38,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 import org.sqlite.SQLiteConnection;
 import org.sqlite.SQLiteDataSource;
@@ -138,11 +137,6 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
   @Override
   public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
     return Optional.of("SELECT CASE CheckGeoPackageMetaData() WHEN 1 THEN EnableGpkgMode() END;");
-  }
-
-  @Override
-  public DatabaseType getRxType() {
-    return DatabaseType.SQLITE;
   }
 
   @Override

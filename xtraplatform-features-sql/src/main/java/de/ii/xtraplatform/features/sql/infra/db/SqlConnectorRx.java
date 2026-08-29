@@ -51,7 +51,6 @@ import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import org.davidmoten.rxjava3.jdbc.Database;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -80,7 +79,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   private final AtomicInteger refCounter;
   private final boolean asyncStartup;
 
-  private Database session;
   private HikariDataSource dataSource;
   private SqlClient sqlClient;
   private Throwable connectionError;
@@ -166,10 +164,8 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     try {
       HikariConfig hikariConfig = createHikariConfig();
       this.dataSource = new HikariDataSource(hikariConfig);
-      this.session = createSession(dataSource);
       this.sqlClient =
           new SqlClientRx(
-              session,
               dataSource,
               dbmsAdapters.get(connectionInfo.getDialect()),
               dbmsAdapters.getDialect(connectionInfo.getDialect()),
@@ -188,13 +184,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     if (Objects.nonNull(healthCheckRegistry)) {
       try {
         healthCheckRegistry.unregister(MetricRegistry.name(poolName, "pool", "ConnectivityCheck"));
-      } catch (Throwable e) {
-        // ignore
-      }
-    }
-    if (Objects.nonNull(session)) {
-      try {
-        session.close();
       } catch (Throwable e) {
         // ignore
       }
@@ -358,10 +347,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     // config.setHealthCheckRegistry(healthCheckRegistry);
 
     return config;
-  }
-
-  private Database createSession(HikariDataSource dataSource) {
-    return Database.fromBlocking(dataSource);
   }
 
   private static long getInitFailTimeout(ConnectionInfoSql connectionInfo) {
