@@ -21,6 +21,7 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,8 +33,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.Database;
-import org.davidmoten.rxjava3.jdbc.internal.DelegatedConnection;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.slf4j.Logger;
@@ -49,17 +50,22 @@ public class SqlClientRx implements SqlClient {
   // it exists to end.
   private static final long READ_STALL_TIMEOUT_MINUTES = 10;
 
+  // rxjava3-jdbc is used for streamed reads only; everything that needs a connection of its own
+  // (sessions, statements without a result) leases it from the pool directly
   private final Database session;
+  private final DataSource dataSource;
   private final SqlDbmsAdapter dbmsAdapter;
   private final SqlDialect dialect;
   private final Collator collator;
 
   public SqlClientRx(
       Database session,
+      DataSource dataSource,
       SqlDbmsAdapter dbmsAdapter,
       SqlDialect dialect,
       Optional<String> defaultCollation) {
     this.session = session;
+    this.dataSource = dataSource;
     this.dbmsAdapter = dbmsAdapter;
     this.dialect = dialect;
     this.collator = dbmsAdapter.getRowSortingCollator(defaultCollation);
@@ -73,10 +79,15 @@ public class SqlClientRx implements SqlClient {
     CompletableFuture<Collection<SqlRow>> result = new CompletableFuture<>();
 
     if (options.getColumnTypes().isEmpty()) {
-      session
-          .update(query)
-          .complete()
-          .subscribe(() -> result.complete(ImmutableList.of()), result::completeExceptionally);
+      // a statement without a result (DDL, INSERT, DROP); autocommit is on, so it is committed when
+      // it returns and the connection goes back to the pool in every case
+      try (Connection connection = dataSource.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.execute(query);
+        result.complete(ImmutableList.of());
+      } catch (SQLException e) {
+        result.completeExceptionally(e);
+      }
 
       return result;
     }
@@ -194,13 +205,22 @@ public class SqlClientRx implements SqlClient {
 
   @Override
   public Connection getConnection() {
-    return session.connection().blockingGet();
+    return leaseConnection();
   }
 
   @Override
   public SqlSession openSession() {
-    Connection connection = session.connection().blockingGet();
-    return new JdbcSqlSession(connection);
+    return new JdbcSqlSession(leaseConnection());
+  }
+
+  /** A pooled connection; closing it returns it to the pool. */
+  private Connection leaseConnection() {
+    try {
+      return dataSource.getConnection();
+    } catch (SQLException e) {
+      throw new IllegalStateException(
+          "Could not obtain a database connection: " + e.getMessage(), e);
+    }
   }
 
   @Override
@@ -217,9 +237,6 @@ public class SqlClientRx implements SqlClient {
   public List<String> getNotifications(Connection connection) {
     Connection actualConnection = connection;
 
-    if (actualConnection instanceof DelegatedConnection) {
-      actualConnection = ((DelegatedConnection) actualConnection).con();
-    }
     if (actualConnection instanceof ProxyConnection) {
       try {
         actualConnection = actualConnection.unwrap(Connection.class);
