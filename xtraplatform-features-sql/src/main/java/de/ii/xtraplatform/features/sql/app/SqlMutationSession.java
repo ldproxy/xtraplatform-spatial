@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -1664,12 +1665,31 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                   (a, b) -> a.getRows().isEmpty() ? b : a.patchWith(b)));
     }
 
-    featureSqlSource
-        .to(Sink.foreach(collected::add))
-        .on(streamRunner)
-        .run()
-        .toCompletableFuture()
-        .join();
+    try {
+      featureSqlSource
+          .to(Sink.foreach(collected::add))
+          .on(streamRunner)
+          .run()
+          .toCompletableFuture()
+          .join();
+    } catch (CompletionException e) {
+      // How the stream is run is nobody else's business, so the wrapper join() adds must not
+      // escape: `Throwable(cause)` takes the wrapper's message from the cause's toString(), which
+      // puts the exception class name into the message a client eventually reads.
+      throw unwrap(e);
+    }
+  }
+
+  // Package-private so a spec can exercise the contract without the mutation fixture.
+  static RuntimeException unwrap(CompletionException wrapper) {
+    Throwable cause = wrapper.getCause();
+    if (cause instanceof RuntimeException runtime) {
+      return runtime;
+    }
+    if (cause == null) {
+      return wrapper;
+    }
+    return new IllegalStateException(cause.getMessage(), cause);
   }
 
   // Original per-feature loop, kept for the UPDATE/REPLACE path (each feature is preceded by a
