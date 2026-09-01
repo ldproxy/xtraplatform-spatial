@@ -200,6 +200,17 @@ public interface FeatureTokenDecoderGmlInputProfile {
    */
   Set<String> getReadOnlyProperties();
 
+  /**
+   * Whether a value that is a string with no characters or with only whitespace makes the document
+   * invalid. The check applies to the value a decoder resolves for a property, so an element that
+   * carries its value in {@code xlink:href} and an element that states {@code xsi:nil} need no case
+   * of their own.
+   */
+  @Value.Default
+  default boolean getRejectEmptyValues() {
+    return false;
+  }
+
   static FeatureTokenDecoderGmlInputProfile empty() {
     return ImmutableFeatureTokenDecoderGmlInputProfile.builder().build();
   }

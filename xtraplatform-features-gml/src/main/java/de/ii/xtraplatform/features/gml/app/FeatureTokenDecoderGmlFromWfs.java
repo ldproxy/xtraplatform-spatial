@@ -372,6 +372,11 @@ public class FeatureTokenDecoderGmlFromWfs
         default:
           // advanceParser(in);
       }
+    } catch (IllegalArgumentException e) {
+      // Already a rejection of the input in its own words — a read-only property, an empty value,
+      // an unsupported xsi:type. The document parsed; adding "Could not parse GML" would describe
+      // the wrong problem, so it is passed through unchanged.
+      throw e;
     } catch (Exception e) {
       throw new IllegalArgumentException("Could not parse GML: " + e.getMessage(), e);
     }
