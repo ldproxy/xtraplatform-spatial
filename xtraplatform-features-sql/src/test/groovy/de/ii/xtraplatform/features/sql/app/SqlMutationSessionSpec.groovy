@@ -41,6 +41,44 @@ class SqlMutationSessionSpec extends Specification {
         return new SqlMutationSession(sqlSession, mappings, null, null, null, Optional.empty(), null, Optional.empty())
     }
 
+    def 'unwrap returns the cause of the join() wrapper, so its class name stays out of the message'() {
+        given: 'the wrapper CompletableFuture.join() throws — its message is the cause toString()'
+        def cause = new IllegalArgumentException("The property 'vna' has an empty value.")
+        def wrapper = new java.util.concurrent.CompletionException(cause)
+
+        expect: 'the wrapper alone would put the class name in front of the message'
+        wrapper.message.startsWith('java.lang.IllegalArgumentException')
+
+        when:
+        def unwrapped = SqlMutationSession.unwrap(wrapper)
+
+        then: 'the cause is handed on as-is, so the message a client reads is just the message'
+        unwrapped.is(cause)
+        unwrapped.message == "The property 'vna' has an empty value."
+    }
+
+    def 'unwrap keeps a checked cause reportable without the class-name prefix'() {
+        given:
+        def cause = new java.io.IOException('connection reset')
+        def wrapper = new java.util.concurrent.CompletionException(cause)
+
+        when:
+        def unwrapped = SqlMutationSession.unwrap(wrapper)
+
+        then:
+        unwrapped instanceof IllegalStateException
+        unwrapped.message == 'connection reset'
+        unwrapped.cause.is(cause)
+    }
+
+    def 'unwrap falls back to the wrapper when it has no cause'() {
+        given:
+        def wrapper = new java.util.concurrent.CompletionException('no cause', null)
+
+        expect:
+        SqlMutationSession.unwrap(wrapper).is(wrapper)
+    }
+
     def 'commit delegates to the underlying SqlSession'() {
         given:
         def session = buildSession()

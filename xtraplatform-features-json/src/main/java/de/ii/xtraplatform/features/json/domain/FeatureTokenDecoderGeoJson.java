@@ -18,6 +18,7 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerEmptyValues;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerReadOnly;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
@@ -49,6 +50,7 @@ public class FeatureTokenDecoderGeoJson
   private final Axes axes;
   private final GeometryDecoderJson geometryDecoder;
   private final Set<String> readOnlyProperties;
+  private final boolean rejectEmptyValues;
 
   private boolean started;
   private int depth = -1;
@@ -81,18 +83,31 @@ public class FeatureTokenDecoderGeoJson
     this(nullValue, crs, axes, supportedCrs, Set.of());
   }
 
-  /**
-   * @param supportedCrs the coordinate reference systems that a {@code coordRefSys} member in the
-   *     document may declare; an empty list does not restrict them
-   */
   public FeatureTokenDecoderGeoJson(
       Optional<String> nullValue,
       EpsgCrs crs,
       Axes axes,
       List<EpsgCrs> supportedCrs,
       Set<String> readOnlyProperties) {
+    this(nullValue, crs, axes, supportedCrs, readOnlyProperties, false);
+  }
+
+  /**
+   * @param supportedCrs the coordinate reference systems that a {@code coordRefSys} member in the
+   *     document may declare; an empty list does not restrict them
+   * @param rejectEmptyValues whether a value that is a string with no characters or with only
+   *     whitespace makes the document invalid
+   */
+  public FeatureTokenDecoderGeoJson(
+      Optional<String> nullValue,
+      EpsgCrs crs,
+      Axes axes,
+      List<EpsgCrs> supportedCrs,
+      Set<String> readOnlyProperties,
+      boolean rejectEmptyValues) {
     super();
     this.readOnlyProperties = readOnlyProperties;
+    this.rejectEmptyValues = rejectEmptyValues;
     try {
       this.parser = JSON_FACTORY.createNonBlockingByteArrayParser();
     } catch (IOException e) {
@@ -110,7 +125,10 @@ public class FeatureTokenDecoderGeoJson
     this.context = createContext();
     this.downstream =
         new FeatureTokenBufferSimple<>(
-            FeatureEventHandlerReadOnly.of(getDownstream(), readOnlyProperties), context);
+            FeatureEventHandlerReadOnly.of(
+                FeatureEventHandlerEmptyValues.of(getDownstream(), rejectEmptyValues),
+                readOnlyProperties),
+            context);
   }
 
   @Override

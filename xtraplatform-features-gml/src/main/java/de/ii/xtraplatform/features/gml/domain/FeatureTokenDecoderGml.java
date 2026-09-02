@@ -18,6 +18,7 @@ import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerEmptyValues;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerReadOnly;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
@@ -633,7 +634,10 @@ public class FeatureTokenDecoderGml
     this.context = createContext();
     this.downstream =
         new FeatureTokenBufferSimple<>(
-            FeatureEventHandlerReadOnly.of(getDownstream(), inputProfile.getReadOnlyProperties()),
+            FeatureEventHandlerReadOnly.of(
+                FeatureEventHandlerEmptyValues.of(
+                    getDownstream(), inputProfile.getRejectEmptyValues()),
+                inputProfile.getReadOnlyProperties()),
             context);
   }
 
@@ -702,6 +706,11 @@ public class FeatureTokenDecoderGml
           // ignore: DTD, SPACE, NAMESPACE, NOTATION_DECLARATION, ENTITY_DECLARATION,
           // PROCESSING_INSTRUCTION, COMMENT, CDATA. ATTRIBUTE is implicit in START_ELEMENT.
       }
+    } catch (IllegalArgumentException e) {
+      // Already a rejection of the input in its own words — a read-only property, an empty value,
+      // an unsupported xsi:type. The document parsed; adding "Could not parse GML" would describe
+      // the wrong problem, so it is passed through unchanged.
+      throw e;
     } catch (Exception e) {
       throw new IllegalArgumentException("Could not parse GML: " + e.getMessage(), e);
     }
@@ -1197,7 +1206,16 @@ public class FeatureTokenDecoderGml
         context.setValueType(Type.STRING);
         downstream.onValue(context);
       } else if (frame.pendingXlinkHrefFallback != null) {
+        // The fallback still wins over an empty value, as it did when the value was dropped.
         context.setValue(frame.pendingXlinkHrefFallback);
+        context.setValueType(Type.STRING);
+        downstream.onValue(context);
+      } else {
+        // The property element was there and carried no value — content that is empty or only
+        // whitespace, the latter never having reached the buffer. That states an empty value, not
+        // an absent one, the way a JSON member does with "": dropping it here silently discarded
+        // what the document states and left the empty value invisible to everything downstream.
+        context.setValue("");
         context.setValueType(Type.STRING);
         downstream.onValue(context);
       }
