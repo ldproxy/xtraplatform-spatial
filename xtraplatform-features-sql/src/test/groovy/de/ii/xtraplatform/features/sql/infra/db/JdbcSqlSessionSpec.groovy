@@ -457,4 +457,51 @@ class JdbcSqlSessionSpec extends Specification {
         session.rollback()
         1 * connection.rollback()  // only the original attempt
     }
+
+    def 'a failed commit surfaces the cause, releases the connection and finalises the session'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        connection.commit() >> { throw new SQLException('violates deferred foreign key constraint', '23503') }
+
+        when:
+        session.commit()
+
+        then:
+        thrown(IllegalStateException)
+        1 * connection.close()
+
+        when: 'the caller cleans up as usual'
+        session.rollback()
+        session.close()
+
+        then: 'the database has already ended the transaction, nothing is rolled back or released twice'
+        0 * connection.rollback()
+        0 * connection.close()
+    }
+
+    def 'a failed rollback still releases the connection'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        connection.rollback() >> { throw new SQLException('rolling-back-failed') }
+
+        when:
+        session.rollback()
+
+        then:
+        1 * connection.close()
+    }
+
+    def 'a connection terminated by the database is still returned to the pool'() {
+        given:
+        def session = new JdbcSqlSession(connection)
+        connection.rollback() >> { throw new SQLException('This connection has been closed.', '08003') }
+        connection.setAutoCommit(true) >> { throw new SQLException('This connection has been closed.', '08003') }
+
+        when:
+        session.close()
+
+        then:
+        noExceptionThrown()
+        1 * connection.close()
+    }
 }
