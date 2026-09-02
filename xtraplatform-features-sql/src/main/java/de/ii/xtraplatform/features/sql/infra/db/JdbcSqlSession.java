@@ -36,6 +36,7 @@ class JdbcSqlSession implements SqlSession {
 
   private final Connection connection;
   private boolean finalised;
+  private boolean released;
   private Savepoint activeSavepoint;
   // Non-fatal SQL warnings (e.g. PostgreSQL RAISE WARNING / RAISE NOTICE) emitted by mutation
   // statements, accumulated until the caller drains them.
@@ -363,10 +364,12 @@ class JdbcSqlSession implements SqlSession {
     }
     try {
       connection.commit();
-      finalised = true;
     } catch (SQLException e) {
       throw new IllegalStateException("Commit failed: " + e.getMessage(), e);
     } finally {
+      // a failed COMMIT ends the transaction as well (the database has rolled it back), so the
+      // session is finalised either way and must not attempt a rollback on close()
+      finalised = true;
       releaseConnection();
     }
   }
@@ -395,12 +398,24 @@ class JdbcSqlSession implements SqlSession {
     }
   }
 
+  /**
+   * Returns the connection to the pool exactly once. Every step is isolated: on a connection that
+   * the database has terminated, resetting autocommit throws, and the lease must still be given
+   * back, otherwise the pool loses a connection for good.
+   */
   private void releaseConnection() {
+    if (released) {
+      return;
+    }
+    released = true;
+
     try {
-      if (!connection.isClosed()) {
-        connection.setAutoCommit(true);
-        connection.close();
-      }
+      connection.setAutoCommit(true);
+    } catch (SQLException e) {
+      LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+    }
+    try {
+      connection.close();
     } catch (SQLException e) {
       LOGGER.debug("Connection close failed: {}", e.getMessage());
     }

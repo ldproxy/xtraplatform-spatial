@@ -57,7 +57,6 @@ import de.ii.xtraplatform.features.domain.FeatureStreamImpl;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
 import de.ii.xtraplatform.features.domain.FeatureTokenSource;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
-import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Builder;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Type;
 import de.ii.xtraplatform.features.domain.FilterEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableDatasetChange;
@@ -85,13 +84,10 @@ import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsReaderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.FeatureDecoderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureEncoderSql;
 import de.ii.xtraplatform.features.sql.app.FeatureMutationsSql;
 import de.ii.xtraplatform.features.sql.app.FeatureQueryEncoderSql;
 import de.ii.xtraplatform.features.sql.app.FilterEncoderSql;
-import de.ii.xtraplatform.features.sql.app.ModifiableFeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
@@ -108,11 +104,7 @@ import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
 import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
-import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
-import de.ii.xtraplatform.streams.domain.Reactive.Sink;
-import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
-import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
 import java.sql.SQLException;
 import java.time.ZoneId;
@@ -130,10 +122,10 @@ import java.util.OptionalInt;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
@@ -658,7 +650,6 @@ public class FeatureProviderSql
             getData().getNativeTimeZone().orElse(ZoneId.of("UTC")));
     this.featureMutationsSql =
         new FeatureMutationsSql(
-            this::getSqlClient,
             new SqlInsertGenerator2(
                 getData().getNativeCrs().orElse(OgcCrs.CRS84),
                 crsTransformerFactory,
@@ -1263,8 +1254,9 @@ public class FeatureProviderSql
       FeatureTokenSource featureTokenSource,
       EpsgCrs crs,
       Optional<String> featureId) {
-
-    return writeFeatures(Type.CREATE, featureType, featureTokenSource, featureId, crs, false);
+    return runInSession(
+        Type.CREATE,
+        session -> session.createFeatures(featureType, featureTokenSource, crs, featureId));
   }
 
   @Override
@@ -1274,13 +1266,9 @@ public class FeatureProviderSql
       FeatureTokenSource featureTokenSource,
       EpsgCrs crs,
       boolean partial) {
-    return writeFeatures(
+    return runInSession(
         partial ? Type.UPDATE : Type.REPLACE,
-        featureType,
-        featureTokenSource,
-        Optional.of(featureId),
-        crs,
-        partial);
+        session -> session.updateFeature(featureType, featureId, featureTokenSource, crs, partial));
   }
 
   @Override
@@ -1303,27 +1291,7 @@ public class FeatureProviderSql
 
   @Override
   public MutationResult deleteFeature(String featureType, String id) {
-    Optional<List<SqlQueryMapping>> queryMapping =
-        Optional.ofNullable(queryMappings.get(featureType));
-
-    if (queryMapping.isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format("Feature type '%s' not found.", featureType));
-    }
-
-    Reactive.Source<String> deletionSource =
-        featureMutationsSql.getDeletionSource(queryMapping.get().get(0), id);
-
-    RunnableStream<MutationResult> deletionStream =
-        deletionSource
-            .to(Sink.ignore())
-            .withResult(ImmutableMutationResult.builder().type(Type.DELETE).hasFeatures(false))
-            .handleError(ImmutableMutationResult.Builder::error)
-            .handleItem(ImmutableMutationResult.Builder::addIds)
-            .handleEnd(Builder::build)
-            .on(getStreamRunner());
-
-    return deletionStream.run().toCompletableFuture().join();
+    return runInSession(Type.DELETE, session -> session.deleteFeature(featureType, id));
   }
 
   @Override
@@ -1356,80 +1324,97 @@ public class FeatureProviderSql
     return true;
   }
 
-  private MutationResult writeFeatures(
-      Type type,
-      String featureType,
-      FeatureTokenSource featureTokenSource,
-      Optional<String> featureId,
-      EpsgCrs crs,
-      boolean partial) {
-    Optional<List<SqlQueryMapping>> queryMapping =
-        Optional.ofNullable(queryMappings.get(featureType));
-
-    if (queryMapping.isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format("Feature type '%s' not found.", featureType));
+  /**
+   * Runs one mutation in a session of its own: committed when the session reports success, rolled
+   * back otherwise, and the connection is returned to the pool in every case, including a failed
+   * COMMIT or a connection the database has terminated.
+   */
+  private MutationResult runInSession(Type type, Function<Session, MutationResult> mutation) {
+    Session session;
+    try {
+      session = openSession();
+    } catch (RuntimeException e) {
+      // no connection could be leased, so there is nothing to release
+      return ImmutableMutationResult.builder().type(type).hasFeatures(false).error(e).build();
     }
 
-    Transformer<FeatureDataSql, String> featureWriter =
-        type == Type.CREATE
-            ? featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, featureId, crs)
-            : featureMutationsSql.getUpdaterFlow(
-                queryMapping.get().get(0), null, featureId.get(), crs);
+    try {
+      MutationResult result = mutation.apply(session);
 
-    ImmutableMutationResult.Builder builder =
-        ImmutableMutationResult.builder().type(type).hasFeatures(false);
-    FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
+      if (result.getError().isPresent()) {
+        session.rollback();
 
-    Source<FeatureDataSql> featureSqlSource =
-        featureTokenSource
-            .via(statsCollector)
-            .via(
-                new FeatureEncoderSql(
-                    queryMapping.get().get(0),
-                    crs,
-                    getNativeCrs(),
-                    crsTransformerFactory,
-                    getData().getNativeTimeZone(),
-                    partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty(),
-                    getPropertyEncryption()))
-            .via(Transformer.map(feature -> feature));
+        return ImmutableMutationResult.builder()
+            .from(result)
+            .error(toMutationError(result.getError().get()))
+            .build();
+      }
 
-    if (partial) {
-      featureSqlSource =
-          featureSqlSource.via(
-              Transformer.reduce(
-                  ModifiableFeatureDataSql.create(),
-                  (a, b) -> a.getRows().isEmpty() ? b : a.patchWith(b)));
+      session.commit();
+
+      return result;
+    } catch (RuntimeException e) {
+      session.rollback();
+
+      return ImmutableMutationResult.builder()
+          .type(type)
+          .hasFeatures(false)
+          .error(toMutationError(e))
+          .build();
+    } finally {
+      session.close();
+    }
+  }
+
+  /**
+   * Errors caused by the submitted data - a statement or a COMMIT rejected by the database,
+   * unparsable JSON - are reported as a bad request with a generic message; the database message is
+   * in the debug log and is returned to the client with 'Prefer: handling=strict'. Everything else,
+   * notably a lost database connection or an exhausted pool, is passed through and reported as a
+   * server error.
+   */
+  private static Throwable toMutationError(Throwable error) {
+    for (Throwable t = error; Objects.nonNull(t); t = t.getCause() == t ? null : t.getCause()) {
+      if (t instanceof JsonParseException) {
+        return invalidFeatureData(t);
+      }
+      if (t instanceof SQLException) {
+        return isDataError((SQLException) t) ? invalidFeatureData(t) : error;
+      }
     }
 
-    RunnableStream<MutationResult> mutationStream =
-        featureSqlSource
-            .via(featureWriter)
-            .to(Sink.ignore())
-            .withResult((Builder) builder)
-            .handleError(
-                (result, throwable) -> {
-                  Throwable error = throwable;
+    return error;
+  }
 
-                  if (throwable instanceof PSQLException
-                      || throwable instanceof JsonParseException) {
-                    error =
-                        new IllegalArgumentException(
-                            "Invalid feature data. You may be able to obtain more information about"
-                                + " the problem by adding the header ‘Prefer: handling=strict’ to"
-                                + " the request.",
-                            throwable);
-                    LogContext.errorAsDebug(LOGGER, throwable, "Error during feature mutation");
-                  }
+  private static Throwable invalidFeatureData(Throwable cause) {
+    LogContext.errorAsDebug(LOGGER, cause, "Error during feature mutation");
 
-                  return result.error(error);
-                })
-            .handleItem((Builder::addIds))
-            .handleEnd(Builder::build)
-            .on(getStreamRunner());
+    return new IllegalArgumentException(
+        "Invalid feature data. You may be able to obtain more information about the problem by"
+            + " adding the header \u2018Prefer: handling=strict\u2019 to the request.",
+        cause);
+  }
 
-    return mutationStream.run().toCompletableFuture().join();
+  /**
+   * The first SQLSTATE in the chain (causes and next-exceptions, e.g. of a batch failure) decides:
+   * connection failures (08), insufficient resources (53), operator intervention (57), system (58)
+   * and internal (XX) errors are not caused by the request; no SQLSTATE at all (e.g. a pool
+   * timeout) is not either.
+   */
+  private static boolean isDataError(SQLException e) {
+    for (Throwable t : e) {
+      if (t instanceof SQLException && Objects.nonNull(((SQLException) t).getSQLState())) {
+        String state = ((SQLException) t).getSQLState();
+
+        return !(state.startsWith("08")
+            || state.startsWith("53")
+            || state.startsWith("57")
+            || state.startsWith("58")
+            || state.startsWith("XX"));
+      }
+    }
+
+    return false;
   }
 
   @Override

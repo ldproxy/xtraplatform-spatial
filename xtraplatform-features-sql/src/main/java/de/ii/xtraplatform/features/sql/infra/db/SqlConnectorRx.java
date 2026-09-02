@@ -170,6 +170,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
       this.sqlClient =
           new SqlClientRx(
               session,
+              dataSource,
               dbmsAdapters.get(connectionInfo.getDialect()),
               dbmsAdapters.getDialect(connectionInfo.getDialect()),
               connectionInfo.getDefaultCollation());
@@ -294,6 +295,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
                   this.connectionInfo.getPool().getIdleTimeout(),
                   connectionInfoSql.getPool().getIdleTimeout()))
           .put(
+              "leakDetectionThreshold",
+              Objects.equals(
+                  this.connectionInfo.getPool().getLeakDetectionThreshold(),
+                  connectionInfoSql.getPool().getLeakDetectionThreshold()))
+          .put(
               "driverOptions",
               Objects.equals(
                   this.connectionInfo.getDriverOptions(), connectionInfoSql.getDriverOptions()));
@@ -335,6 +341,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     config.setMinimumIdle(asyncStartup ? 0 : minConnections);
     config.setInitializationFailTimeout(asyncStartup ? -1 : getInitFailTimeout(connectionInfo));
     config.setIdleTimeout(parseMs(connectionInfo.getPool().getIdleTimeout()));
+    if (Objects.nonNull(connectionInfo.getPool().getLeakDetectionThreshold())) {
+      // Hikari itself disables values below 2s or above maxLifetime with a warning
+      config.setLeakDetectionThreshold(
+          parseMs(connectionInfo.getPool().getLeakDetectionThreshold()));
+    }
     config.setPoolName(poolName);
     config.setKeepaliveTime(300_000);
 

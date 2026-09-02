@@ -9,10 +9,7 @@ package de.ii.xtraplatform.features.sql.infra.db;
 
 import com.google.common.collect.ImmutableList;
 import com.zaxxer.hikari.pool.ProxyConnection;
-import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
-import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
@@ -20,12 +17,11 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import de.ii.xtraplatform.streams.domain.Reactive;
-import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,14 +31,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.sql.DataSource;
 import org.davidmoten.rxjava3.jdbc.Database;
-import org.davidmoten.rxjava3.jdbc.Tx;
-import org.davidmoten.rxjava3.jdbc.internal.DelegatedConnection;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.slf4j.Logger;
@@ -58,17 +50,22 @@ public class SqlClientRx implements SqlClient {
   // it exists to end.
   private static final long READ_STALL_TIMEOUT_MINUTES = 10;
 
+  // rxjava3-jdbc is used for streamed reads only; everything that needs a connection of its own
+  // (sessions, statements without a result) leases it from the pool directly
   private final Database session;
+  private final DataSource dataSource;
   private final SqlDbmsAdapter dbmsAdapter;
   private final SqlDialect dialect;
   private final Collator collator;
 
   public SqlClientRx(
       Database session,
+      DataSource dataSource,
       SqlDbmsAdapter dbmsAdapter,
       SqlDialect dialect,
       Optional<String> defaultCollation) {
     this.session = session;
+    this.dataSource = dataSource;
     this.dbmsAdapter = dbmsAdapter;
     this.dialect = dialect;
     this.collator = dbmsAdapter.getRowSortingCollator(defaultCollation);
@@ -82,10 +79,15 @@ public class SqlClientRx implements SqlClient {
     CompletableFuture<Collection<SqlRow>> result = new CompletableFuture<>();
 
     if (options.getColumnTypes().isEmpty()) {
-      session
-          .update(query)
-          .complete()
-          .subscribe(() -> result.complete(ImmutableList.of()), result::completeExceptionally);
+      // a statement without a result (DDL, INSERT, DROP); autocommit is on, so it is committed when
+      // it returns and the connection goes back to the pool in every case
+      try (Connection connection = dataSource.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.execute(query);
+        result.complete(ImmutableList.of());
+      } catch (SQLException e) {
+        result.completeExceptionally(e);
+      }
 
       return result;
     }
@@ -202,198 +204,23 @@ public class SqlClientRx implements SqlClient {
   }
 
   @Override
-  public Reactive.Source<String> getMutationSource(
-      List<Supplier<String>> statements,
-      List<Consumer<String>> idConsumers,
-      Object executionContext,
-      Optional<String> featureId) {
-    /*List<Function<FeatureSql, String>> toStatementsWithLog =
-    statements.stream()
-        .map(
-            function ->
-                (Function<FeatureSql, String>)
-                    featureSql -> {
-                      String statement = function.apply(featureSql);
-
-                      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-                        LOGGER.debug(MARKER.SQL, "Executing statement: {}", statement);
-                      }
-
-                      return statement;
-                    })
-        .collect(Collectors.toList());*/
-
-    // rxjava3-jdbc does not release the transacted connection when a statement stream is cancelled,
-    // which is what happens to all preceding statements when a later one fails, see the guard
-    MutationTransactionGuard guard = new MutationTransactionGuard();
-
-    String first = statements.get(0).get();
-    if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", first);
-    }
-
-    Flowable<? extends Tx<?>> txFlowable =
-        guard
-            .track(
-                session
-                    .update(first)
-                    .transacted()
-                    .returnGeneratedKeys()
-                    .get(
-                        resultSet -> {
-                          guard.capture(resultSet);
-                          return consumeId(resultSet, null, idConsumers, 0);
-                        })
-                    // the transacted connection is created when the statement stream is subscribed
-                    .doOnSubscribe(subscription -> guard.acquired()))
-            .filter(tx -> !tx.isComplete());
-
-    for (int j = 1; j < statements.size(); j++) {
-      int finalJ = j;
-      txFlowable =
-          txFlowable.flatMap(
-              tx -> {
-                String next = statements.get(finalJ).get();
-                if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-                  LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
-                }
-
-                // tx.update forks the transacted connection
-                guard.acquired();
-
-                return guard
-                    .track(
-                        tx.update(next)
-                            .returnGeneratedKeys()
-                            .get(
-                                resultSet -> {
-                                  guard.capture(resultSet);
-                                  return consumeId(
-                                      resultSet,
-                                      tx.value() instanceof String ? (String) tx.value() : null,
-                                      idConsumers,
-                                      finalJ);
-                                }))
-                    .filter(tx2 -> !tx2.isComplete());
-              });
-    }
-
-    Flowable<String> flowable =
-        txFlowable
-            .map(tx -> featureId.orElse((String) tx.value()))
-            .doFinally(guard::releaseIfLeaked);
-
-    return Reactive.Source.publisher(flowable);
-  }
-
-  private static String consumeId(
-      ResultSet resultSet, String previousId, List<Consumer<String>> idConsumers, int index) {
-    // null not allowed as return value
-    String id = null;
-
-    try {
-      id = resultSet.getString(1);
-
-      if (index < idConsumers.size()) {
-        Consumer<String> idConsumer = idConsumers.get(index);
-
-        if (Objects.nonNull(idConsumer)) {
-          idConsumer.accept(id);
-        }
-      } else if (LOGGER.isWarnEnabled()) {
-        LOGGER.warn("No id consumer for mutation statement {}, returned id: {}", index, id);
-      }
-    } catch (SQLException e) {
-      LogContext.errorAsDebug(
-          LOGGER, e, "Could not read the id returned by mutation statement {}", index);
-    }
-
-    return previousId != null ? previousId : id;
-  }
-
-  @Override
-  public Transformer<FeatureDataSql, String> getMutationFlow(
-      Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
-      Object executionContext,
-      String primaryKey,
-      Optional<String> id) {
-
-    Reactive.Transformer<FeatureDataSql, String> toQueries =
-        Reactive.Transformer.flatMap(
-            feature -> {
-              List<Supplier<Tuple<String, Consumer<String>>>> m = mutations.apply(feature);
-
-              // both lists have to stay index aligned, the statements are resolved lazily since
-              // they may depend on ids returned by preceding statements
-              List<Supplier<String>> statements = new ArrayList<>();
-              List<Consumer<String>> idConsumers = new ArrayList<>();
-
-              for (Supplier<Tuple<String, Consumer<String>>> queryFunction : m) {
-                Tuple<String, Consumer<String>> query = queryFunction.get();
-
-                if (Objects.isNull(query.first())) {
-                  continue;
-                }
-
-                statements.add(() -> queryFunction.get().first());
-                idConsumers.add(query.second());
-              }
-
-              Optional<String> featureId =
-                  feature
-                      .getMapping()
-                      .getColumnForId()
-                      .flatMap(
-                          idCol -> {
-                            if (!Objects.equals(primaryKey, idCol.second().getName())
-                                && feature
-                                    .getRows()
-                                    .get(0)
-                                    .first()
-                                    .getFullPath()
-                                    .equals(idCol.first().getFullPath())) {
-                              return Optional.ofNullable(
-                                  feature
-                                      .getRows()
-                                      .get(0)
-                                      .second()
-                                      .getValues()
-                                      .get(idCol.second().getName()));
-                            }
-                            return Optional.empty();
-                          })
-                      .map(SqlClientRx::unquote);
-
-              return getMutationSource(statements, idConsumers, executionContext, featureId);
-            });
-
-    if (id.isPresent()) {
-      // TODO: check that feature id equals given id
-      Reactive.Transformer<FeatureDataSql, FeatureDataSql> filter =
-          Reactive.Transformer.filter(featureSql -> true);
-
-      return filter.via(toQueries);
-    }
-
-    return toQueries;
-  }
-
-  private static String unquote(String value) {
-    if (value.startsWith("'") && value.endsWith("'")) {
-      return value.substring(1, value.length() - 1);
-    }
-    return value;
-  }
-
-  @Override
   public Connection getConnection() {
-    return session.connection().blockingGet();
+    return leaseConnection();
   }
 
   @Override
   public SqlSession openSession() {
-    Connection connection = session.connection().blockingGet();
-    return new JdbcSqlSession(connection);
+    return new JdbcSqlSession(leaseConnection());
+  }
+
+  /** A pooled connection; closing it returns it to the pool. */
+  private Connection leaseConnection() {
+    try {
+      return dataSource.getConnection();
+    } catch (SQLException e) {
+      throw new IllegalStateException(
+          "Could not obtain a database connection: " + e.getMessage(), e);
+    }
   }
 
   @Override
@@ -410,9 +237,6 @@ public class SqlClientRx implements SqlClient {
   public List<String> getNotifications(Connection connection) {
     Connection actualConnection = connection;
 
-    if (actualConnection instanceof DelegatedConnection) {
-      actualConnection = ((DelegatedConnection) actualConnection).con();
-    }
     if (actualConnection instanceof ProxyConnection) {
       try {
         actualConnection = actualConnection.unwrap(Connection.class);

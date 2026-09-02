@@ -212,6 +212,32 @@ public interface ConnectionInfoSql extends ConnectionInfo {
     String getIdleTimeout();
 
     /**
+     * @langEn Diagnostic option. If set to a duration of at least `2s`, a warning with the stack
+     *     trace of the borrowing code is logged whenever a connection has been out of the pool for
+     *     longer than that, and a second message is logged when such a connection is returned after
+     *     all. A connection that is never returned only produces the first message, which is how a
+     *     leak is told apart from a slow request. Long-running requests such as large exports or
+     *     multi-action transactions legitimately hold a connection for a while, so choose a value
+     *     above the longest expected request. `0` disables the check. The messages are written by
+     *     the logger `com.zaxxer.hikari`, the warning at level `WARN` and the return message at
+     *     level `INFO`; a logging configuration that restricts third-party loggers has to let them
+     *     through.
+     * @langDe Diagnoseoption. Bei einer Dauer von mindestens `2s` wird eine Warnung mit dem
+     *     Stacktrace des anfordernden Codes protokolliert, sobald eine Verbindung länger als diese
+     *     Dauer aus dem Pool entnommen ist, und eine zweite Meldung, wenn eine solche Verbindung
+     *     doch noch zurückgegeben wird. Eine Verbindung, die nie zurückgegeben wird, erzeugt nur
+     *     die erste Meldung; so lässt sich ein Leck von einer langsamen Anfrage unterscheiden.
+     *     Langlaufende Anfragen wie große Exporte oder Transaktionen mit vielen Aktionen halten
+     *     eine Verbindung berechtigterweise länger, der Wert sollte daher über der längsten
+     *     erwarteten Anfrage liegen. `0` deaktiviert die Prüfung. Die Meldungen schreibt der Logger
+     *     `com.zaxxer.hikari`, die Warnung mit Level `WARN` und die Rückgabemeldung mit Level
+     *     `INFO`; eine Logging-Konfiguration, die Fremd-Logger einschränkt, muss sie durchlassen.
+     * @default 0
+     */
+    @Nullable
+    String getLeakDetectionThreshold();
+
+    /**
      * @langEn If enabled for multiple providers with matching `host`, `database` and `user`, a
      *     single connection pool will be shared between these providers. If any of the other
      *     `connectionInfo` options do not match, the provider startup will fail.
