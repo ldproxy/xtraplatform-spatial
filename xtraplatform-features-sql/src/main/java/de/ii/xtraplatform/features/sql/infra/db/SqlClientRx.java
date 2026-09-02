@@ -20,6 +20,7 @@ import de.ii.xtraplatform.streams.domain.Reactive;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Collator;
@@ -34,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.Database;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.slf4j.Logger;
@@ -50,21 +50,16 @@ public class SqlClientRx implements SqlClient {
   // it exists to end.
   private static final long READ_STALL_TIMEOUT_MINUTES = 10;
 
-  // rxjava3-jdbc is used for streamed reads only; everything that needs a connection of its own
-  // (sessions, statements without a result) leases it from the pool directly
-  private final Database session;
   private final DataSource dataSource;
   private final SqlDbmsAdapter dbmsAdapter;
   private final SqlDialect dialect;
   private final Collator collator;
 
   public SqlClientRx(
-      Database session,
       DataSource dataSource,
       SqlDbmsAdapter dbmsAdapter,
       SqlDialect dialect,
       Optional<String> defaultCollation) {
-    this.session = session;
     this.dataSource = dataSource;
     this.dbmsAdapter = dbmsAdapter;
     this.dialect = dialect;
@@ -92,11 +87,19 @@ public class SqlClientRx implements SqlClient {
       return result;
     }
 
-    session
-        .select(query)
-        .get(resultSet -> new SqlRowVals(collator).read(resultSet, options))
-        .toList()
-        .subscribe(result::complete, result::completeExceptionally);
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(query)) {
+      List<SqlRow> rows = new ArrayList<>();
+
+      while (resultSet.next()) {
+        rows.add(new SqlRowVals(collator).read(resultSet, options));
+      }
+
+      result.complete(rows);
+    } catch (SQLException | RuntimeException e) {
+      result.completeExceptionally(e);
+    }
 
     return result;
   }
@@ -108,31 +111,35 @@ public class SqlClientRx implements SqlClient {
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 
-    org.davidmoten.rxjava3.jdbc.ResultSetMapper<SqlRow> mapper =
-        resultSet -> {
-          SqlRow row = new SqlRowVals(collator).read(resultSet, options);
-
-          if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
-            logBuffer.add(row);
-          }
-
-          return row;
-        };
-
     // A positive fetch size requires a transaction so the database driver uses a server-side cursor
     // and streams rows instead of buffering the whole result set in memory (PostgreSQL ignores the
     // fetch size with autoCommit=true).
-    // TODO encapsulating the query in a transaction is also a workaround for what appears to be a
-    //      bug in rxjava3-jdbc, see https://github.com/interactive-instruments/ldproxy/issues/1293
+    boolean streamed = options.getFetchSize() > 0;
+
+    // The connection is leased when the stream is subscribed and returned to the pool when it
+    // terminates, whether the rows were exhausted, the read failed or the consumer cancelled.
     Flowable<SqlRow> flowable =
-        options.getFetchSize() > 0
-            ? session
-                .select(query)
-                .transacted()
-                .fetchSize(options.getFetchSize())
-                .valuesOnly()
-                .get(mapper)
-            : session.select(query).get(mapper);
+        Flowable.using(
+            () -> lease(streamed),
+            connection ->
+                Flowable.generate(
+                    () -> execute(connection, query, options.getFetchSize()),
+                    (resultSet, emitter) -> {
+                      if (resultSet.next()) {
+                        SqlRow row = new SqlRowVals(collator).read(resultSet, options);
+
+                        if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
+                          logBuffer.add(row);
+                        }
+
+                        emitter.onNext(row);
+                      } else {
+                        emitter.onComplete();
+                      }
+                    },
+                    SqlClientRx::close),
+            connection -> release(connection, streamed),
+            true);
 
     // TODO: prettify, see
     // https://github.com/slick/slick/blob/main/slick/src/main/scala/slick/jdbc/StatementInvoker.scala
@@ -169,20 +176,17 @@ public class SqlClientRx implements SqlClient {
               });
     }
 
-    // The blocking connection provider runs connect+execute+read on the subscribing thread, so
-    // without this the whole stream is single-threaded. Subscribing on a worker thread lets several
-    // parallel-flagged queries (e.g. the concurrent single-shot value phase) run at once, each on
-    // its
-    // own connection.
+    // Lease, execute and read run on the subscribing thread, so without this the whole stream is
+    // single-threaded. Subscribing on a worker thread lets several parallel-flagged queries (e.g.
+    // the concurrent single-shot value phase) run at once, each on its own connection.
     if (options.isParallel()) {
       flowable = flowable.subscribeOn(Schedulers.io());
     }
 
-    // Safety net for a read that neither completes nor fails. A database error raised while the
-    // rows are being streamed is not delivered by the underlying library (see the issue linked
-    // above), so the stream can stall forever: no error is logged, no response is sent, and the
-    // connections the sub-query holds stay held until the client gives up. A connection lost
-    // mid-stream — a failover in a replicated cluster, for instance — looks exactly the same.
+    // Safety net for a read that neither completes nor fails: a connection lost mid-stream — a
+    // failover in a replicated cluster, for instance — can leave the driver waiting for the next
+    // row forever, so no error is logged, no response is sent, and the connections the sub-query
+    // holds stay held until the client gives up.
     // The timeout is per element, not per stream, so a slow but progressing read is unaffected
     // however long it runs in total; only a gap longer than the window ends the stream, with an
     // error that does propagate. A database-side statement_timeout is no substitute: its error
@@ -201,6 +205,80 @@ public class SqlClientRx implements SqlClient {
                             READ_STALL_TIMEOUT_MINUTES))));
 
     return Reactive.Source.publisher(flowable);
+  }
+
+  private Connection lease(boolean transaction) throws SQLException {
+    Connection connection = dataSource.getConnection();
+
+    if (transaction) {
+      try {
+        connection.setAutoCommit(false);
+      } catch (SQLException e) {
+        close(connection);
+        throw e;
+      }
+    }
+
+    return connection;
+  }
+
+  private static ResultSet execute(Connection connection, String query, int fetchSize)
+      throws SQLException {
+    Statement statement = connection.createStatement();
+
+    try {
+      if (fetchSize > 0) {
+        statement.setFetchSize(fetchSize);
+      }
+
+      return statement.executeQuery(query);
+    } catch (SQLException | RuntimeException e) {
+      close(statement);
+      throw e;
+    }
+  }
+
+  /** Ends a read-only transaction, if any, and returns the connection to the pool. */
+  private static void release(Connection connection, boolean transaction) {
+    if (transaction) {
+      try {
+        // nothing to commit, and a rollback is the cheapest way to close the server-side cursor
+        connection.rollback();
+      } catch (SQLException e) {
+        LOGGER.debug("Ending the read transaction failed: {}", e.getMessage());
+      }
+      try {
+        connection.setAutoCommit(true);
+      } catch (SQLException e) {
+        LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+      }
+    }
+
+    close(connection);
+  }
+
+  /** Closes the result set and the statement it belongs to. */
+  private static void close(ResultSet resultSet) {
+    Statement statement = null;
+
+    try {
+      statement = resultSet.getStatement();
+    } catch (SQLException e) {
+      // the result set is closed below regardless
+    }
+
+    close((AutoCloseable) resultSet);
+    close(statement);
+  }
+
+  private static void close(AutoCloseable closeable) {
+    if (Objects.nonNull(closeable)) {
+      try {
+        closeable.close();
+      } catch (Exception e) {
+        LOGGER.debug("Closing {} failed: {}", closeable.getClass().getSimpleName(), e.getMessage());
+      }
+    }
   }
 
   @Override

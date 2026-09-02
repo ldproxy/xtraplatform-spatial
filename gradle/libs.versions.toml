@@ -3,7 +3,6 @@ antlr = '4.13.2'
 xsom = '20140925'
 aalto = '1.4.0'
 staxmate = '2.4.2'
-rxjava-jdbc = '0.1.4-ii.1'
 hikaricp = '7.1.0'
 postgresql = '42.7.13'
 sqlite = '3.53.4.0'
@@ -28,7 +27,6 @@ aalto = { module = "com.fasterxml:aalto-xml", version.ref = "aalto" }
 staxmate = { module = "com.fasterxml.staxmate:staxmate", version.ref = "staxmate" }
 
 # sql
-rxjava-jdbc = { module = "com.github.davidmoten:rxjava3-jdbc", version.ref = "rxjava-jdbc" }
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 sqlite = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
