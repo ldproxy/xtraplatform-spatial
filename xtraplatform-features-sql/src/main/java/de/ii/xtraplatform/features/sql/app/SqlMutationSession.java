@@ -148,15 +148,9 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     }
 
     RowCursor rowCursor = new RowCursor(mapping.getMainTable().getFullPath());
-    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
-        roleIdColumn = mapping.getColumnForId();
-    String roleIdColumnName = roleIdColumn.map(t -> t.second().getName()).orElse(null);
-    SqlQuerySchema roleIdTable =
-        roleIdColumn.map(de.ii.xtraplatform.base.domain.util.Tuple::first).orElse(null);
 
     try {
-      writeFeaturesBatched(
-          collected, rowCursor, Optional.empty(), crs, roleIdTable, roleIdColumnName, builder);
+      writeCollectedFeatures(mapping, collected, rowCursor, Optional.empty(), crs, false, builder);
     } catch (RuntimeException e) {
       builder.error(e);
     }
@@ -1564,6 +1558,41 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     sqlSession.close();
   }
 
+  /**
+   * Writes the features that were drained from the request and reports their ids.
+   *
+   * <p>The value of the role-id column in a written feature is the externally visible id of the
+   * feature, but only where the client assigns it (e.g. an ALKIS {@code gml:id} decoded into an
+   * {@code objid} column, where the surrogate primary key is not the id). Where the database
+   * generates the id on insert, an id in the request body is not inserted at all — the id of the
+   * feature is the one the insert returns, so the column is not consulted.
+   *
+   * <p>Package-private so a spec can exercise which id a write reports without the stream that
+   * drains the request body.
+   */
+  void writeCollectedFeatures(
+      SqlQueryMapping mapping,
+      List<FeatureDataSql> collected,
+      RowCursor rowCursor,
+      Optional<String> featureId,
+      EpsgCrs crs,
+      boolean deleteFirst,
+      ImmutableMutationResult.Builder builder) {
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
+        roleIdColumn = mapping.hasGeneratedId() ? Optional.empty() : mapping.getColumnForId();
+    String roleIdColumnName = roleIdColumn.map(t -> t.second().getName()).orElse(null);
+    SqlQuerySchema roleIdTable =
+        roleIdColumn.map(de.ii.xtraplatform.base.domain.util.Tuple::first).orElse(null);
+
+    if (deleteFirst) {
+      writeFeaturesPerFeature(
+          collected, rowCursor, featureId, crs, true, roleIdTable, roleIdColumnName, builder);
+    } else {
+      writeFeaturesBatched(
+          collected, rowCursor, featureId, crs, roleIdTable, roleIdColumnName, builder);
+    }
+  }
+
   private FeatureTransactions.MutationResult writeFeatures(
       FeatureTransactions.MutationResult.Type type,
       String featureType,
@@ -1588,23 +1617,8 @@ public class SqlMutationSession implements FeatureTransactions.Session {
         type == FeatureTransactions.MutationResult.Type.UPDATE
             || type == FeatureTransactions.MutationResult.Type.REPLACE;
 
-    // Role-id column on the main table — its value in the inserted feature is the externally
-    // visible feature id (e.g. ALKIS gml:id stored in 'objid'); fall back to the surrogate PK only
-    // when no role-id column / no value is present.
-    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
-        roleIdColumn = mapping.getColumnForId();
-    String roleIdColumnName = roleIdColumn.map(t -> t.second().getName()).orElse(null);
-    SqlQuerySchema roleIdTable =
-        roleIdColumn.map(de.ii.xtraplatform.base.domain.util.Tuple::first).orElse(null);
-
     try {
-      if (deleteFirst) {
-        writeFeaturesPerFeature(
-            collected, rowCursor, featureId, crs, true, roleIdTable, roleIdColumnName, builder);
-      } else {
-        writeFeaturesBatched(
-            collected, rowCursor, featureId, crs, roleIdTable, roleIdColumnName, builder);
-      }
+      writeCollectedFeatures(mapping, collected, rowCursor, featureId, crs, deleteFirst, builder);
     } catch (RuntimeException e) {
       builder.error(e);
     }

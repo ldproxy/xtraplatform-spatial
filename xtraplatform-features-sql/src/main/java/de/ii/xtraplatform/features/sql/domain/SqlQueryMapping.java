@@ -93,6 +93,26 @@ public interface SqlQueryMapping {
     return getColumnForRole(Role.ID);
   }
 
+  /**
+   * Whether the database assigns the id of a new feature on insert: the column of the property with
+   * the role {@code ID} is the primary key of its table and is not excluded from generation with
+   * {@code {generated=false}}. Where the id is generated, a value in the request body is not
+   * inserted, so the id of a new feature is the one that the insert returns.
+   */
+  default boolean hasGeneratedId() {
+    Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> column = getColumnForId();
+
+    if (column.isEmpty() || getSchemaForId().isEmpty()) {
+      return true;
+    }
+
+    if (!Objects.equals(column.get().first().getPrimaryKey(), column.get().second().getName())) {
+      return false;
+    }
+
+    return !column.get().second().hasOperation(SqlQueryColumn.Operation.DO_NOT_GENERATE);
+  }
+
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForFilterGeometry() {
     return getColumnForRole(Role.FILTER_GEOMETRY).or(() -> getColumnForRole(Role.PRIMARY_GEOMETRY));
   }

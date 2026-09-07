@@ -101,7 +101,6 @@ import de.ii.xtraplatform.features.sql.app.SqlMutationSession;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
 import de.ii.xtraplatform.services.domain.AuditLog;
@@ -1327,25 +1326,7 @@ public class FeatureProviderSql
         Optional.ofNullable(queryMappings.get(featureType));
 
     if (queryMapping.isPresent()) {
-      return queryMapping.get().stream()
-          .allMatch(
-              mapping -> {
-                if (mapping.getColumnForId().isPresent() && mapping.getSchemaForId().isPresent()) {
-                  String primaryKey = mapping.getColumnForId().get().first().getPrimaryKey();
-                  String idColumn = mapping.getColumnForId().get().second().getName();
-
-                  if (!Objects.equals(primaryKey, idColumn)) {
-                    return false;
-                  }
-
-                  return !mapping
-                      .getColumnForId()
-                      .get()
-                      .second()
-                      .hasOperation(Operation.DO_NOT_GENERATE);
-                }
-                return true;
-              });
+      return queryMapping.get().stream().allMatch(SqlQueryMapping::hasGeneratedId);
     }
 
     return true;
