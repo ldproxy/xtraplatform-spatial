@@ -93,7 +93,7 @@ public abstract class FeaturePropertyTransformerFlatten
               newPath.size() - 1,
               newPath.get(newPath.size() - 1) + "[" + arrays.get(arrayPath) + "]");
           if (currentPath.size() > arrayPath.size()) {
-            newPath.add(currentPath.get(currentPath.size() - 1));
+            newPath.addAll(currentPath.subList(arrayPath.size(), currentPath.size()));
           }
           currentPath = newPath;
         }
