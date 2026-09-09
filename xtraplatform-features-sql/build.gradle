@@ -23,13 +23,6 @@ dependencies {
     provided project(':xtraplatform-geometries')
     provided project(':xtraplatform-strings')
 
-    embedded(libs.rxjava.jdbc) {
-        exclude module: 'rxjava'
-        exclude module: 'reactive-streams'
-        exclude module: 'commons-io'
-        exclude module: 'slf4j-api'
-        exclude group: 'com.google.code.findbugs'
-    }
     //use reactive-streams + rxjava exported from this
     embeddedImport 'de.interactive_instruments:xtraplatform-streams'
 
