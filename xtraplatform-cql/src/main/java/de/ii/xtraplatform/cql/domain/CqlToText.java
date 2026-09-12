@@ -203,6 +203,12 @@ public class CqlToText implements CqlVisitor<String> {
 
   @Override
   public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+    if (scalarOperation instanceof InResultSetByKey) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s has no CQL2-Text encoding, it can only be used in a query expression.",
+              InResultSetByKey.TYPE));
+    }
     if (scalarOperation instanceof InResultSet) {
       return String.format("INRESULTSET(%s, %s)", children.get(0), children.get(1));
     }
