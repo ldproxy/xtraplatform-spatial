@@ -87,6 +87,20 @@ public final class CqlBuiltInFunctions {
                           + "ids, or the feature id.",
                       TYPE_STRING),
                   argument("resultSet", "Name of the result set.", TYPE_STRING)),
+              ImmutableList.of(TYPE_BOOLEAN)),
+          CustomFunction.ofQueryExpressionOnly(
+              InResultSetByKey.TYPE,
+              "Tests whether the composite key of a feature is contained in a named result set. "
+                  + "The key has one member per key part, the part names are those declared by the "
+                  + "query that defines the result set, and the value of each member is the "
+                  + "property of this feature type that holds that part. Result sets are defined "
+                  + "by other queries of the same query expression; this function can therefore "
+                  + "only be used within a query expression, not in a standalone CQL2 filter, and "
+                  + "it has no CQL2-Text encoding.",
+              ImmutableList.of(
+                  argument(
+                      "key", "Key of this feature type, one member per key part.", TYPE_STRING),
+                  argument("resultSet", "Name of the result set.", TYPE_STRING)),
               ImmutableList.of(TYPE_BOOLEAN)));
 
   private CqlBuiltInFunctions() {}

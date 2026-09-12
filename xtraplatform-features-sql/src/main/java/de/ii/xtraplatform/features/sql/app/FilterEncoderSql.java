@@ -38,6 +38,7 @@ import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.InResultSet;
+import de.ii.xtraplatform.cql.domain.InResultSetByKey;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
@@ -565,6 +566,136 @@ public class FilterEncoderSql {
             : producerMapping.getColumnForId())
         .map(column -> column.second().getType())
         .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING);
+  }
+
+  /** Alias of the result set in the semi-join of a composite-key predicate. */
+  private static final String RESULT_SET_ALIAS = "_rsk";
+
+  /** Column names a composite-key result set projects, one per key part in canonical part order. */
+  public static List<String> resultSetValueColumns(int keyParts) {
+    List<String> columns = new ArrayList<>(keyParts);
+    for (int i = 0; i < keyParts; i++) {
+      columns.add(RESULT_SET_VALUE_COLUMN + "_" + i);
+    }
+    return columns;
+  }
+
+  /**
+   * Build the producer SELECT of a composite-key result set: one column per key part, in the
+   * canonical part order, so that consumer and producer agree on the order without the order in the
+   * request mattering. DISTINCT because the members of the set are the distinct keys, not the rows
+   * of the producing feature type — for a key with few distinct values that is the difference
+   * between a handful of rows and one row per feature.
+   */
+  String resultSetProducerSelectByKey(
+      InResultSetByKey inResultSet, boolean withValueAlias, CteCollector collector) {
+    String setName = inResultSet.getSetName();
+    String producerType =
+        inResultSet
+            .getProducerType()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+    SqlQueryMapping producerMapping =
+        mappingResolver
+            .apply(producerType)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format(
+                            "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                            setName, producerType)));
+
+    List<String> valueColumns = resultSetValueColumns(inResultSet.getKeyNames().size());
+    List<String> projection = new ArrayList<>();
+    SqlQuerySchema mainTable = null;
+    List<String> aliases = null;
+
+    for (int i = 0; i < inResultSet.getKeyNames().size(); i++) {
+      String part = inResultSet.getKeyNames().get(i);
+      String property = inResultSet.getProducerKey().get(part);
+
+      if (Objects.isNull(property)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. Result set '%s' does not define the key part '%s'.",
+                setName, part));
+      }
+
+      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> column =
+          producerMapping
+              .getColumnForValue(property)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format(
+                              "Filter is invalid. The key part '%s' of result set '%s' is the property '%s', which is unknown for feature type '%s'.",
+                              part, setName, property, producerType)));
+
+      if (!column.first().getRelations().isEmpty()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The key part '%s' of result set '%s' is the property '%s', which is not on the main table of feature type '%s'. The key parts of a result set must be properties of the main table.",
+                part, setName, property, producerType));
+      }
+
+      if (Objects.isNull(mainTable)) {
+        mainTable = column.first();
+        aliases = AliasGenerator.getAliases(mainTable);
+      }
+
+      String expression =
+          String.format("%s.%s", aliases.get(aliases.size() - 1), column.second().getName());
+      projection.add(withValueAlias ? expression + " AS " + valueColumns.get(i) : expression);
+    }
+
+    Optional<Cql2Expression> tableFilter =
+        producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
+    Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
+    Optional<Cql2Expression> effectiveFilter =
+        tableFilter.isPresent() && producerFilter.isPresent()
+            ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
+            : tableFilter.isPresent() ? tableFilter : producerFilter;
+    String where =
+        effectiveFilter
+            .map(
+                filter ->
+                    " WHERE "
+                        + prepareExpression(filter)
+                            .accept(new CqlToSql2(producerMapping, collector)))
+            .orElse("");
+
+    return String.format(
+        "SELECT DISTINCT %s FROM %s %s%s",
+        String.join(", ", projection), mainTable.getName(), aliases.get(0), where);
+  }
+
+  /** Producer SELECT of a composite-key result set for up-front materialization. */
+  public String encodeResultSetProducerByKey(InResultSetByKey inResultSet) {
+    return resultSetProducerSelectByKey(inResultSet, false, null);
+  }
+
+  /** Producer SELECT of a composite-key result set for materialization into a table. */
+  public String encodeResultSetProducerByKeyAliased(InResultSetByKey inResultSet) {
+    return resultSetProducerSelectByKey(inResultSet, true, null);
+  }
+
+  /** Types of the key-part columns of a composite-key result set, in canonical part order. */
+  public List<de.ii.xtraplatform.features.domain.SchemaBase.Type> resultSetValueTypesByKey(
+      InResultSetByKey inResultSet) {
+    String producerType = inResultSet.getProducerType().orElseThrow();
+    SqlQueryMapping producerMapping = mappingResolver.apply(producerType).orElseThrow();
+
+    return inResultSet.getKeyNames().stream()
+        .map(part -> inResultSet.getProducerKey().get(part))
+        .map(
+            property ->
+                producerMapping
+                    .getColumnForValue(property)
+                    .map(column -> column.second().getType())
+                    .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING))
+        .collect(Collectors.toList());
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -2280,6 +2411,10 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSetByKey) {
+        return encodeInResultSetByKey((InResultSetByKey) scalarOperation);
+      }
+
       if (scalarOperation instanceof InResultSet) {
         return encodeInResultSet((InResultSet) scalarOperation, children.get(0));
       }
@@ -2384,6 +2519,119 @@ public class FilterEncoderSql {
               : String.format(" IN (SELECT %s FROM %s)", CTE_VALUE_COL, cteName);
 
       return String.format(mainExpression, "", reference);
+    }
+
+    /**
+     * A composite-key result set is a semi-join on several key parts at once. It is encoded as
+     * EXISTS rather than as a row-constructor IN so that the negation is exact: with IN, a NULL in
+     * any key part would make NOT IN unknown and drop the feature, although "this key is not a
+     * member" is what the filter asks for. EXISTS also keeps the three sources of a result set —
+     * materialized table, inlined values, re-derived producer — in one shape.
+     */
+    private String encodeInResultSetByKey(InResultSetByKey inResultSet) {
+      List<String> keyColumns = new ArrayList<>();
+
+      for (Property property : inResultSet.getProperties()) {
+        String name = property.getName().replaceAll("^\"|\"$", "");
+
+        // the same structural check the producer side makes: a key part has to resolve to a column
+        // of the main table. A property in a child or junction table would encode as a semi-join
+        // subquery, which cannot take part in a row-wise comparison.
+        de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> column =
+            mapping
+                .getColumnForValue(name)
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. The key part '%s' of %s is unknown for this feature type.",
+                                name, InResultSetByKey.TYPE)));
+
+        if (!column.first().getRelations().isEmpty()) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Filter is invalid. The key part '%s' of %s is not on the main table of this feature type. The key parts of a result set must be properties of the main table.",
+                  name, InResultSetByKey.TYPE));
+        }
+
+        String expression = property.accept(this);
+
+        if (!operandHasSelect(expression) || expression.contains("(SELECT")) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Filter is invalid. The key part '%s' of %s cannot be encoded as a single column.",
+                  name, InResultSetByKey.TYPE));
+        }
+
+        keyColumns.add(String.format(expression, "", ""));
+      }
+
+      List<String> valueColumns = resultSetValueColumns(inResultSet.getKeyNames().size());
+
+      if (inResultSet.getMaterializedTable().isPresent()) {
+        return existsInResultSet(
+            String.format("%s %s", inResultSet.getMaterializedTable().get(), RESULT_SET_ALIAS),
+            valueColumns,
+            keyColumns,
+            "");
+      }
+
+      if (inResultSet.getMaterializedValues().isPresent()) {
+        List<List<Object>> members = inResultSet.getMaterializedValues().get();
+
+        if (members.isEmpty()) {
+          return "1 = 0";
+        }
+
+        String values =
+            members.stream()
+                .map(
+                    member ->
+                        member.stream()
+                            .map(FilterEncoderSql::renderInlineLiteral)
+                            .collect(Collectors.joining(", ")))
+                .map(member -> "(" + member + ")")
+                .collect(Collectors.joining(", "));
+
+        return existsInResultSet(
+            String.format(
+                "(VALUES %s) %s (%s)", values, RESULT_SET_ALIAS, String.join(", ", valueColumns)),
+            valueColumns,
+            keyColumns,
+            "");
+      }
+
+      boolean outermost = collector == null;
+      CteCollector coll = outermost ? new CteCollector() : collector;
+      String cteName =
+          coll.register(
+              inResultSet.getSetName(),
+              () -> resultSetProducerSelectByKey(inResultSet, true, coll));
+
+      return existsInResultSet(
+          String.format("%s %s", cteName, RESULT_SET_ALIAS),
+          valueColumns,
+          keyColumns,
+          outermost ? coll.renderWith(sqlDialect) + " " : "");
+    }
+
+    private String existsInResultSet(
+        String fromClause, List<String> valueColumns, List<String> keyColumns, String with) {
+      StringBuilder conditions = new StringBuilder();
+
+      for (int i = 0; i < keyColumns.size(); i++) {
+        if (i > 0) {
+          conditions.append(" AND ");
+        }
+        conditions
+            .append(RESULT_SET_ALIAS)
+            .append('.')
+            .append(valueColumns.get(i))
+            .append(" = ")
+            .append(keyColumns.get(i));
+      }
+
+      return String.format("EXISTS (%sSELECT 1 FROM %s WHERE %s)", with, fromClause, conditions);
     }
 
     @Override

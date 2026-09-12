@@ -38,6 +38,7 @@ import de.ii.xtraplatform.cql.domain.ImmutableLte;
 import de.ii.xtraplatform.cql.domain.ImmutableNeq;
 import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.cql.domain.InResultSet;
+import de.ii.xtraplatform.cql.domain.InResultSetByKey;
 import de.ii.xtraplatform.cql.domain.Interval;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
@@ -152,6 +153,11 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   @Override
   public Type visit(BinaryScalarOperation scalarOperation, List<Type> children) {
+    if (scalarOperation instanceof InResultSetByKey) {
+      // the key parts may be of any queryable type, the second argument is always the
+      // name of a result set
+      return Type.Boolean;
+    }
     if (scalarOperation instanceof InResultSet) {
       // the first argument may be of any queryable type, the second is always the
       // name of a result set
