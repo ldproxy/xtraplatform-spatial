@@ -123,7 +123,7 @@ class CreatedFeatureIdSpec extends Specification {
 
         SqlMutationSession session = new SqlMutationSession(
                 sqlSession, [buildings: [mapping]], featureMutationsSql, null, null,
-                Optional.empty(), null, Optional.empty())
+                Optional.empty(), null)
         ImmutableMutationResult.Builder builder = ImmutableMutationResult.builder()
                 .type(FeatureTransactions.MutationResult.Type.CREATE)
                 .hasFeatures(false)
