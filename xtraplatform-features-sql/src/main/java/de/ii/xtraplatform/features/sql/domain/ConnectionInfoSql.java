@@ -121,12 +121,14 @@ public interface ConnectionInfoSql extends ConnectionInfo {
 
   /**
    * @langEn Custom options for the JDBC driver. For `PGIS`, you might pass `gssEncMode`, `ssl`,
-   *     `sslmode`, `sslcert`, `sslkey`, `sslrootcert` and `sslpassword`. For details see the
-   *     [driver
+   *     `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `sslpassword`, `socketTimeout`,
+   *     `connectTimeout` and `tcpKeepAlive`. `socketTimeout` and `connectTimeout` are numbers of
+   *     seconds, `tcpKeepAlive` is `true` or `false`. For details see the [driver
    *     documentation](https://jdbc.postgresql.org/documentation/head/connect.html#connection-parameters).
    * @langDe Einstellungen für den JDBC-Treiber. Für `PGIS` werden `gssEncMode`, `ssl`, `sslmode`,
-   *     `sslcert`, `sslkey`, `sslrootcert` und `sslpassword` durchgereicht. Für Details siehe die
-   *     [Dokumentation des
+   *     `sslcert`, `sslkey`, `sslrootcert`, `sslpassword`, `socketTimeout`, `connectTimeout` und
+   *     `tcpKeepAlive` durchgereicht. `socketTimeout` und `connectTimeout` sind Angaben in
+   *     Sekunden, `tcpKeepAlive` ist `true` oder `false`. Für Details siehe die [Dokumentation des
    *     Treibers](https://jdbc.postgresql.org/documentation/head/connect.html#connection-parameters).
    * @default {}
    */

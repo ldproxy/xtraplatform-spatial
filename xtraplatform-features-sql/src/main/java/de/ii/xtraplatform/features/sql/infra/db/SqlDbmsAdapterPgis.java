@@ -118,10 +118,34 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
                 case "sslpassword":
                   ds.setSslPassword(value);
                   break;
+                case "socketTimeout":
+                  ds.setSocketTimeout(parseSeconds(key, value));
+                  break;
+                case "connectTimeout":
+                  ds.setConnectTimeout(parseSeconds(key, value));
+                  break;
+                case "tcpKeepAlive":
+                  ds.setTcpKeepAlive(Objects.equals(value, "true"));
+                  break;
               }
             });
 
     return ds;
+  }
+
+  private static int parseSeconds(String key, String value) {
+    try {
+      int seconds = Integer.parseInt(value);
+      if (seconds < 0) {
+        throw new NumberFormatException();
+      }
+      return seconds;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid value for driver option '%s', a non-negative number of seconds is required: %s",
+              key, value));
+    }
   }
 
   @Override
