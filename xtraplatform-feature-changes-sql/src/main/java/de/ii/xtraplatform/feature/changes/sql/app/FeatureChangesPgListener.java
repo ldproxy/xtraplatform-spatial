@@ -254,6 +254,15 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
     }
   }
 
+  // Source paths may carry path options, e.g. "id{generated=false}" for a client-provided
+  // identifier. The options are not part of the table or column name and have to be removed
+  // before the name is used in the trigger SQL.
+  static String column(String sourcePath) {
+    int options = sourcePath.indexOf('{');
+
+    return options < 0 ? sourcePath : sourcePath.substring(0, options);
+  }
+
   private List<Subscription> getSubscriptions(
       Set<FeatureSchema> types,
       List<String> includes,
@@ -284,29 +293,26 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
                                 .notificationPoller(notificationPoller)
                                 .index(count.getAndIncrement())
                                 .type(type.getName())
-                                .table(
-                                    sourcePath.substring(
-                                        1,
-                                        sourcePath.contains("{")
-                                            ? sourcePath.indexOf('{')
-                                            : sourcePath.length()))
+                                .table(column(sourcePath.substring(1)))
                                 .idColumn(
                                     type.getIdProperty()
                                         .flatMap(FeatureSchema::getSourcePath)
+                                        .map(FeatureChangesPgListener::column)
                                         .orElseThrow())
                                 .geometryColumn(
                                     type.getPrimaryGeometry()
-                                        .map(s -> s.getSourcePath().orElseThrow()))
+                                        .map(s -> column(s.getSourcePath().orElseThrow())))
                                 .intervalColumns(
                                     type.getPrimaryInterval()
                                         .map(
                                             t ->
                                                 Tuple.of(
-                                                    t.first().getSourcePath().orElseThrow(),
-                                                    t.second().getSourcePath().orElseThrow())))
+                                                    column(t.first().getSourcePath().orElseThrow()),
+                                                    column(
+                                                        t.second().getSourcePath().orElseThrow()))))
                                 .instantColumn(
                                     type.getPrimaryInstant()
-                                        .map(s -> s.getSourcePath().orElseThrow()))
+                                        .map(s -> column(s.getSourcePath().orElseThrow())))
                                 .build()))
         .collect(Collectors.toList());
   }
