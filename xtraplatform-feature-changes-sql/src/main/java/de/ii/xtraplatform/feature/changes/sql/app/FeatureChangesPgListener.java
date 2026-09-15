@@ -165,7 +165,19 @@ public class FeatureChangesPgListener implements FeatureQueriesExtension {
         .forEach(subscription -> subscribe(provider.getId(), subscription));
 
     executorService.scheduleWithFixedDelay(
-        () -> poll(provider.getId(), provider.changes()),
+        () -> {
+          // an uncaught exception would cancel the periodic execution, e.g. when a
+          // reconnect fails because no database connection can be leased at that moment
+          try {
+            poll(provider.getId(), provider.changes());
+          } catch (Throwable e) {
+            LogContext.errorAsDebug(
+                LOGGER,
+                e,
+                "Could not poll for feature changes for provider '{}'",
+                provider.getId());
+          }
+        },
         configuration.getPollingInterval().toSeconds(),
         configuration.getPollingInterval().toSeconds(),
         TimeUnit.SECONDS);

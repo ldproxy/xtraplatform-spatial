@@ -59,6 +59,17 @@ interface Subscription {
   }
 
   default Subscription connect() {
+    // close a previous connection before leasing a new one, otherwise the connection
+    // would never be returned to the connection pool
+    getCurrentConnection()
+        .ifPresent(
+            connection -> {
+              try {
+                connection.close();
+              } catch (SQLException e) {
+                // ignore
+              }
+            });
     return ((ImmutableSubscription) this).withCurrentConnection(getConnectionFactory().get());
   }
 
