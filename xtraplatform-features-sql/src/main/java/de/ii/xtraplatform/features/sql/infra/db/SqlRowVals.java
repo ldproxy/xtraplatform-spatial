@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -316,6 +317,8 @@ class SqlRowVals implements SqlRow {
         result = ((Date) id1).compareTo((Date) id2);
       } else if (id1 instanceof Timestamp) {
         result = ((Timestamp) id1).compareTo((Timestamp) id2);
+      } else if (id1 instanceof UUID) {
+        result = compareUuid((UUID) id1, (UUID) id2);
       } else if (Objects.nonNull(collator)) {
         result = collator.compare((String) id1, (String) id2);
       } else {
@@ -326,6 +329,19 @@ class SqlRowVals implements SqlRow {
       }
     }
     return 0;
+  }
+
+  // A uuid sort key has to be merged in the order the database returned the rows in. PostgreSQL
+  // orders uuid as 16 unsigned bytes, while UUID.compareTo() compares the two halves as signed
+  // longs, so the two disagree for every value whose high bit is set. Compare the halves
+  // unsigned to reproduce the database order.
+  private static int compareUuid(UUID uuid1, UUID uuid2) {
+    int result =
+        Long.compareUnsigned(uuid1.getMostSignificantBits(), uuid2.getMostSignificantBits());
+
+    return result != 0
+        ? result
+        : Long.compareUnsigned(uuid1.getLeastSignificantBits(), uuid2.getLeastSignificantBits());
   }
 
   @Override
