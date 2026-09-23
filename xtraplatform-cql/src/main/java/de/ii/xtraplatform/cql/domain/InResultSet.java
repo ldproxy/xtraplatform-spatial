@@ -29,7 +29,7 @@ import org.immutables.value.Value;
  */
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableInResultSet.Builder.class)
-public interface InResultSet extends BinaryScalarOperation {
+public interface InResultSet extends BinaryScalarOperation, ResultSetReference {
 
   String TYPE = "inResultSet";
 

@@ -13,9 +13,12 @@ import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
 import de.ii.xtraplatform.cql.domain.CqlVisitorCopy;
 import de.ii.xtraplatform.cql.domain.ImmutableInResultSet;
+import de.ii.xtraplatform.cql.domain.ImmutableInResultSetByKey;
 import de.ii.xtraplatform.cql.domain.InResultSet;
+import de.ii.xtraplatform.cql.domain.InResultSetByKey;
 import de.ii.xtraplatform.cql.domain.Not;
 import de.ii.xtraplatform.cql.domain.Or;
+import de.ii.xtraplatform.cql.domain.ResultSetReference;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableSubQuery;
 import de.ii.xtraplatform.features.domain.MultiFeatureQuery;
@@ -27,6 +30,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -95,7 +99,7 @@ public class ResultSetMaterializer {
    * {@link #dropTables(java.util.Collection) drop} them once the query's stream has completed.
    */
   public MultiFeatureQuery materialize(MultiFeatureQuery query, List<String> createdTables) {
-    Map<String, InResultSet> sets = new LinkedHashMap<>();
+    Map<String, ResultSetReference> sets = new LinkedHashMap<>();
     for (SubQuery subQuery : query.getQueries()) {
       for (Cql2Expression filter : subQuery.getFilters()) {
         collect(filter, sets);
@@ -109,6 +113,8 @@ public class ResultSetMaterializer {
     // across concurrent requests (and, with the instance token, across provider instances)
     long sequence = SEQUENCE.incrementAndGet();
     Map<String, List<Object>> materialized = new HashMap<>();
+    // composite-key sets: set name -> the distinct key tuples, in canonical part order
+    Map<String, List<List<Object>>> materializedKeys = new HashMap<>();
     // oversized sets materialized into a request-scoped table: set name -> table name
     Map<String, String> materializedTables = new HashMap<>();
     int shortCircuited = 0;
@@ -119,38 +125,72 @@ public class ResultSetMaterializer {
     for (List<String> level : topologicalLevels(sets)) {
       Map<String, CompletableFuture<Collection<SqlRow>>> running = new LinkedHashMap<>();
       Map<String, SchemaBase.Type> valueTypes = new HashMap<>();
+      Map<String, List<SchemaBase.Type>> keyTypes = new HashMap<>();
       // keep each level's prepared nodes (dependencies already applied) for the join phase, where
       // an
       // oversized set is materialized into a table from the very same producer
-      Map<String, InResultSet> prepared = new HashMap<>();
+      Map<String, ResultSetReference> prepared = new HashMap<>();
       for (String name : level) {
-        InResultSet node = sets.get(name);
+        ResultSetReference node = sets.get(name);
         // if a dependency has already materialized to no members in a position that forces this
         // producer's filter false, the producer can only be empty too — record the empty set and
         // skip its query. Consumers encode IN () for it either way, so the output is unchanged.
         if (node.getProducerFilter().isPresent()
-            && isProvablyEmpty(node.getProducerFilter().get(), materialized)) {
-          materialized.put(name, List.of());
+            && isProvablyEmpty(node.getProducerFilter().get(), materialized, materializedKeys)) {
+          if (node instanceof InResultSetByKey) {
+            materializedKeys.put(name, List.of());
+          } else {
+            materialized.put(name, List.of());
+          }
           shortCircuited++;
           continue;
         }
-        InResultSet preparedNode =
-            node.getProducerFilter().isPresent()
-                ? new ImmutableInResultSet.Builder()
-                    .from(node)
-                    .producerFilter(
-                        applyMaterialized(
-                            node.getProducerFilter().get(), materialized, materializedTables))
-                    .build()
-                : node;
+        ResultSetReference preparedNode = node;
+        if (node.getProducerFilter().isPresent()) {
+          Cql2Expression applied =
+              applyMaterialized(
+                  node.getProducerFilter().get(),
+                  materialized,
+                  materializedKeys,
+                  materializedTables);
+          preparedNode =
+              node instanceof InResultSetByKey
+                  ? new ImmutableInResultSetByKey.Builder()
+                      .from((InResultSetByKey) node)
+                      .args(((InResultSetByKey) node).getArgs())
+                      .producerFilter(applied)
+                      .build()
+                  : new ImmutableInResultSet.Builder()
+                      .from((InResultSet) node)
+                      .args(((InResultSet) node).getArgs())
+                      .producerFilter(applied)
+                      .build();
+        }
         prepared.put(name, preparedNode);
 
         // bound the fetch to one past the cap so an oversized set is detected without loading it
         // all
-        String producerQuery =
-            filterEncoder.encodeResultSetProducer(preparedNode) + " LIMIT " + (maxSetSize + 1);
-        valueTypes.put(name, filterEncoder.resultSetValueType(node));
-        running.put(name, sqlClient.get().run(producerQuery, SqlQueryOptions.single()));
+        String producerQuery;
+        SqlQueryOptions options;
+        if (preparedNode instanceof InResultSetByKey) {
+          producerQuery =
+              filterEncoder.encodeResultSetProducerByKey((InResultSetByKey) preparedNode)
+                  + " LIMIT "
+                  + (maxSetSize + 1);
+          List<SchemaBase.Type> types =
+              filterEncoder.resultSetValueTypesByKey((InResultSetByKey) preparedNode);
+          keyTypes.put(name, types);
+          options =
+              SqlQueryOptions.withColumnTypes(Collections.nCopies(types.size(), String.class));
+        } else {
+          producerQuery =
+              filterEncoder.encodeResultSetProducer((InResultSet) preparedNode)
+                  + " LIMIT "
+                  + (maxSetSize + 1);
+          valueTypes.put(name, filterEncoder.resultSetValueType((InResultSet) node));
+          options = SqlQueryOptions.single();
+        }
+        running.put(name, sqlClient.get().run(producerQuery, options));
       }
 
       for (Map.Entry<String, CompletableFuture<Collection<SqlRow>>> entry : running.entrySet()) {
@@ -170,12 +210,29 @@ public class ResultSetMaterializer {
           }
           continue;
         }
-        List<Object> values =
-            rows.stream()
-                .map(row -> coerce(row.getValues().get(0), valueTypes.get(name)))
-                .distinct()
-                .collect(Collectors.toList());
-        materialized.put(name, values);
+        if (keyTypes.containsKey(name)) {
+          List<SchemaBase.Type> types = keyTypes.get(name);
+          List<List<Object>> keys =
+              rows.stream()
+                  .map(
+                      row -> {
+                        List<Object> key = new ArrayList<>(types.size());
+                        for (int i = 0; i < types.size(); i++) {
+                          key.add(coerce(row.getValues().get(i), types.get(i)));
+                        }
+                        return key;
+                      })
+                  .distinct()
+                  .collect(Collectors.toList());
+          materializedKeys.put(name, keys);
+        } else {
+          List<Object> values =
+              rows.stream()
+                  .map(row -> coerce(row.getValues().get(0), valueTypes.get(name)))
+                  .distinct()
+                  .collect(Collectors.toList());
+          materialized.put(name, values);
+        }
       }
     }
 
@@ -198,7 +255,10 @@ public class ResultSetMaterializer {
                                     .map(
                                         filter ->
                                             applyMaterialized(
-                                                filter, materialized, materializedTables))
+                                                filter,
+                                                materialized,
+                                                materializedKeys,
+                                                materializedTables))
                                     .collect(Collectors.toList()))
                             .build())
             .collect(Collectors.toList());
@@ -208,7 +268,7 @@ public class ResultSetMaterializer {
 
   /** True if the query contains at least one result-set reference. */
   public static boolean hasResultSets(MultiFeatureQuery query) {
-    Map<String, InResultSet> sets = new LinkedHashMap<>();
+    Map<String, ResultSetReference> sets = new LinkedHashMap<>();
     for (SubQuery subQuery : query.getQueries()) {
       for (Cql2Expression filter : subQuery.getFilters()) {
         collect(filter, sets);
@@ -220,10 +280,10 @@ public class ResultSetMaterializer {
     return false;
   }
 
-  private static void collect(Cql2Expression expression, Map<String, InResultSet> sets) {
+  private static void collect(Cql2Expression expression, Map<String, ResultSetReference> sets) {
     Collector collector = new Collector();
     expression.accept(collector);
-    for (InResultSet node : collector.found) {
+    for (ResultSetReference node : collector.found) {
       if (!sets.containsKey(node.getSetName())) {
         sets.put(node.getSetName(), node);
         node.getProducerFilter().ifPresent(filter -> collect(filter, sets));
@@ -236,7 +296,7 @@ public class ResultSetMaterializer {
    * only on sets in earlier levels. Sets within a level are independent and may be materialized
    * concurrently.
    */
-  private List<List<String>> topologicalLevels(Map<String, InResultSet> sets) {
+  private List<List<String>> topologicalLevels(Map<String, ResultSetReference> sets) {
     Map<String, Set<String>> deps = new HashMap<>();
     for (String name : sets.keySet()) {
       deps.put(name, dependenciesOf(sets.get(name), sets));
@@ -261,14 +321,15 @@ public class ResultSetMaterializer {
     return levels;
   }
 
-  private static Set<String> dependenciesOf(InResultSet node, Map<String, InResultSet> sets) {
+  private static Set<String> dependenciesOf(
+      ResultSetReference node, Map<String, ResultSetReference> sets) {
     if (node.getProducerFilter().isEmpty()) {
       return Set.of();
     }
     Collector collector = new Collector();
     node.getProducerFilter().get().accept(collector);
     Set<String> deps = new HashSet<>();
-    for (InResultSet dependency : collector.found) {
+    for (ResultSetReference dependency : collector.found) {
       if (sets.containsKey(dependency.getSetName())) {
         deps.add(dependency.getSetName());
       }
@@ -279,9 +340,11 @@ public class ResultSetMaterializer {
   private static Cql2Expression applyMaterialized(
       Cql2Expression expression,
       Map<String, List<Object>> materialized,
+      Map<String, List<List<Object>>> materializedKeys,
       Map<String, String> materializedTables) {
     return (Cql2Expression)
-        expression.accept(new ApplyMaterialized(materialized, materializedTables));
+        expression.accept(
+            new ApplyMaterialized(materialized, materializedKeys, materializedTables));
   }
 
   /**
@@ -292,7 +355,7 @@ public class ResultSetMaterializer {
    */
   private void materializeTable(
       String name,
-      InResultSet prepared,
+      ResultSetReference prepared,
       long sequence,
       Map<String, String> materializedTables,
       List<String> createdTables) {
@@ -301,17 +364,25 @@ public class ResultSetMaterializer {
       suffix = suffix.substring(0, 24);
     }
     String table = TABLE_PREFIX + instanceId + "_" + sequence + "_" + suffix;
+    String producerSelect;
+    String indexColumns;
+    if (prepared instanceof InResultSetByKey) {
+      producerSelect =
+          filterEncoder.encodeResultSetProducerByKeyAliased((InResultSetByKey) prepared);
+      // one index over all key parts, in the same canonical order the consumers compare them in
+      indexColumns =
+          String.join(
+              ", ",
+              FilterEncoderSql.resultSetValueColumns(
+                  ((InResultSetByKey) prepared).getKeyNames().size()));
+    } else {
+      producerSelect = filterEncoder.encodeResultSetProducerAliased((InResultSet) prepared);
+      indexColumns = FilterEncoderSql.RESULT_SET_VALUE_COLUMN;
+    }
     SqlClient client = sqlClient.get();
+    client.run(dialect.createResultSetTable(table, producerSelect), SqlQueryOptions.ddl()).join();
     client
-        .run(
-            dialect.createResultSetTable(
-                table, filterEncoder.encodeResultSetProducerAliased(prepared)),
-            SqlQueryOptions.ddl())
-        .join();
-    client
-        .run(
-            dialect.createResultSetTableIndex(table, FilterEncoderSql.RESULT_SET_VALUE_COLUMN),
-            SqlQueryOptions.ddl())
+        .run(dialect.createResultSetTableIndex(table, indexColumns), SqlQueryOptions.ddl())
         .join();
     materializedTables.put(name, table);
     createdTables.add(table);
@@ -337,8 +408,10 @@ public class ResultSetMaterializer {
    * indeterminate, so a producer is skipped only when boolean algebra guarantees an empty result.
    */
   private static boolean isProvablyEmpty(
-      Cql2Expression filter, Map<String, List<Object>> materialized) {
-    return truth(filter, materialized) == Truth.FALSE;
+      Cql2Expression filter,
+      Map<String, List<Object>> materialized,
+      Map<String, List<List<Object>>> materializedKeys) {
+    return truth(filter, materialized, materializedKeys) == Truth.FALSE;
   }
 
   private enum Truth {
@@ -347,7 +420,15 @@ public class ResultSetMaterializer {
     UNKNOWN
   }
 
-  private static Truth truth(CqlNode node, Map<String, List<Object>> materialized) {
+  private static Truth truth(
+      CqlNode node,
+      Map<String, List<Object>> materialized,
+      Map<String, List<List<Object>>> materializedKeys) {
+    if (node instanceof InResultSetByKey) {
+      List<List<Object>> keys = materializedKeys.get(((InResultSetByKey) node).getSetName());
+      // as below: a materialized-empty set makes the semi-join always false
+      return keys != null && keys.isEmpty() ? Truth.FALSE : Truth.UNKNOWN;
+    }
     if (node instanceof InResultSet) {
       List<Object> values = materialized.get(((InResultSet) node).getSetName());
       // a materialized-empty set makes the IN / A_OVERLAPS predicate always false; a non-empty or
@@ -357,7 +438,7 @@ public class ResultSetMaterializer {
     if (node instanceof And) {
       Truth result = Truth.TRUE;
       for (Cql2Expression child : ((And) node).getArgs()) {
-        Truth childTruth = truth(child, materialized);
+        Truth childTruth = truth(child, materialized, materializedKeys);
         if (childTruth == Truth.FALSE) {
           return Truth.FALSE;
         }
@@ -370,7 +451,7 @@ public class ResultSetMaterializer {
     if (node instanceof Or) {
       Truth result = Truth.FALSE;
       for (Cql2Expression child : ((Or) node).getArgs()) {
-        Truth childTruth = truth(child, materialized);
+        Truth childTruth = truth(child, materialized, materializedKeys);
         if (childTruth == Truth.TRUE) {
           return Truth.TRUE;
         }
@@ -381,7 +462,7 @@ public class ResultSetMaterializer {
       return result;
     }
     if (node instanceof Not) {
-      Truth child = truth(((Not) node).getArgs().get(0), materialized);
+      Truth child = truth(((Not) node).getArgs().get(0), materialized, materializedKeys);
       if (child == Truth.TRUE) {
         return Truth.FALSE;
       }
@@ -414,34 +495,58 @@ public class ResultSetMaterializer {
     }
   }
 
-  /** Records the {@link InResultSet} nodes encountered while traversing a filter. */
+  /** Records the result-set references encountered while traversing a filter. */
   private static class Collector extends CqlVisitorCopy {
-    private final List<InResultSet> found = new ArrayList<>();
+    private final List<ResultSetReference> found = new ArrayList<>();
 
     @Override
     public CqlNode visit(BinaryScalarOperation scalarOperation, List<CqlNode> children) {
       CqlNode copy = super.visit(scalarOperation, children);
-      if (copy instanceof InResultSet) {
-        found.add((InResultSet) copy);
+      if (copy instanceof ResultSetReference) {
+        found.add((ResultSetReference) copy);
       }
       return copy;
     }
   }
 
-  /** Attaches materialized values (or a materialized table) to the {@link InResultSet} nodes. */
+  /** Attaches materialized values (or a materialized table) to the result-set references. */
   private static class ApplyMaterialized extends CqlVisitorCopy {
     private final Map<String, List<Object>> materialized;
+    private final Map<String, List<List<Object>>> materializedKeys;
     private final Map<String, String> materializedTables;
 
     ApplyMaterialized(
-        Map<String, List<Object>> materialized, Map<String, String> materializedTables) {
+        Map<String, List<Object>> materialized,
+        Map<String, List<List<Object>>> materializedKeys,
+        Map<String, String> materializedTables) {
       this.materialized = materialized;
+      this.materializedKeys = materializedKeys;
       this.materializedTables = materializedTables;
     }
 
     @Override
     public CqlNode visit(BinaryScalarOperation scalarOperation, List<CqlNode> children) {
       CqlNode copy = super.visit(scalarOperation, children);
+      if (copy instanceof InResultSetByKey) {
+        InResultSetByKey node = (InResultSetByKey) copy;
+        List<List<Object>> keys = materializedKeys.get(node.getSetName());
+        if (keys != null) {
+          return new ImmutableInResultSetByKey.Builder()
+              .from(node)
+              .args(node.getArgs())
+              .materializedValues(keys)
+              .build();
+        }
+        String table = materializedTables.get(node.getSetName());
+        if (table != null) {
+          return new ImmutableInResultSetByKey.Builder()
+              .from(node)
+              .args(node.getArgs())
+              .materializedTable(table)
+              .build();
+        }
+        return copy;
+      }
       if (copy instanceof InResultSet) {
         InResultSet node = (InResultSet) copy;
         List<Object> values = materialized.get(node.getSetName());
