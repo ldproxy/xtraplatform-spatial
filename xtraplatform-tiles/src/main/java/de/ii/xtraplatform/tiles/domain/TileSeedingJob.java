@@ -18,6 +18,7 @@ import de.ii.xtraplatform.xtralink.domain.JobInputs;
 import de.ii.xtraplatform.xtralink.domain.Jobs;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -54,7 +55,8 @@ public interface TileSeedingJob extends JobInputs {
         new JobContextEntity(tileProvider),
         tileSeedingJob.getTileSets().entrySet().stream()
             .collect(
-                ImmutableMap.toImmutableMap(Map.Entry::getKey, e -> e.getValue().getProgress2())));
+                ImmutableMap.toImmutableMap(Map.Entry::getKey, e -> e.getValue().getProgress2())),
+        Optional.of(3600));
   }
 
   String getTileProvider();
