@@ -229,11 +229,12 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
             queryTemplates.getValueQueryTemplates().stream()
                 .map(
                     valueQueryTemplate ->
-                        // single-shot reads matching rows in one pass: no offset and no key-range
-                        // window (which would otherwise constrain the result set to the meta
-                        // query's minKey/maxKey); an optional per-sub-query maximum caps each
-                        // sub-query (0 = no limit)
-                        unpaged
+                        // single-shot reads, and reads without a meta query (single feature),
+                        // read matching rows in one pass: no offset and no key-range window
+                        // (which would otherwise constrain the result set to the meta query's
+                        // minKey/maxKey); an optional per-sub-query maximum caps each sub-query
+                        // (0 = no limit)
+                        unpaged || skipMetaQuery
                             ? valueQueryTemplate.generateValueQuery(
                                 query instanceof MultiFeatureQuery
                                     ? ((MultiFeatureQuery) query).getMaxFeaturesPerSubQuery()
