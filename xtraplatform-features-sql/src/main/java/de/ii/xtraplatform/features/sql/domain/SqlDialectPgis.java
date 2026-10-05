@@ -346,6 +346,14 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
+  public String applyToJsonArrayLike(String mainExpression, String pattern) {
+    return String.format(
+        mainExpression,
+        "EXISTS (SELECT 1 FROM jsonb_array_elements_text((",
+        String.format(")::jsonb) AS alike_item WHERE alike_item LIKE %s)", pattern));
+  }
+
+  @Override
   public String escapeString(String value) {
     return value.replaceAll("'", "''");
   }
