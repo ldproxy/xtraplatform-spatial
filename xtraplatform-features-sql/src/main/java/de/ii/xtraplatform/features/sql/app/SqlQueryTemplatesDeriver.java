@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.sql.app;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
-import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SortKey.Direction;
 import de.ii.xtraplatform.features.domain.Tuple;
@@ -166,17 +165,14 @@ public class SqlQueryTemplatesDeriver {
         forceSimpleFeatures,
         minMaxKeys,
         virtualTables) -> {
-      boolean isIdFilter = filter.filter(SqlQueryTemplatesDeriver::containsIdFilter).isPresent();
       List<String> aliases = AliasGenerator.getAliases(schema);
 
       SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
 
       Optional<String> sqlFilter = getFilter(main, mapping, filter);
       Optional<String> whereClause =
-          isIdFilter
-              ? sqlFilter
-              : toWhereClause(
-                  aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
+          toWhereClause(
+              aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
       boolean useRangePaging = additionalSortKeys.isEmpty() && minMaxKeys.isPresent();
       Optional<String> pagingClause =
           useRangePaging || (limit == 0 && offset == 0)
@@ -280,24 +276,6 @@ public class SqlQueryTemplatesDeriver {
     return String.format(
         "SELECT %s FROM %s%s%s%s ORDER BY %s%s",
         columns, mainTable, join.isEmpty() ? "" : " ", join, where, orderBy, paging);
-  }
-
-  /**
-   * Recognises an id-bounded filter even when it is buried inside conjunctions, e.g. {@code
-   * In(_ID_, [...])} on its own or {@code And(In(_ID_, [...]), <other>)} — both treat the row-set
-   * as constrained by the id list and let the SQL generator skip the surrogate-key range guard.
-   */
-  private static boolean containsIdFilter(Cql2Expression expr) {
-    if (expr instanceof In && ((In) expr).isIdFilter()) {
-      return true;
-    }
-    if (expr instanceof And) {
-      return ((And) expr)
-          .getArgs().stream()
-              .anyMatch(
-                  arg -> arg instanceof Cql2Expression && containsIdFilter((Cql2Expression) arg));
-    }
-    return false;
   }
 
   private Optional<String> toWhereClause(
