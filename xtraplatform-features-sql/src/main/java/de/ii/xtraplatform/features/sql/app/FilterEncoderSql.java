@@ -14,6 +14,8 @@ import static de.ii.xtraplatform.cql.domain.ArrayFunction.A_OVERLAPS;
 import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATE;
 import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME;
+import static de.ii.xtraplatform.features.domain.SchemaBase.Type.FEATURE_REF_ARRAY;
+import static de.ii.xtraplatform.features.domain.SchemaBase.Type.VALUE_ARRAY;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -2289,12 +2291,54 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+      Optional<String> jsonArrayLike = encodeLikeInJsonArray(function, children);
+      if (jsonArrayLike.isPresent()) {
+        return jsonArrayLike.get();
+      }
+
       Optional<String> customExpression = renderCustomFunction(function, children);
       if (customExpression.isPresent()) {
         return customExpression.get();
       }
 
       return super.visit(function, children);
+    }
+
+    // the ALIKE template matches the pattern against the column value, which for an array in a
+    // JSON document is the JSON text of the whole array; match each array item instead
+    private Optional<String> encodeLikeInJsonArray(
+        de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+      if (!"ALIKE".equalsIgnoreCase(function.getName())
+          || children.size() != 2
+          || !(function.getArgs().get(0) instanceof Property)
+          || !operandHasSelect(children.get(0))) {
+        return Optional.empty();
+      }
+
+      String propertyName =
+          ((Property) function.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+      SqlQueryColumn column =
+          getTableColumn(propertyName, false, !propertyName.contains(".")).second();
+      if (Objects.isNull(column)
+          || column.getOperationParameter(Operation.CONNECTOR).filter("JSON"::equals).isEmpty()) {
+        return Optional.empty();
+      }
+
+      boolean isArray =
+          mapping
+              .getSchemaForValue(propertyName)
+              .filter(
+                  schema ->
+                      schema.getType() == VALUE_ARRAY
+                          || schema.getType() == FEATURE_REF_ARRAY
+                          || mapping.isInConnectedArray(schema))
+              .isPresent();
+      if (!isArray) {
+        return Optional.empty();
+      }
+
+      return Optional.of(
+          sqlDialect.applyToJsonArrayLike(children.get(0), reduceSelectToColumn(children.get(1))));
     }
 
     private String reduceToColumn(String expression) {
