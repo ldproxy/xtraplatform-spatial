@@ -146,13 +146,6 @@ public interface SeedingOptions {
   @Nullable
   Integer getMaxThreads();
 
-  @Deprecated(since = "v4.5", forRemoval = true)
-  @Value.Lazy
-  @JsonIgnore
-  default int getEffectiveMaxThreads() {
-    return Objects.isNull(getMaxThreads()) || getMaxThreads() <= 1 ? 1 : getMaxThreads();
-  }
-
   /**
    * @langEn The maximum number of tiles in a seeding job (S=256, M=1024, L=16384, XL=65536). The
    *     tile seeding is split into multiple jobs to distribute the work across threads and nodes.

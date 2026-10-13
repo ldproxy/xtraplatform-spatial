@@ -356,9 +356,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
                     partitions);
               }
 
-              return storage == Storage.MBTILES
-                      || storage == Storage.PER_TILESET
-                      || storage == Storage.PER_JOB
+              return storage == Storage.PER_TILESET || storage == Storage.PER_JOB
                   ? TileStoreMbTiles.readWrite(
                       cacheStore,
                       id,
