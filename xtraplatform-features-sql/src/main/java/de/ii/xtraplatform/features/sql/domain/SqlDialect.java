@@ -58,6 +58,17 @@ public interface SqlDialect {
         "Arrays as queryables are not supported for this feature provider.");
   }
 
+  /**
+   * @param mainExpression the filter expression for the array in the JSON document, with the
+   *     placeholders {@code %1$s} and {@code %2$s} around the array value
+   * @param pattern the LIKE pattern
+   * @return a predicate that is true, if one of the array items matches the pattern
+   */
+  default String applyToJsonArrayLike(String mainExpression, String pattern) {
+    throw new IllegalArgumentException(
+        "Arrays as queryables are not supported for this feature provider.");
+  }
+
   default String applyToAsIds() {
     return " AS IDS";
   }

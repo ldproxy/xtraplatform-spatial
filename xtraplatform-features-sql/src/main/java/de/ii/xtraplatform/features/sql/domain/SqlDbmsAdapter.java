@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 
 @AutoMultiBind
@@ -31,8 +30,6 @@ public interface SqlDbmsAdapter {
   Optional<String> getInitSql(ConnectionInfoSql connectionInfo);
 
   List<String> getDefaultSchemas();
-
-  DatabaseType getRxType();
 
   List<String> getSystemSchemas();
 
