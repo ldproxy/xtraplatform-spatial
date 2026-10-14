@@ -285,10 +285,26 @@ public class CqlTextVisitor extends CqlParserBaseVisitor<CqlNode> {
     SpatialFunction spatialFunction =
         SpatialFunction.valueOf(ctx.SpatialFunction().getText().toUpperCase(Locale.ROOT));
 
-    Spatial spatial1 = (Spatial) ctx.geomExpression().get(0).accept(this);
-    Spatial spatial2 = (Spatial) ctx.geomExpression().get(1).accept(this);
+    Spatial spatial1 = toSpatial(ctx.geomExpression().get(0).accept(this), spatialFunction);
+    Spatial spatial2 = toSpatial(ctx.geomExpression().get(1).accept(this), spatialFunction);
 
     return BinarySpatialOperation.of(spatialFunction, spatial1, spatial2);
+  }
+
+  // the grammar accepts a function as a geometry expression, but functions are not supported as
+  // arguments of spatial predicates
+  private static Spatial toSpatial(CqlNode node, SpatialFunction spatialFunction) {
+    if (node instanceof Spatial spatial) {
+      return spatial;
+    }
+    if (node instanceof Function function) {
+      throw new CqlParseException(
+          String.format(
+              "Functions are not supported as arguments of %s, found: %s.",
+              spatialFunction.name(), function.getName()));
+    }
+    throw new CqlParseException(
+        String.format("Unsupported argument of %s: %s", spatialFunction.name(), node));
   }
 
   @Override
