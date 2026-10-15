@@ -79,6 +79,10 @@ public interface ScalarLiteral extends Scalar, Literal {
 
     public Builder(String literal, boolean determineType) {
       super();
+      // a character string cannot contain NUL in a database, e.g. PostgreSQL rejects it
+      if (literal.indexOf('\u0000') >= 0) {
+        throw new CqlParseException("A character string must not contain the character U+0000.");
+      }
       if (determineType) {
         Object castedLiteral = castToType(literal);
         value(castedLiteral);
