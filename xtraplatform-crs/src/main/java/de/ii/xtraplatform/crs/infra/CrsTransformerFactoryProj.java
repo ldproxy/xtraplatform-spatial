@@ -58,6 +58,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.GeographicCRS;
 import org.opengis.referencing.crs.SingleCRS;
 import org.opengis.referencing.cs.AxisDirection;
+import org.opengis.referencing.cs.CartesianCS;
 import org.opengis.referencing.cs.CoordinateSystem;
 import org.opengis.referencing.cs.EllipsoidalCS;
 import org.opengis.referencing.cs.RangeMeaning;
@@ -469,6 +470,12 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     return crs.getCoordinateSystem().getDimension() == 3;
   }
 
+  private boolean isGeocentric(CoordinateReferenceSystem crs) {
+    return isCrs3d(crs)
+        && !(crs instanceof CompoundCRS)
+        && crs.getCoordinateSystem() instanceof CartesianCS;
+  }
+
   private EpsgCrs applyWorkarounds(EpsgCrs crs) {
     // ArcGIS still uses code 102100 instead of 3857, but proj does not support it anymore
     if (crs.getCode() == 102_100) {
@@ -553,7 +560,8 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     try {
       boolean is3dTo3d = isCrs3d(sourceProjCrs) && isCrs3d(targetProjCrs);
       int sourceDimension = isCrs3d(sourceProjCrs) ? 3 : 2;
-      int targetDimension = is3dTo3d ? 3 : 2;
+      // a geocentric position needs all three coordinates, also for a 2D source
+      int targetDimension = is3dTo3d || isGeocentric(targetProjCrs) ? 3 : 2;
 
       CoordinateOperationContext coordinateOperationContext = new CoordinateOperationContext();
       coordinateOperationContext.setAuthority("EPSG");
