@@ -106,6 +106,27 @@ public class FeatureStreamImpl implements FeatureStream {
     this.idsArePerType = !data.getGloballyUniqueFeatureIds();
   }
 
+  // The collection metadata is published when the stream starts. A stream that ends before, e.g.
+  // because the database rejects the first query, completes it with the stream error; a caller
+  // waiting for the metadata would block forever otherwise.
+  static <W extends ResultBase> CompletionStage<W> completeMetadataOnEnd(
+      CompletionStage<W> result, CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+    return result.whenComplete(
+        (r, throwable) -> {
+          if (onCollectionMetadata.isDone()) {
+            return;
+          }
+          Throwable error =
+              Objects.nonNull(throwable)
+                  ? throwable
+                  : Objects.nonNull(r) ? r.getError().orElse(null) : null;
+          onCollectionMetadata.completeExceptionally(
+              Objects.requireNonNullElseGet(
+                  error,
+                  () -> new IllegalStateException("The feature stream ended before it started.")));
+        });
+  }
+
   // For types without properties that are represented as links (an explicit `link` in the
   // schema or a role that declares a link relation) the PropertyLinks transformer would be a
   // per-token no-op and is not wired at all.
@@ -235,7 +256,8 @@ public class FeatureStreamImpl implements FeatureStream {
                   });
         };
 
-    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
+    return completeMetadataOnEnd(
+        runner.runQuery(stream, query, mergedTransformations, !doTransform), onCollectionMetadata);
   }
 
   @Override
@@ -336,7 +358,8 @@ public class FeatureStreamImpl implements FeatureStream {
                   });
         };
 
-    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
+    return completeMetadataOnEnd(
+        runner.runQuery(stream, query, mergedTransformations, !doTransform), onCollectionMetadata);
   }
 
   private FeatureTokenSource getFeatureTokenSourceTransformed(
