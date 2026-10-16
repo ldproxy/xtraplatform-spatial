@@ -32,8 +32,10 @@ public class WithoutProperties implements SchemaVisitorTopDown<FeatureSchema, Fe
       return null;
     }
 
+    // the id of the feature identifies the feature, it is not a property that can be deselected
     if (!fields.isEmpty()
         && !parents.isEmpty()
+        && !(parents.size() == 1 && schema.isId())
         && !(fields.contains(getEffectiveSchema(schema, parents).getFullPathAsString())
             || visitedProperties.stream().anyMatch(Objects::nonNull))) {
       return null;

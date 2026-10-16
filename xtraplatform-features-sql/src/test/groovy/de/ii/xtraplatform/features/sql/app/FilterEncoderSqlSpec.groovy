@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app
 
+import com.google.common.collect.ImmutableList
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
 import de.ii.xtraplatform.cql.domain.CustomFunction
 import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
@@ -21,6 +22,11 @@ import de.ii.xtraplatform.cql.app.CqlImpl
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
 import de.ii.xtraplatform.cql.domain.IsNull
 import de.ii.xtraplatform.cql.domain.Not
+import de.ii.xtraplatform.cql.domain.AContainedBy
+import de.ii.xtraplatform.cql.domain.AContains
+import de.ii.xtraplatform.cql.domain.AEquals
+import de.ii.xtraplatform.cql.domain.AOverlaps
+import de.ii.xtraplatform.cql.domain.ArrayLiteral
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
@@ -814,6 +820,35 @@ class FilterEncoderSqlSpec extends Specification {
 
         actual == expected
 
+    }
+
+    def 'array predicates with an empty array'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def property = Property.of("location")
+        def empty = ArrayLiteral.of(ImmutableList.of())
+        def operators = [
+                A_CONTAINS   : { a, b -> AContains.of(a, b) },
+                A_CONTAINEDBY: { a, b -> AContainedBy.of(a, b) },
+                A_OVERLAPS   : { a, b -> AOverlaps.of(a, b) },
+                A_EQUALS     : { a, b -> AEquals.of(a, b) }]
+
+        when:
+        def filter = literalFirst ? operators[operator](empty, property) : operators[operator](property, empty)
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+        where:
+        operator        | literalFirst || expected
+        "A_CONTAINS"    | false        || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL GROUP BY AA.id)"
+        "A_CONTAINEDBY" | true         || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL GROUP BY AA.id)"
+        "A_OVERLAPS"    | false        || "1=0"
+        "A_EQUALS"      | false        || "1=0"
+        "A_CONTAINEDBY" | false        || "1=0"
+        "A_CONTAINS"    | true         || "1=0"
     }
 
     def 'interval list test'() {
