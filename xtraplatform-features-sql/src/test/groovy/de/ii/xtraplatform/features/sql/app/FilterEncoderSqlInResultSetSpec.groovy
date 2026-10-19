@@ -116,7 +116,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(Not.of(filter), mappings["value_array"])
 
         then:
-        sql == "NOT (A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id = 'foo') SELECT rs_value FROM _rs_0_s1)))"
+        sql == "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IN (WITH _rs_0_s1 AS MATERIALIZED (SELECT A.id AS rs_value FROM externalprovider A WHERE A.id = 'foo') SELECT rs_value FROM _rs_0_s1)) NE_ WHERE NE_.id = A.id)"
     }
 
     def 'negated consumer on the id queryable'() {
@@ -138,7 +138,7 @@ class FilterEncoderSqlInResultSetSpec extends Specification {
         def sql = filterEncoder.encode(filter, mappings["value_array"])
 
         then:
-        sql == "NOT (A.id IN (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IS NOT NULL))"
+        sql == "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM externalprovider AA JOIN externalprovider_externalprovidername AB ON (AA.id=AB.externalprovider_fk) WHERE AB.externalprovidername IS NOT NULL) NE_ WHERE NE_.id = A.id)"
     }
 
     def 'chained result sets nest recursively'() {
