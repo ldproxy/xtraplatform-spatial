@@ -94,6 +94,8 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -900,18 +902,54 @@ public class FilterEncoderSql {
         && values.isEmpty();
   }
 
+  private static final Pattern SEMI_JOIN =
+      Pattern.compile("^A\\.(\\w+) IN \\((SELECT .*)\\)$", Pattern.DOTALL);
+
+  // The negation of a predicate on a joined property, i.e. of a semi-join
+  // `A.<key> IN (SELECT <alias>.<key> FROM ...)`. As `NOT (A.<key> IN (...))` the planner can only
+  // evaluate the subquery as a SubPlan per candidate (or hash it, if it fits into work_mem), which
+  // for frequent values takes minutes. `NOT EXISTS` over the unchanged subquery is the same
+  // predicate (the outer key is never null), and the planner turns it into an anti-join that probes
+  // the joined table per candidate. Anything but a single semi-join is wrapped in `NOT (...)`. The
+  // derived table is aliased without AS, which Oracle does not accept there.
+  static String negate(String predicate) {
+    Matcher matcher = SEMI_JOIN.matcher(predicate);
+    if (matcher.matches() && closesAtEnd(predicate, predicate.indexOf(" IN (") + 4)) {
+      return String.format(
+          "NOT EXISTS (SELECT 1 FROM (%2$s) NE_ WHERE NE_.%1$s = A.%1$s)",
+          matcher.group(1), matcher.group(2));
+    }
+    return String.format("NOT (%s)", predicate);
+  }
+
+  // whether the parenthesis at openIndex is closed by the last character, ignoring parentheses in
+  // string literals
+  private static boolean closesAtEnd(String expression, int openIndex) {
+    int depth = 0;
+    boolean inLiteral = false;
+    for (int i = openIndex; i < expression.length(); i++) {
+      char c = expression.charAt(i);
+      if (c == '\'') {
+        inLiteral = !inLiteral;
+      } else if (!inLiteral && c == '(') {
+        depth++;
+      } else if (!inLiteral && c == ')') {
+        depth--;
+        if (depth == 0) {
+          return i == expression.length() - 1;
+        }
+      }
+    }
+    return false;
+  }
+
   // As in the other array predicates, a property without values (no row in the joined table) does
   // not match. So only a property with values contains the empty array, and no property overlaps
   // with it, is contained by it or is equal to it. The SQL `IN ()` would be invalid.
   private static String encodeEmptyArray(
-      ArrayFunction operator,
-      boolean notInverse,
-      String mainExpression,
-      String alias,
-      String sortKey) {
+      ArrayFunction operator, boolean notInverse, String mainExpression) {
     if (notInverse ? operator == A_CONTAINS : operator == A_CONTAINEDBY) {
-      return String.format(
-          mainExpression, "", String.format(" IS NOT NULL GROUP BY %s.%s", alias, sortKey));
+      return String.format(mainExpression, "", " IS NOT NULL");
     }
     return "1=0";
   }
@@ -1417,7 +1455,7 @@ public class FilterEncoderSql {
         // contributes no subquery rows at all. "Property has no value" is the negation of
         // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
         // null, so the negation is exact.
-        return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
+        return negate(String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -1748,25 +1786,32 @@ public class FilterEncoderSql {
 
       if (qualifiedColumn.second().isEmpty()) {
         if (isEmptyArray(arrayOperation.getArgs().get(notInverse ? 1 : 0))) {
-          return encodeEmptyArray(
-              arrayOperation.getArrayOperator(),
-              notInverse,
-              mainExpression,
-              aliases.get(0),
-              rootSchema.getSortKey().get());
+          return encodeEmptyArray(arrayOperation.getArrayOperator(), notInverse, mainExpression);
         }
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          if (elementCount > 1) {
+            // "contains all values" is the conjunction of one semi-join per value; unlike a single
+            // subquery with GROUP BY ... HAVING count(distinct ...) = n, each of them lets the
+            // planner probe the joined table per candidate
+            Optional<List<String>> elements =
+                renderArrayElements(arrayOperation.getArgs().get(notInverse ? 1 : 0));
+            if (elements.isPresent()) {
+              String semiJoin = mainExpression;
+              return elements.get().stream()
+                  .map(element -> String.format(semiJoin, "", " IN (" + element + ")"))
+                  .collect(Collectors.joining(" AND ", "(", ")"));
+            }
+          }
           // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
-          // group selected by `IN (<one value>)` trivially has one distinct value); dropping it
-          // keeps the result identical but lets the planner estimate the grouped row count, which
-          // it cannot do across a count(distinct) HAVING filter
+          // group selected by `IN (<one value>)` trivially has one distinct value), and without a
+          // HAVING the GROUP BY is redundant in the `IN` semi-join; dropping both keeps the result
+          // identical but lets the planner turn the subquery into a semi-join that probes the
+          // joined table per candidate instead of materializing every matching row
           String arrayQuery =
               elementCount == 1
-                  ? String.format(
-                      " IN %1$s GROUP BY %2$s.%3$s",
-                      secondExpression, aliases.get(0), rootSchema.getSortKey().get())
+                  ? String.format(" IN %1$s", secondExpression)
                   : String.format(
                       " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
                       secondExpression,
@@ -1786,10 +1831,9 @@ public class FilterEncoderSql {
                   elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
-          String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s",
-                  secondExpression, aliases.get(0), rootSchema.getSortKey().get());
+          // no GROUP BY: in the `IN` semi-join it would only prevent the planner from probing the
+          // joined table per candidate
+          String arrayQuery = String.format(" IN %1$s", secondExpression);
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -1831,6 +1875,16 @@ public class FilterEncoderSql {
       throw new IllegalStateException("unexpected array operator: " + arrayOperation);
     }
 
+    // the SQL literals of the elements of an array literal, if they are available individually
+    private Optional<List<String>> renderArrayElements(Operand operand) {
+      if (operand instanceof ArrayLiteral arrayLiteral
+          && arrayLiteral.getValue() instanceof List<?> values
+          && values.stream().allMatch(Scalar.class::isInstance)) {
+        return Optional.of(values.stream().map(value -> ((Scalar) value).accept(this)).toList());
+      }
+      return Optional.empty();
+    }
+
     @Override
     public String visit(ArrayLiteral arrayLiteral, List<String> children) {
       if (arrayLiteral.getValue() instanceof String) {
@@ -1866,7 +1920,7 @@ public class FilterEncoderSql {
         // without any related row are dropped by the INNER join and multi-valued properties get
         // any- instead of all-semantics. Wrap instead — the outer operand (A.<sortKey>) is never
         // null, so NOT (...) is the exact logical negation.
-        return String.format("%s (%s)", operator, operation);
+        return negate(operation);
       }
       Integer pos = null;
       Cql2Expression arg = not.getArgs().get(0);
@@ -2758,7 +2812,7 @@ public class FilterEncoderSql {
         // contributes no subquery rows at all. "Property has no value" is the negation of
         // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
         // null, so the negation is exact.
-        return String.format("NOT (%s)", String.format(mainExpression, "", " IS NOT NULL"));
+        return negate(String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -3098,25 +3152,32 @@ public class FilterEncoderSql {
 
       if (qualifiedColumn.second().isEmpty()) {
         if (isEmptyArray(arrayOperation.getArgs().get(notInverse ? 1 : 0))) {
-          return encodeEmptyArray(
-              arrayOperation.getArrayOperator(),
-              notInverse,
-              mainExpression,
-              aliases.get(0),
-              mapping.getMainTable().getSortKey());
+          return encodeEmptyArray(arrayOperation.getArrayOperator(), notInverse, mainExpression);
         }
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          if (elementCount > 1) {
+            // "contains all values" is the conjunction of one semi-join per value; unlike a single
+            // subquery with GROUP BY ... HAVING count(distinct ...) = n, each of them lets the
+            // planner probe the joined table per candidate
+            Optional<List<String>> elements =
+                renderArrayElements(arrayOperation.getArgs().get(notInverse ? 1 : 0));
+            if (elements.isPresent()) {
+              String semiJoin = mainExpression;
+              return elements.get().stream()
+                  .map(element -> String.format(semiJoin, "", " IN (" + element + ")"))
+                  .collect(Collectors.joining(" AND ", "(", ")"));
+            }
+          }
           // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
-          // group selected by `IN (<one value>)` trivially has one distinct value); dropping it
-          // keeps the result identical but lets the planner estimate the grouped row count, which
-          // it cannot do across a count(distinct) HAVING filter
+          // group selected by `IN (<one value>)` trivially has one distinct value), and without a
+          // HAVING the GROUP BY is redundant in the `IN` semi-join; dropping both keeps the result
+          // identical but lets the planner turn the subquery into a semi-join that probes the
+          // joined table per candidate instead of materializing every matching row
           String arrayQuery =
               elementCount == 1
-                  ? String.format(
-                      " IN %1$s GROUP BY %2$s.%3$s",
-                      secondExpression, aliases.get(0), mapping.getMainTable().getSortKey())
+                  ? String.format(" IN %1$s", secondExpression)
                   : String.format(
                       " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
                       secondExpression,
@@ -3136,10 +3197,9 @@ public class FilterEncoderSql {
                   elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
-          String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s",
-                  secondExpression, aliases.get(0), mapping.getMainTable().getSortKey());
+          // no GROUP BY: in the `IN` semi-join it would only prevent the planner from probing the
+          // joined table per candidate
+          String arrayQuery = String.format(" IN %1$s", secondExpression);
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -3181,6 +3241,16 @@ public class FilterEncoderSql {
       throw new IllegalStateException("unexpected array operator: " + arrayOperation);
     }
 
+    // the SQL literals of the elements of an array literal, if they are available individually
+    private Optional<List<String>> renderArrayElements(Operand operand) {
+      if (operand instanceof ArrayLiteral arrayLiteral
+          && arrayLiteral.getValue() instanceof List<?> values
+          && values.stream().allMatch(Scalar.class::isInstance)) {
+        return Optional.of(values.stream().map(value -> ((Scalar) value).accept(this)).toList());
+      }
+      return Optional.empty();
+    }
+
     @Override
     public String visit(ArrayLiteral arrayLiteral, List<String> children) {
       if (arrayLiteral.getValue() instanceof String) {
@@ -3216,7 +3286,7 @@ public class FilterEncoderSql {
         // without any related row are dropped by the INNER join and multi-valued properties get
         // any- instead of all-semantics. Wrap instead — the outer operand (A.<sortKey>) is never
         // null, so NOT (...) is the exact logical negation.
-        return String.format("%s (%s)", operator, operation);
+        return negate(operation);
       }
       Integer pos = null;
       Cql2Expression arg = not.getArgs().get(0);
