@@ -331,8 +331,10 @@ public interface SqlConnector
                                               getSqlClient()
                                                   .getSourceStream(
                                                       valueQueries.get(k),
+                                                      // the options of the sub-query, the sort keys
+                                                      // differ between the queries
                                                       new ImmutableSqlQueryOptions.Builder()
-                                                          .from(options)
+                                                          .from(querySets.get(index).getOptions())
                                                           .tableSchema(
                                                               querySets
                                                                   .get(index)
@@ -554,8 +556,12 @@ public interface SqlConnector
                                                   return getSqlClient()
                                                       .getSourceStream(
                                                           valueQuery,
+                                                          // the options of the sub-query, the sort
+                                                          // keys
+                                                          // differ between the queries
                                                           new ImmutableSqlQueryOptions.Builder()
-                                                              .from(options)
+                                                              .from(
+                                                                  querySets.get(index).getOptions())
                                                               .tableSchema(
                                                                   querySets
                                                                       .get(index)
