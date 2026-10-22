@@ -7,7 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
-import de.ii.xtraplatform.cql.domain.And;
+import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
@@ -16,8 +16,6 @@ import de.ii.xtraplatform.cql.domain.ImmutableInResultSet;
 import de.ii.xtraplatform.cql.domain.ImmutableInResultSetByKey;
 import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.InResultSetByKey;
-import de.ii.xtraplatform.cql.domain.Not;
-import de.ii.xtraplatform.cql.domain.Or;
 import de.ii.xtraplatform.cql.domain.ResultSetReference;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableSubQuery;
@@ -37,9 +35,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -69,6 +70,10 @@ public class ResultSetMaterializer {
   private final FilterEncoderSql filterEncoder;
   private final int maxSetSize;
   private final SqlDialect dialect;
+  private final String providerId;
+  // whether the warning that no table can be created has been logged since tables were last
+  // possible
+  private final AtomicBoolean noTablesLogged = new AtomicBoolean(false);
   // random per-provider-instance token so concurrent instances on the same database cannot collide
   private final String instanceId;
 
@@ -77,11 +82,70 @@ public class ResultSetMaterializer {
       FilterEncoderSql filterEncoder,
       int maxSetSize,
       SqlDialect dialect) {
+    this(sqlClient, filterEncoder, maxSetSize, dialect, "");
+  }
+
+  public ResultSetMaterializer(
+      Supplier<SqlClient> sqlClient,
+      FilterEncoderSql filterEncoder,
+      int maxSetSize,
+      SqlDialect dialect,
+      String providerId) {
     this.sqlClient = sqlClient;
     this.filterEncoder = filterEncoder;
     this.maxSetSize = maxSetSize;
     this.dialect = dialect;
+    this.providerId = providerId;
     this.instanceId = Integer.toHexString(ThreadLocalRandom.current().nextInt());
+  }
+
+  /**
+   * Whether the role may create a table for a result set that is too large for a literal list. It
+   * is checked each time such a result set occurs, so a privilege that is granted later takes
+   * effect without a restart. Without it, the result set is evaluated as a subquery, which gives
+   * the same results, but can be considerably slower, so this is logged once until tables are
+   * possible again. If the privilege cannot be determined, a table is assumed to be possible.
+   */
+  private boolean canCreateTable() {
+    Optional<String> privilegeQuery = dialect.resultSetTablePrivilegeQuery();
+    if (privilegeQuery.isEmpty()) {
+      return true;
+    }
+    try {
+      List<Object> values =
+          sqlClient
+              .get()
+              .run(
+                  privilegeQuery.get(), SqlQueryOptions.withColumnTypes(String.class, String.class))
+              .join()
+              .stream()
+              .findFirst()
+              .map(SqlRow::getValues)
+              .orElse(List.of());
+      if (values.size() == 2 && "true".equals(values.get(1))) {
+        noTablesLogged.set(false);
+        return true;
+      }
+      if (noTablesLogged.compareAndSet(false, true) && LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "The database role of the feature provider with id '{}' may not create tables in"
+                + " schema '{}'. Result sets of multi-queries with more than {} values are"
+                + " evaluated as subqueries, which can be considerably slower. Grant CREATE on the"
+                + " schema to use tables.",
+            providerId,
+            values.isEmpty() ? null : values.get(0),
+            maxSetSize);
+      }
+      return false;
+    } catch (CompletionException e) {
+      LogContext.errorAsWarn(
+          LOGGER,
+          e,
+          "Could not determine whether the database role of the feature provider with id '{}' may"
+              + " create a table for a large result set, assuming it may.",
+          providerId);
+      return true;
+    }
   }
 
   /**
@@ -144,7 +208,8 @@ public class ResultSetMaterializer {
         // producer's filter false, the producer can only be empty too — record the empty set and
         // skip its query. Consumers encode IN () for it either way, so the output is unchanged.
         if (node.getProducerFilter().isPresent()
-            && isProvablyEmpty(node.getProducerFilter().get(), materialized, materializedKeys)) {
+            && ResultSetTruth.isProvablyEmpty(
+                node.getProducerFilter().get(), materialized, materializedKeys)) {
           if (node instanceof InResultSetByKey) {
             materializedKeys.put(name, List.of());
           } else {
@@ -205,10 +270,17 @@ public class ResultSetMaterializer {
         String name = entry.getKey();
         Collection<SqlRow> rows = entry.getValue().join();
         if (rows.size() > maxSetSize) {
-          if (dialect.supportsResultSetTables()) {
+          if (dialect.supportsResultSetTables() && canCreateTable()) {
             // too large to inline as a literal list: materialize the producer once into an indexed
             // table; consumers reference it instead of re-deriving the producer each time
             materializeTable(name, prepared.get(name), sequence, materializedTables, createdTables);
+          } else if (dialect.supportsResultSetTables()) {
+            // the role may not create tables, which is logged once by canCreateTable()
+            LOGGER.debug(
+                "Result set '{}' has more than the materialization cap of {} members; evaluating"
+                    + " it inline, as no table can be created for it.",
+                name,
+                maxSetSize);
           } else if (LOGGER.isWarnEnabled()) {
             LOGGER.warn(
                 "Result set '{}' has more than the materialization cap of {} members; falling back"
@@ -408,80 +480,6 @@ public class ResultSetMaterializer {
         }
       }
     }
-  }
-
-  /**
-   * True if the filter can only ever be false given the result sets materialized so far, i.e. it
-   * references a set that materialized to no members in a boolean position that forces the whole
-   * filter false. Conservative: any leaf whose value is not pinned by an empty set is treated as
-   * indeterminate, so a producer is skipped only when boolean algebra guarantees an empty result.
-   */
-  private static boolean isProvablyEmpty(
-      Cql2Expression filter,
-      Map<String, List<Object>> materialized,
-      Map<String, List<List<Object>>> materializedKeys) {
-    return truth(filter, materialized, materializedKeys) == Truth.FALSE;
-  }
-
-  private enum Truth {
-    TRUE,
-    FALSE,
-    UNKNOWN
-  }
-
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
-  private static Truth truth(
-      CqlNode node,
-      Map<String, List<Object>> materialized,
-      Map<String, List<List<Object>>> materializedKeys) {
-    if (node instanceof InResultSetByKey) {
-      List<List<Object>> keys = materializedKeys.get(((InResultSetByKey) node).getSetName());
-      // as below: a materialized-empty set makes the semi-join always false
-      return keys != null && keys.isEmpty() ? Truth.FALSE : Truth.UNKNOWN;
-    }
-    if (node instanceof InResultSet) {
-      List<Object> values = materialized.get(((InResultSet) node).getSetName());
-      // a materialized-empty set makes the IN / A_OVERLAPS predicate always false; a non-empty or
-      // not-yet-materialized (oversized) set is indeterminate at the query level
-      return values != null && values.isEmpty() ? Truth.FALSE : Truth.UNKNOWN;
-    }
-    if (node instanceof And) {
-      Truth result = Truth.TRUE;
-      for (Cql2Expression child : ((And) node).getArgs()) {
-        Truth childTruth = truth(child, materialized, materializedKeys);
-        if (childTruth == Truth.FALSE) {
-          return Truth.FALSE;
-        }
-        if (childTruth == Truth.UNKNOWN) {
-          result = Truth.UNKNOWN;
-        }
-      }
-      return result;
-    }
-    if (node instanceof Or) {
-      Truth result = Truth.FALSE;
-      for (Cql2Expression child : ((Or) node).getArgs()) {
-        Truth childTruth = truth(child, materialized, materializedKeys);
-        if (childTruth == Truth.TRUE) {
-          return Truth.TRUE;
-        }
-        if (childTruth == Truth.UNKNOWN) {
-          result = Truth.UNKNOWN;
-        }
-      }
-      return result;
-    }
-    if (node instanceof Not) {
-      Truth child = truth(((Not) node).getArgs().get(0), materialized, materializedKeys);
-      if (child == Truth.TRUE) {
-        return Truth.FALSE;
-      }
-      if (child == Truth.FALSE) {
-        return Truth.TRUE;
-      }
-      return Truth.UNKNOWN;
-    }
-    return Truth.UNKNOWN;
   }
 
   private static Object coerce(Object value, SchemaBase.Type type) {

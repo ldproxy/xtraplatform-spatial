@@ -34,6 +34,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlRow
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.sql.SQLException
 import java.util.concurrent.CompletableFuture
 import java.util.function.Function
 import java.util.function.Supplier
@@ -77,6 +78,14 @@ class ResultSetMaterializerSpec extends Specification {
         }
     }
 
+    // the answer of the privilege query: the schema and whether the role may create tables in it
+    CompletableFuture<Collection<SqlRow>> privilege(boolean canCreate) {
+        def row = Stub(SqlRow) {
+            getValues() >> ["bag", String.valueOf(canCreate)]
+        }
+        return CompletableFuture.completedFuture([row])
+    }
+
     static MultiFeatureQuery query(Cql2Expression filter) {
         return ImmutableMultiFeatureQuery.builder()
                 .addQueries(
@@ -117,6 +126,7 @@ class ResultSetMaterializerSpec extends Specification {
         // detection query returns more than the cap -> producer is materialized into a table once
         // (no pre-drop: the name is unique per call)
         1 * sqlClient.run({ it.contains("LIMIT 2") }, _) >> CompletableFuture.completedFuture([row("x"), row("y")])
+        1 * sqlClient.run({ it.contains("has_schema_privilege") }, _) >> privilege(true)
         1 * sqlClient.run({ it.startsWith("CREATE UNLOGGED TABLE _rs_mat_") && it.contains("_s1 AS") }, _) >> CompletableFuture.completedFuture([])
         1 * sqlClient.run({ it.startsWith("CREATE INDEX ON _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
         0 * sqlClient.run({ it.startsWith("DROP TABLE") }, _)
@@ -268,6 +278,67 @@ class ResultSetMaterializerSpec extends Specification {
         ]
         def node = (InResultSet) result.getQueries().get(0).getFilters().get(0)
         node.getMaterializedValues().get() == ["b"]
+    }
+
+    def 'a result set exceeding the cap is left unmaterialized when no table can be created'() {
+        given:
+        def filter = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 1, new SqlDialectPgis())
+
+        when:
+        def result = materializer.materialize(query(filter))
+
+        then:
+        1 * sqlClient.run({ it.contains("LIMIT 2") }, _) >> CompletableFuture.completedFuture([row("x"), row("y")])
+        1 * sqlClient.run({ it.contains("has_schema_privilege") }, _) >> privilege(false)
+        0 * sqlClient.run({ it.startsWith("CREATE") }, _)
+        def node = (InResultSet) result.getQueries().get(0).getFilters().get(0)
+        node.getMaterializedValues().isEmpty()
+        node.getMaterializedTable().isEmpty()
+    }
+
+    def 'a privilege granted later is used for the next large result set'() {
+        given:
+        def filter = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 1, new SqlDialectPgis())
+
+        when:
+        def before = materializer.materialize(query(filter))
+
+        then:
+        1 * sqlClient.run({ it.contains("LIMIT 2") }, _) >> CompletableFuture.completedFuture([row("x"), row("y")])
+        1 * sqlClient.run({ it.contains("has_schema_privilege") }, _) >> privilege(false)
+        0 * sqlClient.run({ it.startsWith("CREATE") }, _)
+        ((InResultSet) before.getQueries().get(0).getFilters().get(0)).getMaterializedTable().isEmpty()
+
+        when:
+        def after = materializer.materialize(query(filter))
+
+        then:
+        1 * sqlClient.run({ it.contains("LIMIT 2") }, _) >> CompletableFuture.completedFuture([row("x"), row("y")])
+        1 * sqlClient.run({ it.contains("has_schema_privilege") }, _) >> privilege(true)
+        1 * sqlClient.run({ it.startsWith("CREATE UNLOGGED TABLE _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
+        1 * sqlClient.run({ it.startsWith("CREATE INDEX ON _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
+        ((InResultSet) after.getQueries().get(0).getFilters().get(0)).getMaterializedTable().isPresent()
+    }
+
+    def 'a table is assumed to be possible when the privilege query fails'() {
+        given:
+        def filter = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 1, new SqlDialectPgis())
+
+        when:
+        def result = materializer.materialize(query(filter))
+
+        then:
+        1 * sqlClient.run({ it.contains("LIMIT 2") }, _) >> CompletableFuture.completedFuture([row("x"), row("y")])
+        1 * sqlClient.run({ it.contains("has_schema_privilege") }, _) >> CompletableFuture.failedFuture(new SQLException("permission denied for function has_schema_privilege"))
+        1 * sqlClient.run({ it.startsWith("CREATE UNLOGGED TABLE _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
+        1 * sqlClient.run({ it.startsWith("CREATE INDEX ON _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
+        ((InResultSet) result.getQueries().get(0).getFilters().get(0)).getMaterializedTable().isPresent()
     }
 
     def 'a query without result sets is returned unchanged'() {
