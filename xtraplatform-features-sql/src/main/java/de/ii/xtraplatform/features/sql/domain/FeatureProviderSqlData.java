@@ -168,11 +168,13 @@ public interface FeatureProviderSqlData
     /**
      * @langEn Maximum number of members a result set of a multi-query may have to be materialized
      *     once and reused as a literal list across the queries of the request. Larger result sets
-     *     fall back to inline (re-evaluated) subqueries.
+     *     are written to a table for the duration of the request (`PGIS`, requires `CREATE` on the
+     *     first schema in `schemas`) or fall back to inline (re-evaluated) subqueries.
      * @langDe Maximale Anzahl von Elementen einer Ergebnismenge einer Multi-Query, bis zu der diese
      *     einmal materialisiert und als Literalliste über die Abfragen der Anfrage hinweg
-     *     wiederverwendet wird. Größere Ergebnismengen werden auf eingebettete (neu ausgewertete)
-     *     Unterabfragen zurückgesetzt.
+     *     wiederverwendet wird. Größere Ergebnismengen werden für die Dauer der Anfrage in eine
+     *     Tabelle geschrieben (`PGIS`, erfordert `CREATE` auf das erste Schema in `schemas`) oder
+     *     auf eingebettete (neu ausgewertete) Unterabfragen zurückgesetzt.
      * @default 100000
      */
     @DocIgnore
