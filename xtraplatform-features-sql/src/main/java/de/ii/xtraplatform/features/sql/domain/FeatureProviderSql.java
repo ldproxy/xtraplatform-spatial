@@ -173,6 +173,21 @@ import org.threeten.extra.Interval;
  *     <p>#### Pool
  *     <p>Settings for the connection pool.
  *     <p>{@docTable:pool}
+ *     <p>#### Database privileges
+ *     <p>For `PGIS`, the database role in `connectionInfo` needs the following privileges,
+ *     depending on the features that are used:
+ *     <p><code>
+ * - Reading features: `CONNECT` on the database, `USAGE` on the schemas in `schemas` and `SELECT`
+ *   on the tables and views of the mapping.
+ * - Large result sets of stored queries: a result set with more than 100,000 values is written
+ *   to a table for the duration of the request. This requires `CREATE` on the first schema in
+ *   `schemas`, or on `public` if no schema is set. PostgreSQL 15 and later do not grant `CREATE`
+ *   on `public` to all roles.
+ * - Mutations (see [CRUD](#crud)): `INSERT`, `UPDATE` and `DELETE` on the tables and `USAGE` on
+ *   the sequences of generated keys.
+ * - [Change Listener](90-extensions/change_listener.md): the extension creates the triggers on
+ *   the tables itself, which requires ownership of the tables and `TEMPORARY` on the database.
+ *     </code>
  *     <p>### Dataset Changes
  *     <p>{@docVar:datasetChanges}
  *     <p>{@docTable:datasetChanges}
@@ -266,6 +281,22 @@ import org.threeten.extra.Interval;
  *     <p>#### Pool
  *     <p>Einstellungen für den Connection-Pool.
  *     <p>{@docTable:pool}
+ *     <p>#### Datenbankrechte
+ *     <p>Für `PGIS` benötigt die Datenbankrolle in `connectionInfo` je nach den genutzten
+ *     Funktionen die folgenden Rechte:
+ *     <p><code>
+ * - Lesen von Features: `CONNECT` auf die Datenbank, `USAGE` auf die Schemas in `schemas` und
+ *   `SELECT` auf die Tabellen und Views des Mappings.
+ * - Große Ergebnismengen von Stored Queries: eine Ergebnismenge mit mehr als 100.000 Werten wird
+ *   für die Dauer der Anfrage in eine Tabelle geschrieben. Dafür ist `CREATE` auf das erste Schema
+ *   in `schemas` erforderlich, oder auf `public`, wenn kein Schema angegeben ist. Ab PostgreSQL 15
+ *   ist `CREATE` auf `public` nicht mehr allen Rollen erlaubt.
+ * - Änderungen (siehe [CRUD](#crud)): `INSERT`, `UPDATE` und `DELETE` auf die Tabellen und `USAGE`
+ *   auf die Sequenzen generierter Schlüssel.
+ * - [Change Listener](90-extensions/change_listener.md): die Erweiterung legt die Trigger auf den
+ *   Tabellen selbst an, dafür muss die Rolle Eigentümer der Tabellen sein und `TEMPORARY` auf die
+ *   Datenbank haben.
+ *     </code>
  *     <p>### Datensatzänderungen
  *     <p>{@docVar:datasetChanges}
  *     <p>{@docTable:datasetChanges}
