@@ -174,6 +174,13 @@ public interface FeatureSchema
    *     temporal properties that contain the start of the primary interval of the previous and next
    *     version of the feature. These properties are not represented as feature properties, but as
    *     links with the link relation types `predecessor-version` and `successor-version`.
+   *     `AUXILIARY` marks a property that is not essential for the primary representation of the
+   *     feature, but provides additional context, typically derived or computed from other
+   *     properties or from relating the feature to other data, for example the area of a building
+   *     computed from its geometry or the administrative area in which it is located. Auxiliary
+   *     properties are never receivable. If the building block PROJECTIONS is enabled, they are by
+   *     default left out of the features in the API (see `defaultExcludedProperties` and the query
+   *     parameter `exclude-properties`); they can be requested explicitly. Since v4.9.
    * @langDe Kennzeichnet besondere Bedeutungen der Eigenschaft. `ID` ist bei der Eigenschaft eines
    *     Objekts anzugeben, die für die `featureId` in der API zu verwenden ist. Diese Eigenschaft
    *     ist typischerweise die erste Eigenschaft im `properties`-Objekt. Erlaubte Zeichen in diesen
@@ -193,7 +200,15 @@ public interface FeatureSchema
    *     zeitlichen Eigenschaften angegeben werden, die den Beginn des primären Zeitintervalls der
    *     vorherigen bzw. nächsten Version des Features enthalten. Diese Eigenschaften werden nicht
    *     als Feature-Eigenschaften repräsentiert, sondern als Links mit den Linkrelationen
-   *     `predecessor-version` und `successor-version`.
+   *     `predecessor-version` und `successor-version`. `AUXILIARY` kennzeichnet eine Eigenschaft,
+   *     die für die primäre Darstellung des Features nicht wesentlich ist, aber zusätzlichen
+   *     Kontext liefert, typischerweise abgeleitet oder berechnet aus anderen Eigenschaften oder
+   *     aus der Beziehung des Features zu anderen Daten, zum Beispiel die aus der Geometrie
+   *     berechnete Fläche eines Gebäudes oder die Verwaltungseinheit, in der es liegt. Solche
+   *     Eigenschaften sind nie empfangbar (receivable). Ist der Baustein PROJECTIONS aktiviert,
+   *     werden sie in der API standardmäßig nicht ausgegeben (siehe `defaultExcludedProperties` und
+   *     den Query-Parameter `exclude-properties`); sie können explizit angefordert werden. Seit
+   *     v4.9.
    * @default null
    */
   @Override
@@ -542,6 +557,7 @@ public interface FeatureSchema
   default boolean receivable() {
     return !isConstant()
         && !isId()
+        && !isAuxiliary()
         && !getExcludedScopes().contains(Scope.RECEIVABLE)
         && !isMultiSource()
         && getTransformations().stream().allMatch(PropertyTransformation::isInternal);
