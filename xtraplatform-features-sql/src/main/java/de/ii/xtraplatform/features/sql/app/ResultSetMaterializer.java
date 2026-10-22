@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
@@ -37,9 +38,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -68,6 +71,10 @@ public class ResultSetMaterializer {
   private final FilterEncoderSql filterEncoder;
   private final int maxSetSize;
   private final SqlDialect dialect;
+  private final String providerId;
+  // whether the warning that no table can be created has been logged since tables were last
+  // possible
+  private final AtomicBoolean noTablesLogged = new AtomicBoolean(false);
   // random per-provider-instance token so concurrent instances on the same database cannot collide
   private final String instanceId;
 
@@ -76,11 +83,70 @@ public class ResultSetMaterializer {
       FilterEncoderSql filterEncoder,
       int maxSetSize,
       SqlDialect dialect) {
+    this(sqlClient, filterEncoder, maxSetSize, dialect, "");
+  }
+
+  public ResultSetMaterializer(
+      Supplier<SqlClient> sqlClient,
+      FilterEncoderSql filterEncoder,
+      int maxSetSize,
+      SqlDialect dialect,
+      String providerId) {
     this.sqlClient = sqlClient;
     this.filterEncoder = filterEncoder;
     this.maxSetSize = maxSetSize;
     this.dialect = dialect;
+    this.providerId = providerId;
     this.instanceId = Integer.toHexString(ThreadLocalRandom.current().nextInt());
+  }
+
+  /**
+   * Whether the role may create a table for a result set that is too large for a literal list. It
+   * is checked each time such a result set occurs, so a privilege that is granted later takes
+   * effect without a restart. Without it, the result set is evaluated as a subquery, which gives
+   * the same results, but can be considerably slower, so this is logged once until tables are
+   * possible again. If the privilege cannot be determined, a table is assumed to be possible.
+   */
+  private boolean canCreateTable() {
+    Optional<String> privilegeQuery = dialect.resultSetTablePrivilegeQuery();
+    if (privilegeQuery.isEmpty()) {
+      return true;
+    }
+    try {
+      List<Object> values =
+          sqlClient
+              .get()
+              .run(
+                  privilegeQuery.get(), SqlQueryOptions.withColumnTypes(String.class, String.class))
+              .join()
+              .stream()
+              .findFirst()
+              .map(SqlRow::getValues)
+              .orElse(List.of());
+      if (values.size() == 2 && "true".equals(values.get(1))) {
+        noTablesLogged.set(false);
+        return true;
+      }
+      if (noTablesLogged.compareAndSet(false, true) && LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "The database role of the feature provider with id '{}' may not create tables in"
+                + " schema '{}'. Result sets of multi-queries with more than {} values are"
+                + " evaluated as subqueries, which can be considerably slower. Grant CREATE on the"
+                + " schema to use tables.",
+            providerId,
+            values.isEmpty() ? null : values.get(0),
+            maxSetSize);
+      }
+      return false;
+    } catch (RuntimeException e) {
+      LogContext.errorAsWarn(
+          LOGGER,
+          e,
+          "Could not determine whether the database role of the feature provider with id '{}' may"
+              + " create a table for a large result set, assuming it may.",
+          providerId);
+      return true;
+    }
   }
 
   /**
@@ -197,10 +263,17 @@ public class ResultSetMaterializer {
         String name = entry.getKey();
         Collection<SqlRow> rows = entry.getValue().join();
         if (rows.size() > maxSetSize) {
-          if (dialect.supportsResultSetTables()) {
+          if (dialect.supportsResultSetTables() && canCreateTable()) {
             // too large to inline as a literal list: materialize the producer once into an indexed
             // table; consumers reference it instead of re-deriving the producer each time
             materializeTable(name, prepared.get(name), sequence, materializedTables, createdTables);
+          } else if (dialect.supportsResultSetTables()) {
+            // the role may not create tables, which is logged once by canCreateTable()
+            LOGGER.debug(
+                "Result set '{}' has more than the materialization cap of {} members; evaluating"
+                    + " it inline, as no table can be created for it.",
+                name,
+                maxSetSize);
           } else if (LOGGER.isWarnEnabled()) {
             LOGGER.warn(
                 "Result set '{}' has more than the materialization cap of {} members; falling back"

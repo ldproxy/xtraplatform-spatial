@@ -56,6 +56,13 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
+  public Optional<String> resultSetTablePrivilegeQuery() {
+    return Optional.of(
+        "SELECT current_schema(), coalesce(has_schema_privilege(current_schema(), 'CREATE'),"
+            + " false)::text");
+  }
+
+  @Override
   public String createResultSetTable(String name, String producerSelect) {
     // UNLOGGED: no WAL, much faster to populate; the table is request-scoped scratch data. It is a
     // regular (not session-TEMP) table so it stays visible to the other pooled connections that run

@@ -179,10 +179,12 @@ import org.threeten.extra.Interval;
  *     <p><code>
  * - Reading features: `CONNECT` on the database, `USAGE` on the schemas in `schemas` and `SELECT`
  *   on the tables and views of the mapping.
- * - Large result sets of stored queries: a result set with more than 100,000 values is written
- *   to a table for the duration of the request. This requires `CREATE` on the first schema in
- *   `schemas`, or on `public` if no schema is set. PostgreSQL 15 and later do not grant `CREATE`
- *   on `public` to all roles.
+ * - Large result sets of stored queries (recommended): a result set with more than 100,000 values
+ *   is written to a table for the duration of the request, if the role has `CREATE` on the first
+ *   schema in `schemas`, or on `public` if no schema is set. PostgreSQL 15 and later do not grant
+ *   `CREATE` on `public` to all roles. Without the privilege, such a result set is evaluated as a
+ *   subquery in each query that uses it: the results are the same, but queries that use a large
+ *   result set several times can be considerably slower. This is logged when it first occurs.
  * - Mutations (see [CRUD](#crud)): `INSERT`, `UPDATE` and `DELETE` on the tables and `USAGE` on
  *   the sequences of generated keys.
  * - [Change Listener](90-extensions/change_listener.md): the extension creates the triggers on
@@ -287,10 +289,13 @@ import org.threeten.extra.Interval;
  *     <p><code>
  * - Lesen von Features: `CONNECT` auf die Datenbank, `USAGE` auf die Schemas in `schemas` und
  *   `SELECT` auf die Tabellen und Views des Mappings.
- * - Große Ergebnismengen von Stored Queries: eine Ergebnismenge mit mehr als 100.000 Werten wird
- *   für die Dauer der Anfrage in eine Tabelle geschrieben. Dafür ist `CREATE` auf das erste Schema
- *   in `schemas` erforderlich, oder auf `public`, wenn kein Schema angegeben ist. Ab PostgreSQL 15
- *   ist `CREATE` auf `public` nicht mehr allen Rollen erlaubt.
+ * - Große Ergebnismengen von Stored Queries (empfohlen): eine Ergebnismenge mit mehr als 100.000
+ *   Werten wird für die Dauer der Anfrage in eine Tabelle geschrieben, wenn die Rolle `CREATE` auf
+ *   das erste Schema in `schemas` hat, oder auf `public`, wenn kein Schema angegeben ist. Ab
+ *   PostgreSQL 15 ist `CREATE` auf `public` nicht mehr allen Rollen erlaubt. Ohne das Recht wird
+ *   eine solche Ergebnismenge in jeder Abfrage, die sie verwendet, als Unterabfrage ausgewertet:
+ *   die Ergebnisse sind gleich, aber Abfragen, die eine große Ergebnismenge mehrfach verwenden,
+ *   können deutlich langsamer sein. Dies wird beim ersten Auftreten protokolliert.
  * - Änderungen (siehe [CRUD](#crud)): `INSERT`, `UPDATE` und `DELETE` auf die Tabellen und `USAGE`
  *   auf die Sequenzen generierter Schlüssel.
  * - [Change Listener](90-extensions/change_listener.md): die Erweiterung legt die Trigger auf den
@@ -669,7 +674,8 @@ public class FeatureProviderSql
             this::getSqlClient,
             filterEncoder,
             getData().getQueryGeneration().getResultSetMaterializationMaxSize(),
-            sqlDialect);
+            sqlDialect,
+            getId());
 
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(

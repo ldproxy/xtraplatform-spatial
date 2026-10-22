@@ -115,6 +115,15 @@ public interface SqlDialect {
     return false;
   }
 
+  /**
+   * A query whose single row has two text columns: the schema in which a result-set table is
+   * created (the first schema of the search path) and {@code true} if the role may create tables in
+   * it. Empty if the dialect cannot tell; tables are then assumed to be possible.
+   */
+  default Optional<String> resultSetTablePrivilegeQuery() {
+    return Optional.empty();
+  }
+
   /** DDL to materialize a result-set producer into a session-independent table once. */
   default String createResultSetTable(String name, String producerSelect) {
     throw new UnsupportedOperationException();
