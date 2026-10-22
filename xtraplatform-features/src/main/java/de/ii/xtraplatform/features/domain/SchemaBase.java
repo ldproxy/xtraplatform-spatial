@@ -71,7 +71,13 @@ public interface SchemaBase<T extends SchemaBase<T>> {
      * The verbatim identifier of the reference system of a position variant (see the {@code
      * crsProperty} of a {@code crsVariants} declaration). Implicitly {@code internal}.
      */
-    ORIGINAL_CRS_IDENTIFIER;
+    ORIGINAL_CRS_IDENTIFIER,
+    /**
+     * A property that is not essential for the primary representation of the feature, but provides
+     * additional context, typically derived or computed from other properties or from relating the
+     * feature to other data. Never receivable; APIs may leave it out by default.
+     */
+    AUXILIARY;
 
     private final String linkRelation;
 
@@ -294,7 +300,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default boolean receivable() {
-    return !getExcludedScopes().contains(Scope.RECEIVABLE);
+    return !getExcludedScopes().contains(Scope.RECEIVABLE) && !isAuxiliary();
   }
 
   default boolean hasOneOf(Set<Scope> scopes) {
@@ -785,6 +791,13 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Auxiliary
   default boolean isId() {
     return getRole().filter(role -> role == Role.ID).isPresent();
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isAuxiliary() {
+    return getRole().filter(role -> role == Role.AUXILIARY).isPresent();
   }
 
   @JsonIgnore
