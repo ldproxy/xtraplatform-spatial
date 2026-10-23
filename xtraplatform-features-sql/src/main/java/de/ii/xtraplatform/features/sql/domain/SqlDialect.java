@@ -40,6 +40,14 @@ public interface SqlDialect {
 
   String applyToDatetime(String column, Optional<String> format);
 
+  /**
+   * The datetime column as compared in a filter when the provider compares datetime values in the
+   * type of the column. The default keeps the conversion of {@link #applyToDatetime}.
+   */
+  default String applyToDatetimeForNativeComparison(String column, Optional<String> format) {
+    return applyToDatetime(column, format);
+  }
+
   String applyToDateLiteral(String date);
 
   String applyToDatetimeLiteral(String datetime);

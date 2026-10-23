@@ -120,6 +120,7 @@ public class FilterEncoderSql {
   // "table.column" in lower case and mapped to the column the index is keyed on; see
   // SqlDbmsAdapter.getSpatialIndexes
   private final Map<String, String> spatialIndexes;
+  private final boolean nativeDatetimeComparison;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -182,7 +183,32 @@ public class FilterEncoderSql {
       String accentiCollation,
       java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver,
       Map<String, String> spatialIndexes) {
+    this(
+        nativeCrs,
+        sqlDialect,
+        crsTransformerFactory,
+        crsInfo,
+        cql,
+        customFunctions,
+        accentiCollation,
+        mappingResolver,
+        spatialIndexes,
+        false);
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation,
+      java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver,
+      Map<String, String> spatialIndexes,
+      boolean nativeDatetimeComparison) {
     this.spatialIndexes = spatialIndexes;
+    this.nativeDatetimeComparison = nativeDatetimeComparison;
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -299,6 +325,12 @@ public class FilterEncoderSql {
    * de.ii.xtraplatform.cql.domain.CqlToText} applies before encoding it, so that the bounding box
    * is guaranteed to describe the geometry that ends up in the query. Null for an empty geometry.
    */
+  private String datetimeColumn(String qualifiedColumn, Optional<String> format) {
+    return nativeDatetimeComparison
+        ? sqlDialect.applyToDatetimeForNativeComparison(qualifiedColumn, format)
+        : sqlDialect.applyToDatetime(qualifiedColumn, format);
+  }
+
   private double[][] envelopeOf(GeometryNode geometry) {
     return coordinatesTransformer
         .apply(geometry.getGeometry(), geometry.getCrs().or(() -> geometry.getGeometry().getCrs()))
@@ -1031,7 +1063,7 @@ public class FilterEncoderSql {
                         sqlDialect.applyToDate(qualifiedColumn, column.getFormat()),
                         Optional.<String>empty());
                   return Tuple.of(
-                      sqlDialect.applyToDatetime(qualifiedColumn, column.getFormat()),
+                      datetimeColumn(qualifiedColumn, column.getFormat()),
                       Optional.<String>empty());
                 }
                 return Tuple.of(qualifiedColumn, Optional.<String>empty());
@@ -2127,7 +2159,7 @@ public class FilterEncoderSql {
                 }
                 if (col.getType() == DATETIME) {
                   return Tuple.of(
-                      sqlDialect.applyToDatetime(
+                      datetimeColumn(
                           qualifiedColumn, col.getOperationParameter(Operation.DATETIME)),
                       Optional.<String>empty());
                 }

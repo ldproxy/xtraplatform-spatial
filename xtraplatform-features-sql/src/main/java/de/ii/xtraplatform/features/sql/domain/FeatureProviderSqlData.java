@@ -211,6 +211,27 @@ public interface FeatureProviderSqlData
       return Optional.empty();
     }
 
+    /**
+     * @langEn Option to compare the values of `DATETIME` properties in filters in the data type of
+     *     the database column, so that the database can use indexes and statistics of the column.
+     *     Requires that the columns have a timestamp type (`timestamp` or `timestamptz`);
+     *     properties with a `format` are not affected. With the option, fractions of a second are
+     *     compared exactly; without it, values are compared at the precision of whole seconds. Only
+     *     supported for PostgreSQL, ignored for other dialects.
+     * @langDe Steuert, ob die Werte von `DATETIME`-Eigenschaften in Filtern im Datentyp der
+     *     Datenbankspalte verglichen werden, damit die Datenbank Indizes und Statistiken der Spalte
+     *     nutzen kann. Setzt voraus, dass die Spalten einen Zeitstempel-Typ haben (`timestamp` oder
+     *     `timestamptz`); Eigenschaften mit einem `format` sind nicht betroffen. Mit der Option
+     *     werden Sekundenbruchteile exakt verglichen, ohne sie werden die Werte auf ganze Sekunden
+     *     genau verglichen. Nur für PostgreSQL unterstützt, bei anderen Dialekten ohne Wirkung.
+     * @default false
+     * @since v4.9
+     */
+    @Value.Default
+    default boolean getNativeDatetimeComparison() {
+      return false;
+    }
+
     // TODO
     @DocIgnore
     @Value.Default
