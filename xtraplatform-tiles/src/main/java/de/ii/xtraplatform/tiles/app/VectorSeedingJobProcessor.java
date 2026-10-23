@@ -8,46 +8,44 @@
 package de.ii.xtraplatform.tiles.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
-import de.ii.xtraplatform.base.domain.AppContext;
+import de.ii.xtralink.jobs.JobResult;
+import de.ii.xtralink.jobs.PartialJob;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2.State;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
-import de.ii.xtraplatform.jobs.domain.Job;
-import de.ii.xtraplatform.jobs.domain.JobProcessor;
-import de.ii.xtraplatform.jobs.domain.JobQueueMin;
-import de.ii.xtraplatform.jobs.domain.JobResult;
-import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.TileProvider;
 import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJobSet;
+import de.ii.xtraplatform.tiles.domain.TileSeedingPartialJob;
+import de.ii.xtraplatform.xtralink.domain.JobProcessing;
+import de.ii.xtraplatform.xtralink.domain.JobProcessor;
+import de.ii.xtraplatform.xtralink.domain.JobProcessorBase;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Singleton
-@AutoBind
-public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, TileSeedingJobSet> {
+@AutoBind(interfaces = JobProcessorBase.class)
+public class VectorSeedingJobProcessor
+    implements JobProcessor<TileSeedingJob, TileSeedingPartialJob> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorSeedingJobProcessor.class);
 
-  private final int concurrency;
   private final EntityRegistry entityRegistry;
 
   @Inject
-  VectorSeedingJobProcessor(AppContext appContext, EntityRegistry entityRegistry) {
-    this.concurrency = appContext.getConfiguration().getJobConcurrency();
+  VectorSeedingJobProcessor(EntityRegistry entityRegistry) {
     this.entityRegistry = entityRegistry;
   }
 
   @Override
-  public String getJobType() {
-    return TileSeedingJob.TYPE_MVT;
+  public Set<String> getKinds() {
+    return Set.of(TileSeedingPartialJob.TYPE_MVT);
   }
 
   @Override
@@ -56,14 +54,9 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
   }
 
   @Override
-  public int getConcurrency(JobSet jobSet) {
-    return concurrency;
-  }
-
-  @Override
-  public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
-    TileSeedingJob seedingJob = getDetails(job, jobQueue);
-    TileSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
+  public JobResult process(PartialJob job, de.ii.xtralink.jobs.Job jobSet, JobProcessing jobs)
+      throws Exception {
+    TileSeedingPartialJob seedingJob = getPartialContext(job, jobs);
 
     Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJob.getTileProvider());
     if (optionalTileProvider.isPresent()) {
@@ -71,7 +64,7 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
 
       if (!tileProvider.seeding().isSupported()) {
         LOGGER.error("Tile provider does not support seeding: {}", tileProvider.getId());
-        return JobResult.error("Tile provider does not support seeding"); // early return
+        return jobs.failure("Tile provider does not support seeding"); // early return
       }
       if (!tileProvider.seeding().isAvailable()) {
         if (LOGGER.isDebugEnabled(MARKER.JOBS) || LOGGER.isTraceEnabled()) {
@@ -79,7 +72,7 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
               MARKER.JOBS,
               "Tile provider '{}' not available, suspending job ({})",
               tileProvider.getId(),
-              job.getId());
+              job.id());
         }
         tileProvider
             .seeding()
@@ -91,60 +84,43 @@ public class VectorSeedingJobProcessor implements JobProcessor<TileSeedingJob, T
                           MARKER.JOBS,
                           "Tile provider '{}' became available, resuming job ({})",
                           tileProvider.getId(),
-                          job.getId());
+                          job.id());
                     }
-                    jobQueue.push(job);
+                    jobs.repush(job.id());
                   }
                 },
                 true);
-        return JobResult.onHold(); // early return
+        return jobs.onHold(); // early return
       }
 
       AtomicInteger last = new AtomicInteger(0);
       Consumer<Integer> updateProgress =
           (current) -> {
             int delta = current - last.getAndSet(current);
-            Map<String, Object> detailParameters =
-                Map.of(
-                    "tileSet", seedingJob.getTileSet(),
-                    "tileMatrixSet", seedingJob.getTileMatrixSet(),
-                    "level", seedingJob.getSubMatrices().get(0).getLevel(),
-                    "delta", delta);
-
-            jobQueue.updateJob(job, delta);
-            jobQueue.updateJobSet(jobSet, delta, detailParameters);
+            jobs.update(job.id(), delta);
           };
 
       try {
         tileProvider.seeding().get().runSeeding(seedingJob, updateProgress);
       } catch (IOException e) {
-        return JobResult.retry(e.getMessage());
+        return jobs.retry(e.getMessage());
       } catch (Throwable e) {
-        updateProgress.accept(job.getTotal().get());
+        updateProgress.accept(job.progress().total());
         throw e;
       }
     }
 
-    return JobResult.success();
+    return jobs.success();
   }
 
   @Override
-  public Class<TileSeedingJob> getDetailsType() {
+  public Class<TileSeedingJob> getInputsClass() {
     return TileSeedingJob.class;
   }
 
   @Override
-  public Class<TileSeedingJobSet> getSetDetailsType() {
-    return TileSeedingJobSet.class;
-  }
-
-  @Override
-  public Map<String, Class<?>> getJobTypes() {
-    return Map.of(
-        TileSeedingJob.TYPE_MVT,
-        TileSeedingJob.class,
-        TileSeedingJob.TYPE_PNG,
-        TileSeedingJob.class);
+  public Class<TileSeedingPartialJob> getPartialContextClass() {
+    return TileSeedingPartialJob.class;
   }
 
   private Optional<TileProvider> getTileProvider(String id) {

@@ -14,11 +14,14 @@ import static de.ii.xtraplatform.cql.domain.ArrayFunction.A_OVERLAPS;
 import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATE;
 import static de.ii.xtraplatform.features.domain.SchemaBase.Type.DATETIME;
+import static de.ii.xtraplatform.features.domain.SchemaBase.Type.FEATURE_REF_ARRAY;
+import static de.ii.xtraplatform.features.domain.SchemaBase.Type.VALUE_ARRAY;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.cql.domain.And;
+import de.ii.xtraplatform.cql.domain.ArrayFunction;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
 import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
@@ -37,6 +40,8 @@ import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.cql.domain.Function;
 import de.ii.xtraplatform.cql.domain.GeometryNode;
 import de.ii.xtraplatform.cql.domain.In;
+import de.ii.xtraplatform.cql.domain.InResultSet;
+import de.ii.xtraplatform.cql.domain.InResultSetByKey;
 import de.ii.xtraplatform.cql.domain.IsNull;
 import de.ii.xtraplatform.cql.domain.Like;
 import de.ii.xtraplatform.cql.domain.LogicalOperation;
@@ -45,6 +50,7 @@ import de.ii.xtraplatform.cql.domain.Operand;
 import de.ii.xtraplatform.cql.domain.Property;
 import de.ii.xtraplatform.cql.domain.Scalar;
 import de.ii.xtraplatform.cql.domain.ScalarLiteral;
+import de.ii.xtraplatform.cql.domain.SpatialFunction;
 import de.ii.xtraplatform.cql.domain.SpatialOperation;
 import de.ii.xtraplatform.cql.domain.Temporal;
 import de.ii.xtraplatform.cql.domain.TemporalLiteral;
@@ -54,6 +60,7 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.Tuple;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SchemaSql.PropertyTypeInfo;
@@ -69,18 +76,26 @@ import de.ii.xtraplatform.geometries.domain.Polygon;
 import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
+import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +115,11 @@ public class FilterEncoderSql {
   private final Cql cql;
   private final String accentiCollation;
   private final Map<String, CustomFunction> customFunctions;
+  private final java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver;
+  // geometry columns with a spatial index that the query has to name explicitly, keyed by
+  // "table.column" in lower case and mapped to the column the index is keyed on; see
+  // SqlDbmsAdapter.getSpatialIndexes
+  private final Map<String, String> spatialIndexes;
   BiFunction<Geometry<?>, Optional<EpsgCrs>, Geometry<?>> coordinatesTransformer;
 
   public FilterEncoderSql(
@@ -120,12 +140,56 @@ public class FilterEncoderSql {
       Cql cql,
       List<CustomFunction> customFunctions,
       String accentiCollation) {
+    this(
+        nativeCrs,
+        sqlDialect,
+        crsTransformerFactory,
+        crsInfo,
+        cql,
+        customFunctions,
+        accentiCollation,
+        type -> Optional.empty());
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation,
+      java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver) {
+    this(
+        nativeCrs,
+        sqlDialect,
+        crsTransformerFactory,
+        crsInfo,
+        cql,
+        customFunctions,
+        accentiCollation,
+        mappingResolver,
+        Map.of());
+  }
+
+  public FilterEncoderSql(
+      EpsgCrs nativeCrs,
+      SqlDialect sqlDialect,
+      CrsTransformerFactory crsTransformerFactory,
+      CrsInfo crsInfo,
+      Cql cql,
+      List<CustomFunction> customFunctions,
+      String accentiCollation,
+      java.util.function.Function<String, Optional<SqlQueryMapping>> mappingResolver,
+      Map<String, String> spatialIndexes) {
+    this.spatialIndexes = spatialIndexes;
     this.nativeCrs = nativeCrs;
     this.sqlDialect = sqlDialect;
     this.crsTransformerFactory = crsTransformerFactory;
     this.crsInfo = crsInfo;
     this.cql = cql;
     this.accentiCollation = accentiCollation;
+    this.mappingResolver = mappingResolver;
     this.customFunctions =
         ImmutableMap.copyOf(
             CqlBuiltInFunctions.prependBuiltInFunctions(customFunctions).stream()
@@ -135,6 +199,123 @@ public class FilterEncoderSql {
                         function -> function,
                         (left, right) -> right)));
     this.coordinatesTransformer = this::transformCoordinatesIfNecessary;
+  }
+
+  /**
+   * Adds the spatial index predicate of the dialect to an exact spatial predicate, as a conjunct.
+   *
+   * <p>The conjunct is only added where it is implied by the exact predicate, so that it can change
+   * neither the result nor the meaning of the predicate under negation: the operator has to be one
+   * whose match implies that the bounding boxes intersect, the geometry has to be a column of the
+   * main table that a spatial index is known for, and the other operand has to be a geometry
+   * literal whose bounding box is known.
+   *
+   * @param literalEnvelopes the bounding boxes of the geometry literals of the filter being
+   *     encoded, keyed by the SQL they were encoded to
+   * @param acceleratedPredicates records the added conjunct, so that {@link
+   *     #withoutSpatialIndexPredicates} can drop it again under a negation
+   * @param geometryTableAndColumn resolves the table and column of the geometry operand, evaluated
+   *     only once everything else already matched
+   */
+  private String withSpatialIndexPredicate(
+      SpatialFunction operator,
+      List<String> children,
+      String mainExpression,
+      String predicate,
+      Map<String, double[][]> literalEnvelopes,
+      Map<String, String> acceleratedPredicates,
+      Supplier<Optional<Tuple<String, String>>> geometryTableAndColumn) {
+    if (spatialIndexes.isEmpty()
+        || !SqlDialect.SPATIAL_OPERATORS_IMPLYING_BBOX_INTERSECTION.contains(operator)
+        // Only the direct conjunct form of a property reference addresses the geometry as a column
+        // of the main table (see visit(Property)). In the semi-join form the geometry belongs to a
+        // joined table, where the predicate would have to go inside the subquery instead.
+        || !(mainExpression.startsWith("%1$s") && mainExpression.endsWith("%2$s"))) {
+      return predicate;
+    }
+
+    double[][] envelope =
+        children.stream()
+            .map(literalEnvelopes::get)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+
+    if (Objects.isNull(envelope)) {
+      return predicate;
+    }
+
+    return geometryTableAndColumn
+        .get()
+        .flatMap(
+            tableColumn ->
+                Optional.ofNullable(
+                        spatialIndexes.get(
+                            String.format("%s.%s", tableColumn.first(), tableColumn.second())
+                                .toLowerCase(Locale.ROOT)))
+                    .flatMap(
+                        keyColumn ->
+                            sqlDialect.getSpatialIndexPredicate(
+                                tableColumn.first(),
+                                tableColumn.second(),
+                                "A",
+                                keyColumn,
+                                envelope[0],
+                                envelope[1])))
+        .map(
+            indexPredicate -> {
+              String accelerated = String.format("(%s AND %s)", indexPredicate, predicate);
+              // remembered so that a negation can drop it again, see
+              // withoutSpatialIndexPredicates
+              acceleratedPredicates.put(accelerated, predicate);
+              return accelerated;
+            })
+        .orElse(predicate);
+  }
+
+  /**
+   * Removes the spatial index predicates that were added to the operand of a negation.
+   *
+   * <p>The conjunct is implied by the exact predicate for every row that has a geometry, so adding
+   * it changes nothing there, negated or not. A row whose geometry is NULL is the exception: it has
+   * no entry in the spatial index, so the conjunct is false for it, while the exact predicate is
+   * NULL. Both keep the row out of a positive result, but negated the one yields true and the other
+   * NULL. Dropping the conjunct under a negation keeps that case as it was.
+   */
+  private static String withoutSpatialIndexPredicates(
+      String expression, Map<String, String> acceleratedPredicates) {
+    String withoutIndexPredicates = expression;
+
+    for (Entry<String, String> accelerated : acceleratedPredicates.entrySet()) {
+      withoutIndexPredicates =
+          withoutIndexPredicates.replace(accelerated.getKey(), accelerated.getValue());
+    }
+
+    return withoutIndexPredicates;
+  }
+
+  /**
+   * The bounding box of a geometry literal, derived after the same transformation that {@link
+   * de.ii.xtraplatform.cql.domain.CqlToText} applies before encoding it, so that the bounding box
+   * is guaranteed to describe the geometry that ends up in the query. Null for an empty geometry.
+   */
+  private double[][] envelopeOf(GeometryNode geometry) {
+    return coordinatesTransformer
+        .apply(geometry.getGeometry(), geometry.getCrs().or(() -> geometry.getGeometry().getCrs()))
+        .accept(new MinMaxDeriver());
+  }
+
+  /**
+   * The column of a plain {@code A.<column>} reference. Anything else — a sub-decoder expression, a
+   * date function — is not a column that a spatial index could be looked up for.
+   */
+  private static Optional<String> plainColumnOfMainTable(String qualifiedColumn) {
+    if (!qualifiedColumn.startsWith("A.")
+        || qualifiedColumn.indexOf('(') >= 0
+        || qualifiedColumn.indexOf(' ') >= 0) {
+      return Optional.empty();
+    }
+    return Optional.of(qualifiedColumn.substring(2));
   }
 
   private Optional<String> renderCustomFunction(
@@ -235,6 +416,291 @@ public class FilterEncoderSql {
           "");
     }
     return expression;
+  }
+
+  // output column alias of every result-set CTE; consumers reference it as `SELECT <col> FROM
+  // <cte>`
+  /** Stable name of the single value column projected by a result-set producer. */
+  public static final String RESULT_SET_VALUE_COLUMN = "rs_value";
+
+  private static final String CTE_VALUE_COL = RESULT_SET_VALUE_COLUMN;
+
+  /**
+   * Collects the result-set subqueries of one top-level {@code inResultSet} predicate as named,
+   * materialized CTEs so that each result set is evaluated exactly once instead of being
+   * re-embedded (and re-evaluated) at every nesting level. CTEs are stored in dependency order — a
+   * nested set is registered while building the body of its parent, so it is inserted first and may
+   * be referenced by the parent.
+   */
+  private static final class CteCollector {
+    private final LinkedHashMap<String, String> ctes = new LinkedHashMap<>();
+    private final Map<String, String> namesBySet = new java.util.HashMap<>();
+    private int counter;
+
+    String register(String setName, Supplier<String> bodySupplier) {
+      String existing = namesBySet.get(setName);
+      if (existing != null) {
+        return existing;
+      }
+      String name = "_rs_" + (counter++) + "_" + setName.replaceAll("[^A-Za-z0-9_]", "_");
+      namesBySet.put(setName, name);
+      // building the body registers any nested result sets first, preserving dependency order
+      String body = bodySupplier.get();
+      ctes.put(name, body);
+      return name;
+    }
+
+    String renderWith(SqlDialect dialect) {
+      return "WITH "
+          + ctes.entrySet().stream()
+              .map(e -> dialect.materializedCte(e.getKey(), e.getValue()))
+              .collect(Collectors.joining(", "));
+    }
+  }
+
+  private static String renderInlineLiteral(Object value) {
+    if (value instanceof String) {
+      return "'" + ((String) value).replace("'", "''") + "'";
+    }
+    return String.valueOf(value);
+  }
+
+  /**
+   * Build the producer SELECT of a result set: {@code SELECT <value column> FROM <producer main>
+   * <joins> WHERE <producer filter>}. With {@code withValueAlias} the value column is aliased as
+   * the CTE value column (for use inside a CTE); without it the bare value column is selected (for
+   * the materializer, which reads that single column). The optional collector lets nested result
+   * sets in the producer filter hoist into the same WITH clause.
+   */
+  String resultSetProducerSelect(
+      InResultSet inResultSet, boolean withValueAlias, CteCollector collector) {
+    String setName = inResultSet.getSetName();
+    String producerType =
+        inResultSet
+            .getProducerType()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+    SqlQueryMapping producerMapping =
+        mappingResolver
+            .apply(producerType)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format(
+                            "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                            setName, producerType)));
+    de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> setColumn =
+        inResultSet.getProducerValues().isPresent()
+            ? producerMapping
+                .getColumnForValue(inResultSet.getProducerValues().get())
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. Result set '%s' projects the property '%s', which is unknown for feature type '%s'.",
+                                setName, inResultSet.getProducerValues().get(), producerType)))
+            : producerMapping
+                .getColumnForId()
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. Feature type '%s' has no id property for result set '%s'.",
+                                producerType, setName)));
+
+    SqlQuerySchema valueTable = setColumn.first();
+    List<String> aliases = AliasGenerator.getAliases(valueTable);
+    SqlQueryTable producerMain =
+        valueTable.getRelations().isEmpty() ? valueTable : valueTable.getRelations().get(0);
+    String join = JoinGenerator.getJoins(valueTable, aliases, this);
+    String valueColumn =
+        String.format("%s.%s", aliases.get(aliases.size() - 1), setColumn.second().getName());
+
+    Optional<Cql2Expression> tableFilter =
+        producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
+    Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
+    Optional<Cql2Expression> effectiveFilter =
+        tableFilter.isPresent() && producerFilter.isPresent()
+            ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
+            : tableFilter.isPresent() ? tableFilter : producerFilter;
+    String where =
+        effectiveFilter
+            .map(
+                filter ->
+                    " WHERE "
+                        + prepareExpression(filter)
+                            .accept(new CqlToSql2(producerMapping, collector)))
+            .orElse("");
+
+    String valueExpr =
+        withValueAlias ? String.format("%s AS %s", valueColumn, CTE_VALUE_COL) : valueColumn;
+    return String.format(
+        "SELECT %2$s FROM %1$s %3$s%4$s%5$s%6$s",
+        producerMain.getName(), valueExpr, aliases.get(0), join.isEmpty() ? "" : " ", join, where);
+  }
+
+  /**
+   * Producer SELECT of a result set for up-front materialization: returns the bare value column so
+   * the caller can run it once and collect the values. Any nested result sets referenced by the
+   * producer filter that already carry materialized values are inlined as literals.
+   */
+  public String encodeResultSetProducer(InResultSet inResultSet) {
+    return resultSetProducerSelect(inResultSet, false, null);
+  }
+
+  /**
+   * Producer SELECT of a result set for materialization into a table: the value column is aliased
+   * to {@link #RESULT_SET_VALUE_COLUMN} so the resulting table has a stable column name to index
+   * and to reference from the consuming filters.
+   */
+  public String encodeResultSetProducerAliased(InResultSet inResultSet) {
+    return resultSetProducerSelect(inResultSet, true, null);
+  }
+
+  /**
+   * Type of the value column of a result set, used to coerce and render its materialized values.
+   */
+  public de.ii.xtraplatform.features.domain.SchemaBase.Type resultSetValueType(
+      InResultSet inResultSet) {
+    String producerType = inResultSet.getProducerType().orElseThrow();
+    SqlQueryMapping producerMapping = mappingResolver.apply(producerType).orElseThrow();
+    return (inResultSet.getProducerValues().isPresent()
+            ? producerMapping.getColumnForValue(inResultSet.getProducerValues().get())
+            : producerMapping.getColumnForId())
+        .map(column -> column.second().getType())
+        .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING);
+  }
+
+  /** Alias of the result set in the semi-join of a composite-key predicate. */
+  private static final String RESULT_SET_ALIAS = "_rsk";
+
+  /** Column names a composite-key result set projects, one per key part in canonical part order. */
+  public static List<String> resultSetValueColumns(int keyParts) {
+    List<String> columns = new ArrayList<>(keyParts);
+    for (int i = 0; i < keyParts; i++) {
+      columns.add(RESULT_SET_VALUE_COLUMN + "_" + i);
+    }
+    return columns;
+  }
+
+  /**
+   * Build the producer SELECT of a composite-key result set: one column per key part, in the
+   * canonical part order, so that consumer and producer agree on the order without the order in the
+   * request mattering. DISTINCT because the members of the set are the distinct keys, not the rows
+   * of the producing feature type — for a key with few distinct values that is the difference
+   * between a handful of rows and one row per feature.
+   */
+  String resultSetProducerSelectByKey(
+      InResultSetByKey inResultSet, boolean withValueAlias, CteCollector collector) {
+    String setName = inResultSet.getSetName();
+    String producerType =
+        inResultSet
+            .getProducerType()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+    SqlQueryMapping producerMapping =
+        mappingResolver
+            .apply(producerType)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format(
+                            "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                            setName, producerType)));
+
+    List<String> valueColumns = resultSetValueColumns(inResultSet.getKeyNames().size());
+    List<String> projection = new ArrayList<>();
+    SqlQuerySchema mainTable = null;
+    List<String> aliases = null;
+
+    for (int i = 0; i < inResultSet.getKeyNames().size(); i++) {
+      String part = inResultSet.getKeyNames().get(i);
+      String property = inResultSet.getProducerKey().get(part);
+
+      if (Objects.isNull(property)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. Result set '%s' does not define the key part '%s'.",
+                setName, part));
+      }
+
+      de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> column =
+          producerMapping
+              .getColumnForValue(property)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format(
+                              "Filter is invalid. The key part '%s' of result set '%s' is the property '%s', which is unknown for feature type '%s'.",
+                              part, setName, property, producerType)));
+
+      if (!column.first().getRelations().isEmpty()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The key part '%s' of result set '%s' is the property '%s', which is not on the main table of feature type '%s'. The key parts of a result set must be properties of the main table.",
+                part, setName, property, producerType));
+      }
+
+      if (Objects.isNull(mainTable)) {
+        mainTable = column.first();
+        aliases = AliasGenerator.getAliases(mainTable);
+      }
+
+      String expression =
+          String.format("%s.%s", aliases.get(aliases.size() - 1), column.second().getName());
+      projection.add(withValueAlias ? expression + " AS " + valueColumns.get(i) : expression);
+    }
+
+    Optional<Cql2Expression> tableFilter =
+        producerMapping.getMainTable().getFilter().map(filter -> (Cql2Expression) filter);
+    Optional<Cql2Expression> producerFilter = inResultSet.getProducerFilter();
+    Optional<Cql2Expression> effectiveFilter =
+        tableFilter.isPresent() && producerFilter.isPresent()
+            ? Optional.of(And.of(tableFilter.get(), producerFilter.get()))
+            : tableFilter.isPresent() ? tableFilter : producerFilter;
+    String where =
+        effectiveFilter
+            .map(
+                filter ->
+                    " WHERE "
+                        + prepareExpression(filter)
+                            .accept(new CqlToSql2(producerMapping, collector)))
+            .orElse("");
+
+    return String.format(
+        "SELECT DISTINCT %s FROM %s %s%s",
+        String.join(", ", projection), mainTable.getName(), aliases.get(0), where);
+  }
+
+  /** Producer SELECT of a composite-key result set for up-front materialization. */
+  public String encodeResultSetProducerByKey(InResultSetByKey inResultSet) {
+    return resultSetProducerSelectByKey(inResultSet, false, null);
+  }
+
+  /** Producer SELECT of a composite-key result set for materialization into a table. */
+  public String encodeResultSetProducerByKeyAliased(InResultSetByKey inResultSet) {
+    return resultSetProducerSelectByKey(inResultSet, true, null);
+  }
+
+  /** Types of the key-part columns of a composite-key result set, in canonical part order. */
+  public List<de.ii.xtraplatform.features.domain.SchemaBase.Type> resultSetValueTypesByKey(
+      InResultSetByKey inResultSet) {
+    String producerType = inResultSet.getProducerType().orElseThrow();
+    SqlQueryMapping producerMapping = mappingResolver.apply(producerType).orElseThrow();
+
+    return inResultSet.getKeyNames().stream()
+        .map(part -> inResultSet.getProducerKey().get(part))
+        .map(
+            property ->
+                producerMapping
+                    .getColumnForValue(property)
+                    .map(column -> column.second().getType())
+                    .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING))
+        .collect(Collectors.toList());
   }
 
   public String encode(Cql2Expression cqlFilter, SchemaSql schema) {
@@ -361,6 +827,66 @@ public class FilterEncoderSql {
     return Optional.of(encodeNested(null, mergedFilter, table.get(), true));
   }
 
+  private static final String DYNAMIC_REF_TYPE = "DYNAMIC";
+
+  /** The valid target types of a property in a mapping, or empty if they are not constrained. */
+  private Optional<Set<String>> targetTypes(SqlQueryMapping mapping, String propertyName) {
+    FeatureSchema schema =
+        mapping
+            .getSchemaForObject(propertyName)
+            .or(() -> mapping.getSchemaForValue(propertyName))
+            .orElse(null);
+    return validTargetTypes(schema);
+  }
+
+  /**
+   * The valid target types of a feature-reference property: from its {@code refType} (case 1), the
+   * union over its {@code concat}/{@code coalesce} members (case 2), or a constant or enum on its
+   * {@code type} sub-property (case 3). Empty when the target type is not constrained (case 4) or
+   * any branch is open.
+   */
+  Optional<Set<String>> validTargetTypes(FeatureSchema schema) {
+    if (Objects.isNull(schema)) {
+      return Optional.empty();
+    }
+
+    List<FeatureSchema> members =
+        !schema.getConcat().isEmpty()
+            ? schema.getConcat()
+            : !schema.getCoalesce().isEmpty() ? schema.getCoalesce() : List.of();
+    if (!members.isEmpty()) {
+      Set<String> types = new LinkedHashSet<>();
+      for (FeatureSchema member : members) {
+        Optional<Set<String>> memberTypes = validTargetTypes(member);
+        if (memberTypes.isEmpty()) {
+          return Optional.empty(); // an open branch leaves the overall target type unconstrained
+        }
+        types.addAll(memberTypes.get());
+      }
+      return types.isEmpty() ? Optional.empty() : Optional.of(types);
+    }
+
+    if (schema.getRefType().filter(type -> !DYNAMIC_REF_TYPE.equals(type)).isPresent()) {
+      return Optional.of(Set.of(schema.getRefType().get()));
+    }
+
+    Optional<FeatureSchema> typeProperty =
+        schema.getProperties().stream().filter(FeatureSchema::isType).findFirst();
+    if (typeProperty.isPresent()) {
+      FeatureSchema type = typeProperty.get();
+      if (type.getConstantValue().isPresent()) {
+        return Optional.of(Set.of(type.getConstantValue().get()));
+      }
+      List<String> enumValues =
+          type.getConstraints().map(SchemaConstraints::getEnumValues).orElse(List.of());
+      if (!enumValues.isEmpty()) {
+        return Optional.of(new LinkedHashSet<>(enumValues));
+      }
+    }
+
+    return Optional.empty();
+  }
+
   private static Predicate<SchemaSql> getPropertyNameMatcher(
       String propertyName, boolean includeObjects) {
     return property ->
@@ -370,9 +896,73 @@ public class FilterEncoderSql {
                 && Objects.equals(propertyName, property.getSourcePath().get()));
   }
 
+  private static boolean isEmptyArray(Operand operand) {
+    return operand instanceof ArrayLiteral arrayLiteral
+        && arrayLiteral.getValue() instanceof List<?> values
+        && values.isEmpty();
+  }
+
+  private static final Pattern SEMI_JOIN =
+      Pattern.compile("^A\\.(\\w+) IN \\((SELECT .*)\\)$", Pattern.DOTALL);
+
+  // The negation of a predicate on a joined property, i.e. of a semi-join
+  // `A.<key> IN (SELECT <alias>.<key> FROM ...)`. As `NOT (A.<key> IN (...))` the planner can only
+  // evaluate the subquery as a SubPlan per candidate (or hash it, if it fits into work_mem), which
+  // for frequent values takes minutes. `NOT EXISTS` over the unchanged subquery is the same
+  // predicate (the outer key is never null), and the planner turns it into an anti-join that probes
+  // the joined table per candidate. Anything but a single semi-join is wrapped in `NOT (...)`. The
+  // derived table is aliased without AS, which Oracle does not accept there.
+  static String negate(String predicate) {
+    Matcher matcher = SEMI_JOIN.matcher(predicate);
+    if (matcher.matches() && closesAtEnd(predicate, predicate.indexOf(" IN (") + 4)) {
+      return String.format(
+          "NOT EXISTS (SELECT 1 FROM (%2$s) NE_ WHERE NE_.%1$s = A.%1$s)",
+          matcher.group(1), matcher.group(2));
+    }
+    return String.format("NOT (%s)", predicate);
+  }
+
+  // whether the parenthesis at openIndex is closed by the last character, ignoring parentheses in
+  // string literals
+  private static boolean closesAtEnd(String expression, int openIndex) {
+    int depth = 0;
+    boolean inLiteral = false;
+    for (int i = openIndex; i < expression.length(); i++) {
+      char c = expression.charAt(i);
+      if (c == '\'') {
+        inLiteral = !inLiteral;
+      } else if (!inLiteral && c == '(') {
+        depth++;
+      } else if (!inLiteral && c == ')') {
+        depth--;
+        if (depth == 0) {
+          return i == expression.length() - 1;
+        }
+      }
+    }
+    return false;
+  }
+
+  // As in the other array predicates, a property without values (no row in the joined table) does
+  // not match. So only a property with values contains the empty array, and no property overlaps
+  // with it, is contained by it or is equal to it. The SQL `IN ()` would be invalid.
+  private static String encodeEmptyArray(
+      ArrayFunction operator, boolean notInverse, String mainExpression) {
+    if (notInverse ? operator == A_CONTAINS : operator == A_CONTAINEDBY) {
+      return String.format(mainExpression, "", " IS NOT NULL");
+    }
+    return "1=0";
+  }
+
   private class CqlToSql extends CqlToText {
 
     private final SchemaSql rootSchema;
+    // bounding boxes of the geometry literals of the filter being encoded, keyed by the SQL they
+    // were encoded to; a visitor encodes a single filter, so this neither leaks nor is shared
+    private final Map<String, double[][]> literalEnvelopes = new LinkedHashMap<>();
+    // spatial predicates that a spatial index predicate was added to, mapped to the predicate
+    // without it
+    private final Map<String, String> acceleratedPredicates = new LinkedHashMap<>();
 
     private CqlToSql(SchemaSql rootSchema) {
       super(coordinatesTransformer);
@@ -536,6 +1126,20 @@ public class FilterEncoderSql {
               FilterEncoderSql.this);
       if (!join.isEmpty()) join += " ";
 
+      // When the predicate needs no sub-table join, its operand is a column reachable directly from
+      // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
+      // self-semi-join (A.id IN (SELECT A.id FROM <main> WHERE ...)): that subquery scans the whole
+      // main table and the planner does not flatten it, so it is O(table) per predicate regardless
+      // of how few rows are selected. The semi-join form is kept whenever a join, junction, or
+      // array
+      // traversal is genuinely required (join non-empty) — there it is load-bearing for
+      // cardinality.
+      if (join.isEmpty() && !Objects.equals(table.getParentPath(), ImmutableList.of("_route_"))) {
+        return String.format(
+            "%%1$s%1$s%%2$s",
+            getQualifiedColumn(table, propertyName, "A", allowColumnFallback).first());
+      }
+
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
           rootSchema.getName(),
@@ -600,7 +1204,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
@@ -612,7 +1217,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + end
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
@@ -624,7 +1230,8 @@ public class FilterEncoderSql {
             + start
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + end.substring(end.indexOf("%2$s") + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -784,6 +1391,13 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSet) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. %s can only be used within a query expression.",
+                InResultSet.TYPE));
+      }
+
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
       List<String> expressions = processBinary(scalarOperation.getArgs(), children);
@@ -834,6 +1448,14 @@ public class FilterEncoderSql {
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
         mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+      } else if (mainExpression.contains("(SELECT")) {
+        // The property needs a join, so the operand is an EXISTS-style semi-join
+        // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
+        // column for NULL inside that subquery can never match: a feature without related rows
+        // contributes no subquery rows at all. "Property has no value" is the negation of
+        // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
+        // null, so the negation is exact.
+        return negate(String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -984,13 +1606,41 @@ public class FilterEncoderSql {
 
       List<String> expressions = processBinary(spatialOperation.getArgs(), children);
 
-      return String.format(
+      String predicate =
+          String.format(
+              expressions.get(0),
+              String.format("%s(", operator.first()),
+              operator
+                  .second()
+                  .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
+                  .orElse(String.format(", %s)%s", expressions.get(1), match)));
+
+      return withSpatialIndexPredicate(
+          spatialOperation.getSpatialOperator(),
+          children,
           expressions.get(0),
-          String.format("%s(", operator.first()),
-          operator
-              .second()
-              .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
-              .orElse(String.format(", %s)%s", expressions.get(1), match)));
+          predicate,
+          literalEnvelopes,
+          acceleratedPredicates,
+          () -> geometryTableAndColumn(spatialOperation));
+    }
+
+    /** The table and column of the geometry operand of a spatial predicate, if it is a column. */
+    private Optional<Tuple<String, String>> geometryTableAndColumn(
+        BinarySpatialOperation spatialOperation) {
+      return spatialOperation.getArgs().stream()
+          .filter(Property.class::isInstance)
+          .map(Property.class::cast)
+          .findFirst()
+          .flatMap(
+              property -> {
+                String propertyName = property.getName().replaceAll("^\"|\"$", "");
+                boolean allowColumnFallback = !propertyName.contains(".");
+                SchemaSql table = getTable(propertyName, false, allowColumnFallback);
+                return plainColumnOfMainTable(
+                        getQualifiedColumn(table, propertyName, "A", allowColumnFallback).first())
+                    .map(column -> Tuple.of(rootSchema.getName(), column));
+              });
     }
 
     @Override
@@ -1032,7 +1682,10 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(GeometryNode geometry, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      String expression =
+          sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      literalEnvelopes.computeIfAbsent(expression, ignore -> envelopeOf(geometry));
+      return expression;
     }
 
     @Override
@@ -1132,17 +1785,40 @@ public class FilterEncoderSql {
           getQualifiedColumn(table, propertyName, aliases.get(aliases.size() - 1), false);
 
       if (qualifiedColumn.second().isEmpty()) {
+        if (isEmptyArray(arrayOperation.getArgs().get(notInverse ? 1 : 0))) {
+          return encodeEmptyArray(arrayOperation.getArrayOperator(), notInverse, mainExpression);
+        }
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          if (elementCount > 1) {
+            // "contains all values" is the conjunction of one semi-join per value; unlike a single
+            // subquery with GROUP BY ... HAVING count(distinct ...) = n, each of them lets the
+            // planner probe the joined table per candidate
+            Optional<List<String>> elements =
+                renderArrayElements(arrayOperation.getArgs().get(notInverse ? 1 : 0));
+            if (elements.isPresent()) {
+              String semiJoin = mainExpression;
+              return elements.get().stream()
+                  .map(element -> String.format(semiJoin, "", " IN (" + element + ")"))
+                  .collect(Collectors.joining(" AND ", "(", ")"));
+            }
+          }
+          // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
+          // group selected by `IN (<one value>)` trivially has one distinct value), and without a
+          // HAVING the GROUP BY is redundant in the `IN` semi-join; dropping both keeps the result
+          // identical but lets the planner turn the subquery into a semi-join that probes the
+          // joined table per candidate instead of materializing every matching row
           String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
-                  secondExpression,
-                  aliases.get(0),
-                  rootSchema.getSortKey().get(),
-                  qualifiedColumn.first(),
-                  elementCount);
+              elementCount == 1
+                  ? String.format(" IN %1$s", secondExpression)
+                  : String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
+                      secondExpression,
+                      aliases.get(0),
+                      rootSchema.getSortKey().get(),
+                      qualifiedColumn.first(),
+                      elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_EQUALS) {
           String arrayQuery =
@@ -1155,10 +1831,9 @@ public class FilterEncoderSql {
                   elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
-          String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s",
-                  secondExpression, aliases.get(0), rootSchema.getSortKey().get());
+          // no GROUP BY: in the `IN` semi-join it would only prevent the planner from probing the
+          // joined table per candidate
+          String arrayQuery = String.format(" IN %1$s", secondExpression);
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -1200,6 +1875,16 @@ public class FilterEncoderSql {
       throw new IllegalStateException("unexpected array operator: " + arrayOperation);
     }
 
+    // the SQL literals of the elements of an array literal, if they are available individually
+    private Optional<List<String>> renderArrayElements(Operand operand) {
+      if (operand instanceof ArrayLiteral arrayLiteral
+          && arrayLiteral.getValue() instanceof List<?> values
+          && values.stream().allMatch(Scalar.class::isInstance)) {
+        return Optional.of(values.stream().map(value -> ((Scalar) value).accept(this)).toList());
+      }
+      return Optional.empty();
+    }
+
     @Override
     public String visit(ArrayLiteral arrayLiteral, List<String> children) {
       if (arrayLiteral.getValue() instanceof String) {
@@ -1226,7 +1911,17 @@ public class FilterEncoderSql {
     public String visit(Not not, List<String> children) {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
-      String operation = children.get(0);
+      String operation = withoutSpatialIndexPredicates(children.get(0), acceleratedPredicates);
+      if (operation.contains("(SELECT")) {
+        // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
+        // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
+        // negation into the subquery, negating the inner predicate (exists a related row that
+        // does NOT match) instead of the whole predicate (NO related row matches): features
+        // without any related row are dropped by the INNER join and multi-valued properties get
+        // any- instead of all-semantics. Wrap instead — the outer operand (A.<sortKey>) is never
+        // null, so NOT (...) is the exact logical negation.
+        return negate(operation);
+      }
       Integer pos = null;
       Cql2Expression arg = not.getArgs().get(0);
       if (arg instanceof In) {
@@ -1266,7 +1961,9 @@ public class FilterEncoderSql {
             operation.substring(0, pos), operator, operation.substring(pos + 1, length));
       }
 
-      return super.visit(not, children);
+      // operation, not children: Not is unary, and operation is the operand with any spatial index
+      // predicate removed
+      return super.visit(not, ImmutableList.of(operation));
     }
 
     @Override
@@ -1326,10 +2023,25 @@ public class FilterEncoderSql {
   private class CqlToSql2 extends CqlToText {
 
     private final SqlQueryMapping mapping;
+    // non-null while encoding the producer filter of an enclosing inResultSet, so that nested
+    // result sets register their CTEs with the same collector instead of nesting inline
+    private final CteCollector collector;
 
     private CqlToSql2(SqlQueryMapping mapping) {
+      this(mapping, null);
+    }
+
+    // bounding boxes of the geometry literals of the filter being encoded, keyed by the SQL they
+    // were encoded to; a visitor encodes a single filter, so this neither leaks nor is shared
+    private final Map<String, double[][]> literalEnvelopes = new LinkedHashMap<>();
+    // spatial predicates that a spatial index predicate was added to, mapped to the predicate
+    // without it
+    private final Map<String, String> acceleratedPredicates = new LinkedHashMap<>();
+
+    private CqlToSql2(SqlQueryMapping mapping, CteCollector collector) {
       super(coordinatesTransformer);
       this.mapping = mapping;
+      this.collector = collector;
     }
 
     protected FeatureSchema getSchema(
@@ -1453,7 +2165,8 @@ public class FilterEncoderSql {
           .filter("EXPRESSION"::equals)
           .isPresent()) {
         String columnResolved =
-            SqlQueryColumnOperations.getQualifiedColumnResolved(alias, column, sqlDialect);
+            SqlQueryColumnOperations.getQualifiedColumnResolved(
+                alias, column, sqlDialect, Set.of(Operation.WKB, Operation.WKT), false);
 
         return columnResolved.replace("AS " + column.getName(), "");
       }
@@ -1521,6 +2234,23 @@ public class FilterEncoderSql {
               FilterEncoderSql.this);
       if (!join.isEmpty()) join += " ";
 
+      // When the predicate needs no sub-table join, its operand is a column reachable directly from
+      // the main table (aliased A). Emit it as a direct conjunct instead of a redundant
+      // self-semi-join (A.id IN (SELECT A.id FROM <main> WHERE ...)): that subquery scans the whole
+      // main table and the planner does not flatten it, so it is O(table) per predicate regardless
+      // of how few rows are selected. The semi-join form is kept whenever a join, junction, or
+      // array
+      // traversal is genuinely required (join non-empty) — there it is load-bearing for
+      // cardinality.
+      if (join.isEmpty()
+          && !Objects.equals(table.first().getParentPath(), ImmutableList.of("_route_"))) {
+        return String.format(
+            "%%1$s%1$s%%2$s",
+            getQualifiedColumn(
+                    table.first(), table.second(), propertyName, "A", allowColumnFallback)
+                .first());
+      }
+
       return String.format(
           "A.%3$s IN (SELECT %2$s.%3$s FROM %1$s %2$s %4$sWHERE %%1$s%5$s%%2$s)",
           mapping.getMainTable().getName(),
@@ -1585,7 +2315,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof Property && arg2 instanceof TemporalLiteral) {
         String startColumn = reduceToColumn(start);
         startColumn =
@@ -1597,7 +2328,8 @@ public class FilterEncoderSql {
             + startColumn
             + ", "
             + end
-            + ")%2$s)";
+            + ")%2$s"
+            + start.substring(start.indexOf("%2$s") + 4);
       } else if (arg1 instanceof TemporalLiteral && arg2 instanceof Property) {
         String endColumn = reduceToColumn(end);
         endColumn =
@@ -1609,7 +2341,8 @@ public class FilterEncoderSql {
             + start
             + ", "
             + endColumn
-            + ")%2$s)";
+            + ")%2$s"
+            + end.substring(end.indexOf("%2$s") + 4);
       }
       throw new IllegalStateException("unsupported interval: " + interval);
     }
@@ -1643,12 +2376,54 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+      Optional<String> jsonArrayLike = encodeLikeInJsonArray(function, children);
+      if (jsonArrayLike.isPresent()) {
+        return jsonArrayLike.get();
+      }
+
       Optional<String> customExpression = renderCustomFunction(function, children);
       if (customExpression.isPresent()) {
         return customExpression.get();
       }
 
       return super.visit(function, children);
+    }
+
+    // the ALIKE template matches the pattern against the column value, which for an array in a
+    // JSON document is the JSON text of the whole array; match each array item instead
+    private Optional<String> encodeLikeInJsonArray(
+        de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+      if (!"ALIKE".equalsIgnoreCase(function.getName())
+          || children.size() != 2
+          || !(function.getArgs().get(0) instanceof Property)
+          || !operandHasSelect(children.get(0))) {
+        return Optional.empty();
+      }
+
+      String propertyName =
+          ((Property) function.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+      SqlQueryColumn column =
+          getTableColumn(propertyName, false, !propertyName.contains(".")).second();
+      if (Objects.isNull(column)
+          || column.getOperationParameter(Operation.CONNECTOR).filter("JSON"::equals).isEmpty()) {
+        return Optional.empty();
+      }
+
+      boolean isArray =
+          mapping
+              .getSchemaForValue(propertyName)
+              .filter(
+                  schema ->
+                      schema.getType() == VALUE_ARRAY
+                          || schema.getType() == FEATURE_REF_ARRAY
+                          || mapping.isInConnectedArray(schema))
+              .isPresent();
+      if (!isArray) {
+        return Optional.empty();
+      }
+
+      return Optional.of(
+          sqlDialect.applyToJsonArrayLike(children.get(0), reduceSelectToColumn(children.get(1))));
     }
 
     private String reduceToColumn(String expression) {
@@ -1765,12 +2540,227 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(BinaryScalarOperation scalarOperation, List<String> children) {
+      if (scalarOperation instanceof InResultSetByKey) {
+        return encodeInResultSetByKey((InResultSetByKey) scalarOperation);
+      }
+
+      if (scalarOperation instanceof InResultSet) {
+        return encodeInResultSet((InResultSet) scalarOperation, children.get(0));
+      }
+
       String operator = SCALAR_OPERATORS.get(scalarOperation.getClass());
 
       List<String> expressions = processBinary(scalarOperation.getArgs(), children);
 
       String operation = String.format(" %s %s", operator, expressions.get(1));
       return String.format(expressions.get(0), "", operation);
+    }
+
+    private String encodeInResultSet(InResultSet inResultSet, String mainExpression) {
+      if (!operandHasSelect(mainExpression)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The first argument of %s must be a queryable.",
+                InResultSet.TYPE));
+      }
+
+      String setName = inResultSet.getSetName();
+      String producerType =
+          inResultSet
+              .getProducerType()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format("Filter is invalid. Unknown result set: '%s'.", setName)));
+
+      SqlQueryMapping producerMapping =
+          mappingResolver
+              .apply(producerType)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          String.format(
+                              "Filter is invalid. Result set '%s' cannot be resolved for feature type '%s'.",
+                              setName, producerType)));
+
+      // type compatibility: the value type of the result set must be a valid target type of the
+      // consumed property. The target types of a property are known when it has a refType, a
+      // concat/coalesce, or a type sub-property with a constant or enum; otherwise they are
+      // unconstrained and the check is skipped (no false negatives).
+      String consumerProperty =
+          ((Property) inResultSet.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+      Optional<Set<String>> consumerTargets = targetTypes(mapping, consumerProperty);
+      Optional<Set<String>> setTypes =
+          inResultSet.getProducerValues().isPresent()
+              ? targetTypes(producerMapping, inResultSet.getProducerValues().get())
+              : Optional.of(Set.of(producerType));
+      if (consumerTargets.isPresent()
+          && setTypes.isPresent()
+          && Collections.disjoint(consumerTargets.get(), setTypes.get())) {
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn(
+              "inResultSet: the value type(s) {} of result set '{}' are not among the valid target"
+                  + " types {} of property '{}'; the relation cannot match and the hop is skipped.",
+              setTypes.get(),
+              setName,
+              consumerTargets.get(),
+              consumerProperty);
+        }
+        return "1 = 0";
+      }
+
+      // if the result set has been materialized into a table, reference it directly so the producer
+      // runs once and each consumer only scans the indexed table
+      if (inResultSet.getMaterializedTable().isPresent()) {
+        return String.format(
+            mainExpression,
+            "",
+            String.format(
+                " IN (SELECT %s FROM %s)",
+                CTE_VALUE_COL, inResultSet.getMaterializedTable().get()));
+      }
+
+      // if the result set has been materialized up front, inline its values as a literal IN list
+      if (inResultSet.getMaterializedValues().isPresent()) {
+        List<Object> values = inResultSet.getMaterializedValues().get();
+        if (values.isEmpty()) {
+          return "1 = 0";
+        }
+        String list =
+            values.stream()
+                .map(FilterEncoderSql::renderInlineLiteral)
+                .collect(Collectors.joining(", "));
+        return String.format(mainExpression, "", String.format(" IN (%s)", list));
+      }
+
+      // otherwise re-derive the result set inline; hoist it (and any nested result sets referenced
+      // by its producer filter) into materialized CTEs so each is evaluated once within the
+      // statement. CTEs are emitted in dependency order; the outermost predicate prepends the WITH.
+      boolean outermost = collector == null;
+      CteCollector coll = outermost ? new CteCollector() : collector;
+      String cteName =
+          coll.register(setName, () -> resultSetProducerSelect(inResultSet, true, coll));
+
+      String reference =
+          outermost
+              ? String.format(
+                  " IN (%s SELECT %s FROM %s)", coll.renderWith(sqlDialect), CTE_VALUE_COL, cteName)
+              : String.format(" IN (SELECT %s FROM %s)", CTE_VALUE_COL, cteName);
+
+      return String.format(mainExpression, "", reference);
+    }
+
+    /**
+     * A composite-key result set is a semi-join on several key parts at once. It is encoded as
+     * EXISTS rather than as a row-constructor IN so that the negation is exact: with IN, a NULL in
+     * any key part would make NOT IN unknown and drop the feature, although "this key is not a
+     * member" is what the filter asks for. EXISTS also keeps the three sources of a result set —
+     * materialized table, inlined values, re-derived producer — in one shape.
+     */
+    private String encodeInResultSetByKey(InResultSetByKey inResultSet) {
+      List<String> keyColumns = new ArrayList<>();
+
+      for (Property property : inResultSet.getProperties()) {
+        String name = property.getName().replaceAll("^\"|\"$", "");
+
+        // the same structural check the producer side makes: a key part has to resolve to a column
+        // of the main table. A property in a child or junction table would encode as a semi-join
+        // subquery, which cannot take part in a row-wise comparison.
+        de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> column =
+            mapping
+                .getColumnForValue(name)
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            String.format(
+                                "Filter is invalid. The key part '%s' of %s is unknown for this feature type.",
+                                name, InResultSetByKey.TYPE)));
+
+        if (!column.first().getRelations().isEmpty()) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Filter is invalid. The key part '%s' of %s is not on the main table of this feature type. The key parts of a result set must be properties of the main table.",
+                  name, InResultSetByKey.TYPE));
+        }
+
+        String expression = property.accept(this);
+
+        if (!operandHasSelect(expression) || expression.contains("(SELECT")) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Filter is invalid. The key part '%s' of %s cannot be encoded as a single column.",
+                  name, InResultSetByKey.TYPE));
+        }
+
+        keyColumns.add(String.format(expression, "", ""));
+      }
+
+      List<String> valueColumns = resultSetValueColumns(inResultSet.getKeyNames().size());
+
+      if (inResultSet.getMaterializedTable().isPresent()) {
+        return existsInResultSet(
+            String.format("%s %s", inResultSet.getMaterializedTable().get(), RESULT_SET_ALIAS),
+            valueColumns,
+            keyColumns,
+            "");
+      }
+
+      if (inResultSet.getMaterializedValues().isPresent()) {
+        List<List<Object>> members = inResultSet.getMaterializedValues().get();
+
+        if (members.isEmpty()) {
+          return "1 = 0";
+        }
+
+        String values =
+            members.stream()
+                .map(
+                    member ->
+                        member.stream()
+                            .map(FilterEncoderSql::renderInlineLiteral)
+                            .collect(Collectors.joining(", ")))
+                .map(member -> "(" + member + ")")
+                .collect(Collectors.joining(", "));
+
+        return existsInResultSet(
+            String.format(
+                "(VALUES %s) %s (%s)", values, RESULT_SET_ALIAS, String.join(", ", valueColumns)),
+            valueColumns,
+            keyColumns,
+            "");
+      }
+
+      boolean outermost = collector == null;
+      CteCollector coll = outermost ? new CteCollector() : collector;
+      String cteName =
+          coll.register(
+              inResultSet.getSetName(),
+              () -> resultSetProducerSelectByKey(inResultSet, true, coll));
+
+      return existsInResultSet(
+          String.format("%s %s", cteName, RESULT_SET_ALIAS),
+          valueColumns,
+          keyColumns,
+          outermost ? coll.renderWith(sqlDialect) + " " : "");
+    }
+
+    private String existsInResultSet(
+        String fromClause, List<String> valueColumns, List<String> keyColumns, String with) {
+      StringBuilder conditions = new StringBuilder();
+
+      for (int i = 0; i < keyColumns.size(); i++) {
+        if (i > 0) {
+          conditions.append(" AND ");
+        }
+        conditions
+            .append(RESULT_SET_ALIAS)
+            .append('.')
+            .append(valueColumns.get(i))
+            .append(" = ")
+            .append(keyColumns.get(i));
+      }
+
+      return String.format("EXISTS (%sSELECT 1 FROM %s WHERE %s)", with, fromClause, conditions);
     }
 
     @Override
@@ -1815,6 +2805,14 @@ public class FilterEncoderSql {
       if (!operandHasSelect(mainExpression)) {
         // special case of a literal, we need to build the SQL expression
         mainExpression = String.format("%%1$s%1$s%%2$s", mainExpression);
+      } else if (mainExpression.contains("(SELECT")) {
+        // The property needs a join, so the operand is an EXISTS-style semi-join
+        // (A.id IN (SELECT ... WHERE <col> <op>)) built from INNER joins. Testing the joined
+        // column for NULL inside that subquery can never match: a feature without related rows
+        // contributes no subquery rows at all. "Property has no value" is the negation of
+        // "property has some value" (NOT EXISTS); the outer operand (A.<sortKey>) is never
+        // null, so the negation is exact.
+        return negate(String.format(mainExpression, "", " IS NOT NULL"));
       }
 
       // mainExpression is either a literal value or a SELECT expression
@@ -1965,13 +2963,48 @@ public class FilterEncoderSql {
 
       List<String> expressions = processBinary(spatialOperation.getArgs(), children);
 
-      return String.format(
+      String predicate =
+          String.format(
+              expressions.get(0),
+              String.format("%s(", operator.first()),
+              operator
+                  .second()
+                  .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
+                  .orElse(String.format(", %s)%s", expressions.get(1), match)));
+
+      return withSpatialIndexPredicate(
+          spatialOperation.getSpatialOperator(),
+          children,
           expressions.get(0),
-          String.format("%s(", operator.first()),
-          operator
-              .second()
-              .map(mask -> String.format(", %s, 'mask=%s')%s", expressions.get(1), mask, match))
-              .orElse(String.format(", %s)%s", expressions.get(1), match)));
+          predicate,
+          literalEnvelopes,
+          acceleratedPredicates,
+          () -> geometryTableAndColumn(spatialOperation));
+    }
+
+    /** The table and column of the geometry operand of a spatial predicate, if it is a column. */
+    private Optional<Tuple<String, String>> geometryTableAndColumn(
+        BinarySpatialOperation spatialOperation) {
+      return spatialOperation.getArgs().stream()
+          .filter(Property.class::isInstance)
+          .map(Property.class::cast)
+          .findFirst()
+          .flatMap(
+              property -> {
+                String propertyName = property.getName().replaceAll("^\"|\"$", "");
+                boolean allowColumnFallback = !propertyName.contains(".");
+                de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> table =
+                    getTableColumn(propertyName, false, allowColumnFallback);
+                return plainColumnOfMainTable(
+                        getQualifiedColumn(
+                                table.first(),
+                                table.second(),
+                                propertyName,
+                                "A",
+                                allowColumnFallback)
+                            .first())
+                    .map(column -> Tuple.of(mapping.getMainTable().getName(), column));
+              });
     }
 
     @Override
@@ -2013,7 +3046,10 @@ public class FilterEncoderSql {
 
     @Override
     public String visit(GeometryNode geometry, List<String> children) {
-      return sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      String expression =
+          sqlDialect.applyToWkt(super.visit(geometry, children), nativeCrs.getCode());
+      literalEnvelopes.computeIfAbsent(expression, ignore -> envelopeOf(geometry));
+      return expression;
     }
 
     @Override
@@ -2115,17 +3151,40 @@ public class FilterEncoderSql {
               table.first(), table.second(), propertyName, aliases.get(aliases.size() - 1), false);
 
       if (qualifiedColumn.second().isEmpty()) {
+        if (isEmptyArray(arrayOperation.getArgs().get(notInverse ? 1 : 0))) {
+          return encodeEmptyArray(arrayOperation.getArrayOperator(), notInverse, mainExpression);
+        }
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
+          if (elementCount > 1) {
+            // "contains all values" is the conjunction of one semi-join per value; unlike a single
+            // subquery with GROUP BY ... HAVING count(distinct ...) = n, each of them lets the
+            // planner probe the joined table per candidate
+            Optional<List<String>> elements =
+                renderArrayElements(arrayOperation.getArgs().get(notInverse ? 1 : 0));
+            if (elements.isPresent()) {
+              String semiJoin = mainExpression;
+              return elements.get().stream()
+                  .map(element -> String.format(semiJoin, "", " IN (" + element + ")"))
+                  .collect(Collectors.joining(" AND ", "(", ")"));
+            }
+          }
+          // for a single required value the `HAVING count(distinct …) = 1` is tautological (every
+          // group selected by `IN (<one value>)` trivially has one distinct value), and without a
+          // HAVING the GROUP BY is redundant in the `IN` semi-join; dropping both keeps the result
+          // identical but lets the planner turn the subquery into a semi-join that probes the
+          // joined table per candidate instead of materializing every matching row
           String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
-                  secondExpression,
-                  aliases.get(0),
-                  mapping.getMainTable().getSortKey(),
-                  qualifiedColumn.first(),
-                  elementCount);
+              elementCount == 1
+                  ? String.format(" IN %1$s", secondExpression)
+                  : String.format(
+                      " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
+                      secondExpression,
+                      aliases.get(0),
+                      mapping.getMainTable().getSortKey(),
+                      qualifiedColumn.first(),
+                      elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_EQUALS) {
           String arrayQuery =
@@ -2138,10 +3197,9 @@ public class FilterEncoderSql {
                   elementCount);
           return String.format(mainExpression, "", arrayQuery);
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
-          String arrayQuery =
-              String.format(
-                  " IN %1$s GROUP BY %2$s.%3$s",
-                  secondExpression, aliases.get(0), mapping.getMainTable().getSortKey());
+          // no GROUP BY: in the `IN` semi-join it would only prevent the planner from probing the
+          // joined table per candidate
+          String arrayQuery = String.format(" IN %1$s", secondExpression);
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -2183,6 +3241,16 @@ public class FilterEncoderSql {
       throw new IllegalStateException("unexpected array operator: " + arrayOperation);
     }
 
+    // the SQL literals of the elements of an array literal, if they are available individually
+    private Optional<List<String>> renderArrayElements(Operand operand) {
+      if (operand instanceof ArrayLiteral arrayLiteral
+          && arrayLiteral.getValue() instanceof List<?> values
+          && values.stream().allMatch(Scalar.class::isInstance)) {
+        return Optional.of(values.stream().map(value -> ((Scalar) value).accept(this)).toList());
+      }
+      return Optional.empty();
+    }
+
     @Override
     public String visit(ArrayLiteral arrayLiteral, List<String> children) {
       if (arrayLiteral.getValue() instanceof String) {
@@ -2209,7 +3277,17 @@ public class FilterEncoderSql {
     public String visit(Not not, List<String> children) {
       String operator = LOGICAL_OPERATORS.get(not.getClass());
 
-      String operation = children.get(0);
+      String operation = withoutSpatialIndexPredicates(children.get(0), acceleratedPredicates);
+      if (operation.contains("(SELECT")) {
+        // The child predicate is (or contains) an EXISTS-style semi-join on a joined property
+        // (A.id IN (SELECT ... WHERE <predicate>)). The string surgery below would push the
+        // negation into the subquery, negating the inner predicate (exists a related row that
+        // does NOT match) instead of the whole predicate (NO related row matches): features
+        // without any related row are dropped by the INNER join and multi-valued properties get
+        // any- instead of all-semantics. Wrap instead — the outer operand (A.<sortKey>) is never
+        // null, so NOT (...) is the exact logical negation.
+        return negate(operation);
+      }
       Integer pos = null;
       Cql2Expression arg = not.getArgs().get(0);
       if (arg instanceof In) {
@@ -2249,7 +3327,9 @@ public class FilterEncoderSql {
             operation.substring(0, pos), operator, operation.substring(pos + 1, length));
       }
 
-      return super.visit(not, children);
+      // operation, not children: Not is unary, and operation is the operand with any spatial index
+      // predicate removed
+      return super.visit(not, ImmutableList.of(operation));
     }
 
     @Override

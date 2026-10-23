@@ -177,6 +177,11 @@ public interface Operand extends CqlNode {
       if (Objects.nonNull(iv)) {
         try {
           Object value = iv.findInjectableValue("filterCrs", null, null, null);
+          // the value is injected as an Optional<EpsgCrs> (see CqlImpl#read), but a bare EpsgCrs is
+          // also accepted
+          if (value instanceof Optional) {
+            value = ((Optional<?>) value).orElse(null);
+          }
           if (value instanceof EpsgCrs) {
             return Optional.of((EpsgCrs) value);
           }

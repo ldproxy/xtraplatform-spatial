@@ -429,6 +429,23 @@ class FeatureSchemaFixtures {
                                     .required(true)
                                     .build())
                             .sourcePath("name"))
+            .putProperties2("optional_with_required",
+                    new ImmutableFeatureSchema.Builder()
+                            .type(Type.OBJECT)
+                            .putProperties2("numerator",
+                                    new ImmutableFeatureSchema.Builder()
+                                            .type(Type.FLOAT)
+                                            .constraints(new ImmutableSchemaConstraints.Builder()
+                                                    .required(true)
+                                                    .build())
+                                            .sourcePath("numerator"))
+                            .putProperties2("denominator",
+                                    new ImmutableFeatureSchema.Builder()
+                                            .type(Type.FLOAT)
+                                            .constraints(new ImmutableSchemaConstraints.Builder()
+                                                    .required(true)
+                                                    .build())
+                                            .sourcePath("denominator")))
             .build()
 
     public static final SchemaMapping BIOTOP_MAPPING = new ImmutableSchemaMapping.Builder()

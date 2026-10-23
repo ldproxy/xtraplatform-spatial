@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.threeten.extra.Interval;
 
 public class SqlDialectPgis implements SqlDialect {
@@ -40,6 +42,39 @@ public class SqlDialectPgis implements SqlDialect {
     return SqlDbmsPgis.ID;
   }
 
+  @Override
+  public String materializedCte(String name, String query) {
+    // PostgreSQL 12+ inlines a CTE that is referenced only once; MATERIALIZED forces a single
+    // evaluation, which is what lets a result set be computed once instead of re-evaluated per
+    // nesting level.
+    return name + " AS MATERIALIZED (" + query + ")";
+  }
+
+  @Override
+  public boolean supportsResultSetTables() {
+    return true;
+  }
+
+  @Override
+  public String createResultSetTable(String name, String producerSelect) {
+    // UNLOGGED: no WAL, much faster to populate; the table is request-scoped scratch data. It is a
+    // regular (not session-TEMP) table so it stays visible to the other pooled connections that run
+    // the consuming sub-queries concurrently.
+    return String.format("CREATE UNLOGGED TABLE %s AS (%s)", name, producerSelect);
+  }
+
+  @Override
+  public String createResultSetTableIndex(String name, String valueColumn) {
+    return String.format("CREATE INDEX ON %s (%s)", name, valueColumn);
+  }
+
+  @Override
+  public String dropResultSetTable(String name) {
+    return String.format("DROP TABLE IF EXISTS %s", name);
+  }
+
+  // the year of an ISO 8601 date, optionally signed, followed by the rest of the value
+  private static final Pattern ISO_YEAR = Pattern.compile("^([+-]?\\d{4,})(-.*)$");
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
   private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
@@ -196,12 +231,25 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public String applyToDateLiteral(String date) {
-    return String.format("DATE '%s'", date);
+    return String.format("DATE '%s'", withEra(date));
   }
 
   @Override
   public String applyToDatetimeLiteral(String datetime) {
-    return String.format("TIMESTAMP '%s'", datetime);
+    return String.format("TIMESTAMP '%s'", withEra(datetime));
+  }
+
+  // PostgreSQL has no year 0 and no negative years: the ISO 8601 year 0 is 1 BC, -1 is 2 BC etc.
+  private static String withEra(String value) {
+    Matcher matcher = ISO_YEAR.matcher(value);
+    if (!matcher.matches()) {
+      return value;
+    }
+    long year = Long.parseLong(matcher.group(1));
+    if (year > 0) {
+      return value;
+    }
+    return String.format("%04d%s BC", 1 - year, matcher.group(2));
   }
 
   @Override
@@ -315,21 +363,15 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
-  public String escapeString(String value) {
-    return value.replaceAll("'", "''");
+  public String applyToJsonArrayLike(String mainExpression, String pattern) {
+    return String.format(
+        mainExpression,
+        "EXISTS (SELECT 1 FROM jsonb_array_elements_text((",
+        String.format(")::jsonb) AS alike_item WHERE alike_item LIKE %s)", pattern));
   }
 
   @Override
-  public String applyToExpression(
-      String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
-    if (!subDecoderPaths.isEmpty()) {
-      String expression =
-          subDecoderPaths.values().iterator().next().replaceAll("\\$(?:t|T|table)\\$", table);
-      if (spatial) {
-        expression = applyToWkt(expression, false, false);
-      }
-      return String.format("(%s) AS %s", expression, name);
-    }
-    return SqlDialect.super.applyToExpression(table, name, subDecoderPaths, spatial);
+  public String escapeString(String value) {
+    return value.replaceAll("'", "''");
   }
 }

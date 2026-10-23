@@ -50,15 +50,22 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
           GeometryType.GEOMETRY_COLLECTION);
 
   private final boolean geoJsonOnly;
+  // the coordinate reference systems that a 'coordRefSys' member may declare; an empty list does
+  // not restrict them
+  private final List<EpsgCrs> supportedCrs;
 
   public GeometryDecoderJson() {
-    super();
-    this.geoJsonOnly = false;
+    this(false, List.of());
   }
 
   public GeometryDecoderJson(boolean geoJsonOnly) {
+    this(geoJsonOnly, List.of());
+  }
+
+  public GeometryDecoderJson(boolean geoJsonOnly, List<EpsgCrs> supportedCrs) {
     super();
     this.geoJsonOnly = geoJsonOnly;
+    this.supportedCrs = supportedCrs;
   }
 
   @SuppressWarnings({
@@ -186,7 +193,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
 
     Optional<EpsgCrs> coordRefSys = crs;
     if (node.has("coordRefSys")) {
-      coordRefSys = parseCoordRefSys(node);
+      coordRefSys = parseCoordRefSys(node.get("coordRefSys"));
     }
 
     return switch (geometryType) {
@@ -426,7 +433,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
   private Optional<EpsgCrs> parseCoordRefSys(JsonParser parser) throws IOException {
     JsonToken token = parser.nextToken();
     if (token == JsonToken.VALUE_STRING) {
-      return Optional.of(EpsgCrs.fromString(parser.getText()));
+      return Optional.of(checkSupported(EpsgCrs.fromString(parser.getText())));
     } else if (token == JsonToken.START_OBJECT) {
       Optional<EpsgCrs> crs = Optional.empty();
       while (token != JsonToken.END_OBJECT) {
@@ -436,7 +443,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
           if (token != JsonToken.VALUE_STRING) {
             throw new IOException("Expected string value for 'href', but got: " + token);
           }
-          crs = Optional.of(EpsgCrs.fromString(parser.getText()));
+          crs = Optional.of(checkSupported(EpsgCrs.fromString(parser.getText())));
         }
       }
       return crs;
@@ -464,7 +471,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
 
   private Optional<EpsgCrs> parseCoordRefSys(JsonNode node) throws IOException {
     if (node.isTextual()) {
-      return Optional.of(EpsgCrs.fromString(node.asText()));
+      return Optional.of(checkSupported(EpsgCrs.fromString(node.asText())));
     } else if (node.isObject() && node.has("href")) {
       return parseCoordRefSys(node.get("href"));
     } else if (node.isArray()) {
@@ -485,6 +492,22 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
       throw new IOException(
           "Expected STRING, OBJECT or ARRAY for 'coordRefSys', but got: " + node.getNodeType());
     }
+  }
+
+  /**
+   * A coordinate reference system declared in the document must be one of the supported ones. Only
+   * the code is compared, the axis order is a property of the encoding, not of the coordinate
+   * reference system.
+   */
+  private EpsgCrs checkSupported(EpsgCrs crs) throws IOException {
+    if (!supportedCrs.isEmpty()
+        && supportedCrs.stream().noneMatch(supported -> supported.getCode() == crs.getCode())) {
+      throw new IOException(
+          String.format(
+              "The coordinate reference system '%s' in 'coordRefSys' is not supported here. Supported coordinate reference systems: %s.",
+              crs.toUriString(), supportedCrs.stream().map(EpsgCrs::toUriString).toList()));
+    }
+    return crs;
   }
 
   private static List<Geometry<?>> applyCrs(

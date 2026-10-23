@@ -166,6 +166,22 @@ public interface FeatureProviderSqlData
     }
 
     /**
+     * @langEn Maximum number of members a result set of a multi-query may have to be materialized
+     *     once and reused as a literal list across the queries of the request. Larger result sets
+     *     fall back to inline (re-evaluated) subqueries.
+     * @langDe Maximale Anzahl von Elementen einer Ergebnismenge einer Multi-Query, bis zu der diese
+     *     einmal materialisiert und als Literalliste über die Abfragen der Anfrage hinweg
+     *     wiederverwendet wird. Größere Ergebnismengen werden auf eingebettete (neu ausgewertete)
+     *     Unterabfragen zurückgesetzt.
+     * @default 100000
+     */
+    @DocIgnore
+    @Value.Default
+    default int getResultSetMaterializationMaxSize() {
+      return 100_000;
+    }
+
+    /**
      * @langEn Option to disable computation of the number of selected features for performance
      *     reasons that are returned in `numberMatched`. As a general rule this should be disabled
      *     for big datasets.

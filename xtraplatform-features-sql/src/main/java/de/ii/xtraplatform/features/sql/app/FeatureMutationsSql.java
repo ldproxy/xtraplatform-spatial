@@ -11,14 +11,10 @@ import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlPathDefaults;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
-import de.ii.xtraplatform.streams.domain.Reactive;
-import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,58 +30,13 @@ public class FeatureMutationsSql {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureMutationsSql.class);
 
-  private final Supplier<SqlClient> sqlClient;
   private final FeatureStoreInsertGenerator generator;
   private final SqlPathDefaults sqlPathDefaults;
 
   public FeatureMutationsSql(
-      Supplier<SqlClient> sqlClient,
-      FeatureStoreInsertGenerator generator,
-      SqlPathDefaults sqlPathDefaults) {
-    this.sqlClient = sqlClient;
+      FeatureStoreInsertGenerator generator, SqlPathDefaults sqlPathDefaults) {
     this.generator = generator;
     this.sqlPathDefaults = sqlPathDefaults;
-  }
-
-  public Reactive.Transformer<FeatureDataSql, String> getCreatorFlow(
-      SqlQueryMapping schema, Object executionContext, Optional<String> id, EpsgCrs crs) {
-
-    RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
-
-    String primaryKey = schema.getMainTable().getPrimaryKey();
-
-    return sqlClient
-        .get()
-        .getMutationFlow(
-            feature -> createInstanceInserts(feature, rowCursor, id, crs, false),
-            executionContext,
-            primaryKey,
-            Optional.empty());
-  }
-
-  public Reactive.Transformer<FeatureDataSql, String> getUpdaterFlow(
-      SqlQueryMapping schema, Object executionContext, String id, EpsgCrs crs) {
-
-    RowCursor rowCursor = new RowCursor(schema.getMainTable().getFullPath());
-
-    String primaryKey = schema.getMainTable().getPrimaryKey();
-
-    return sqlClient
-        .get()
-        .getMutationFlow(
-            feature -> createInstanceInserts(feature, rowCursor, Optional.of(id), crs, true),
-            executionContext,
-            primaryKey,
-            Optional.of(id));
-  }
-
-  public Reactive.Source<String> getDeletionSource(SqlQueryMapping mapping, String id) {
-    Supplier<Tuple<String, Consumer<String>>> delete = createInstanceDelete(mapping, id);
-
-    return sqlClient
-        .get()
-        .getSourceStream(delete.get().first(), SqlQueryOptions.withColumnTypes(String.class))
-        .via(Transformer.map(sqlRow -> (String) sqlRow.getValues().get(0)));
   }
 
   List<Supplier<Tuple<String, Consumer<String>>>> createInstanceInserts(

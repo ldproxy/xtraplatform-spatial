@@ -31,5 +31,7 @@ public interface TileMatrixSetBase {
 
   double getMaxAllowableOffset(int level, int row, int col);
 
+  double getMaxAllowableOffset(int level, int row, int col, int tileExtent);
+
   int getTmsRow(int level, int row);
 }

@@ -9,12 +9,14 @@ package de.ii.xtraplatform.features.sql.infra.db;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.EpsgCrs.Force;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.ImmutableGeoInfo;
+import de.ii.xtraplatform.features.sql.domain.SqlClientBasic;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg;
@@ -36,7 +38,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 import org.sqlite.SQLiteConnection;
 import org.sqlite.SQLiteDataSource;
@@ -122,6 +123,12 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
         };
 
     ds.setLoadExtension(true);
+    // SQLite matches LIKE case-insensitively for ASCII characters unless told otherwise, which
+    // would make the CQL2 LIKE predicate behave differently here than on any other backend —
+    // CQL2 defines it as case-sensitive, and case-insensitive matching as CASEI(). Setting it on
+    // the data source applies the pragma to every connection it opens; it cannot be appended to
+    // getInitSql(), which is executed as a single statement.
+    ds.setCaseSensitiveLike(true);
     ds.setUrl(String.format("jdbc:sqlite:%s", source));
 
     return ds;
@@ -130,11 +137,6 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
   @Override
   public Optional<String> getInitSql(ConnectionInfoSql connectionInfo) {
     return Optional.of("SELECT CASE CheckGeoPackageMetaData() WHEN 1 THEN EnableGpkgMode() END;");
-  }
-
-  @Override
-  public DatabaseType getRxType() {
-    return DatabaseType.SQLITE;
   }
 
   @Override
@@ -164,6 +166,46 @@ public class SqlDbmsAdapterGpkg implements SqlDbmsAdapter {
         "sqlite_sequence",
         "ElementaryGeometries",
         "SpatialIndex");
+  }
+
+  /**
+   * Reports the geometry columns that have a GeoPackage R-Tree, mapped to the column that the
+   * R-Tree entries are keyed on.
+   *
+   * <p>The R-Tree virtual table itself is looked up instead of the {@code gpkg_rtree_index} row in
+   * {@code gpkg_extensions}, because it is the table that the generated query has to name, and the
+   * two can disagree: the extension may be registered for a column whose R-Tree was dropped.
+   *
+   * <p>The key column is the primary key of the feature table, which is what the R-Tree triggers
+   * store. It is reported instead of assuming {@code rowid}: a GeoPackage feature table is required
+   * to have an {@code INTEGER PRIMARY KEY}, which SQLite makes an alias of {@code rowid}, but in a
+   * file that does not follow that requirement the two differ and joining on {@code rowid} would
+   * match the wrong rows. Feature tables with a composite primary key are left out, as their rows
+   * cannot be addressed by the single id column of an R-Tree.
+   */
+  @Override
+  public Map<String, String> getSpatialIndexes(SqlClientBasic sqlClient) throws SQLException {
+    String query =
+        "SELECT gc.table_name, gc.column_name, ti.name FROM gpkg_geometry_columns gc"
+            + " JOIN sqlite_master m ON m.type = 'table' AND lower(m.name) = lower('rtree_' || gc.table_name || '_' || gc.column_name)"
+            + " JOIN pragma_table_info(gc.table_name) ti ON ti.pk = 1"
+            + " GROUP BY gc.table_name, gc.column_name HAVING count(*) = 1;";
+
+    ImmutableMap.Builder<String, String> spatialIndexes = ImmutableMap.builder();
+
+    // the connection comes from the pool, closing it hands it back
+    try (Connection connection = sqlClient.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(query)) {
+      while (resultSet.next()) {
+        spatialIndexes.put(
+            String.format("%s.%s", resultSet.getString(1), resultSet.getString(2))
+                .toLowerCase(Locale.ROOT),
+            resultSet.getString(3));
+      }
+    }
+
+    return spatialIndexes.build();
   }
 
   @Override

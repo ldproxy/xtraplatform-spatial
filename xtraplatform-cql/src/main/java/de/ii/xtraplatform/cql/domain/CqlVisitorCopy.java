@@ -33,6 +33,30 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
 
   @Override
   public CqlNode visit(BinaryScalarOperation scalarOperation, List<CqlNode> children) {
+    if (scalarOperation instanceof InResultSetByKey) {
+      // keep the resolved producer context, only the args are copied
+      return new ImmutableInResultSetByKey.Builder()
+          .from((InResultSetByKey) scalarOperation)
+          .args(
+              children.stream()
+                  .filter(child -> child instanceof Scalar)
+                  .map(child -> (Scalar) child)
+                  .toList())
+          .build();
+    }
+
+    if (scalarOperation instanceof InResultSet) {
+      // keep the resolved producer context, only the args are copied
+      return new ImmutableInResultSet.Builder()
+          .from((InResultSet) scalarOperation)
+          .args(
+              children.stream()
+                  .filter(child -> child instanceof Scalar)
+                  .map(child -> (Scalar) child)
+                  .toList())
+          .build();
+    }
+
     BinaryScalarOperation.Builder<?> builder = null;
 
     if (scalarOperation instanceof Eq) {
@@ -201,7 +225,9 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
 
   @Override
   public CqlNode visit(Function function, List<CqlNode> children) {
-    return function;
+    return Function.of(
+        function.getName(),
+        children.stream().map(Operand.class::cast).collect(Collectors.toList()));
   }
 
   @Override

@@ -258,7 +258,9 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
             .limit(tileset.getFeatureLimit())
             .offset(0)
             .crs(tile.getTileMatrixSet().getCrs())
-            .maxAllowableOffset(getMaxAllowableOffset(tile, nativeCrs));
+            .maxAllowableOffset(
+                getMaxAllowableOffset(
+                    tile, nativeCrs, tileset.getTileExtentOrDefault(tile.getTileMatrixSet())));
 
     if (tileset.getFilters().containsKey(tile.getTileMatrixSet().getId())) {
       tileset.getFilters().get(tile.getTileMatrixSet().getId()).stream()
@@ -310,10 +312,10 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
     return queryBuilder.build();
   }
 
-  public double getMaxAllowableOffset(TileCoordinates tile, EpsgCrs nativeCrs) {
+  public double getMaxAllowableOffset(TileCoordinates tile, EpsgCrs nativeCrs, int tileExtent) {
     double maxAllowableOffsetTileMatrixSet =
         tile.getTileMatrixSet()
-            .getMaxAllowableOffset(tile.getLevel(), tile.getRow(), tile.getCol());
+            .getMaxAllowableOffset(tile.getLevel(), tile.getRow(), tile.getCol(), tileExtent);
     Unit<?> tmsCrsUnit = crsInfo.getUnit(tile.getTileMatrixSet().getCrs());
     Unit<?> nativeCrsUnit = crsInfo.getUnit(nativeCrs);
     if (tmsCrsUnit.equals(nativeCrsUnit)) {

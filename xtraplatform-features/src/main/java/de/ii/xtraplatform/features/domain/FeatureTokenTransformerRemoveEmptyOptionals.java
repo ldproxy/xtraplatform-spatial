@@ -107,7 +107,7 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
     }
 
     if (Objects.nonNull(context.geometry())
-        || context.schema().get().isRequired()
+        || isEffectivelyRequired(context)
         || !removeNullValues.getOrDefault(context.type(), true)) {
       openIfNecessary(context);
 
@@ -122,12 +122,33 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
     }
 
     if (Objects.nonNull(context.value())
-        || context.schema().get().isRequired()
+        || isEffectivelyRequired(context)
         || !removeNullValues.getOrDefault(context.type(), true)) {
       openIfNecessary(context);
 
       super.onValue(context);
     }
+  }
+
+  /**
+   * A null value is kept only if its property is effectively required, i.e. the property itself and
+   * every wrapping property up to (but excluding) the feature are required. A required property
+   * inside an optional object must not keep that object alive when all of its values are null: in
+   * that case the optional wrapper, together with the null value, is removed. Without this check
+   * the wrapping property is only ever looked at indirectly, so an optional object whose required
+   * sub-properties are all null is emitted as an empty object instead of being omitted.
+   */
+  private boolean isEffectivelyRequired(ModifiableContext<FeatureSchema, SchemaMapping> context) {
+    if (context.schema().isEmpty() || !context.schema().get().isRequired()) {
+      return false;
+    }
+
+    List<FeatureSchema> parentSchemas = context.parentSchemas();
+
+    return parentSchemas.size() <= 1
+        || parentSchemas.stream()
+            .limit(parentSchemas.size() - 1L)
+            .allMatch(FeatureSchema::isRequired);
   }
 
   private void openIfNecessary(ModifiableContext<FeatureSchema, SchemaMapping> context) {

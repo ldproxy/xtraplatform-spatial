@@ -58,6 +58,17 @@ public interface SqlDialect {
         "Arrays as queryables are not supported for this feature provider.");
   }
 
+  /**
+   * @param mainExpression the filter expression for the array in the JSON document, with the
+   *     placeholders {@code %1$s} and {@code %2$s} around the array value
+   * @param pattern the LIKE pattern
+   * @return a predicate that is true, if one of the array items matches the pattern
+   */
+  default String applyToJsonArrayLike(String mainExpression, String pattern) {
+    throw new IllegalArgumentException(
+        "Arrays as queryables are not supported for this feature provider.");
+  }
+
   default String applyToAsIds() {
     return " AS IDS";
   }
@@ -86,6 +97,39 @@ public interface SqlDialect {
     return select;
   }
 
+  /**
+   * Render a common table expression that is guaranteed to be evaluated only once. The default is a
+   * plain {@code name AS (query)}; dialects that would otherwise inline a single-reference CTE
+   * (PostgreSQL 12+) must force materialization.
+   */
+  default String materializedCte(String name, String query) {
+    return name + " AS (" + query + ")";
+  }
+
+  /**
+   * Whether result sets that exceed the materialization cap can be materialized into a (temporary)
+   * table that consumers join, instead of being re-derived inline in every consumer. Dialects that
+   * return {@code false} keep the inline re-evaluation fallback.
+   */
+  default boolean supportsResultSetTables() {
+    return false;
+  }
+
+  /** DDL to materialize a result-set producer into a session-independent table once. */
+  default String createResultSetTable(String name, String producerSelect) {
+    throw new UnsupportedOperationException();
+  }
+
+  /** DDL to index the value column of a materialized result-set table. */
+  default String createResultSetTableIndex(String name, String valueColumn) {
+    throw new UnsupportedOperationException();
+  }
+
+  /** DDL to drop a materialized result-set table if it exists. */
+  default String dropResultSetTable(String name) {
+    throw new UnsupportedOperationException();
+  }
+
   String castToBigInt(int value);
 
   Optional<BoundingBox> parseExtent(String extent, EpsgCrs crs);
@@ -105,6 +149,28 @@ public interface SqlDialect {
     return "";
   }
 
+  /**
+   * Returns a predicate that restricts the rows to those whose geometry bounding box intersects the
+   * bounding box given as {@code min}/{@code max}, evaluated with a spatial index on {@code
+   * table}.{@code column}, or an empty optional if the dialect cannot use a spatial index that way.
+   *
+   * <p>The predicate is a conjunct that is added to the exact spatial predicate, never a
+   * replacement for it. Dialects whose spatial operators already consult the spatial index by
+   * themselves (such as PostGIS, where {@code ST_Intersects} includes the {@code &&} bounding box
+   * operator) do not implement this.
+   *
+   * @param table the table holding the geometry column
+   * @param column the geometry column
+   * @param alias the alias the table is referenced by in the query
+   * @param keyColumn the column of the table that the index entries are keyed on
+   * @param min the lower corner of the bounding box, in the native CRS
+   * @param max the upper corner of the bounding box, in the native CRS
+   */
+  default Optional<String> getSpatialIndexPredicate(
+      String table, String column, String alias, String keyColumn, double[] min, double[] max) {
+    return Optional.empty();
+  }
+
   default String getTemporalOperator(TemporalFunction temporalFunction) {
     // this is implementation specific
     return null;
@@ -114,9 +180,40 @@ public interface SqlDialect {
     return ImmutableSet.of();
   }
 
+  /**
+   * Renders a column that a sub-decoder produces from an expression: the {@code $T$} placeholders
+   * of the expression are resolved to {@code table}, a geometry is wrapped for output, and the
+   * result is aliased to {@code name}.
+   *
+   * @param geometryOperation {@link SqlQueryColumn.Operation#WKB} or {@link
+   *     SqlQueryColumn.Operation#WKT} when the expression yields a geometry that has to be wrapped
+   *     for output in that encoding, empty when it does not. The encoding is a per-provider setting
+   *     ({@code queryGeneration.geometryEncoding}) and a dialect is shared by all providers of its
+   *     DBMS, so it has to be passed in rather than held by the dialect.
+   * @param forcePolygonCCW whether the geometry has to be returned with counter-clockwise polygons
+   * @param linearizeCurves whether curves in the geometry have to be linearized
+   */
   default String applyToExpression(
-      String table, String name, Map<String, String> subDecoderPaths, boolean spatial) {
-    return name;
+      String table,
+      String name,
+      Map<String, String> subDecoderPaths,
+      Optional<SqlQueryColumn.Operation> geometryOperation,
+      boolean forcePolygonCCW,
+      boolean linearizeCurves) {
+    if (subDecoderPaths.isEmpty()) {
+      return name;
+    }
+
+    String expression =
+        subDecoderPaths.values().iterator().next().replaceAll("\\$(?:t|T|table)\\$", table);
+
+    if (geometryOperation.filter(SqlQueryColumn.Operation.WKB::equals).isPresent()) {
+      expression = applyToWkb(expression, forcePolygonCCW, linearizeCurves);
+    } else if (geometryOperation.filter(SqlQueryColumn.Operation.WKT::equals).isPresent()) {
+      expression = applyToWkt(expression, forcePolygonCCW, linearizeCurves);
+    }
+
+    return String.format("(%s) AS %s", expression, name);
   }
 
   Map<SpatialFunction, String> SPATIAL_OPERATORS =
@@ -133,4 +230,23 @@ public interface SqlDialect {
 
   Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
       new ImmutableMap.Builder<SpatialFunction, String>().build();
+
+  /**
+   * The spatial operators for which a match implies that the bounding boxes of both operands
+   * intersect. Only for these may a bounding box predicate from a spatial index be added as a
+   * conjunct: the conjunct is then implied by the exact predicate, so it changes neither the result
+   * nor the meaning of the predicate under negation.
+   *
+   * <p>{@code S_DISJOINT} is absent because two geometries can be disjoint while being arbitrarily
+   * far apart, so a bounding box predicate would discard matching rows.
+   */
+  Set<SpatialFunction> SPATIAL_OPERATORS_IMPLYING_BBOX_INTERSECTION =
+      ImmutableSet.of(
+          SpatialFunction.S_EQUALS,
+          SpatialFunction.S_TOUCHES,
+          SpatialFunction.S_WITHIN,
+          SpatialFunction.S_OVERLAPS,
+          SpatialFunction.S_CROSSES,
+          SpatialFunction.S_INTERSECTS,
+          SpatialFunction.S_CONTAINS);
 }

@@ -13,6 +13,7 @@ dependencies {
     provided 'de.interactive_instruments:xtraplatform-streams'
     provided 'de.interactive_instruments:xtraplatform-web'
     provided 'de.interactive_instruments:xtraplatform-proj'
+    provided 'de.interactive_instruments:xtraplatform-xtralink'
     provided project(':xtraplatform-cql')
     provided project(':xtraplatform-crs')
     provided project(':xtraplatform-features')

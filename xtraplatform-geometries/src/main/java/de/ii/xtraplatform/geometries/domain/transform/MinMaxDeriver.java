@@ -119,7 +119,9 @@ public class MinMaxDeriver implements GeometryVisitor<double[][]> {
   private static double[][] initMinMax(int dimensions) {
     double[][] minMax = new double[2][dimensions];
     Arrays.fill(minMax[0], Double.MAX_VALUE);
-    Arrays.fill(minMax[1], Double.MIN_VALUE);
+    // -Double.MAX_VALUE, not Double.MIN_VALUE: the latter is the smallest positive value, which
+    // would survive every Math.max on an axis whose coordinates are all negative
+    Arrays.fill(minMax[1], -Double.MAX_VALUE);
     return minMax;
   }
 

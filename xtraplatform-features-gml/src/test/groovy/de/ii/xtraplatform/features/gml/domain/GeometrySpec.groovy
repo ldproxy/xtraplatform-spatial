@@ -445,7 +445,7 @@ class GeometrySpec extends Specification {
         String gmlOut = sw.toString()
 
         then:
-        gmlOut == "<gml:Surface><gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring><gml:curveMember><gml:LineStringSegment><gml:posList>0.0 0.0 0.0 1.0 1.0 1.0 0.0 0.0</gml:posList></gml:LineStringSegment></gml:curveMember></gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface>"
+        gmlOut == "<gml:Surface><gml:patches><gml:PolygonPatch><gml:exterior><gml:Ring><gml:curveMember><gml:Curve><gml:segments><gml:LineStringSegment><gml:posList>0.0 0.0 0.0 1.0 1.0 1.0 0.0 0.0</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve></gml:curveMember></gml:Ring></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface>"
     }
 
     def 'CURVEPOLYGON XY with USE_SURFACE_RING_CURVE'() {

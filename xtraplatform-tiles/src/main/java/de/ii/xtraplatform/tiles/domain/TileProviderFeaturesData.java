@@ -81,13 +81,13 @@ import org.immutables.value.Value;
  * providerSubType: FEATURES
  * caches:
  * - type: IMMUTABLE
- *   storage: MBTILES
+ *   storage: PER_JOB
  *   levels:
  *     WebMercatorQuad:
  *       min: 5
  *       max: 12
  * - type: DYNAMIC
- *   storage: MBTILES
+ *   storage: PER_TILESET
  *   seeded: false
  *   levels:
  *     WebMercatorQuad:

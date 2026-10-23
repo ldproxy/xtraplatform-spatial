@@ -242,6 +242,10 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
     Type propertyType = schema.getType();
     if (Type.VALUE.equals(propertyType) && schema.getValueType().isPresent()) {
       propertyType = schema.getValueType().get();
+    } else if (Type.ENCRYPTED.equals(propertyType)) {
+      propertyType = schema.getValueType().orElse(Type.STRING);
+    } else if (Type.ENCRYPTED_ARRAY.equals(propertyType)) {
+      propertyType = Type.VALUE_ARRAY;
     }
     String propertyName = schema.getName();
     Optional<String> label = schema.getLabel();

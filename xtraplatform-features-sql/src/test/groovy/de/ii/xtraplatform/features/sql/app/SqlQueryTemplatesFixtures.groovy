@@ -43,8 +43,8 @@ class SqlQueryTemplatesFixtures {
             "  SELECT * FROM NR, NM, NS"
 
     static String META_FILTER = "WITH\n" +
-            "    NR AS (SELECT MIN(SKEY) AS minKey, MAX(SKEY) AS maxKey, count(*) AS numberReturned FROM (SELECT A.id AS SKEY FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.type = 1) ORDER BY SKEY LIMIT 10 OFFSET 10) AS IDS),\n" +
-            "    NM AS (SELECT count(*) AS numberMatched FROM (SELECT A.id AS SKEY FROM externalprovider A WHERE A.id IN (SELECT AA.id FROM externalprovider AA WHERE AA.type = 1) ORDER BY 1) AS IDS),\n" +
+            "    NR AS (SELECT MIN(SKEY) AS minKey, MAX(SKEY) AS maxKey, count(*) AS numberReturned FROM (SELECT A.id AS SKEY FROM externalprovider A WHERE A.type = 1 ORDER BY SKEY LIMIT 10 OFFSET 10) AS IDS),\n" +
+            "    NM AS (SELECT count(*) AS numberMatched FROM (SELECT A.id AS SKEY FROM externalprovider A WHERE A.type = 1 ORDER BY 1) AS IDS),\n" +
             "    NS AS (SELECT -1::bigint AS numberSkipped)\n" +
             "  SELECT * FROM NR, NM, NS"
 
@@ -70,9 +70,9 @@ class SqlQueryTemplatesFixtures {
     ]
 
     static List<String> SELF_JOINS_FILTER = [
-            "SELECT A.id AS SKEY, A.oid FROM building A WHERE (A.id IN (SELECT AA.id FROM building AA WHERE AA.oid > 1)) ORDER BY 1",
-            "SELECT A.id AS SKEY, B.id AS SKEY_1, B.id FROM building A JOIN building B ON (A.id=B.fk_buildingpart_parent AND (B.id > 100)) WHERE (A.id IN (SELECT AA.id FROM building AA WHERE AA.oid > 1)) ORDER BY 1,2",
-            "SELECT A.id AS SKEY, B.id AS SKEY_1, B.id FROM building A JOIN building B ON (A.fk_buildingpart_parent=B.id AND (B.id > 1000)) WHERE (A.id IN (SELECT AA.id FROM building AA WHERE AA.oid > 1)) ORDER BY 1,2"
+            "SELECT A.id AS SKEY, A.oid FROM building A WHERE (A.oid > 1) ORDER BY 1",
+            "SELECT A.id AS SKEY, B.id AS SKEY_1, B.id FROM building A JOIN building B ON (A.id=B.fk_buildingpart_parent AND (B.id > 100)) WHERE (A.oid > 1) ORDER BY 1,2",
+            "SELECT A.id AS SKEY, B.id AS SKEY_1, B.id FROM building A JOIN building B ON (A.fk_buildingpart_parent=B.id AND (B.id > 1000)) WHERE (A.oid > 1) ORDER BY 1,2"
     ]
 
     static List<String> SELF_JOIN_NESTED_DUPLICATE = [

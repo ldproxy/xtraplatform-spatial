@@ -19,6 +19,7 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.transform.ImmutablePropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformation;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Sink;
 import de.ii.xtraplatform.streams.domain.Reactive.SinkReduced;
@@ -28,6 +29,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -49,6 +51,12 @@ public class FeatureStreamImpl implements FeatureStream {
   private final boolean stepClean;
   private final boolean stepEtag;
   private final boolean stepMetadata;
+  private final boolean stepAudit;
+
+  private final AuditLog auditLog;
+  private final boolean hasPropertyLinks;
+  private final boolean deduplicate;
+  private final boolean idsArePerType;
 
   public FeatureStreamImpl(
       Query query,
@@ -57,7 +65,8 @@ public class FeatureStreamImpl implements FeatureStream {
       boolean nativeCrsIs3d,
       Map<String, Codelist> codelists,
       QueryRunner runner,
-      boolean doTransform) {
+      boolean doTransform,
+      AuditLog auditLog) {
     this.query = query;
     this.data = data;
     this.crsTransformerFactory = crsTransformerFactory;
@@ -65,6 +74,7 @@ public class FeatureStreamImpl implements FeatureStream {
     this.codelists = codelists;
     this.runner = runner;
     this.doTransform = doTransform;
+    this.auditLog = auditLog;
 
     this.stepMappingSchema =
         !query.skipPipelineSteps().contains(PipelineSteps.MAPPING_SCHEMA)
@@ -86,24 +96,104 @@ public class FeatureStreamImpl implements FeatureStream {
     this.stepMetadata =
         !query.skipPipelineSteps().contains(PipelineSteps.METADATA)
             && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.stepAudit =
+        auditLog.isEnabled()
+            && !query.skipPipelineSteps().contains(PipelineSteps.AUDIT)
+            && !query.skipPipelineSteps().contains(PipelineSteps.ALL);
+    this.hasPropertyLinks = hasPropertyLinks(query, data);
+    this.deduplicate =
+        query instanceof MultiFeatureQuery && ((MultiFeatureQuery) query).getDeduplicate();
+    this.idsArePerType = !data.getGloballyUniqueFeatureIds();
+  }
+
+  // The collection metadata is published when the stream starts. A stream that ends before, e.g.
+  // because the database rejects the first query, completes it with the stream error; a caller
+  // waiting for the metadata would block forever otherwise.
+  static <W extends ResultBase> CompletionStage<W> completeMetadataOnEnd(
+      CompletionStage<W> result, CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+    return result.whenComplete(
+        (r, throwable) -> {
+          if (onCollectionMetadata.isDone()) {
+            return;
+          }
+          Throwable error =
+              Objects.nonNull(throwable)
+                  ? throwable
+                  : Objects.nonNull(r) ? r.getError().orElse(null) : null;
+          onCollectionMetadata.completeExceptionally(
+              Objects.requireNonNullElseGet(
+                  error,
+                  () -> new IllegalStateException("The feature stream ended before it started.")));
+        });
+  }
+
+  // For types without properties that are represented as links (an explicit `link` in the
+  // schema or a role that declares a link relation) the PropertyLinks transformer would be a
+  // per-token no-op and is not wired at all.
+  private static boolean hasPropertyLinks(Query query, FeatureProviderDataV2 data) {
+    return getTypes(query).stream()
+        .map(type -> data.getTypes().get(type))
+        .filter(Objects::nonNull)
+        .flatMap(schema -> schema.getAllNestedProperties().stream())
+        .anyMatch(property -> property.getEffectiveLink().isPresent());
+  }
+
+  private static List<String> getTypes(Query query) {
+    if (query instanceof FeatureQuery) {
+      return List.of(((FeatureQuery) query).getType());
+    }
+    if (query instanceof MultiFeatureQuery) {
+      return ((MultiFeatureQuery) query).getQueries().stream().map(TypeQuery::getType).toList();
+    }
+    return List.of();
+  }
+
+  private static List<FeatureQueryExtension> getExtensions(Query query) {
+    if (query instanceof FeatureQuery) {
+      return ((FeatureQuery) query).getExtensions();
+    }
+    if (query instanceof MultiFeatureQuery) {
+      return ((MultiFeatureQuery) query).getExtensions();
+    }
+    return List.of();
   }
 
   @Override
   public CompletionStage<Result> runWith(
       Sink<Object> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> auditLogId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
 
     BiFunction<FeatureTokenSource, Map<String, String>, Stream<Result>> stream =
         (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
           ImmutableResult.Builder resultBuilder = ImmutableResult.builder();
+          // duplicates are dropped first so that no downstream step sees them
+          FeatureTokenSource deduplicated =
+              deduplicate
+                  ? tokenSource.via(new FeatureTokenTransformerDeduplicate(idsArePerType))
+                  : tokenSource;
+          // PropertyLinks must run before the per-format value-transformation step so it
+          // captures the raw ISO timestamp, not a locale-formatted variant used in the body
+          FeatureTokenSource source =
+              hasPropertyLinks
+                  ? deduplicated.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
+                  : deduplicated;
+          // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
+          // the same pre-format slot so they see raw provider values and can mutate tokens before
+          // any format-specific transformation
+          for (FeatureQueryExtension ext : getExtensions(query)) {
+            if (ext instanceof FeatureTokenTransformerExtension) {
+              source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
+            }
+          }
+          source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(source, mergedTransformations)
+                  : source;
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -122,11 +212,26 @@ public class FeatureStreamImpl implements FeatureStream {
           }
 
           if (stepMetadata) {
-            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+            source =
+                source.via(
+                    new FeatureTokenTransformerMetadata(
+                        resultBuilder, data.getNativeTimeZone().orElse(ZoneId.of("UTC"))));
           }
+
+          FeatureTokenTransformerAudit auditTransformer = null;
+          if (stepAudit && auditLogId.isPresent() && auditLog.logIsAvailable(auditLogId.get())) {
+            auditTransformer = new FeatureTokenTransformerAudit(auditLogId.get(), auditLog);
+            source = source.via(auditTransformer);
+          }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
 
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
+
+          if (query.getJobHook().isPresent()) {
+            source = source.via(new FeatureTokenTransformerProgress(query.getJobHook().get()));
+          }
 
           Reactive.BasicStream<?, Void> basicStream =
               sink instanceof Reactive.SinkTransformed
@@ -141,36 +246,60 @@ public class FeatureStreamImpl implements FeatureStream {
                     if (strongETag && x instanceof byte[]) {
                       eTag.put((byte[]) x);
                     }
-                    return builder.isEmpty(x instanceof byte[] ? ((byte[]) x).length <= 0 : false);
+                    return builder.isEmpty(x instanceof byte[] && ((byte[]) x).length <= 0);
                   })
               .handleEnd(
                   (ImmutableResult.Builder builder1) -> {
+                    finishAuditLog.run();
+
                     if (strongETag) {
                       builder1.eTag(eTag.build(ETag.Type.STRONG));
                     }
+
                     return builder1.build();
                   });
         };
 
-    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
+    return completeMetadataOnEnd(
+        runner.runQuery(stream, query, mergedTransformations, !doTransform), onCollectionMetadata);
   }
 
   @Override
   public <X> CompletionStage<ResultReduced<X>> runWith(
       SinkReduced<Object, X> sink,
       Map<String, PropertyTransformations> propertyTransformations,
-      CompletableFuture<CollectionMetadata> onCollectionMetadata) {
+      CompletableFuture<CollectionMetadata> onCollectionMetadata,
+      Optional<String> auditLogId) {
 
     Map<String, PropertyTransformations> mergedTransformations =
         getMergedTransformations(data.getTypes(), query, propertyTransformations);
 
     BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<ResultReduced<X>>> stream =
         (tokenSource, virtualTables) -> {
-          FeatureTokenSource source =
-              doTransform
-                  ? getFeatureTokenSourceTransformed(tokenSource, mergedTransformations)
-                  : tokenSource;
           ImmutableResultReduced.Builder<X> resultBuilder = ImmutableResultReduced.<X>builder();
+          // duplicates are dropped first so that no downstream step sees them
+          FeatureTokenSource deduplicated =
+              deduplicate
+                  ? tokenSource.via(new FeatureTokenTransformerDeduplicate(idsArePerType))
+                  : tokenSource;
+          // PropertyLinks must run before the per-format value-transformation step so it
+          // captures the raw ISO timestamp, not a locale-formatted variant used in the body
+          FeatureTokenSource source =
+              hasPropertyLinks
+                  ? deduplicated.via(new FeatureTokenTransformerPropertyLinks(resultBuilder))
+                  : deduplicated;
+          // FeatureTokenTransformerExtension query-extensions (e.g. composite-id rewrite) run in
+          // the same pre-format slot so they see raw provider values and can mutate tokens before
+          // any format-specific transformation
+          for (FeatureQueryExtension ext : getExtensions(query)) {
+            if (ext instanceof FeatureTokenTransformerExtension) {
+              source = source.via(((FeatureTokenTransformerExtension) ext).createTransformer());
+            }
+          }
+          source =
+              doTransform
+                  ? getFeatureTokenSourceTransformed(source, mergedTransformations)
+                  : source;
           final ETag.Incremental eTag = ETag.incremental();
           final boolean strongETag =
               query instanceof FeatureQuery
@@ -188,10 +317,26 @@ public class FeatureStreamImpl implements FeatureStream {
             source = source.via(new FeatureTokenTransformerWeakETag(resultBuilder));
           }
           if (stepMetadata) {
-            source = source.via(new FeatureTokenTransformerMetadata(resultBuilder));
+            source =
+                source.via(
+                    new FeatureTokenTransformerMetadata(
+                        resultBuilder, data.getNativeTimeZone().orElse(ZoneId.of("UTC"))));
           }
+
+          FeatureTokenTransformerAudit auditTransformer = null;
+          if (stepAudit && auditLogId.isPresent() && auditLog.logIsAvailable(auditLogId.get())) {
+            auditTransformer = new FeatureTokenTransformerAudit(auditLogId.get(), auditLog);
+            source = source.via(auditTransformer);
+          }
+          final Runnable finishAuditLog =
+              auditTransformer != null ? auditTransformer::appendToLog : () -> {};
+
           source =
               source.via(new FeatureTokenTransformerHooks(resultBuilder, onCollectionMetadata));
+
+          if (query.getJobHook().isPresent()) {
+            source = source.via(new FeatureTokenTransformerProgress(query.getJobHook().get()));
+          }
 
           Reactive.BasicStream<?, X> basicStream =
               sink instanceof Reactive.SinkReducedTransformed
@@ -212,6 +357,8 @@ public class FeatureStreamImpl implements FeatureStream {
                   })
               .handleEnd(
                   (ImmutableResultReduced.Builder<X> xBuilder) -> {
+                    finishAuditLog.run();
+
                     if (strongETag) {
                       xBuilder.eTag(eTag.build(ETag.Type.STRONG));
                     }
@@ -219,7 +366,8 @@ public class FeatureStreamImpl implements FeatureStream {
                   });
         };
 
-    return runner.runQuery(stream, query, mergedTransformations, !doTransform);
+    return completeMetadataOnEnd(
+        runner.runQuery(stream, query, mergedTransformations, !doTransform), onCollectionMetadata);
   }
 
   private FeatureTokenSource getFeatureTokenSourceTransformed(
@@ -263,7 +411,8 @@ public class FeatureStreamImpl implements FeatureStream {
                           data.getNativeCrs().orElse(OgcCrs.CRS84),
                           nativeCrsIs3d ? OgcCrs.CRS84h : OgcCrs.CRS84));
       FeatureTokenTransformerCoordinates coordinatesMapper =
-          new FeatureTokenTransformerCoordinates(crsTransformer, crsTransformerWgs84);
+          new FeatureTokenTransformerCoordinates(
+              crsTransformer, crsTransformerWgs84, crsTransformerFactory);
       tokenSourceTransformed = tokenSourceTransformed.via(coordinatesMapper);
     }
     if (stepClean) {
@@ -292,6 +441,8 @@ public class FeatureStreamImpl implements FeatureStream {
     }
 
     if (query instanceof MultiFeatureQuery multiFeatureQuery) {
+      // multiple queries may use the same feature type, the transformations only depend on the
+      // type
       return multiFeatureQuery.getQueries().stream()
           .map(
               typeQuery ->
@@ -301,7 +452,8 @@ public class FeatureStreamImpl implements FeatureStream {
                           featureSchemas,
                           typeQuery,
                           Optional.ofNullable(propertyTransformations.get(typeQuery.getType())))))
-          .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+          .collect(
+              ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
     }
 
     return ImmutableMap.of();

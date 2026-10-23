@@ -60,13 +60,12 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
     super(encodingContext);
     this.parameters = encodingContext.getParameters();
     this.tile = encodingContext.getCoordinates();
-    this.tileEncoder = new VectorTileEncoder(tile.getTileMatrixSet().getTileExtent());
+    final int tileExtent = parameters.getTileExtentOrDefault(tile.getTileMatrixSet());
+    this.tileEncoder = new VectorTileEncoder(tileExtent);
     this.affineTransformation = createTransformNativeToTile();
     this.tileset = encodingContext.getTileset();
     this.tilePrecisionModel =
-        new PrecisionModel(
-            (double) tile.getTileMatrixSet().getTileExtent()
-                / (double) tile.getTileMatrixSet().getTileSize());
+        new PrecisionModel((double) tileExtent / (double) tile.getTileMatrixSet().getTileSize());
     this.geometryFactoryTile = new GeometryFactory(tilePrecisionModel);
     this.geometryFactoryWorld = new GeometryFactory();
 

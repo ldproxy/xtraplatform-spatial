@@ -160,6 +160,21 @@ class CrsTransformerProjSpec extends Specification {
 
     }
 
+    def 'CRS transformer - 2D to a geocentric CRS'() {
+        given:
+        CrsTransformerProj gct = (CrsTransformerProj) transformerFactory.getTransformer(EpsgCrs.of(25832), EpsgCrs.of(4936)).get()
+
+        when:
+        double[] result = gct.transform([500000.0, 5550000.0] as double[], 1, 2)
+
+        then:
+        gct.getTargetDimension() == 3
+        result.length == 3
+        Math.abs(result[0] - 4046000) < 10000
+        Math.abs(result[1] - 641000) < 10000
+        Math.abs(result[2] - 4869000) < 10000
+    }
+
     def 'CRS transformer - dimension mismatch'() {
         when:
         CrsTransformerProj gct = (CrsTransformerProj) transformerFactory.getTransformer(EpsgCrs.of(25832), EpsgCrs.of(5555)).get()

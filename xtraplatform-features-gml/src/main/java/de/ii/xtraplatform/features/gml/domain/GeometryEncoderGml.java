@@ -495,9 +495,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       if (useSurfaceAndCurve) {
         writeStartTagObject(RING, true);
         writeStartTagProperty(CURVE_MEMBER);
-        writeStartTagDataType(LINE_STRING_SEGMENT);
-        writePositionList(ring.getValue().getCoordinates(), geometry.getAxes());
-        writeEndTag();
+        ring.accept(encodeAsEmbeddedGeometry.orElse(this));
         writeEndTag();
       } else {
         writeStartTagObject(LINEAR_RING, true);

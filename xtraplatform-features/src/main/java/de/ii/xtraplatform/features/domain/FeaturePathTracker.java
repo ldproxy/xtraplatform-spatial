@@ -22,6 +22,9 @@ public class FeaturePathTracker {
 
   private final Joiner joiner;
   private final List<String> localPath;
+  // bumped on every mutation so callers can cheaply detect a path change (e.g. lookup memoization)
+  // without rebuilding/comparing the path list
+  private long version;
 
   public FeaturePathTracker() {
     this.localPath = new ArrayList<>(64);
@@ -34,6 +37,7 @@ public class FeaturePathTracker {
   }
 
   public void track(int depth) {
+    version++;
     shorten(depth);
   }
 
@@ -41,6 +45,7 @@ public class FeaturePathTracker {
     if (depth < 0) {
       return;
     }
+    version++;
     shorten(depth);
 
     track(localName);
@@ -56,12 +61,23 @@ public class FeaturePathTracker {
   }
 
   public void track(String localName) {
+    version++;
     localPath.add(localName);
   }
 
   public void track(List<String> path) {
+    version++;
     localPath.clear();
     localPath.addAll(path);
+  }
+
+  /** Monotonically increasing token that changes on every mutation of the tracked path. */
+  public long version() {
+    return version;
+  }
+
+  public boolean isEmpty() {
+    return localPath.isEmpty();
   }
 
   @Override

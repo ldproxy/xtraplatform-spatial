@@ -34,7 +34,8 @@ public interface SqlQueryColumn {
     CONSTANT,
     EXPRESSION,
     CONNECTOR,
-    DO_NOT_GENERATE;
+    DO_NOT_GENERATE,
+    ENCRYPT;
   }
 
   String getName();

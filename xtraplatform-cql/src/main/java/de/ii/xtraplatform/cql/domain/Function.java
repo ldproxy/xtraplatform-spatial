@@ -61,11 +61,7 @@ public interface Function extends Temporal, Cql2Expression {
       gen.writeFieldName("args");
       gen.writeStartArray();
       for (Operand operand : value.getArgs()) {
-        if (operand instanceof ScalarLiteral) {
-          gen.writeString(String.format("%s", ((ScalarLiteral) operand).getValue().toString()));
-        } else {
-          gen.writeObject(operand);
-        }
+        gen.writeObject(operand);
       }
       gen.writeEndArray();
       gen.writeEndObject();

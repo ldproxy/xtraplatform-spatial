@@ -48,9 +48,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import org.davidmoten.rxjava3.jdbc.Database;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -72,13 +72,13 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   private final int maxConnections;
   private final int minConnections;
   private final int queueSize;
+  private final Semaphore connectionBudget;
   private final Path dataDir;
   private final String applicationName;
   private final String providerId;
   private final AtomicInteger refCounter;
   private final boolean asyncStartup;
 
-  private Database session;
   private HikariDataSource dataSource;
   private SqlClient sqlClient;
   private Throwable connectionError;
@@ -105,6 +105,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
         connectionInfo.getPool().getMinConnections() >= 0
             ? connectionInfo.getPool().getMinConnections()
             : maxConnections;
+    this.connectionBudget = new Semaphore(Math.max(1, maxConnections), true);
 
     // int capacity = maxConnections / maxQueries;
     // TODO
@@ -139,6 +140,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   }
 
   @Override
+  public Semaphore getConnectionBudget() {
+    return connectionBudget;
+  }
+
+  @Override
   public int getMinConnections() {
     return minConnections;
   }
@@ -158,10 +164,9 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     try {
       HikariConfig hikariConfig = createHikariConfig();
       this.dataSource = new HikariDataSource(hikariConfig);
-      this.session = createSession(dataSource);
       this.sqlClient =
           new SqlClientRx(
-              session,
+              dataSource,
               dbmsAdapters.get(connectionInfo.getDialect()),
               dbmsAdapters.getDialect(connectionInfo.getDialect()),
               connectionInfo.getDefaultCollation());
@@ -179,13 +184,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     if (Objects.nonNull(healthCheckRegistry)) {
       try {
         healthCheckRegistry.unregister(MetricRegistry.name(poolName, "pool", "ConnectivityCheck"));
-      } catch (Throwable e) {
-        // ignore
-      }
-    }
-    if (Objects.nonNull(session)) {
-      try {
-        session.close();
       } catch (Throwable e) {
         // ignore
       }
@@ -286,6 +284,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
                   this.connectionInfo.getPool().getIdleTimeout(),
                   connectionInfoSql.getPool().getIdleTimeout()))
           .put(
+              "leakDetectionThreshold",
+              Objects.equals(
+                  this.connectionInfo.getPool().getLeakDetectionThreshold(),
+                  connectionInfoSql.getPool().getLeakDetectionThreshold()))
+          .put(
               "driverOptions",
               Objects.equals(
                   this.connectionInfo.getDriverOptions(), connectionInfoSql.getDriverOptions()));
@@ -327,6 +330,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     config.setMinimumIdle(asyncStartup ? 0 : minConnections);
     config.setInitializationFailTimeout(asyncStartup ? -1 : getInitFailTimeout(connectionInfo));
     config.setIdleTimeout(parseMs(connectionInfo.getPool().getIdleTimeout()));
+    if (Objects.nonNull(connectionInfo.getPool().getLeakDetectionThreshold())) {
+      // Hikari itself disables values below 2s or above maxLifetime with a warning
+      config.setLeakDetectionThreshold(
+          parseMs(connectionInfo.getPool().getLeakDetectionThreshold()));
+    }
     config.setPoolName(poolName);
     config.setKeepaliveTime(300_000);
 
@@ -339,10 +347,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     // config.setHealthCheckRegistry(healthCheckRegistry);
 
     return config;
-  }
-
-  private Database createSession(HikariDataSource dataSource) {
-    return Database.fromBlocking(dataSource);
   }
 
   private static long getInitFailTimeout(ConnectionInfoSql connectionInfo) {

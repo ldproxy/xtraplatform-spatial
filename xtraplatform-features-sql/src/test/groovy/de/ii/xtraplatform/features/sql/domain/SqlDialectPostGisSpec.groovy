@@ -157,4 +157,21 @@ class SqlDialectPostGisSpec extends Specification {
             extent.isEmpty()
     }
 
+
+    def 'a date or timestamp literal before the year 1 is written with the era'() {
+        expect:
+        sqlDialectPostGis.applyToDatetimeLiteral(value) == expected
+        sqlDialectPostGis.applyToDateLiteral(value) == expected.replace("TIMESTAMP", "DATE")
+
+        where:
+        value                    || expected
+        "2020-01-01T10:20:30Z"   || "TIMESTAMP '2020-01-01T10:20:30Z'"
+        "0001-01-01T00:00:00Z"   || "TIMESTAMP '0001-01-01T00:00:00Z'"
+        "0000-01-01T00:00:00Z"   || "TIMESTAMP '0001-01-01T00:00:00Z BC'"
+        "-0001-12-31T23:59:59Z"  || "TIMESTAMP '0002-12-31T23:59:59Z BC'"
+        "+10000-01-01T00:00:00Z" || "TIMESTAMP '+10000-01-01T00:00:00Z'"
+        "0000-01-01"             || "TIMESTAMP '0001-01-01 BC'"
+        "-infinity"              || "TIMESTAMP '-infinity'"
+        "infinity"               || "TIMESTAMP 'infinity'"
+    }
 }

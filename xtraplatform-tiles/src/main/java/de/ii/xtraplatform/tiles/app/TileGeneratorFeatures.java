@@ -243,7 +243,9 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     }
 
     // if the tileset is sparse, check, if the tile is outside the extent of the feature data;
-    // if yes, return an empty tile
+    // if yes, return an empty tile. An absent extent means the extent is unknown, e.g. because
+    // the computation failed; only an extent that is known not to intersect the tile proves
+    // that there is nothing to generate, everything else goes through the regular generation
     if (Boolean.TRUE.equals(tileset.getSparse()) && featureProvider.extents().isAvailable()) {
       String featureType = tileset.getFeatureType().orElse(tileQuery.getTileset());
       if (featureProvider
@@ -253,16 +255,15 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
           .filter(
               bboxFeatures -> {
                 try {
-                  return BoundingBox.intersects(
+                  return !BoundingBox.intersects(
                       bboxFeatures,
                       tileQuery.getBoundingBox(bboxFeatures.getEpsgCrs(), crsTransformerFactory));
                 } catch (CrsTransformationException e) {
                   // ignore, assume there are features
-                  return true;
+                  return false;
                 }
               })
-          // if the extent is empty, there are no features, so we can return an empty tile, too
-          .isEmpty()) {
+          .isPresent()) {
         return EMPTY_TILES.get(tileQuery.getMediaType());
       }
     }

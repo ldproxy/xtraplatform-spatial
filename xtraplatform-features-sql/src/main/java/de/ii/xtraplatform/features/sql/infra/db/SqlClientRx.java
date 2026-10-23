@@ -10,8 +10,6 @@ package de.ii.xtraplatform.features.sql.infra.db;
 import com.google.common.collect.ImmutableList;
 import com.zaxxer.hikari.pool.ProxyConnection;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
-import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
@@ -19,11 +17,12 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import de.ii.xtraplatform.streams.domain.Reactive;
-import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,15 +31,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.davidmoten.rxjava3.jdbc.Database;
-import org.davidmoten.rxjava3.jdbc.Tx;
-import org.davidmoten.rxjava3.jdbc.internal.DelegatedConnection;
+import javax.sql.DataSource;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.slf4j.Logger;
@@ -50,17 +44,23 @@ public class SqlClientRx implements SqlClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlClientRx.class);
 
-  private final Database session;
+  // Generous on purpose: this is not a query budget but a stall detector, so it has to sit
+  // well above the slowest legitimate gap between two rows (a count over a large table, a
+  // sub-query whose first row needs a full scan). Only an unbounded wait is the failure mode
+  // it exists to end.
+  private static final long READ_STALL_TIMEOUT_MINUTES = 10;
+
+  private final DataSource dataSource;
   private final SqlDbmsAdapter dbmsAdapter;
   private final SqlDialect dialect;
   private final Collator collator;
 
   public SqlClientRx(
-      Database session,
+      DataSource dataSource,
       SqlDbmsAdapter dbmsAdapter,
       SqlDialect dialect,
       Optional<String> defaultCollation) {
-    this.session = session;
+    this.dataSource = dataSource;
     this.dbmsAdapter = dbmsAdapter;
     this.dialect = dialect;
     this.collator = dbmsAdapter.getRowSortingCollator(defaultCollation);
@@ -74,19 +74,32 @@ public class SqlClientRx implements SqlClient {
     CompletableFuture<Collection<SqlRow>> result = new CompletableFuture<>();
 
     if (options.getColumnTypes().isEmpty()) {
-      session
-          .update(query)
-          .complete()
-          .subscribe(() -> result.complete(ImmutableList.of()), result::completeExceptionally);
+      // a statement without a result (DDL, INSERT, DROP); autocommit is on, so it is committed when
+      // it returns and the connection goes back to the pool in every case
+      try (Connection connection = dataSource.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.execute(query);
+        result.complete(ImmutableList.of());
+      } catch (SQLException e) {
+        result.completeExceptionally(e);
+      }
 
       return result;
     }
 
-    session
-        .select(query)
-        .get(resultSet -> new SqlRowVals(collator).read(resultSet, options))
-        .toList()
-        .subscribe(result::complete, result::completeExceptionally);
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(query)) {
+      List<SqlRow> rows = new ArrayList<>();
+
+      while (resultSet.next()) {
+        rows.add(new SqlRowVals(collator).read(resultSet, options));
+      }
+
+      result.complete(rows);
+    } catch (SQLException | RuntimeException e) {
+      result.completeExceptionally(e);
+    }
 
     return result;
   }
@@ -98,21 +111,35 @@ public class SqlClientRx implements SqlClient {
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 
-    // TODO encapsulating the query in a transaction is a workaround for what appears to be a bug in
-    //      rxjava3-jdbc, see https://github.com/interactive-instruments/ldproxy/issues/1293
+    // A positive fetch size requires a transaction so the database driver uses a server-side cursor
+    // and streams rows instead of buffering the whole result set in memory (PostgreSQL ignores the
+    // fetch size with autoCommit=true).
+    boolean streamed = options.getFetchSize() > 0;
+
+    // The connection is leased when the stream is subscribed and returned to the pool when it
+    // terminates, whether the rows were exhausted, the read failed or the consumer cancelled.
     Flowable<SqlRow> flowable =
-        session
-            .select(query)
-            .get(
-                resultSet -> {
-                  SqlRow row = new SqlRowVals(collator).read(resultSet, options);
+        Flowable.using(
+            () -> lease(streamed),
+            connection ->
+                Flowable.generate(
+                    () -> execute(connection, query, options.getFetchSize()),
+                    (resultSet, emitter) -> {
+                      if (resultSet.next()) {
+                        SqlRow row = new SqlRowVals(collator).read(resultSet, options);
 
-                  if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
-                    logBuffer.add(row);
-                  }
+                        if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT) && logBuffer.size() < 10) {
+                          logBuffer.add(row);
+                        }
 
-                  return row;
-                });
+                        emitter.onNext(row);
+                      } else {
+                        emitter.onComplete();
+                      }
+                    },
+                    SqlClientRx::close),
+            connection -> release(connection, streamed),
+            true);
 
     // TODO: prettify, see
     // https://github.com/slick/slick/blob/main/slick/src/main/scala/slick/jdbc/StatementInvoker.scala
@@ -149,178 +176,129 @@ public class SqlClientRx implements SqlClient {
               });
     }
 
-    return Reactive.Source.publisher(flowable);
-  }
-
-  @Override
-  public Reactive.Source<String> getMutationSource(
-      List<Supplier<String>> statements,
-      List<Consumer<String>> idConsumers,
-      Object executionContext,
-      Optional<String> featureId) {
-    /*List<Function<FeatureSql, String>> toStatementsWithLog =
-    statements.stream()
-        .map(
-            function ->
-                (Function<FeatureSql, String>)
-                    featureSql -> {
-                      String statement = function.apply(featureSql);
-
-                      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-                        LOGGER.debug(MARKER.SQL, "Executing statement: {}", statement);
-                      }
-
-                      return statement;
-                    })
-        .collect(Collectors.toList());*/
-
-    int[] i = {0};
-    BiFunction<ResultSet, String, String> mapper =
-        (slickRow, previousId) -> {
-          LOGGER.debug("QUERY {}", i[0]);
-          // null not allowed as return value
-          String id = null;
-          try {
-            id = slickRow.getString(1);
-            LOGGER.debug("RETURNED {}", id);
-            idConsumers.get(i[0]).accept(id);
-            // LOGGER.debug("VALUES {}", values);
-            LOGGER.debug("");
-          } catch (SQLException e) {
-            e.printStackTrace();
-          }
-          i[0]++;
-
-          return previousId != null ? previousId : id;
-        };
-
-    String first = statements.get(0).get();
-    if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", first);
+    // Lease, execute and read run on the subscribing thread, so without this the whole stream is
+    // single-threaded. Subscribing on a worker thread lets several parallel-flagged queries (e.g.
+    // the concurrent single-shot value phase) run at once, each on its own connection.
+    if (options.isParallel()) {
+      flowable = flowable.subscribeOn(Schedulers.io());
     }
 
-    Flowable<? extends Tx<?>> txFlowable =
-        session
-            .update(first)
-            .transacted()
-            .returnGeneratedKeys()
-            .get(resultSet -> mapper.apply(resultSet, null))
-            .filter(tx -> !tx.isComplete());
-
-    for (int j = 1; j < statements.size(); j++) {
-      int finalJ = j;
-      txFlowable =
-          txFlowable.flatMap(
-              tx -> {
-                String next = statements.get(finalJ).get();
-                if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-                  LOGGER.debug(MARKER.SQL, "Executing statement: {}", next);
-                }
-
-                return tx.update(next)
-                    .returnGeneratedKeys()
-                    .get(
-                        resultSet ->
-                            mapper.apply(
-                                resultSet,
-                                tx.value() instanceof String ? (String) tx.value() : null))
-                    .filter(tx2 -> !tx2.isComplete());
-              });
-    }
-
-    Flowable<String> flowable = txFlowable.map(tx -> featureId.orElse((String) tx.value()));
+    // Safety net for a read that neither completes nor fails: a connection lost mid-stream — a
+    // failover in a replicated cluster, for instance — can leave the driver waiting for the next
+    // row forever, so no error is logged, no response is sent, and the connections the sub-query
+    // holds stay held until the client gives up.
+    // The timeout is per element, not per stream, so a slow but progressing read is unaffected
+    // however long it runs in total; only a gap longer than the window ends the stream, with an
+    // error that does propagate. A database-side statement_timeout is no substitute: its error
+    // would be swallowed the same way.
+    flowable =
+        flowable.timeout(
+            READ_STALL_TIMEOUT_MINUTES,
+            TimeUnit.MINUTES,
+            Schedulers.computation(),
+            Flowable.error(
+                () ->
+                    new IllegalStateException(
+                        String.format(
+                            "The database delivered no row for %d minutes and the read was ended; "
+                                + "the statement is in the SQL debug log.",
+                            READ_STALL_TIMEOUT_MINUTES))));
 
     return Reactive.Source.publisher(flowable);
   }
 
-  @Override
-  public Transformer<FeatureDataSql, String> getMutationFlow(
-      Function<FeatureDataSql, List<Supplier<Tuple<String, Consumer<String>>>>> mutations,
-      Object executionContext,
-      String primaryKey,
-      Optional<String> id) {
+  private Connection lease(boolean transaction) throws SQLException {
+    Connection connection = dataSource.getConnection();
 
-    Reactive.Transformer<FeatureDataSql, String> toQueries =
-        Reactive.Transformer.flatMap(
-            feature -> {
-              List<Supplier<Tuple<String, Consumer<String>>>> m = mutations.apply(feature);
-
-              List<Supplier<String>> statements =
-                  m.stream()
-                      .map(
-                          queryFunction ->
-                              Objects.isNull(queryFunction.get().first())
-                                  ? null
-                                  : (Supplier<String>) () -> queryFunction.get().first())
-                      .filter(Objects::nonNull)
-                      .collect(Collectors.toList());
-
-              List<Consumer<String>> idConsumers =
-                  m.stream()
-                      .map(
-                          queryFunction -> {
-                            // TODO
-                            Tuple<String, Consumer<String>> query = queryFunction.get();
-                            return query.second();
-                          })
-                      .filter(Objects::nonNull)
-                      .collect(Collectors.toList());
-
-              Optional<String> featureId =
-                  feature
-                      .getMapping()
-                      .getColumnForId()
-                      .flatMap(
-                          idCol -> {
-                            if (!Objects.equals(primaryKey, idCol.second().getName())
-                                && feature
-                                    .getRows()
-                                    .get(0)
-                                    .first()
-                                    .getFullPath()
-                                    .equals(idCol.first().getFullPath())) {
-                              return Optional.ofNullable(
-                                  feature
-                                      .getRows()
-                                      .get(0)
-                                      .second()
-                                      .getValues()
-                                      .get(idCol.second().getName()));
-                            }
-                            return Optional.empty();
-                          })
-                      .map(SqlClientRx::unquote);
-
-              return getMutationSource(statements, idConsumers, executionContext, featureId);
-            });
-
-    if (id.isPresent()) {
-      // TODO: check that feature id equals given id
-      Reactive.Transformer<FeatureDataSql, FeatureDataSql> filter =
-          Reactive.Transformer.filter(featureSql -> true);
-
-      return filter.via(toQueries);
+    if (transaction) {
+      try {
+        connection.setAutoCommit(false);
+      } catch (SQLException e) {
+        close(connection);
+        throw e;
+      }
     }
 
-    return toQueries;
+    return connection;
   }
 
-  private static String unquote(String value) {
-    if (value.startsWith("'") && value.endsWith("'")) {
-      return value.substring(1, value.length() - 1);
+  private static ResultSet execute(Connection connection, String query, int fetchSize)
+      throws SQLException {
+    Statement statement = connection.createStatement();
+
+    try {
+      if (fetchSize > 0) {
+        statement.setFetchSize(fetchSize);
+      }
+
+      return statement.executeQuery(query);
+    } catch (SQLException | RuntimeException e) {
+      close(statement);
+      throw e;
     }
-    return value;
+  }
+
+  /** Ends a read-only transaction, if any, and returns the connection to the pool. */
+  private static void release(Connection connection, boolean transaction) {
+    if (transaction) {
+      try {
+        // nothing to commit, and a rollback is the cheapest way to close the server-side cursor
+        connection.rollback();
+      } catch (SQLException e) {
+        LOGGER.debug("Ending the read transaction failed: {}", e.getMessage());
+      }
+      try {
+        connection.setAutoCommit(true);
+      } catch (SQLException e) {
+        LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+      }
+    }
+
+    close(connection);
+  }
+
+  /** Closes the result set and the statement it belongs to. */
+  private static void close(ResultSet resultSet) {
+    Statement statement = null;
+
+    try {
+      statement = resultSet.getStatement();
+    } catch (SQLException e) {
+      // the result set is closed below regardless
+    }
+
+    close((AutoCloseable) resultSet);
+    close(statement);
+  }
+
+  private static void close(AutoCloseable closeable) {
+    if (Objects.nonNull(closeable)) {
+      try {
+        closeable.close();
+      } catch (Exception e) {
+        LOGGER.debug("Closing {} failed: {}", closeable.getClass().getSimpleName(), e.getMessage());
+      }
+    }
   }
 
   @Override
   public Connection getConnection() {
-    return session.connection().blockingGet();
+    return leaseConnection();
   }
 
   @Override
   public SqlSession openSession() {
-    Connection connection = session.connection().blockingGet();
-    return new JdbcSqlSession(connection);
+    return new JdbcSqlSession(leaseConnection());
+  }
+
+  /** A pooled connection; closing it returns it to the pool. */
+  private Connection leaseConnection() {
+    try {
+      return dataSource.getConnection();
+    } catch (SQLException e) {
+      throw new IllegalStateException(
+          "Could not obtain a database connection: " + e.getMessage(), e);
+    }
   }
 
   @Override
@@ -337,9 +315,6 @@ public class SqlClientRx implements SqlClient {
   public List<String> getNotifications(Connection connection) {
     Connection actualConnection = connection;
 
-    if (actualConnection instanceof DelegatedConnection) {
-      actualConnection = ((DelegatedConnection) actualConnection).con();
-    }
     if (actualConnection instanceof ProxyConnection) {
       try {
         actualConnection = actualConnection.unwrap(Connection.class);

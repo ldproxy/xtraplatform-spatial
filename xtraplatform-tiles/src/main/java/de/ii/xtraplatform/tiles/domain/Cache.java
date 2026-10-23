@@ -7,9 +7,12 @@
  */
 package de.ii.xtraplatform.tiles.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 /**
@@ -81,11 +84,28 @@ public interface Cache extends WithTmsLevels, WithTilesetTmsLevels {
   Type getType();
 
   /**
-   * @langEn Either `PLAIN` or `MBTILES`.
-   * @langDe Entweder `PLAIN` oder `MBTILES`.
+   * @langEn Either `PER_JOB`, `PER_TILE` or `PER_TILESET`. The deprecated values `PLAIN` and
+   *     `MBTILES` are converted to `PER_TILE` and `PER_TILESET`.
+   * @langDe Entweder `PER_JOB`, `PER_TILE` oder `PER_TILESET`. Die veralteten Werte `PLAIN` und
+   *     `MBTILES` werden in `PER_TILE` und `PER_TILESET` umgewandelt.
    * @since v3.4
    */
   Storage getStorage();
+
+  /**
+   * Migrates the deprecated storage types `PLAIN` and `MBTILES` to `PER_TILE` and `PER_TILESET`.
+   */
+  @Value.Check
+  default Cache migrateStorage() {
+    if (getStorage() == Storage.PLAIN) {
+      return new ImmutableCache.Builder().from(this).storage(Storage.PER_TILE).build();
+    }
+    if (getStorage() == Storage.MBTILES) {
+      return new ImmutableCache.Builder().from(this).storage(Storage.PER_TILESET).build();
+    }
+
+    return this;
+  }
 
   /**
    * @langEn Should this cache be included by the [Seeding](#seeding)?
@@ -104,9 +124,13 @@ public interface Cache extends WithTmsLevels, WithTilesetTmsLevels {
    * @default false
    * @since v4.6
    */
-  @Value.Default
-  default boolean getSeededOnly() {
-    return false;
+  @Nullable
+  Boolean getSeededOnly();
+
+  @JsonIgnore
+  @Value.Lazy
+  default boolean isSeededOnly() {
+    return Objects.equals(getSeededOnly(), Boolean.TRUE);
   }
 
   /**

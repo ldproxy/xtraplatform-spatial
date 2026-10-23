@@ -24,4 +24,13 @@ public interface SqlQuerySet {
   List<SqlQuerySchema> getTableSchemas();
 
   SqlQueryOptions getOptions();
+
+  /**
+   * Index of the query in a multi-query that this query set belongs to. Multiple queries may use
+   * the same feature type, so the main table alone does not identify the query.
+   */
+  @Value.Default
+  default int getQueryIndex() {
+    return 0;
+  }
 }

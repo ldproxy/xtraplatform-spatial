@@ -17,16 +17,16 @@ tokens:
     target: hatObjekt
     onlyIf: source,concat,coalesce,mapped
   - type: VALUE
-    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id
-    target: hatObjekt.1_id
-    value: 1
-    valueType: INTEGER
-    onlyIf: source,concat,coalesce
-  - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/constant_hatObjekt_37
     target: hatObjekt.1_type
     value: bst_erdgasleitung
     valueType: STRING
+    onlyIf: source,concat,coalesce
+  - type: VALUE
+    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id
+    target: hatObjekt.1_id
+    value: 1
+    valueType: INTEGER
     onlyIf: source,concat,coalesce
   - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/text
@@ -59,16 +59,16 @@ tokens:
     target: hatObjekt
     onlyIf: source,concat,mapped
   - type: VALUE
-    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id
-    target: hatObjekt.1_id
-    value: 2
-    valueType: INTEGER
-    onlyIf: source,concat
-  - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/constant_hatObjekt_37
     target: hatObjekt.1_type
     value: bst_erdgasleitung
     valueType: STRING
+    onlyIf: source,concat
+  - type: VALUE
+    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/_id
+    target: hatObjekt.1_id
+    value: 2
+    valueType: INTEGER
     onlyIf: source,concat
   - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_erdgasleitung/text
@@ -109,16 +109,16 @@ tokens:
     target: hatObjekt
     onlyIf: source,concat
   - type: VALUE
-    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/_id
-    target: hatObjekt.2_id
-    value: null
-    valueType: INTEGER
-    onlyIf: source,concat
-  - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/constant_hatObjekt_38
     target: hatObjekt.2_type
     value: bst_speicher
     valueType: STRING
+    onlyIf: source,concat
+  - type: VALUE
+    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/_id
+    target: hatObjekt.2_id
+    value: null
+    valueType: INTEGER
     onlyIf: source,concat
   - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/text
@@ -141,16 +141,16 @@ tokens:
     target: hatObjekt
     onlyIf: source,concat,mapped
   - type: VALUE
-    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/_id
-    target: hatObjekt.2_id
-    value: 2
-    valueType: INTEGER
-    onlyIf: source,concat
-  - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/constant_hatObjekt_38
     target: hatObjekt.2_type
     value: bst_speicher
     valueType: STRING
+    onlyIf: source,concat
+  - type: VALUE
+    source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/_id
+    target: hatObjekt.2_id
+    value: 2
+    valueType: INTEGER
     onlyIf: source,concat
   - type: VALUE
     source: /pfs_plan/[_id=gehoertzuplan_pfs_plan_fk]bst_speicher/text

@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 
 @AutoMultiBind
@@ -32,13 +31,25 @@ public interface SqlDbmsAdapter {
 
   List<String> getDefaultSchemas();
 
-  DatabaseType getRxType();
-
   List<String> getSystemSchemas();
 
   List<String> getSystemTables();
 
   Map<String, GeoInfo> getGeoInfo(Connection connection, DbInfo dbInfo) throws SQLException;
+
+  /**
+   * Returns the geometry columns that have a spatial index which the query generator has to name
+   * explicitly to make use of, keyed by {@code table.column} in lower case (SQL identifiers are
+   * compared case-insensitively here, as SQLite does for ASCII). The value is the column of the
+   * table that the index entries are keyed on, which a query has to join the index on.
+   *
+   * <p>The default is an empty map, which is correct for every DBMS whose spatial operators consult
+   * the spatial index by themselves. It takes the client rather than a connection so that those
+   * adapters do not have to be handed one they will not use.
+   */
+  default Map<String, String> getSpatialIndexes(SqlClientBasic sqlClient) throws SQLException {
+    return Map.of();
+  }
 
   DbInfo getDbInfo(Connection connection) throws SQLException;
 

@@ -36,11 +36,11 @@ public interface TileSeeding {
       String vectorTileset,
       TileSubMatrix vectorSubMatrix);
 
-  void setupSeeding(TileSeedingJobSet jobSet) throws IOException;
+  void setupSeeding(TileSeedingJob jobSet) throws IOException;
 
-  void cleanupSeeding(TileSeedingJobSet jobSet) throws IOException;
+  void cleanupSeeding(TileSeedingJob jobSet) throws IOException;
 
-  void runSeeding(TileSeedingJob job, Consumer<Integer> updateProgress) throws IOException;
+  void runSeeding(TileSeedingPartialJob job, Consumer<Integer> updateProgress) throws IOException;
 
   default void deleteFromCache(
       String tileset, TileMatrixSetBase tileMatrixSet, TileMatrixSetLimits limits) {}

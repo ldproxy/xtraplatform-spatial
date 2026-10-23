@@ -29,6 +29,8 @@ import de.ii.xtraplatform.cql.domain.Lte
 import de.ii.xtraplatform.cql.domain.Neq
 import de.ii.xtraplatform.cql.domain.Not
 import de.ii.xtraplatform.cql.domain.Or
+import de.ii.xtraplatform.cql.domain.Parameter
+import de.ii.xtraplatform.jsonschema.domain.ImmutableJsonSchemaString
 import de.ii.xtraplatform.cql.domain.Lt
 import de.ii.xtraplatform.cql.domain.Gt
 import de.ii.xtraplatform.cql.domain.Property
@@ -115,6 +117,26 @@ class CqlTypeCheckerSpec extends Specification {
 
         then:
         noExceptionThrown()
+    }
+
+    def 'an unbound parameter is treated as a wildcard'() {
+        given: 'a parameter operand, e.g. in a stored query validated before invocation'
+        def param = Parameter.of("aoi", new ImmutableJsonSchemaString.Builder().build())
+
+        when: 'a parameter is an operand of a spatial or array operation'
+        BinarySpatialOperation.of(SpatialFunction.S_INTERSECTS, Property.of("location_geometry"), param).accept(visitor3)
+        BinaryArrayOperation.of(ArrayFunction.A_CONTAINS, Property.of("seats_per_class"), param).accept(visitor3)
+
+        then: 'the concrete operand is checked, the parameter is not constrained'
+        noExceptionThrown()
+    }
+
+    def 'a scalar comparison on an array property is rejected'() {
+        when: 'a scalar = is used on an array-valued property (the modellart case)'
+        Eq.of(Property.of("seats_per_class"), ScalarLiteral.of("DLKM")).accept(visitor3)
+
+        then:
+        thrown CqlIncompatibleTypes
     }
 
     def 'Test the predicate-checking visitor'() {

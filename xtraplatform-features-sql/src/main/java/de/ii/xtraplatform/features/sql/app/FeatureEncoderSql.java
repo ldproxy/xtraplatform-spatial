@@ -13,10 +13,10 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.MappingRule.Scope;
-import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenEncoderBaseSimple;
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption;
 import de.ii.xtraplatform.features.json.domain.JsonBuilder;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,10 +53,13 @@ public class FeatureEncoderSql
   private static final Logger LOGGER = LoggerFactory.getLogger(FeatureEncoderSql.class);
 
   private final SqlQueryMapping mapping;
+  private final EpsgCrs inputCrs;
   private final EpsgCrs nativeCrs;
+  private final CrsTransformerFactory crsTransformerFactory;
   private final Optional<CrsTransformer> crsTransformer;
   private final Optional<ZoneId> timeZone;
   private final Optional<String> nullValue;
+  private final Optional<PropertyEncryption> encryption;
   private Map<String, JsonBuilder> jsonColumns;
   private final boolean isPatch;
   private final boolean trace;
@@ -76,12 +80,16 @@ public class FeatureEncoderSql
       EpsgCrs nativeCrs,
       CrsTransformerFactory crsTransformerFactory,
       Optional<ZoneId> timeZone,
-      Optional<String> nullValue) {
+      Optional<String> nullValue,
+      Optional<PropertyEncryption> encryption) {
     this.mapping = mapping;
+    this.inputCrs = inputCrs;
+    this.crsTransformerFactory = crsTransformerFactory;
     this.crsTransformer = crsTransformerFactory.getTransformer(inputCrs, nativeCrs);
     this.nativeCrs = nativeCrs;
     this.timeZone = timeZone;
     this.nullValue = nullValue;
+    this.encryption = encryption;
     this.jsonColumns = new LinkedHashMap<>();
     this.isPatch = nullValue.isPresent();
     this.trace = LOGGER.isTraceEnabled();
@@ -258,34 +266,66 @@ public class FeatureEncoderSql
       LOGGER.trace("geometry: {} {}", context.pathAsString(), geometry);
     }
 
-    mapping
-        .getColumnForPrimaryGeometry()
+    // A geometry property that is mapped to its own writable column under its property path
+    // (e.g. a per-CRS position variant) takes precedence over the primary geometry. The column's
+    // storage CRS — the WKT/WKB operation parameter, set from the schema's `crs` option —
+    // determines the transformation target and the SRID of the literal; without the option this
+    // is the provider's nativeCrs, preserving the previous behavior.
+    Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> columnForPath =
+        mapping
+            .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
+            .filter(
+                c ->
+                    c.second().hasOperation(SqlQueryColumn.Operation.WKT)
+                        || c.second().hasOperation(SqlQueryColumn.Operation.WKB));
+
+    columnForPath
+        .or(
+            () ->
+                mapping
+                    .getColumnForPrimaryGeometry()
+                    .filter(c -> mapping.getSchemaForPrimaryGeometry().isPresent()))
         .ifPresentOrElse(
             column -> {
-              mapping
-                  .getSchemaForPrimaryGeometry()
-                  .ifPresentOrElse(
-                      schema -> {
-                        String value = toWkt(geometry, crsTransformer, nativeCrs);
+              EpsgCrs storageCrs = storageCrs(column.second());
+              String value = toWkt(geometry, transformerFor(geometry, storageCrs), storageCrs);
 
-                        currentFeature.addColumn(column.first(), column.second(), value);
+              currentFeature.addColumn(column.first(), column.second(), value);
 
-                        if (trace) {
-                          LOGGER.trace("onGeometry: {} {}", context.pathAsString(), value);
-                        }
-                      },
-                      () -> {
-                        if (trace) {
-                          LOGGER.warn(
-                              "onGeometry: {} not found in mapping", context.pathAsString());
-                        }
-                      });
+              if (trace) {
+                LOGGER.trace("onGeometry: {} {}", context.pathAsString(), value);
+              }
             },
             () -> {
               if (trace) {
                 LOGGER.warn("onGeometry: {} not found in mapping", context.pathAsString());
               }
             });
+  }
+
+  private EpsgCrs storageCrs(SqlQueryColumn column) {
+    SqlQueryColumn.Operation op =
+        column.hasOperation(SqlQueryColumn.Operation.WKB)
+            ? SqlQueryColumn.Operation.WKB
+            : SqlQueryColumn.Operation.WKT;
+    List<String> parameters = column.getOperationParameters(op);
+    if (parameters.isEmpty()) {
+      return nativeCrs;
+    }
+    return EpsgCrs.of(
+        Integer.parseInt(parameters.get(0)),
+        parameters.size() > 1 ? EpsgCrs.Force.valueOf(parameters.get(1)) : EpsgCrs.Force.NONE);
+  }
+
+  // The transformation source is the CRS the geometry actually arrived in (set by the format
+  // decoder from srsName or the request CRS), falling back to the request CRS for decoders that
+  // do not tag geometries.
+  private Optional<CrsTransformer> transformerFor(Geometry<?> geometry, EpsgCrs storageCrs) {
+    EpsgCrs sourceCrs = geometry.getCrs().orElse(inputCrs);
+    if (Objects.equals(sourceCrs, storageCrs)) {
+      return Optional.empty();
+    }
+    return crsTransformerFactory.getTransformer(sourceCrs, storageCrs);
   }
 
   @Override
@@ -298,9 +338,18 @@ public class FeatureEncoderSql
             column -> {
               String value = context.value();
 
-              if (timeZone.isPresent()
-                  && column.second().getType() == Type.DATETIME
-                  && Objects.nonNull(value)) {
+              Type columnType = column.second().getType();
+              boolean encrypted = columnType == Type.ENCRYPTED;
+              Type logicalType =
+                  encrypted
+                      ? Type.valueOf(
+                          column
+                              .second()
+                              .getOperationParameter(
+                                  SqlQueryColumn.Operation.ENCRYPT, Type.STRING.name()))
+                      : columnType;
+
+              if (timeZone.isPresent() && logicalType == Type.DATETIME && Objects.nonNull(value)) {
                 value = toTimeZone(context.pathAsString(), value, timeZone.get(), trace);
               }
 
@@ -313,18 +362,25 @@ public class FeatureEncoderSql
                 return;
               }
 
-              boolean needsQuotes =
-                  column.second().getType() == SchemaBase.Type.STRING
-                      || column.second().getType() == SchemaBase.Type.DATETIME
-                      || column.second().getType() == SchemaBase.Type.DATE;
-              /* (schemaSql.getType() == SchemaBase.Type.FEATURE_REF
-              && schemaSql.getValueType().orElse(SchemaBase.Type.STRING)
-              == SchemaBase.Type.STRING)*/
-
-              value =
-                  needsQuotes && Objects.nonNull(value)
-                      ? String.format("'%s'", value.replaceAll("'", "''"))
-                      : value;
+              // Numeric/boolean values are validated and re-rendered (never inlined as raw request
+              // text); string/date values are quoted with quote-doubling. A null stays null so the
+              // downstream row renderer emits SQL NULL. See SqlLiterals. Values for encrypted
+              // columns are normalized and encrypted; the patch null sentinel must stay
+              // recognizable for FeatureDataSql.patchWith and is quoted like a string.
+              if (Objects.nonNull(value)) {
+                if (encrypted) {
+                  value =
+                      isPatch && value.equals(nullValue.get())
+                          ? SqlLiterals.string(value)
+                          : SqlLiterals.encrypted(
+                              encryption.orElseThrow(FeatureEncoderSql::encryptionNotEnabled),
+                              logicalType,
+                              value,
+                              column.second().getName());
+                } else {
+                  value = SqlLiterals.forType(columnType, value);
+                }
+              }
 
               boolean junctionElement =
                   currentArrayJunctionTable != null
@@ -342,6 +398,11 @@ public class FeatureEncoderSql
             () -> {
               if (trace) LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
             });
+  }
+
+  private static IllegalStateException encryptionNotEnabled() {
+    return new IllegalStateException(
+        "The provider has properties of type ENCRYPTED, but encryption is not enabled.");
   }
 
   @Override
@@ -399,7 +460,7 @@ public class FeatureEncoderSql
   }
 
   private static String toWkt(
-      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs nativeCrs) {
+      Geometry<?> geometry, Optional<CrsTransformer> crsTransformer, EpsgCrs storageCrs) {
 
     if (crsTransformer.isPresent()) {
       geometry =
@@ -416,7 +477,7 @@ public class FeatureEncoderSql
     }
 
     // TODO: functions from Dialect
-    String result = String.format("ST_GeomFromText('%s',%s)", wkt, nativeCrs.getCode());
+    String result = String.format("ST_GeomFromText('%s',%s)", wkt, storageCrs.getCode());
 
     if (geometry.getType() == GeometryType.POLYGON
         || geometry.getType() == GeometryType.MULTI_POLYGON) {

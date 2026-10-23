@@ -34,7 +34,7 @@ class FeatureTokenTransformerMappingSpec extends Specification {
         where:
 
         casename                                  | schema                                           | source                                                 | expected
-        //TODO "joined value array between main columns" | FeatureSchemaFixtures.BIOTOP                     | FeatureTokenFixtures.SINGLE_FEATURE_VALUE_ARRAY_AT_END | FeatureTokenFixtures.SINGLE_FEATURE_VALUE_ARRAY_IN_ORDER_MAPPED
+        "joined value array between main columns" | FeatureSchemaFixtures.BIOTOP                     | FeatureTokenFixtures.SINGLE_FEATURE_VALUE_ARRAY_AT_END | FeatureTokenFixtures.SINGLE_FEATURE_VALUE_ARRAY_IN_ORDER_MAPPED
         "joined object array"                     | FeatureSchemaFixtures.OBJECT_ARRAY               | FeatureTokenFixtures.EXPLORATION_SITE_OBJECT_ARRAY     | FeatureTokenFixtures.EXPLORATION_SITE_OBJECT_ARRAY_MAPPED
         //"object without source path"              | FeatureSchemaFixtures.OBJECT_WITHOUT_SOURCE_PATH | FeatureTokenFixtures.OBJECT_WITHOUT_SOURCE_PATH        | FeatureTokenFixtures.OBJECT_WITHOUT_SOURCE_PATH_MAPPED
 

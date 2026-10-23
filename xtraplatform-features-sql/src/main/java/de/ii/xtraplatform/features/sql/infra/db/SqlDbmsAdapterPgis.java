@@ -12,6 +12,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.crs.domain.EpsgCrs.Force;
+import de.ii.xtraplatform.features.sql.app.PkcsAwareSslSocketFactory;
 import de.ii.xtraplatform.features.sql.domain.ConnectionInfoSql;
 import de.ii.xtraplatform.features.sql.domain.ImmutableGeoInfo;
 import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapter;
@@ -34,7 +35,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
-import org.davidmoten.rxjava3.jdbc.pool.DatabaseType;
 import org.immutables.value.Value;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.slf4j.Logger;
@@ -91,27 +91,31 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
         .getDriverOptions()
         .forEach(
             (key, value) -> {
+              if (Strings.isNullOrEmpty(key) || Strings.isNullOrEmpty(value)) {
+                return;
+              }
               switch (key) {
                 case "gssEncMode":
-                  ds.setGssEncMode(String.valueOf(value));
+                  ds.setGssEncMode(value);
                   break;
                 case "ssl":
                   ds.setSsl(Objects.equals(value, "true"));
                   break;
                 case "sslmode":
-                  ds.setSslMode(String.valueOf(value));
+                  ds.setSslMode(value);
                   break;
                 case "sslcert":
-                  ds.setSslCert(String.valueOf(value));
+                  ds.setSslCert(value);
                   break;
                 case "sslkey":
-                  ds.setSslKey(String.valueOf(value));
+                  ds.setSslKey(value);
+                  ds.setSslfactory(PkcsAwareSslSocketFactory.class.getName());
                   break;
                 case "sslrootcert":
-                  ds.setSslRootCert(String.valueOf(value));
+                  ds.setSslRootCert(value);
                   break;
                 case "sslpassword":
-                  ds.setSslPassword(String.valueOf(value));
+                  ds.setSslPassword(value);
                   break;
               }
             });
@@ -137,11 +141,6 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
       return Optional.of(String.format("SET search_path TO %s,public; %s", schemas, initSql));
     }
     return Optional.of(initSql);
-  }
-
-  @Override
-  public DatabaseType getRxType() {
-    return DatabaseType.POSTGRES;
   }
 
   @Override

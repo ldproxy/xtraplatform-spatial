@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.geoparquet.app;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
 import de.ii.xtraplatform.cql.domain.Cql;
@@ -34,6 +35,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlDbmsAdapters;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryBatch;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.values.domain.ValueStore;
@@ -217,6 +219,8 @@ public class FeatureProviderGeoParquet extends FeatureProviderSql {
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      Encryption encryption,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     super(
         crsTransformerFactory,
@@ -231,6 +235,8 @@ public class FeatureProviderGeoParquet extends FeatureProviderSql {
         volatileRegistry,
         cache,
         scheduler,
+        encryption,
+        auditLog,
         data,
         Map.of());
   }

@@ -10,10 +10,10 @@ package de.ii.xtraplatform.features.sql.domain;
 import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedInject;
+import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.cache.domain.Cache;
@@ -56,9 +56,7 @@ import de.ii.xtraplatform.features.domain.FeatureStream;
 import de.ii.xtraplatform.features.domain.FeatureStreamImpl;
 import de.ii.xtraplatform.features.domain.FeatureTokenDecoder;
 import de.ii.xtraplatform.features.domain.FeatureTokenSource;
-import de.ii.xtraplatform.features.domain.FeatureTokenTransformer;
 import de.ii.xtraplatform.features.domain.FeatureTransactions;
-import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Builder;
 import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Type;
 import de.ii.xtraplatform.features.domain.FilterEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableDatasetChange;
@@ -74,45 +72,43 @@ import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.features.domain.ProviderExtensionRegistry;
 import de.ii.xtraplatform.features.domain.Query;
+import de.ii.xtraplatform.features.domain.QueryRunner;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SourceSchemaValidator;
 import de.ii.xtraplatform.features.domain.transform.OnlyQueryables;
 import de.ii.xtraplatform.features.domain.transform.OnlySortables;
+import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.sql.ImmutableSqlPathSyntax;
 import de.ii.xtraplatform.features.sql.SqlPathSyntax;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsQueryGenerator;
 import de.ii.xtraplatform.features.sql.app.AggregateStatsReaderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.FeatureDecoderSql;
-import de.ii.xtraplatform.features.sql.app.FeatureEncoderSql;
 import de.ii.xtraplatform.features.sql.app.FeatureMutationsSql;
 import de.ii.xtraplatform.features.sql.app.FeatureQueryEncoderSql;
 import de.ii.xtraplatform.features.sql.app.FilterEncoderSql;
-import de.ii.xtraplatform.features.sql.app.ModifiableFeatureDataSql;
 import de.ii.xtraplatform.features.sql.app.MutationSchemaDeriver;
 import de.ii.xtraplatform.features.sql.app.PathParserSql;
 import de.ii.xtraplatform.features.sql.app.QuerySchemaDeriver;
+import de.ii.xtraplatform.features.sql.app.ResultSetMaterializer;
 import de.ii.xtraplatform.features.sql.app.SqlInsertGenerator2;
 import de.ii.xtraplatform.features.sql.app.SqlMappingDeriver;
 import de.ii.xtraplatform.features.sql.app.SqlMutationSession;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplates;
 import de.ii.xtraplatform.features.sql.app.SqlQueryTemplatesDeriver;
 import de.ii.xtraplatform.features.sql.domain.FeatureProviderSqlData.QueryGeneratorSettings;
-import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.infra.db.SourceSchemaValidatorSql;
 import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.WkbDialect;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.services.domain.Scheduler;
 import de.ii.xtraplatform.streams.domain.Reactive;
-import de.ii.xtraplatform.streams.domain.Reactive.RunnableStream;
-import de.ii.xtraplatform.streams.domain.Reactive.Sink;
-import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
-import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import de.ii.xtraplatform.values.domain.ValueStore;
+import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -122,10 +118,13 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
@@ -468,6 +467,7 @@ public class FeatureProviderSql
   private PathParserSql pathParser2;
   private SqlPathParser pathParser3;
   private FilterEncoderSql filterEncoder;
+  private ResultSetMaterializer resultSetMaterializer;
   private SourceSchemaValidator<SchemaSql> sourceSchemaValidator;
   private Map<String, List<SchemaSql>> tableSchemas;
   private Map<String, List<SqlQueryMapping>> queryMappings;
@@ -488,6 +488,8 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      Encryption encryption,
+      AuditLog auditLog,
       @Assisted FeatureProviderDataV2 data) {
     this(
         crsTransformerFactory,
@@ -502,6 +504,8 @@ public class FeatureProviderSql
         volatileRegistry,
         cache,
         scheduler,
+        encryption,
+        auditLog,
         data,
         decoderFactories.getConnectorDecoders());
   }
@@ -519,6 +523,8 @@ public class FeatureProviderSql
       VolatileRegistry volatileRegistry,
       Cache cache,
       Scheduler scheduler,
+      Encryption encryption,
+      AuditLog auditLog,
       FeatureProviderDataV2 data,
       Map<String, DecoderFactory> subdecoders) {
     super(
@@ -528,6 +534,8 @@ public class FeatureProviderSql
         crsInfo,
         extensionRegistry,
         valueStore.forType(Codelist.class),
+        auditLog,
+        encryption,
         data,
         volatileRegistry);
 
@@ -566,7 +574,8 @@ public class FeatureProviderSql
             ? dbmsAdapters.get(getData().getConnectionInfo().getDialect()).getDefaultSchemas()
             : getData().getConnectionInfo().getSchemas();
     this.sourceSchemaValidator =
-        new SourceSchemaValidatorSql(validationSchemas, this::getSqlClient);
+        new SourceSchemaValidatorSql(
+            validationSchemas, getData().getNativeTimeZone(), this::getSqlClient);
 
     this.pathParser3 = createPathParser3(getData().getSourcePathDefaults(), cql, subdecoders);
 
@@ -592,7 +601,12 @@ public class FeatureProviderSql
             crsInfo,
             cql,
             getCql2Functions(),
-            accentiCollation);
+            accentiCollation,
+            type ->
+                Optional.ofNullable(queryMappings.get(type))
+                    .filter(mappings -> mappings.size() == 1)
+                    .map(mappings -> mappings.get(0)),
+            getSpatialIndexes());
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
@@ -619,6 +633,13 @@ public class FeatureProviderSql
         new FeatureQueryEncoderSql(
             allQueryTemplates, allQueryTemplates, getData().getQueryGeneration(), sqlDialect);
 
+    this.resultSetMaterializer =
+        new ResultSetMaterializer(
+            this::getSqlClient,
+            filterEncoder,
+            getData().getQueryGeneration().getResultSetMaterializationMaxSize(),
+            sqlDialect);
+
     this.aggregateStatsReader =
         new AggregateStatsReaderSql(
             this::getSqlClient,
@@ -628,7 +649,6 @@ public class FeatureProviderSql
             getData().getNativeTimeZone().orElse(ZoneId.of("UTC")));
     this.featureMutationsSql =
         new FeatureMutationsSql(
-            this::getSqlClient,
             new SqlInsertGenerator2(
                 getData().getNativeCrs().orElse(OgcCrs.CRS84),
                 crsTransformerFactory,
@@ -637,6 +657,24 @@ public class FeatureProviderSql
     this.pathParser2 = createPathParser2(getData().getSourcePathDefaults(), cql);
 
     return true;
+  }
+
+  /**
+   * The geometry columns with a spatial index that the query generator has to name explicitly to
+   * make use of. Without it, spatial queries keep working, only without the index, so a failure to
+   * determine it is logged and does not keep the provider from starting.
+   */
+  private Map<String, String> getSpatialIndexes() {
+    try {
+      return getSqlClient().getSpatialIndexes();
+    } catch (SQLException | RuntimeException e) {
+      LogContext.errorAsWarn(
+          LOGGER,
+          e,
+          "Could not determine the spatial indexes of the feature provider with id '{}'. Spatial queries will not use a spatial index.",
+          getId());
+      return Map.of();
+    }
   }
 
   @Override
@@ -925,11 +963,6 @@ public class FeatureProviderSql
   }
 
   @Override
-  protected List<FeatureTokenTransformer> getDecoderTransformers() {
-    return ImmutableList.of(); // new FeatureTokenTransformerSorting());
-  }
-
-  @Override
   public FeatureProviderSqlData getData() {
     return (FeatureProviderSqlData) super.getData();
   }
@@ -953,11 +986,7 @@ public class FeatureProviderSql
     if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
       return false;
     }
-    if (!getData().getDatasetChanges().isModeCrud()) {
-      return false;
-    }
-
-    return true;
+    return getData().getDatasetChanges().isModeCrud();
   }
 
   @Override
@@ -1063,22 +1092,18 @@ public class FeatureProviderSql
           aggregateStatsReader.getSpatialExtent(queryMappings.get(typeName), is3dSupported());
 
       Optional<BoundingBox> extent =
-          extentGraph
-              .on(getStreamRunner())
-              .run()
-              .exceptionally(
-                  throwable -> {
-                    LogContext.errorAsWarn(LOGGER, throwable, "Cannot compute spatial extent");
-                    return Optional.empty();
-                  })
-              .toCompletableFuture()
-              .join();
+          extentGraph.on(getStreamRunner()).run().toCompletableFuture().join();
 
+      // only cache the result of a successful computation, a failure cached as "no extent"
+      // would silently persist, e.g. as empty tiles for the type
       cache.put(cacheValidator, extent.orElse(null), cacheKey);
 
       return extent;
     } catch (Throwable e) {
-      // continue
+      Throwable cause =
+          e instanceof CompletionException && Objects.nonNull(e.getCause()) ? e.getCause() : e;
+      LogContext.errorAsWarn(
+          LOGGER, cause, "Cannot compute spatial extent for type '{}'", typeName);
     }
 
     return Optional.empty();
@@ -1159,22 +1184,18 @@ public class FeatureProviderSql
           aggregateStatsReader.getTemporalExtent(queryMappings.get(typeName));
 
       Optional<Interval> extent =
-          extentGraph
-              .on(getStreamRunner())
-              .run()
-              .exceptionally(
-                  throwable -> {
-                    LogContext.errorAsWarn(LOGGER, throwable, "Cannot compute temporal extent");
-                    return Optional.empty();
-                  })
-              .toCompletableFuture()
-              .join();
+          extentGraph.on(getStreamRunner()).run().toCompletableFuture().join();
 
+      // only cache the result of a successful computation, a failure cached as "no extent"
+      // would silently persist
       cache.put(cacheValidator, extent.orElse(null), cacheKey);
 
       return extent;
     } catch (Throwable e) {
-      // continue
+      Throwable cause =
+          e instanceof CompletionException && Objects.nonNull(e.getCause()) ? e.getCause() : e;
+      LogContext.errorAsWarn(
+          LOGGER, cause, "Cannot compute temporal extent for type '{}'", typeName);
     }
 
     return Optional.empty();
@@ -1231,8 +1252,9 @@ public class FeatureProviderSql
       FeatureTokenSource featureTokenSource,
       EpsgCrs crs,
       Optional<String> featureId) {
-
-    return writeFeatures(Type.CREATE, featureType, featureTokenSource, featureId, crs, false);
+    return runInSession(
+        Type.CREATE,
+        session -> session.createFeatures(featureType, featureTokenSource, crs, featureId));
   }
 
   @Override
@@ -1242,13 +1264,9 @@ public class FeatureProviderSql
       FeatureTokenSource featureTokenSource,
       EpsgCrs crs,
       boolean partial) {
-    return writeFeatures(
+    return runInSession(
         partial ? Type.UPDATE : Type.REPLACE,
-        featureType,
-        featureTokenSource,
-        Optional.of(featureId),
-        crs,
-        partial);
+        session -> session.updateFeature(featureType, featureId, featureTokenSource, crs, partial));
   }
 
   @Override
@@ -1260,32 +1278,18 @@ public class FeatureProviderSql
         getNativeCrs(),
         crsTransformerFactory,
         getData().getNativeTimeZone(),
-        getStreamRunner());
+        getStreamRunner(),
+        getPropertyEncryption());
+  }
+
+  @Override
+  protected boolean supportsEncryptedProperties() {
+    return true;
   }
 
   @Override
   public MutationResult deleteFeature(String featureType, String id) {
-    Optional<List<SqlQueryMapping>> queryMapping =
-        Optional.ofNullable(queryMappings.get(featureType));
-
-    if (queryMapping.isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format("Feature type '%s' not found.", featureType));
-    }
-
-    Reactive.Source<String> deletionSource =
-        featureMutationsSql.getDeletionSource(queryMapping.get().get(0), id);
-
-    RunnableStream<MutationResult> deletionStream =
-        deletionSource
-            .to(Sink.ignore())
-            .withResult(ImmutableMutationResult.builder().type(Type.DELETE).hasFeatures(false))
-            .handleError(ImmutableMutationResult.Builder::error)
-            .handleItem(ImmutableMutationResult.Builder::addIds)
-            .handleEnd(Builder::build)
-            .on(getStreamRunner());
-
-    return deletionStream.run().toCompletableFuture().join();
+    return runInSession(Type.DELETE, session -> session.deleteFeature(featureType, id));
   }
 
   @Override
@@ -1294,104 +1298,112 @@ public class FeatureProviderSql
         Optional.ofNullable(queryMappings.get(featureType));
 
     if (queryMapping.isPresent()) {
-      return queryMapping.get().stream()
-          .allMatch(
-              mapping -> {
-                if (mapping.getColumnForId().isPresent() && mapping.getSchemaForId().isPresent()) {
-                  String primaryKey = mapping.getColumnForId().get().first().getPrimaryKey();
-                  String idColumn = mapping.getColumnForId().get().second().getName();
-
-                  if (!Objects.equals(primaryKey, idColumn)) {
-                    return false;
-                  }
-
-                  return !mapping
-                      .getColumnForId()
-                      .get()
-                      .second()
-                      .hasOperation(Operation.DO_NOT_GENERATE);
-                }
-                return true;
-              });
+      return queryMapping.get().stream().allMatch(SqlQueryMapping::hasGeneratedId);
     }
 
     return true;
   }
 
-  private MutationResult writeFeatures(
-      Type type,
-      String featureType,
-      FeatureTokenSource featureTokenSource,
-      Optional<String> featureId,
-      EpsgCrs crs,
-      boolean partial) {
-    Optional<List<SqlQueryMapping>> queryMapping =
-        Optional.ofNullable(queryMappings.get(featureType));
-
-    if (queryMapping.isEmpty()) {
-      throw new IllegalArgumentException(
-          String.format("Feature type '%s' not found.", featureType));
+  /**
+   * Runs one mutation in a session of its own: committed when the session reports success, rolled
+   * back otherwise, and the connection is returned to the pool in every case, including a failed
+   * COMMIT or a connection the database has terminated.
+   */
+  private MutationResult runInSession(Type type, Function<Session, MutationResult> mutation) {
+    Session session;
+    try {
+      session = openSession();
+    } catch (RuntimeException e) {
+      // no connection could be leased, so there is nothing to release
+      return ImmutableMutationResult.builder().type(type).hasFeatures(false).error(e).build();
     }
 
-    Transformer<FeatureDataSql, String> featureWriter =
-        type == Type.CREATE
-            ? featureMutationsSql.getCreatorFlow(queryMapping.get().get(0), null, featureId, crs)
-            : featureMutationsSql.getUpdaterFlow(
-                queryMapping.get().get(0), null, featureId.get(), crs);
+    try {
+      MutationResult result = mutation.apply(session);
 
-    ImmutableMutationResult.Builder builder =
-        ImmutableMutationResult.builder().type(type).hasFeatures(false);
-    FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
+      if (result.getError().isPresent()) {
+        session.rollback();
 
-    Source<FeatureDataSql> featureSqlSource =
-        featureTokenSource
-            .via(statsCollector)
-            .via(
-                new FeatureEncoderSql(
-                    queryMapping.get().get(0),
-                    crs,
-                    getNativeCrs(),
-                    crsTransformerFactory,
-                    getData().getNativeTimeZone(),
-                    partial ? Optional.of(FeatureTransactions.PATCH_NULL_VALUE) : Optional.empty()))
-            .via(Transformer.map(feature -> (FeatureDataSql) feature));
+        return ImmutableMutationResult.builder()
+            .from(result)
+            .error(toMutationError(result.getError().get()))
+            .build();
+      }
 
-    if (partial) {
-      featureSqlSource =
-          featureSqlSource.via(
-              Transformer.reduce(
-                  ModifiableFeatureDataSql.create(),
-                  (a, b) -> a.getRows().isEmpty() ? b : a.patchWith(b)));
+      session.commit();
+
+      return result;
+    } catch (RuntimeException e) {
+      session.rollback();
+
+      return ImmutableMutationResult.builder()
+          .type(type)
+          .hasFeatures(false)
+          .error(toMutationError(e))
+          .build();
+    } finally {
+      session.close();
     }
-
-    RunnableStream<MutationResult> mutationStream =
-        featureSqlSource
-            .via(featureWriter)
-            .to(Sink.ignore())
-            .withResult((Builder) builder)
-            .handleError(
-                (result, throwable) -> {
-                  Throwable error = throwable;
-
-                  if (throwable instanceof PSQLException
-                      || throwable instanceof JsonParseException) {
-                    error =
-                        new IllegalArgumentException(
-                            "Invalid feature data. You may be able to obtain more information about the problem by adding the header ‘Prefer: handling=strict’ to the request.",
-                            throwable);
-                    LogContext.errorAsDebug(LOGGER, throwable, "Error during feature mutation");
-                  }
-
-                  return result.error(error);
-                })
-            .handleItem((Builder::addIds))
-            .handleEnd(Builder::build)
-            .on(getStreamRunner());
-
-    return mutationStream.run().toCompletableFuture().join();
   }
 
+  /**
+   * Errors caused by the submitted data - a statement or a COMMIT rejected by the database,
+   * unparsable JSON - are reported as a bad request with a generic message; the database message is
+   * in the debug log and is returned to the client with 'Prefer: handling=strict'. Everything else,
+   * notably a lost database connection or an exhausted pool, is passed through and reported as a
+   * server error.
+   */
+  private static Throwable toMutationError(Throwable error) {
+    for (Throwable t = error; Objects.nonNull(t); t = t.getCause() == t ? null : t.getCause()) {
+      if (t instanceof JsonParseException) {
+        return invalidFeatureData(t);
+      }
+      if (t instanceof SQLException) {
+        return isDataError((SQLException) t) ? invalidFeatureData(t) : error;
+      }
+    }
+
+    return error;
+  }
+
+  private static Throwable invalidFeatureData(Throwable cause) {
+    LogContext.errorAsDebug(LOGGER, cause, "Error during feature mutation");
+
+    return new IllegalArgumentException(
+        "Invalid feature data. You may be able to obtain more information about the problem by"
+            + " adding the header \u2018Prefer: handling=strict\u2019 to the request.",
+        cause);
+  }
+
+  /**
+   * The first SQLSTATE in the chain (causes and next-exceptions, e.g. of a batch failure) decides:
+   * connection failures (08), insufficient resources (53), operator intervention (57), system (58)
+   * and internal (XX) errors are not caused by the request; no SQLSTATE at all (e.g. a pool
+   * timeout) is not either.
+   */
+  private static boolean isDataError(SQLException e) {
+    for (Throwable t : e) {
+      if (t instanceof SQLException && Objects.nonNull(((SQLException) t).getSQLState())) {
+        String state = ((SQLException) t).getSQLState();
+
+        return !(state.startsWith("08")
+            || state.startsWith("53")
+            || state.startsWith("57")
+            || state.startsWith("58")
+            || state.startsWith("XX"));
+      }
+    }
+
+    return false;
+  }
+
+  @Override
   protected Query preprocessQuery(Query query) {
+    // result-set tables created here are discarded: callers that need to drop them use the overload
+    return preprocessQuery(query, new ArrayList<>());
+  }
+
+  protected Query preprocessQuery(Query query, List<String> resultSetTables) {
     if (query instanceof FeatureQuery
         && (((FeatureQuery) query).getFields().size() > 1
             || !"*".equals(((FeatureQuery) query).getFields().get(0)))) {
@@ -1425,29 +1437,40 @@ public class FeatureProviderSql
       // - disable optimized paging as soon as a sort key is specified for at least one subquery
       // - fix a bug in SqlRowVals or transformations, it seems that the same number of columns is
       // expected for all queries
-      List<SubQuery> queries = ((MultiFeatureQuery) query).getQueries();
+      MultiFeatureQuery multiQuery = (MultiFeatureQuery) query;
+      List<SubQuery> queries = multiQuery.getQueries();
       OptionalInt maxSortKeys =
           queries.stream().mapToInt(subQuery -> subQuery.getSortKeys().size()).max();
 
       if (maxSortKeys.orElse(0) > 0) {
-        return ImmutableMultiFeatureQuery.builder()
-            .from(query)
-            .queries(
-                queries.stream()
-                    .map(
-                        subQuery ->
-                            ImmutableSubQuery.builder()
-                                .from(subQuery)
-                                .sortKeys(
-                                    subQuery.getSortKeys().size() < maxSortKeys.getAsInt()
-                                        ? IntStream.range(0, maxSortKeys.getAsInt())
-                                            .mapToObj(i -> SortKey.of(ID_PLACEHOLDER))
-                                            .collect(Collectors.toList())
-                                        : subQuery.getSortKeys())
-                                .build())
-                    .collect(Collectors.toList()))
-            .build();
+        multiQuery =
+            ImmutableMultiFeatureQuery.builder()
+                .from(multiQuery)
+                .queries(
+                    queries.stream()
+                        .map(
+                            subQuery ->
+                                ImmutableSubQuery.builder()
+                                    .from(subQuery)
+                                    .sortKeys(
+                                        subQuery.getSortKeys().size() < maxSortKeys.getAsInt()
+                                            ? IntStream.range(0, maxSortKeys.getAsInt())
+                                                .mapToObj(i -> SortKey.of(ID_PLACEHOLDER))
+                                                .collect(Collectors.toList())
+                                            : subQuery.getSortKeys())
+                                    .build())
+                        .collect(Collectors.toList()))
+                .build();
       }
+
+      // materialize the result sets of a multi-query once and reuse them across its queries,
+      // instead
+      // of re-deriving each shared result set in every sub-query statement
+      if (ResultSetMaterializer.hasResultSets(multiQuery)) {
+        multiQuery = resultSetMaterializer.materialize(multiQuery, resultSetTables);
+      }
+
+      return multiQuery;
     }
 
     return query;
@@ -1457,9 +1480,28 @@ public class FeatureProviderSql
   public FeatureStream getFeatureStream(MultiFeatureQuery query) {
     validateQuery(query);
 
-    Query query2 = preprocessQuery(query);
+    List<String> resultSetTables = new ArrayList<>();
+    Query query2 = preprocessQuery(query, resultSetTables);
 
     boolean nativeCrsIs3d = crsInfo.is3d(getData().getNativeCrs().orElse(OgcCrs.CRS84));
+
+    // drop any tables materialized for oversized result sets once the query's stream has completed
+    QueryRunner runner =
+        resultSetTables.isEmpty()
+            ? this::runQuery
+            : new QueryRunner() {
+              @Override
+              public <W extends FeatureStream.ResultBase> CompletionStage<W> runQuery(
+                  BiFunction<FeatureTokenSource, Map<String, String>, Reactive.Stream<W>> stream,
+                  Query runQuery,
+                  Map<String, PropertyTransformations> propertyTransformations,
+                  boolean passThrough) {
+                return FeatureProviderSql.this
+                    .runQuery(stream, runQuery, propertyTransformations, passThrough)
+                    .whenComplete(
+                        (result, error) -> resultSetMaterializer.dropTables(resultSetTables));
+              }
+            };
 
     return new FeatureStreamImpl(
         query2,
@@ -1467,8 +1509,9 @@ public class FeatureProviderSql
         crsTransformerFactory,
         nativeCrsIs3d,
         getCodelists(),
-        this::runQuery,
-        !query.hitsOnly());
+        runner,
+        !query.hitsOnly(),
+        auditLog);
   }
 
   @Override
@@ -1512,6 +1555,11 @@ public class FeatureProviderSql
     return getData().getCql2Functions().stream()
         .filter(
             function -> {
+              if (function.getQueryExpressionOnly()) {
+                // encoded by a dedicated handler, not a SQL template; not template-renderable
+                return false;
+              }
+
               if (Objects.nonNull(function.getExpression())
                   && !function.getExpression().isBlank()) {
                 return true;
@@ -1526,7 +1574,8 @@ public class FeatureProviderSql
               }
 
               LOGGER.error(
-                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no expression is defined for dialect '{}' (available keys: {}).",
+                  "Feature provider with id '{}' ignores custom CQL2 function '{}' because no"
+                      + " expression is defined for dialect '{}' (available keys: {}).",
                   getId(),
                   function.getName(),
                   dialectKey,

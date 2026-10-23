@@ -1557,6 +1557,20 @@ class CqlTextSpec extends Specification {
         actual2 == cqlText
     }
 
+    def 'Function as argument of a spatial predicate'() {
+        when: 'reading text'
+        cql.read(cqlText, Cql.Format.TEXT)
+
+        then:
+        CqlParseException e = thrown()
+        e.getMessage() == message
+
+        where:
+        cqlText                                                  || message
+        "S_INTERSECTS(geometry, ENVELOPE(6.5, 49.5, 7.0, 50.0))" || "Functions are not supported as arguments of S_INTERSECTS, found: ENVELOPE."
+        "S_WITHIN(foo(geometry), BBOX(6.5, 49.5, 7.0, 50.0))"    || "Functions are not supported as arguments of S_WITHIN, found: foo."
+    }
+
     def 'BETWEEN with temporal arguments'() {
         given:
         String cqlText = "updated BETWEEN TIMESTAMP('2017-06-10T07:30:00Z') AND TIMESTAMP('2017-06-11T10:30:00Z')"

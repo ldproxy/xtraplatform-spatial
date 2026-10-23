@@ -19,7 +19,7 @@ import de.ii.xtraplatform.tiles.domain.MinMax;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetBase;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetRepository;
-import de.ii.xtraplatform.tiles.domain.TileSeedingJob;
+import de.ii.xtraplatform.tiles.domain.TileSeedingPartialJob;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles.domain.TileWalker;
 import jakarta.inject.Inject;
@@ -129,7 +129,7 @@ public class TileWalkerImpl extends AbstractVolatileComposed implements TileWalk
 
   @Override
   public void walkTileSeedingJob(
-      TileSeedingJob job,
+      TileSeedingPartialJob job,
       Map<String, Map<String, Range<Integer>>> tmsRanges,
       TileVisitor tileVisitor)
       throws IOException {
@@ -160,7 +160,7 @@ public class TileWalkerImpl extends AbstractVolatileComposed implements TileWalk
 
   @Override
   public void walkTileSeedingJobLimits(
-      TileSeedingJob job,
+      TileSeedingPartialJob job,
       Map<String, Map<String, Range<Integer>>> tmsRanges,
       LimitsVisitor limitsVisitor)
       throws IOException {

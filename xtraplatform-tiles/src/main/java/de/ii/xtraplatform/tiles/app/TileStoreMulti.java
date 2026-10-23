@@ -211,9 +211,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
 
   @Override
   public Storage getStorageType() {
-    return storage == Storage.MBTILES
-        ? Storage.PER_TILESET
-        : storage == Storage.PLAIN ? Storage.PER_TILE : storage;
+    return storage;
   }
 
   @Override
@@ -271,9 +269,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
 
   // TODO
   private TileStore getTileStore(ResourceStore blobStore) {
-    return storage == Storage.MBTILES
-            || storage == Storage.PER_TILESET
-            || storage == Storage.PER_JOB
+    return storage == Storage.PER_TILESET || storage == Storage.PER_JOB
         ? TileStoreMbTiles.readWrite(
             blobStore,
             tileSetName,

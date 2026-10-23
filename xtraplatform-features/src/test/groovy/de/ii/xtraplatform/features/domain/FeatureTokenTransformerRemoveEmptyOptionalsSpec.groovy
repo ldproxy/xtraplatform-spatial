@@ -88,6 +88,34 @@ class FeatureTokenTransformerRemoveEmptyOptionalsSpec extends Specification {
 
     }
 
+    def 'single feature optional object with only null required sub-properties'() {
+
+        given:
+
+        when:
+
+        FeatureTokenFixtures.SINGLE_FEATURE_NESTED_OBJECT_REQUIRED_NULLS.forEach(token -> tokenReader.onToken(token))
+
+        then:
+
+        tokens == FeatureTokenFixtures.SINGLE_FEATURE
+
+    }
+
+    def 'single feature optional object with a non-null and a null required sub-property'() {
+
+        given:
+
+        when:
+
+        FeatureTokenFixtures.SINGLE_FEATURE_NESTED_OBJECT_REQUIRED_NULLS_PARTIAL.forEach(token -> tokenReader.onToken(token))
+
+        then:
+
+        tokens == FeatureTokenFixtures.SINGLE_FEATURE_NESTED_OBJECT_REQUIRED_NULLS_PARTIAL_REDUCED
+
+    }
+
     def 'single feature value array'() {
 
         given:

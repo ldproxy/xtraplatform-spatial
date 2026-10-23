@@ -240,9 +240,9 @@ class GeometryDecoderGmlRoundtripSpec extends Specification {
         // curveMembers after decode, not 5.
         //
         // CRS handling: srsName="urn:adv:crs:ETRS89_UTM32" is an ADV URN form. The decoder does
-        // not yet resolve these — that is Phase 1c (srsNameMappings). The current contract is
+        // not yet resolve these (srsNameMappings support is pending). The current contract is
         // therefore "unresolved srsName → no CRS captured"; this assertion locks that behaviour
-        // and will need to flip to Optional.of(EpsgCrs.of(25832)) when Phase 1c lands.
+        // and will need to flip to Optional.of(EpsgCrs.of(25832)) when srsName mappings land.
         roundtrip(
                 '''<gml:CompositeCurve gml:id="o62030.id.27494041.position_complex.Geom_0" srsName="urn:adv:crs:ETRS89_UTM32" srsDimension="2">
                     <gml:curveMember>

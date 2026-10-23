@@ -23,8 +23,8 @@ import spock.lang.Specification
  * </ul>
  *
  * The full insert/replace mutation path (driven via {@code FeatureMutationsSql} +
- * {@code FeatureEncoderSql} + a Reactive stream runner) needs a heavier fixture and is exercised
- * end-to-end via the gvd/alkis transactions smoke configuration.
+ * {@code FeatureEncoderSql} + a Reactive stream runner) needs a heavier fixture and has to be
+ * exercised end-to-end via a transactions smoke configuration.
  */
 class SqlMutationSessionSpec extends Specification {
 
@@ -38,7 +38,45 @@ class SqlMutationSessionSpec extends Specification {
         // FeatureMutationsSql, CrsTransformerFactory, nativeCrs, nativeTimeZone and the Reactive
         // runner are only touched by the create/update code paths; null is safe for the lifecycle
         // and missing-type cases this spec covers.
-        return new SqlMutationSession(sqlSession, mappings, null, null, null, Optional.empty(), null)
+        return new SqlMutationSession(sqlSession, mappings, null, null, null, Optional.empty(), null, Optional.empty())
+    }
+
+    def 'unwrap returns the cause of the join() wrapper, so its class name stays out of the message'() {
+        given: 'the wrapper CompletableFuture.join() throws — its message is the cause toString()'
+        def cause = new IllegalArgumentException("The property 'vna' has an empty value.")
+        def wrapper = new java.util.concurrent.CompletionException(cause)
+
+        expect: 'the wrapper alone would put the class name in front of the message'
+        wrapper.message.startsWith('java.lang.IllegalArgumentException')
+
+        when:
+        def unwrapped = SqlMutationSession.unwrap(wrapper)
+
+        then: 'the cause is handed on as-is, so the message a client reads is just the message'
+        unwrapped.is(cause)
+        unwrapped.message == "The property 'vna' has an empty value."
+    }
+
+    def 'unwrap keeps a checked cause reportable without the class-name prefix'() {
+        given:
+        def cause = new java.io.IOException('connection reset')
+        def wrapper = new java.util.concurrent.CompletionException(cause)
+
+        when:
+        def unwrapped = SqlMutationSession.unwrap(wrapper)
+
+        then:
+        unwrapped instanceof IllegalStateException
+        unwrapped.message == 'connection reset'
+        unwrapped.cause.is(cause)
+    }
+
+    def 'unwrap falls back to the wrapper when it has no cause'() {
+        given:
+        def wrapper = new java.util.concurrent.CompletionException('no cause', null)
+
+        expect:
+        SqlMutationSession.unwrap(wrapper).is(wrapper)
     }
 
     def 'commit delegates to the underlying SqlSession'() {
@@ -80,6 +118,24 @@ class SqlMutationSessionSpec extends Specification {
         0 * sqlSession.rollback()
     }
 
+    def 'savepoint lifecycle delegates to the underlying SqlSession and is advertised as supported'() {
+        given:
+        def session = buildSession()
+
+        expect:
+        session.supportsSavepoints()
+
+        when:
+        session.savepoint()
+        session.releaseSavepoint()
+        session.rollbackToSavepoint()
+
+        then:
+        1 * sqlSession.savepoint()
+        1 * sqlSession.releaseSavepoint()
+        1 * sqlSession.rollbackToSavepoint()
+    }
+
     def 'deleteFeature for an unknown feature type fails fast with IAE (no SQL is run)'() {
         given:
         def session = buildSession([:])  // empty mappings
@@ -91,5 +147,57 @@ class SqlMutationSessionSpec extends Specification {
         def ex = thrown(IllegalArgumentException)
         ex.message.contains('unknown_type')
         0 * sqlSession.run(_, _, _)
+    }
+
+    def 'retireFeature for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.retireFeature('unknown_type', '42', java.time.Instant.parse('2026-06-06T10:00:00Z'))
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
+
+    def 'patchOpenVersion for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.patchOpenVersion('unknown_type', '42', [], null)
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
+
+    def 'assertNoConflictingVersion for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.assertNoConflictingVersion('unknown_type', '42')
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
+    }
+
+    def 'getOpenVersionStart for an unknown feature type fails fast with IAE'() {
+        given:
+        def session = buildSession([:])
+
+        when:
+        session.getOpenVersionStart('unknown_type', '42')
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains('unknown_type')
+        0 * sqlSession.runReturning(_)
     }
 }

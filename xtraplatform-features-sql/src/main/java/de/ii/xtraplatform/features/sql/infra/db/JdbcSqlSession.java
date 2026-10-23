@@ -8,10 +8,14 @@
 package de.ii.xtraplatform.features.sql.infra.db;
 
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
+import de.ii.xtraplatform.features.domain.FeatureMutationConstraintException;
+import de.ii.xtraplatform.features.domain.FeatureMutationHookException;
 import de.ii.xtraplatform.features.sql.domain.SqlSession;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLWarning;
+import java.sql.Savepoint;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +36,11 @@ class JdbcSqlSession implements SqlSession {
 
   private final Connection connection;
   private boolean finalised;
+  private boolean released;
+  private Savepoint activeSavepoint;
+  // Non-fatal SQL warnings (e.g. PostgreSQL RAISE WARNING / RAISE NOTICE) emitted by mutation
+  // statements, accumulated until the caller drains them.
+  private final List<String> pendingWarnings = new ArrayList<>();
 
   JdbcSqlSession(Connection connection) {
     this.connection = connection;
@@ -76,8 +85,7 @@ class JdbcSqlSession implements SqlSession {
             }
             batchStmt.addBatch(sql);
           } catch (SQLException e) {
-            throw new IllegalStateException(
-                "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+            throw mutationFailed("Mutation statement failed: ", sql, e);
           }
           batchedSql.add(sql);
           batchedConsumers.add(consumer);
@@ -97,6 +105,7 @@ class JdbcSqlSession implements SqlSession {
         }
         try (Statement statement = connection.createStatement()) {
           boolean hasResultSet = statement.execute(sql);
+          harvestWarnings(statement);
           String returnedId = null;
           if (hasResultSet) {
             try (ResultSet rs = statement.getResultSet()) {
@@ -112,8 +121,7 @@ class JdbcSqlSession implements SqlSession {
             firstGeneratedId = returnedId;
           }
         } catch (SQLException e) {
-          throw new IllegalStateException(
-              "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+          throw mutationFailed("Mutation statement failed: ", sql, e);
         }
       }
 
@@ -142,6 +150,7 @@ class JdbcSqlSession implements SqlSession {
     }
     try (Statement statement = connection.createStatement()) {
       boolean hasResultSet = statement.execute(sql);
+      harvestWarnings(statement);
       if (!hasResultSet) {
         return List.of();
       }
@@ -153,9 +162,33 @@ class JdbcSqlSession implements SqlSession {
       }
       return ids;
     } catch (SQLException e) {
-      throw new IllegalStateException(
-          "Mutation statement failed: " + e.getMessage() + " — statement: " + sql, e);
+      throw mutationFailed("Mutation statement failed: ", sql, e);
     }
+  }
+
+  @Override
+  public List<String> execute(List<String> statements) {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    List<String> warnings = new ArrayList<>();
+    for (String sql : statements) {
+      if (LOGGER.isDebugEnabled(MARKER.SQL)) {
+        LOGGER.debug(MARKER.SQL, "Executing hook statement: {}", sql);
+      }
+      try (Statement statement = connection.createStatement()) {
+        statement.execute(sql);
+        for (SQLWarning w = statement.getWarnings(); w != null; w = w.getNextWarning()) {
+          warnings.add(w.getMessage());
+        }
+      } catch (SQLException e) {
+        // Expected, configuration-driven failure (e.g. a check function RAISE EXCEPTION) — carry
+        // the warnings collected so far so they survive the failure path.
+        throw new FeatureMutationHookException(
+            "Hook statement failed: " + primaryMessage(e), e, warnings);
+      }
+    }
+    return warnings;
   }
 
   // Generators emit "RETURNING null" for child / junction / FK-update statements — these have
@@ -167,6 +200,83 @@ class JdbcSqlSession implements SqlSession {
       trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
     }
     return trimmed.toLowerCase(Locale.ROOT).endsWith("returning null");
+  }
+
+  /**
+   * Collects the non-fatal SQL warning chain of a just-executed statement into {@link
+   * #pendingWarnings} and clears it — the batch statement is reused across flushes, so its chain
+   * would otherwise be harvested again on the next flush.
+   */
+  private void harvestWarnings(Statement statement) {
+    try {
+      for (SQLWarning w = statement.getWarnings(); w != null; w = w.getNextWarning()) {
+        pendingWarnings.add(w.getMessage());
+      }
+      statement.clearWarnings();
+    } catch (SQLException e) {
+      LOGGER.debug("Reading SQL warnings failed: {}", e.getMessage());
+    }
+  }
+
+  @Override
+  public List<String> drainWarnings() {
+    if (pendingWarnings.isEmpty()) {
+      return List.of();
+    }
+    List<String> drained = List.copyOf(pendingWarnings);
+    pendingWarnings.clear();
+    return drained;
+  }
+
+  /**
+   * Wrap a failed mutation statement. A rejection in SQLSTATE class 23 (integrity constraint
+   * violation — CHECK, foreign key, unique index, or a trigger raising one) is caused by the data
+   * the client sent, so it gets its own exception type that callers can report and log quietly;
+   * anything else stays an IllegalStateException and keeps its stack trace.
+   */
+  private static RuntimeException mutationFailed(String prefix, String sql, SQLException e) {
+    String sqlState = constraintSqlState(e);
+    if (sqlState != null) {
+      // Reported back to the client: keep the rejection itself, leave out the database's call
+      // context and the failing statement. Both are noise for the client and would disclose
+      // internal schema, function names and every attribute value of the statement; the statement
+      // is still available in the SQL debug log.
+      return new FeatureMutationConstraintException(prefix + primaryMessage(e), e, sqlState);
+    }
+    return new IllegalStateException(prefix + e.getMessage() + " — statement: " + sql, e);
+  }
+
+  /**
+   * The primary message of a database error, without the call context the driver appends to {@link
+   * SQLException#getMessage()}. PostgreSQL primary messages are single-line while the context
+   * follows on its own lines, so cutting at the first line break is independent of the server's
+   * message locale (the context label is localised, e.g. {@code CONTEXT:} / {@code Wobei:}).
+   */
+  private static String primaryMessage(SQLException e) {
+    String message = e.getMessage();
+    if (message == null) {
+      return e.getClass().getSimpleName();
+    }
+    int lineBreak = message.indexOf('\n');
+    return (lineBreak < 0 ? message : message.substring(0, lineBreak)).trim();
+  }
+
+  /**
+   * The SQLSTATE of the first integrity-constraint violation in the chain, or null. Iterating the
+   * SQLException itself walks both the causal chain and the next-exception chain, which matters for
+   * the batch path: executeBatch() reports a BatchUpdateException whose actual error is a
+   * next-exception, not a cause.
+   */
+  private static String constraintSqlState(SQLException e) {
+    for (Throwable t : e) {
+      if (t instanceof SQLException) {
+        String state = ((SQLException) t).getSQLState();
+        if (state != null && state.startsWith("23")) {
+          return state;
+        }
+      }
+    }
+    return null;
   }
 
   private void flushBatch(
@@ -181,10 +291,9 @@ class JdbcSqlSession implements SqlSession {
     try {
       batchStmt.executeBatch();
       batchStmt.clearBatch();
+      harvestWarnings(batchStmt);
     } catch (SQLException e) {
-      throw new IllegalStateException(
-          "Batched mutation failed: " + e.getMessage() + " — first statement: " + batchedSql.get(0),
-          e);
+      throw mutationFailed("Batched mutation failed: ", batchedSql.get(0), e);
     }
     // Preserve the per-statement consumer contract: each batched statement returns no id, so
     // call consumers with null in order (in practice these are no-ops for child/junction/FK
@@ -199,16 +308,68 @@ class JdbcSqlSession implements SqlSession {
   }
 
   @Override
+  public void savepoint() {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    if (activeSavepoint != null) {
+      throw new IllegalStateException("A savepoint is already active on this SQL session");
+    }
+    try {
+      activeSavepoint = connection.setSavepoint();
+    } catch (SQLException e) {
+      throw new IllegalStateException("Savepoint failed: " + e.getMessage(), e);
+    }
+  }
+
+  @Override
+  public void releaseSavepoint() {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    if (activeSavepoint == null) {
+      throw new IllegalStateException("No savepoint is active on this SQL session");
+    }
+    try {
+      connection.releaseSavepoint(activeSavepoint);
+    } catch (SQLException e) {
+      throw new IllegalStateException("Savepoint release failed: " + e.getMessage(), e);
+    } finally {
+      activeSavepoint = null;
+    }
+  }
+
+  @Override
+  public void rollbackToSavepoint() {
+    if (finalised) {
+      throw new IllegalStateException("SQL session is closed");
+    }
+    if (activeSavepoint == null) {
+      throw new IllegalStateException("No savepoint is active on this SQL session");
+    }
+    try {
+      connection.rollback(activeSavepoint);
+      connection.releaseSavepoint(activeSavepoint);
+    } catch (SQLException e) {
+      throw new IllegalStateException("Savepoint rollback failed: " + e.getMessage(), e);
+    } finally {
+      activeSavepoint = null;
+    }
+  }
+
+  @Override
   public void commit() {
     if (finalised) {
       throw new IllegalStateException("SQL session is closed");
     }
     try {
       connection.commit();
-      finalised = true;
     } catch (SQLException e) {
       throw new IllegalStateException("Commit failed: " + e.getMessage(), e);
     } finally {
+      // a failed COMMIT ends the transaction as well (the database has rolled it back), so the
+      // session is finalised either way and must not attempt a rollback on close()
+      finalised = true;
       releaseConnection();
     }
   }
@@ -237,12 +398,24 @@ class JdbcSqlSession implements SqlSession {
     }
   }
 
+  /**
+   * Returns the connection to the pool exactly once. Every step is isolated: on a connection that
+   * the database has terminated, resetting autocommit throws, and the lease must still be given
+   * back, otherwise the pool loses a connection for good.
+   */
   private void releaseConnection() {
+    if (released) {
+      return;
+    }
+    released = true;
+
     try {
-      if (!connection.isClosed()) {
-        connection.setAutoCommit(true);
-        connection.close();
-      }
+      connection.setAutoCommit(true);
+    } catch (SQLException e) {
+      LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+    }
+    try {
+      connection.close();
     } catch (SQLException e) {
       LOGGER.debug("Connection close failed: {}", e.getMessage());
     }

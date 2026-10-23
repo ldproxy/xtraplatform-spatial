@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocFile;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
@@ -31,10 +32,63 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     PRIMARY_INSTANT,
     PRIMARY_INTERVAL_START,
     PRIMARY_INTERVAL_END,
+    /**
+     * Denormalised pointer to the predecessor version's PRIMARY_INTERVAL_START value. On versioned
+     * collections, write paths maintain this so a feature can be walked backwards through its
+     * version chain without an extra join. The strategy's mutation pipeline populates it (see
+     * {@code MutationStrategy.insertRoleOverrides}). At query time the value is not emitted inline;
+     * it is surfaced as a link with the rel {@code predecessor-version}.
+     */
+    PREDECESSOR_INTERVAL_START("predecessor-version"),
+    /**
+     * Denormalised pointer to the successor version's PRIMARY_INTERVAL_START value. Set on the
+     * retired row by the mutation pipeline at retire time so a feature can be walked forwards
+     * through its version chain. At query time the value is not emitted inline; it is surfaced as a
+     * link with the rel {@code successor-version}.
+     */
+    SUCCESSOR_INTERVAL_START("successor-version"),
     SECONDARY_GEOMETRY,
     FILTER_GEOMETRY,
     EMBEDDED_FEATURE,
-    FEATURE_REF
+    FEATURE_REF,
+    /**
+     * A 2D/3D position variant of a geometry property with a {@code crsVariants} declaration: the
+     * position as recorded, in a reference system other than the CRS of the main geometry property.
+     * The property declares the CRS it is stored in in {@code nativeCrs}, optionally the CRS of the
+     * recorded positions in {@code originalCrs}, and the reference-system identifiers that route to
+     * it in {@code originalCrsIdentifiers}. Implicitly {@code internal}.
+     */
+    ORIGINAL_GEOMETRY,
+    /**
+     * The single coordinate of a position variant in a 1D vertical reference system (see the {@code
+     * verticalProperty} of a {@code crsVariants} declaration). The property declares the
+     * identifiers of the vertical reference systems that route to it in {@code
+     * originalCrsIdentifiers}. Implicitly {@code internal}.
+     */
+    ORIGINAL_HEIGHT,
+    /**
+     * The verbatim identifier of the reference system of a position variant (see the {@code
+     * crsProperty} of a {@code crsVariants} declaration). Implicitly {@code internal}.
+     */
+    ORIGINAL_CRS_IDENTIFIER;
+
+    private final String linkRelation;
+
+    Role() {
+      this(null);
+    }
+
+    Role(String linkRelation) {
+      this.linkRelation = linkRelation;
+    }
+
+    /**
+     * Returns the link relation type for roles that should be surfaced as link relations rather
+     * than inline property values, or empty for ordinary roles.
+     */
+    public Optional<String> getLinkRelation() {
+      return Optional.ofNullable(linkRelation);
+    }
   }
 
   enum Type {
@@ -51,6 +105,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     OBJECT_ARRAY,
     FEATURE_REF,
     FEATURE_REF_ARRAY,
+    ENCRYPTED,
+    ENCRYPTED_ARRAY,
     UNKNOWN
   }
 
@@ -149,6 +205,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
 
   List<GeometryType> getGeometryTypes();
 
+  Optional<EpsgCrs> getNativeCrs();
+
   Optional<String> getFormat();
 
   Optional<String> getRefType();
@@ -206,6 +264,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   default boolean queryable() {
     return !isObject()
         && !Objects.equals(getType(), Type.UNKNOWN)
+        && !Objects.equals(getType(), Type.ENCRYPTED)
+        && !Objects.equals(getType(), Type.ENCRYPTED_ARRAY)
         && !getExcludedScopes().contains(Scope.QUERYABLE);
   }
 
@@ -218,6 +278,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
         && !isArray()
         && !Objects.equals(getType(), Type.BOOLEAN)
         && !Objects.equals(getType(), Type.UNKNOWN)
+        && !Objects.equals(getType(), Type.ENCRYPTED)
         && !getExcludedScopes().contains(Scope.SORTABLE);
   }
 
@@ -656,7 +717,8 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   default boolean isArray() {
     return getType() == Type.OBJECT_ARRAY
         || getType() == Type.VALUE_ARRAY
-        || getType() == Type.FEATURE_REF_ARRAY;
+        || getType() == Type.FEATURE_REF_ARRAY
+        || getType() == Type.ENCRYPTED_ARRAY;
   }
 
   @JsonIgnore
@@ -704,6 +766,13 @@ public interface SchemaBase<T extends SchemaBase<T>> {
             && (getRefType().isPresent()
                 || getRefUriTemplate().isPresent()
                 || getRefKeyTemplate().isPresent()));
+  }
+
+  @JsonIgnore
+  @Value.Derived
+  @Value.Auxiliary
+  default boolean isEncrypted() {
+    return getType() == Type.ENCRYPTED || getType() == Type.ENCRYPTED_ARRAY;
   }
 
   @JsonIgnore

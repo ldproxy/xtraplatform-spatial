@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.sql.app;
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
-import de.ii.xtraplatform.cql.domain.In;
 import de.ii.xtraplatform.features.domain.SortKey;
 import de.ii.xtraplatform.features.domain.SortKey.Direction;
 import de.ii.xtraplatform.features.domain.Tuple;
@@ -166,21 +165,14 @@ public class SqlQueryTemplatesDeriver {
         forceSimpleFeatures,
         minMaxKeys,
         virtualTables) -> {
-      boolean isIdFilter =
-          filter
-              .filter(
-                  cql2Predicate -> cql2Predicate instanceof In && ((In) cql2Predicate).isIdFilter())
-              .isPresent();
       List<String> aliases = AliasGenerator.getAliases(schema);
 
       SqlQueryTable main = schema.getRelations().isEmpty() ? schema : schema.getRelations().get(0);
 
       Optional<String> sqlFilter = getFilter(main, mapping, filter);
       Optional<String> whereClause =
-          isIdFilter
-              ? sqlFilter
-              : toWhereClause(
-                  aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
+          toWhereClause(
+              aliases.get(0), main.getSortKey(), additionalSortKeys, minMaxKeys, sqlFilter);
       boolean useRangePaging = additionalSortKeys.isEmpty() && minMaxKeys.isPresent();
       Optional<String> pagingClause =
           useRangePaging || (limit == 0 && offset == 0)

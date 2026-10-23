@@ -151,8 +151,24 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    *     scheme
    */
   default double getMaxAllowableOffset(int level, int row, int col) {
+    return getMaxAllowableOffset(level, row, col, getTileExtent());
+  }
+
+  /**
+   * determine the Douglas-Peucker distance parameter for a tile that uses a tile extent that
+   * differs from the tile extent of the tiling scheme
+   *
+   * @param level the zoom level
+   * @param row the row
+   * @param col the column
+   * @param tileExtent the width/height of the tile in its internal coordinate system
+   * @return the distance in the units of measure of the coordinate references system of the tiling
+   *     scheme
+   */
+  @Override
+  default double getMaxAllowableOffset(int level, int row, int col, int tileExtent) {
     BoundingBox bbox = getBoundingBox();
-    return (bbox.getXmax() - bbox.getXmin()) / getCols(level) / getTileExtent();
+    return (bbox.getXmax() - bbox.getXmin()) / getCols(level) / tileExtent;
   }
 
   /**

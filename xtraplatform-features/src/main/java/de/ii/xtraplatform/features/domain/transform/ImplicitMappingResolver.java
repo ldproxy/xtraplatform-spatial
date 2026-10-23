@@ -29,16 +29,20 @@ public class ImplicitMappingResolver implements TypesResolver {
             && property.getSourcePath().isPresent()
             && property.getValueNames().isEmpty())
         || property.getType() == Type.VALUE_ARRAY
+        || property.getType() == Type.ENCRYPTED_ARRAY
         || isFeatureRefInConcat;
   }
 
   @Override
   public FeatureSchema resolve(FeatureSchema property, List<FeatureSchema> parents) {
+    // an encrypted array behaves like a value array in the token stream, the decrypted
+    // values must be wrapped in the same array tokens
+    Type wrapper =
+        property.getType() == Type.ENCRYPTED_ARRAY ? Type.VALUE_ARRAY : property.getType();
     return new Builder()
         .from(property)
         .transformations(List.of())
-        .addTransformations(
-            new ImmutablePropertyTransformation.Builder().wrap(property.getType()).build())
+        .addTransformations(new ImmutablePropertyTransformation.Builder().wrap(wrapper).build())
         .addAllTransformations(property.getTransformations())
         .build();
   }

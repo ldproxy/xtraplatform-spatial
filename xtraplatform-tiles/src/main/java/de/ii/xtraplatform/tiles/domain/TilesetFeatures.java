@@ -70,6 +70,11 @@ public interface TilesetFeatures
   Boolean getSparse();
 
   @DocIgnore
+  @Nullable
+  @Override
+  Integer getTileExtent();
+
+  @DocIgnore
   @Override
   Map<String, List<LevelTransformation>> getTransformations();
 
@@ -156,6 +161,9 @@ public interface TilesetFeatures
     }
     if (Objects.isNull(this.getSparse()) && Objects.nonNull(defaults.getSparse())) {
       withDefaults.sparse(defaults.getSparse());
+    }
+    if (Objects.isNull(this.getTileExtent()) && Objects.nonNull(defaults.getTileExtent())) {
+      withDefaults.tileExtent(defaults.getTileExtent());
     }
 
     return withDefaults.build();

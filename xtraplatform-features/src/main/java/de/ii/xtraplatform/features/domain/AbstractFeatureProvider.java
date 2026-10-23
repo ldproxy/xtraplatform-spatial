@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import de.ii.xtraplatform.base.domain.Encryption;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
@@ -30,12 +31,16 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureQueriesExtension.LIFECYCLE_HOOK;
 import de.ii.xtraplatform.features.domain.FeatureStream.ResultBase;
 import de.ii.xtraplatform.features.domain.ImmutableSchemaMapping.Builder;
+import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import de.ii.xtraplatform.features.domain.SchemaBase.Scope;
+import de.ii.xtraplatform.features.domain.transform.FeatureTokenTransformerDecrypt;
+import de.ii.xtraplatform.features.domain.transform.PropertyEncryption;
 import de.ii.xtraplatform.features.domain.transform.PropertyTransformations;
 import de.ii.xtraplatform.features.domain.transform.SchemaTransformerChain;
 import de.ii.xtraplatform.features.domain.transform.WithScope;
 import de.ii.xtraplatform.features.domain.transform.WithoutProperties;
 import de.ii.xtraplatform.geometries.domain.GeometryType;
+import de.ii.xtraplatform.services.domain.AuditLog;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Runner;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
@@ -46,6 +51,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -80,6 +86,8 @@ public abstract class AbstractFeatureProvider<
   private final Reactive reactive;
   protected final CrsTransformerFactory crsTransformerFactory;
   protected final CrsInfo crsInfo;
+  protected final AuditLog auditLog;
+  protected final Encryption encryption;
   private final ProviderExtensionRegistry extensionRegistry;
   private final Values<Codelist> codelistStore;
   private final FeatureChanges changeHandler;
@@ -98,6 +106,8 @@ public abstract class AbstractFeatureProvider<
       CrsInfo crsInfo,
       ProviderExtensionRegistry extensionRegistry,
       Values<Codelist> codelistStore,
+      AuditLog auditLog,
+      Encryption encryption,
       FeatureProviderDataV2 data,
       VolatileRegistry volatileRegistry) {
     super(data, volatileRegistry);
@@ -107,6 +117,8 @@ public abstract class AbstractFeatureProvider<
     this.crsInfo = crsInfo;
     this.extensionRegistry = extensionRegistry;
     this.codelistStore = codelistStore;
+    this.auditLog = auditLog;
+    this.encryption = encryption;
     this.volatileRegistry = volatileRegistry;
     this.changeHandler = new FeatureChangeHandlerImpl();
     this.connector =
@@ -211,6 +223,16 @@ public abstract class AbstractFeatureProvider<
       LOGGER.error(
           "Feature provider with id '{}' could not be started: {}", getId(), runnerError.get());
       // TODO: volatile defective
+      return false;
+    }
+
+    Optional<String> encryptionError =
+        PropertyEncryption.validateEncryptedProperties(
+            getData().getTypes().values(), encryption.isEnabled(), supportsEncryptedProperties());
+
+    if (encryptionError.isPresent()) {
+      LOGGER.error(
+          "Feature provider with id '{}' could not be started: {}", getId(), encryptionError.get());
       return false;
     }
 
@@ -502,8 +524,28 @@ public abstract class AbstractFeatureProvider<
     return getDecoder(query, Map.of());
   }
 
+  /**
+   * Whether this provider type supports properties of type ENCRYPTED or ENCRYPTED_ARRAY. Provider
+   * startup fails when such properties are declared but not supported.
+   */
+  protected boolean supportsEncryptedProperties() {
+    return false;
+  }
+
+  protected Optional<PropertyEncryption> getPropertyEncryption() {
+    if (encryption.isEnabled()) {
+      return Optional.of(new PropertyEncryption(encryption));
+    }
+    return Optional.empty();
+  }
+
   protected List<FeatureTokenTransformer> getDecoderTransformers() {
-    return ImmutableList.of();
+    return getPropertyEncryption()
+        .map(
+            propertyEncryption ->
+                List.<FeatureTokenTransformer>of(
+                    new FeatureTokenTransformerDecrypt(propertyEncryption)))
+        .orElse(ImmutableList.of());
   }
 
   protected Map<String, Codelist> getCodelists() {
@@ -531,7 +573,8 @@ public abstract class AbstractFeatureProvider<
         nativeCrsIs3d,
         getCodelists(),
         this::runQuery,
-        !query.hitsOnly());
+        !query.hitsOnly(),
+        auditLog);
   }
 
   // TODO: more tests
@@ -664,8 +707,7 @@ public abstract class AbstractFeatureProvider<
 
   private Map<String, SchemaMapping> createMapping(
       Query query, Map<String, PropertyTransformations> propertyTransformations) {
-    if (query instanceof FeatureQuery) {
-      FeatureQuery featureQuery = (FeatureQuery) query;
+    if (query instanceof FeatureQuery featureQuery) {
 
       WithScope withScope =
           featureQuery.getSchemaScope() == SchemaBase.Scope.RETURNABLE
@@ -677,17 +719,41 @@ public abstract class AbstractFeatureProvider<
     }
 
     if (query instanceof MultiFeatureQuery) {
-      return ((MultiFeatureQuery) query)
-          .getQueries().stream()
-              .map(
-                  typeQuery ->
-                      Map.entry(
-                          typeQuery.getType(),
-                          createMapping(typeQuery, WITH_SCOPE_RETURNABLE, propertyTransformations)))
-              .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+      // multiple queries may use the same feature type; the mapping is per type, so the
+      // projections of such queries are merged
+      Map<String, TypeQuery> queriesByType = new LinkedHashMap<>();
+      for (SubQuery subQuery : ((MultiFeatureQuery) query).getQueries()) {
+        queriesByType.merge(
+            subQuery.getType(), subQuery, AbstractFeatureProvider::mergeProjections);
+      }
+
+      return queriesByType.entrySet().stream()
+          .map(
+              entry ->
+                  Map.entry(
+                      entry.getKey(),
+                      createMapping(
+                          entry.getValue(), WITH_SCOPE_RETURNABLE, propertyTransformations)))
+          .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
     }
 
     return Map.of();
+  }
+
+  private static TypeQuery mergeProjections(TypeQuery query1, TypeQuery query2) {
+    List<String> fields =
+        query1.getFields().contains("*") || query2.getFields().contains("*")
+            ? List.of("*")
+            : java.util.stream.Stream.concat(
+                    query1.getFields().stream(), query2.getFields().stream())
+                .distinct()
+                .toList();
+
+    return ImmutableSubQuery.builder()
+        .from((SubQuery) query1)
+        .fields(fields)
+        .skipGeometry(query1.skipGeometry() && query2.skipGeometry())
+        .build();
   }
 
   private SchemaMapping createMapping(
@@ -701,13 +767,19 @@ public abstract class AbstractFeatureProvider<
                 null,
                 !(query instanceof FeatureQuery) || !((FeatureQuery) query).returnsSingleFeature());
 
+    // The property selection is expressed in the technical property names of the feature schema —
+    // that is what the queryables/presentables of an API are named after and what the "properties"
+    // and "exclude-properties" parameters accept. Prune before the transformation chain, because a
+    // rename in that chain (an explicit one, or the alias renames a format with useAlias injects)
+    // would otherwise have already replaced the names the selection is matched against, leaving
+    // only the properties whose name survives the rename unchanged.
     FeatureSchema schema =
         getData()
             .getTypes()
             .get(query.getType())
             .accept(withScope)
-            .accept(schemaTransformations)
-            .accept(new WithoutProperties(query.getFields(), query.skipGeometry()));
+            .accept(new WithoutProperties(query.getFields(), query.skipGeometry()))
+            .accept(schemaTransformations);
 
     return new Builder()
         .targetSchema(schema)

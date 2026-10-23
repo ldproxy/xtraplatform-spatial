@@ -152,7 +152,8 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
     crsTransformerFilterToNative.ifPresent(
         t -> {
           CoordinateTuple transformed = t.transform(pos.x(), pos.y());
-          if (Objects.isNull(transformed)) {
+          // a failed transform yields a tuple with isNull()=true, not a null reference
+          if (Objects.isNull(transformed) || transformed.isNull()) {
             throw new IllegalArgumentException(
                 String.format(
                     "Filter is invalid. Coordinate '%s' cannot be transformed to %s.",
@@ -164,7 +165,7 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
     Position posCrs84 = pos;
     if (crsTransformerFilterToCrs84.isPresent()) {
       CoordinateTuple transformed = crsTransformerFilterToCrs84.get().transform(pos.x(), pos.y());
-      if (Objects.nonNull(transformed)) {
+      if (Objects.nonNull(transformed) && !transformed.isNull()) {
         posCrs84 = Position.ofXY(transformed.getX(), transformed.getY());
       }
     }

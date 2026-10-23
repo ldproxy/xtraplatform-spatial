@@ -11,12 +11,15 @@ import com.fasterxml.aalto.AsyncByteArrayFeeder;
 import com.fasterxml.aalto.AsyncXMLStreamReader;
 import com.fasterxml.aalto.stax.InputFactoryImpl;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
+import de.ii.xtraplatform.features.domain.CrsVariants;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.SchemaBase;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.SchemaConstraints;
 import de.ii.xtraplatform.features.domain.SchemaMapping;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerEmptyValues;
+import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerReadOnly;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.ModifiableContext;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenBufferSimple;
 import de.ii.xtraplatform.features.domain.pipeline.FeatureTokenDecoderSimple;
@@ -25,14 +28,18 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
@@ -81,10 +88,9 @@ import org.slf4j.LoggerFactory;
  * these routinely appear as children of a scalar property element. The decoder hardcodes {@link
  * #GMD_NS} and {@link #GCO_NS} as value-carrying namespaces: any element in those namespaces inside
  * a {@code VALUE_PROPERTY} is treated as a {@code VALUE_WRAPPER} around the property's scalar text,
- * no explicit {@code valueWrap} entry required. Wrappers in other namespaces (e.g. {@code
- * <adv:AX_LI_ProcessStep_Punktort_Description>}) still need explicit {@code valueWrap}
- * configuration on the input profile. To be documented as a Phase 5 restriction of the GML building
- * block.
+ * no explicit {@code xmlPaths} entry required. Wrappers in other namespaces (e.g. {@code
+ * <adv:AX_LI_ProcessStep_Punktort_Description>}) still need explicit {@code xmlPaths} configuration
+ * on the input profile. A known restriction of the GML building block.
  */
 public class FeatureTokenDecoderGml
     extends FeatureTokenDecoderSimple<
@@ -101,9 +107,9 @@ public class FeatureTokenDecoderGml
    * instead uses object elements that directly carry text content (e.g. {@code
    * <gco:CharacterString>}, {@code <gmd:CI_RoleCode>}). When such an element appears as a child of
    * a scalar property element the decoder treats it as a value wrapper around the scalar text, even
-   * without an explicit {@code valueWrap} entry. Any other external namespace that follows the same
-   * convention needs a similar entry here when the need arises — documented as a known restriction
-   * in Phase 5 of the GML building block.
+   * without an explicit {@code xmlPaths} entry. Any other external namespace that follows the same
+   * convention needs a similar entry here when the need arises — a known restriction of the GML
+   * building block.
    */
   private static final String GMD_NS = "http://www.isotc211.org/2005/gmd";
 
@@ -141,13 +147,35 @@ public class FeatureTokenDecoderGml
    * Maps each property's {@link FeatureSchema#getFullPathAsString()} to the equivalent path with
    * each segment replaced by the property's {@code alias} (falling back to the segment name when no
    * alias is set). The encoder applies {@code alias} as a {@code rename} transformation before
-   * consulting {@link FeatureTokenDecoderGmlInputProfile#getValueWrap()}, so its lookup key is the
+   * consulting {@link FeatureTokenDecoderGmlInputProfile#getXmlPaths()}, so its lookup key is the
    * alias-form path. The decoder, which sees the untransformed schema, uses this map to consult
-   * {@code valueWrap} under the same key the encoder writes — keeping a single YAML convention
+   * {@code xmlPaths} under the same key the encoder writes — keeping a single YAML convention
    * (alias-form keys) working symmetrically for read and write. Empty (no aliases declared) when
    * {@code useAlias} is off or no property carries an alias.
    */
   private final Map<String, String> aliasFormPathByPropertyPath;
+
+  /**
+   * Per geometry property (keyed by its technical full path), the srsName routing built from the
+   * schema's {@code crsVariants} declaration by {@link #buildGeometryVariants}.
+   */
+  private final Map<String, GmlGeometryVariants> geometryVariantsCache = new HashMap<>();
+
+  /**
+   * The {@code xmlPaths} chains that do <em>not</em> start with the mapped property's own element,
+   * i.e. those that represent a property as a nested element structure (a flat property encoded as
+   * an ancestor chain, e.g. {@code lzi_beg} as {@code
+   * lebenszeitintervall/AA_Lebenszeitintervall/beginnt}). Keyed by the full path of the schema that
+   * owns the property — {@code ""} for the feature root, the object property's path for a member of
+   * an object / object array — so a chain is only considered where its property lives.
+   *
+   * <p>Chains whose first segment matches the property's own name/alias are absent here: on the
+   * wire those look exactly like a property element with wrapped content, which {@link
+   * #lookupChild(FeatureSchema, String, String)} resolves directly and {@link
+   * #isValueWrapped(FeatureSchema)} handles — the shape produced by the option's value-wrapping use
+   * (ISO 19139 type elements).
+   */
+  private final Map<String, List<XmlPathChain>> structuralChainsByOwnerPath;
 
   private int depth = 0;
   private boolean inFeature = false;
@@ -192,14 +220,24 @@ public class FeatureTokenDecoderGml
      */
     OBJECT_ELEMENT,
     /**
-     * Wrapper element interposed by the encoder's {@code valueWrap} option between a {@link
+     * Wrapper element interposed by the encoder's {@code xmlPaths} option between a {@link
      * #VALUE_PROPERTY} and its scalar text (e.g. {@code <prop><Wrap1><Wrap2>v</Wrap2></Wrap1>
      * </prop>}). Carries no schema meaning; its purpose is to keep the character buffer alive
      * across the wrappers' end-elements so the enclosing VALUE_PROPERTY can read the inner text on
      * its own end. Only pushed when the enclosing VALUE_PROPERTY's {@code fullPathAsString} is
-     * listed in {@link FeatureTokenDecoderGmlInputProfile#getValueWrap()}.
+     * listed in {@link FeatureTokenDecoderGmlInputProfile#getXmlPaths()}.
      */
     VALUE_WRAPPER,
+    /**
+     * Element of an {@code xmlPaths} chain that represents a property as a nested element structure
+     * (see {@link #structuralChainsByOwnerPath}). Contributes no path segment of its own; its child
+     * elements continue the chain until its innermost segment is reached, which resolves to the
+     * mapped property — decoded as a {@link #VALUE_PROPERTY} for a value, or as an {@link
+     * #OBJECT_ELEMENT} holding the object's members for a mapped object. For an object array the
+     * segment carrying the repetition marker anchors the ARRAY bracket on this frame, so all
+     * members repeating from that segment land in one ARRAY pair.
+     */
+    XML_PATH_CHAIN,
     /** Element with no matching schema property; descendants are ignored. */
     UNKNOWN
   }
@@ -218,7 +256,9 @@ public class FeatureTokenDecoderGml
      * Resolved source-path segment contributed by this frame to the path tracker, or {@code null}
      * when no segment is contributed — this is the case for a <em>transparent</em> OBJECT_PROPERTY
      * (no {@code sourcePath}, used to flatten nested objects whose leaves carry columns of the
-     * parent table), and for OBJECT_ELEMENT / UNKNOWN frames.
+     * parent table), and for OBJECT_ELEMENT / UNKNOWN frames. Exception: an OBJECT_ELEMENT resolved
+     * from an {@code xmlPaths} chain carries the mapped property's segment (see {@link
+     * #chainObjectElement}).
      */
     final String segment;
 
@@ -252,12 +292,20 @@ public class FeatureTokenDecoderGml
 
     /**
      * For VALUE_PROPERTY: set to {@code true} when the property's {@code fullPathAsString} is
-     * listed in {@link FeatureTokenDecoderGmlInputProfile#getValueWrap()}. Children that appear
+     * listed in {@link FeatureTokenDecoderGmlInputProfile#getXmlPaths()}. Children that appear
      * inside such a frame are pushed as {@link FrameKind#VALUE_WRAPPER}s so that wrapper
      * end-elements do not flush the character buffer before the scalar text is emitted on the
      * VALUE_PROPERTY's own end.
      */
     boolean valueWrapped;
+
+    /**
+     * For GEOMETRY_PROPERTY: the position-variant routing derived from the property's {@code
+     * variants} declaration in the schema (see {@code buildGeometryVariants}), or {@code null} when
+     * none is declared. Consulted by {@code emitGeometryOrVertical} together with the raw srsName
+     * the geometry decoder captured.
+     */
+    GmlGeometryVariants geometryVariants;
 
     /**
      * For OBJECT_ELEMENT: the {@link FeatureSchema#getName() name} of the array property currently
@@ -267,6 +315,31 @@ public class FeatureTokenDecoderGml
      * affect its parent's open array.
      */
     String openArrayChildPath;
+
+    /**
+     * For XML_PATH_CHAIN: the chains still viable at this point — those whose segments matched
+     * every element consumed so far. Narrowed as the chain is descended.
+     */
+    List<XmlPathChain> chainCandidates;
+
+    /**
+     * For XML_PATH_CHAIN: index of the segment expected for the next child element. Advances past
+     * an injected empty-element segment once that segment has been consumed as a sibling.
+     */
+    int chainIndex;
+
+    /**
+     * For XML_PATH_CHAIN: the property whose ARRAY the enclosing container already opened because
+     * the whole chain repeats. The innermost segment must not bracket that property a second time.
+     */
+    String chainContainerArrayPath;
+
+    /**
+     * For XML_PATH_CHAIN: path-tracker depth of the container the chain starts in, so the property
+     * the chain resolves to is emitted at that container's child depth — the chain's own elements
+     * contribute no path segments.
+     */
+    int chainContainerPathDepth;
 
     private Frame(
         FrameKind kind,
@@ -297,8 +370,26 @@ public class FeatureTokenDecoderGml
       return new Frame(FrameKind.OBJECT_ELEMENT, null, lookupOwner, null, pathDepth);
     }
 
+    /**
+     * OBJECT_ELEMENT resolved from the innermost segment of an {@code xmlPaths} chain. Unlike a
+     * regular object element it carries the property's segment: no OBJECT_PROPERTY frame encloses
+     * it, so its own END emits the {@code onObjectEnd}, re-tracked at this segment.
+     */
+    static Frame chainObjectElement(FeatureSchema prop, String segment, int pathDepth) {
+      return new Frame(FrameKind.OBJECT_ELEMENT, prop, prop, segment, pathDepth);
+    }
+
     static Frame valueWrapper() {
       return new Frame(FrameKind.VALUE_WRAPPER, null, null, null, -1);
+    }
+
+    static Frame xmlPathChain(
+        List<XmlPathChain> candidates, int chainIndex, int containerPathDepth) {
+      Frame frame = new Frame(FrameKind.XML_PATH_CHAIN, null, null, null, -1);
+      frame.chainCandidates = candidates;
+      frame.chainIndex = chainIndex;
+      frame.chainContainerPathDepth = containerPathDepth;
+      return frame;
     }
 
     static Frame unknown() {
@@ -324,7 +415,15 @@ public class FeatureTokenDecoderGml
     this.defaultCrs = headerCrs.isPresent() ? headerCrs : Optional.of(storageCrs);
     this.nullValue = nullValue;
     this.inputProfile = inputProfile;
-    this.geometryDecoder = new GeometryDecoderGml(inputProfile.getSrsNameMappings());
+    // The reference systems of position variants are declared in the schema: each variant
+    // property lists its verbatim identifiers in originalCrsIdentifiers and the CRS they denote in
+    // originalCrs (defaulting to nativeCrs, the CRS the positions are stored in). The input
+    // profile only contributes the alternative URIs of the requestable CRSs (ordinary geometries).
+    Map<String, EpsgCrs> srsNameMappings = new LinkedHashMap<>(inputProfile.getSrsNameMappings());
+    Set<String> verticalSrsNames = new HashSet<>();
+    collectVariantReferenceSystems(featureSchema, srsNameMappings, verticalSrsNames);
+    this.geometryDecoder =
+        new GeometryDecoderGml(srsNameMappings, verticalSrsNames, inputProfile.getSupportedCrs());
     this.buffer = new StringBuilder();
 
     List<String> wrappers = new ArrayList<>(2);
@@ -345,6 +444,8 @@ public class FeatureTokenDecoderGml
       this.aliasFormPathByPropertyPath = Map.of();
     }
 
+    this.structuralChainsByOwnerPath = collectStructuralChains();
+
     try {
       this.parser = new InputFactoryImpl().createAsyncFor(new byte[0]);
     } catch (XMLStreamException e) {
@@ -354,22 +455,162 @@ public class FeatureTokenDecoderGml
 
   /**
    * Mirrors the encoder side, which queries {@link
-   * FeatureTokenDecoderGmlInputProfile#getValueWrap()} after {@code alias → rename} injection —
-   * i.e. by the alias-form path. We check both the untransformed property path and the alias-form
-   * path so a YAML config keyed by either form (alias path when {@code useAlias: true}, or the bare
-   * property path) is recognised.
+   * FeatureTokenDecoderGmlInputProfile#getXmlPaths()} after {@code alias → rename} injection — i.e.
+   * by the alias-form path. We check both the untransformed property path and the alias-form path
+   * so a YAML config keyed by either form (alias path when {@code useAlias: true}, or the bare
+   * property path) is recognised. An {@code xmlPaths} chain is the complete element chain including
+   * the property element as its first segment; only a chain with additional inner segments wraps
+   * the value, so single-segment chains do not flag value wrapping.
    */
   private boolean isValueWrapped(FeatureSchema prop) {
-    Map<String, List<String>> valueWrap = inputProfile.getValueWrap();
-    if (valueWrap.isEmpty()) {
+    Map<String, List<String>> xmlPaths = inputProfile.getXmlPaths();
+    if (xmlPaths.isEmpty()) {
       return false;
     }
     String path = prop.getFullPathAsString();
-    if (valueWrap.containsKey(path)) {
-      return true;
+    List<String> chain = xmlPaths.get(path);
+    if (chain == null) {
+      String aliasPath = aliasFormPathByPropertyPath.get(path);
+      chain = aliasPath == null ? null : xmlPaths.get(aliasPath);
     }
-    String aliasPath = aliasFormPathByPropertyPath.get(path);
-    return aliasPath != null && valueWrap.containsKey(aliasPath);
+    return chain != null && chain.size() > 1;
+  }
+
+  /**
+   * One segment of a parsed {@code xmlPaths} chain: the element's local name, the namespace URI
+   * expected for it ({@code null} when none can be resolved — the segment then matches on local
+   * name alone), and whether the encoder injects it as an empty element (configured with a trailing
+   * {@code /}). Attribute predicates are output-only and are dropped here.
+   */
+  private static final class XmlPathSegment {
+    final String localName;
+    final String namespaceUri;
+    final boolean emptyElement;
+
+    /**
+     * {@code true} for the segment marked with a leading {@code *}: the chain repeats from this
+     * segment for each member of a mapped object array, so the ARRAY bracket is anchored at the
+     * frame whose children match this segment.
+     */
+    final boolean repeats;
+
+    XmlPathSegment(String localName, String namespaceUri, boolean emptyElement, boolean repeats) {
+      this.localName = localName;
+      this.namespaceUri = namespaceUri;
+      this.emptyElement = emptyElement;
+      this.repeats = repeats;
+    }
+
+    boolean matches(String wireLocalName, String wireNamespaceUri) {
+      return localName.equals(wireLocalName)
+          && (namespaceUri == null || namespaceUri.equals(wireNamespaceUri));
+    }
+  }
+
+  /** A property together with the parsed element chain that represents it on the wire. */
+  private static final class XmlPathChain {
+    final FeatureSchema property;
+    final List<XmlPathSegment> segments;
+
+    XmlPathChain(FeatureSchema property, List<XmlPathSegment> segments) {
+      this.property = property;
+      this.segments = segments;
+    }
+  }
+
+  /**
+   * Builds {@link #structuralChainsByOwnerPath} by walking the schema and parsing every {@code
+   * xmlPaths} entry (looked up by the property's technical path or its alias-form path) whose first
+   * segment is not the property's own element.
+   */
+  private Map<String, List<XmlPathChain>> collectStructuralChains() {
+    if (inputProfile.getXmlPaths().isEmpty()) {
+      return Map.of();
+    }
+    Map<String, List<XmlPathChain>> chains = new LinkedHashMap<>();
+    collectStructuralChains(featureSchema, "", chains);
+    return chains;
+  }
+
+  private void collectStructuralChains(
+      FeatureSchema owner, String ownerPath, Map<String, List<XmlPathChain>> chains) {
+    for (FeatureSchema property : owner.getProperties()) {
+      String path = property.getFullPathAsString();
+      List<String> configured = inputProfile.getXmlPaths().get(path);
+      if (configured == null) {
+        String aliasPath = aliasFormPathByPropertyPath.get(path);
+        configured = aliasPath == null ? null : inputProfile.getXmlPaths().get(aliasPath);
+      }
+      if (configured != null && !configured.isEmpty()) {
+        List<XmlPathSegment> segments =
+            configured.stream().map(this::parseXmlPathSegment).collect(Collectors.toList());
+        String propertyElement = stripPrefix(propertyKey(property, inputProfile.getUseAlias()));
+        if (!segments.get(0).localName.equals(propertyElement)) {
+          chains
+              .computeIfAbsent(ownerPath, k -> new ArrayList<>())
+              .add(new XmlPathChain(property, List.copyOf(segments)));
+        }
+      }
+      if (!property.getProperties().isEmpty()) {
+        collectStructuralChains(property, path, chains);
+      }
+    }
+  }
+
+  /**
+   * Parses one configured chain segment. Mirrors the encoder's grammar {@code
+   * '*'?name([attribute=value])*'/'?}: the attribute predicates only affect output and are dropped,
+   * a trailing {@code /} marks an injected empty element, and a {@code prefix:} resolves to the
+   * expected namespace URI (falling back to the input profile's {@code defaultNamespace}). The
+   * leading {@code *} marks the segment from which the chain repeats for each member of a mapped
+   * object array; it anchors the ARRAY bracket in {@link #continueStructuralChain(Frame)}.
+   */
+  private XmlPathSegment parseXmlPathSegment(String configured) {
+    String segment = configured.trim();
+    boolean repeats = segment.startsWith("*");
+    if (repeats) {
+      segment = segment.substring(1).trim();
+    }
+    boolean emptyElement = segment.endsWith("/");
+    if (emptyElement) {
+      segment = segment.substring(0, segment.length() - 1).trim();
+    }
+    int bracket = segment.indexOf('[');
+    if (bracket >= 0) {
+      segment = segment.substring(0, bracket).trim();
+    }
+    int colon = segment.indexOf(':');
+    String namespaceUri;
+    if (colon > 0) {
+      namespaceUri = namespaceNormalizer.getNamespaceURI(segment.substring(0, colon));
+      segment = segment.substring(colon + 1);
+    } else {
+      String defaultPrefix = inputProfile.getDefaultNamespace();
+      namespaceUri =
+          defaultPrefix == null || defaultPrefix.isEmpty()
+              ? null
+              : namespaceNormalizer.getNamespaceURI(defaultPrefix);
+    }
+    return new XmlPathSegment(segment, namespaceUri, emptyElement, repeats);
+  }
+
+  /**
+   * The chains of {@code owner} whose first segment matches the wire element, i.e. the mapped
+   * properties this element may introduce. More than one chain matches when several properties
+   * share leading elements (the encoder's wrapper merging, e.g. {@code lzi_beg} and {@code lzi_end}
+   * inside one {@code AA_Lebenszeitintervall}); the ambiguity is resolved segment by segment as the
+   * chain is descended.
+   */
+  private List<XmlPathChain> matchStructuralChainStart(
+      FeatureSchema owner, String wireLocalName, String wireNamespaceUri) {
+    List<XmlPathChain> candidates =
+        structuralChainsByOwnerPath.get(owner == featureSchema ? "" : owner.getFullPathAsString());
+    if (candidates == null) {
+      return List.of();
+    }
+    return candidates.stream()
+        .filter(c -> c.segments.get(0).matches(wireLocalName, wireNamespaceUri))
+        .collect(Collectors.toList());
   }
 
   private static void collectAliasFormPaths(
@@ -391,7 +632,13 @@ public class FeatureTokenDecoderGml
   @Override
   protected void init() {
     this.context = createContext();
-    this.downstream = new FeatureTokenBufferSimple<>(getDownstream(), context);
+    this.downstream =
+        new FeatureTokenBufferSimple<>(
+            FeatureEventHandlerReadOnly.of(
+                FeatureEventHandlerEmptyValues.of(
+                    getDownstream(), inputProfile.getRejectEmptyValues()),
+                inputProfile.getReadOnlyProperties()),
+            context);
   }
 
   @Override
@@ -459,6 +706,11 @@ public class FeatureTokenDecoderGml
           // ignore: DTD, SPACE, NAMESPACE, NOTATION_DECLARATION, ENTITY_DECLARATION,
           // PROCESSING_INSTRUCTION, COMMENT, CDATA. ATTRIBUTE is implicit in START_ELEMENT.
       }
+    } catch (IllegalArgumentException e) {
+      // Already a rejection of the input in its own words — a read-only property, an empty value,
+      // an unsupported xsi:type. The document parsed; adding "Could not parse GML" would describe
+      // the wrong problem, so it is passed through unchanged.
+      throw e;
     } catch (Exception e) {
       throw new IllegalArgumentException("Could not parse GML: " + e.getMessage(), e);
     }
@@ -469,13 +721,15 @@ public class FeatureTokenDecoderGml
     if (geometryDecoder.isWaitingForInput()) {
       Optional<Geometry<?>> optGeometry =
           geometryDecoder.continueDecoding(parser, crs, srsDimension, parser.getLocalName(), null);
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
+      if (!geometryDecoder.isWaitingForInput()) {
+        emitGeometryOrVertical(optGeometry);
       }
       return false;
     }
 
-    rejectXsiType();
+    if (!isValueWrapChainElement()) {
+      rejectXsiType();
+    }
 
     if (!inFeature && depth < featureRootDepth) {
       String expected = wrapperElementNames.get(depth);
@@ -560,6 +814,12 @@ public class FeatureTokenDecoderGml
       return false;
     }
 
+    if (parent != null && parent.kind == FrameKind.XML_PATH_CHAIN) {
+      continueStructuralChain(parent);
+      depth++;
+      return false;
+    }
+
     FeatureSchema lookupOwner;
     int parentPathDepth;
     if (parent == null) {
@@ -576,17 +836,13 @@ public class FeatureTokenDecoderGml
       // Inside a VALUE_PROPERTY / VALUE_WRAPPER / GEOMETRY_PROPERTY / UNKNOWN frame — descendants
       // carry no schema meaning. (Per GML's alternation rule a scalar property has only text
       // content; if we see an element here it is either unsupported mixed content or an
-      // already-skipped subtree.) Exceptions: (a) the encoder's valueWrap option produces a
+      // already-skipped subtree.) Exceptions: (a) the encoder's xmlPaths option produces a
       // wrapper-element chain around the scalar text of a VALUE_PROPERTY — push VALUE_WRAPPER so
       // the character buffer survives the wrappers' end-elements; (b) gmd/gco object elements
       // (ISO 19115) carry text directly and routinely appear inside a property element — treat
-      // them as value wrappers without requiring an explicit valueWrap entry. Once inside a
+      // them as value wrappers without requiring an explicit xmlPaths entry. Once inside a
       // VALUE_WRAPPER, the chain continues regardless of the inner element's namespace.
-      boolean inValueWrapChain =
-          parent.kind == FrameKind.VALUE_WRAPPER
-              || (parent.kind == FrameKind.VALUE_PROPERTY
-                  && (parent.valueWrapped || isExternalContentNamespace(parser.getNamespaceURI())));
-      frames.push(inValueWrapChain ? Frame.valueWrapper() : Frame.unknown());
+      frames.push(isValueWrapChainElement() ? Frame.valueWrapper() : Frame.unknown());
       depth++;
       return false;
     }
@@ -595,15 +851,31 @@ public class FeatureTokenDecoderGml
     String namespaceUri = parser.getNamespaceURI();
     Optional<FeatureSchema> propOpt = lookupChild(lookupOwner, localName, namespaceUri);
 
+    // An element that matches no property may start an xmlPaths chain that represents a property as
+    // a nested element structure. When exactly one chain matches, its property also participates in
+    // array bracketing below — repeating the whole chain is how a multi-valued mapped property
+    // appears on the wire.
+    List<XmlPathChain> chainStart =
+        propOpt.isPresent()
+            ? List.of()
+            : matchStructuralChainStart(
+                lookupOwner, localName, namespaceUri == null ? "" : namespaceUri);
+
     // Array bracketing fires at any container level: the feature root (parent == null) and every
     // OBJECT_ELEMENT (where the inner object element acts as the container for its child
     // properties). The root level uses {@code currentArrayPath}; each OBJECT_ELEMENT frame
     // carries its own {@code openArrayChildPath}. The open array at this level closes when the
     // next sibling property has a different name.
     boolean isArrayContainer = parent == null || parent.kind == FrameKind.OBJECT_ELEMENT;
+    Optional<FeatureSchema> arrayProp =
+        propOpt.or(
+            () ->
+                chainStart.size() == 1
+                    ? Optional.of(chainStart.get(0).property)
+                    : Optional.empty());
     if (isArrayContainer) {
       String containerArrayPath = parent == null ? currentArrayPath : parent.openArrayChildPath;
-      String childPathSegment = propOpt.map(FeatureSchema::getName).orElse(null);
+      String childPathSegment = arrayProp.map(FeatureSchema::getName).orElse(null);
       if (containerArrayPath != null && !containerArrayPath.equals(childPathSegment)) {
         downstream.onArrayEnd(context);
         if (parent == null) {
@@ -612,6 +884,31 @@ public class FeatureTokenDecoderGml
           parent.openArrayChildPath = null;
         }
       }
+    }
+
+    if (propOpt.isEmpty() && !chainStart.isEmpty()) {
+      // Open the ARRAY bracket for a multi-valued mapped property before its first chain: the
+      // chain's elements contribute no path segment, so the bracket is anchored at the property's
+      // own path, one level below the container.
+      FeatureSchema chainProp = chainStart.size() == 1 ? chainStart.get(0).property : null;
+      if (isArrayContainer && chainProp != null && chainProp.isArray()) {
+        String containerArrayPath = parent == null ? currentArrayPath : parent.openArrayChildPath;
+        if (containerArrayPath == null) {
+          context.pathTracker().track(chainProp.getName(), parentPathDepth + 1);
+          downstream.onArrayStart(context);
+          if (parent == null) {
+            currentArrayPath = chainProp.getName();
+          } else {
+            parent.openArrayChildPath = chainProp.getName();
+          }
+        }
+      }
+      Frame chainFrame = Frame.xmlPathChain(chainStart, 1, parentPathDepth);
+      chainFrame.chainContainerArrayPath =
+          parent == null ? currentArrayPath : parent.openArrayChildPath;
+      frames.push(chainFrame);
+      depth++;
+      return false;
     }
 
     if (propOpt.isEmpty()) {
@@ -648,32 +945,21 @@ public class FeatureTokenDecoderGml
     if (prop.isSpatial()) {
       // Geometry properties decode the full GML geometry subtree via {@link GeometryDecoderGml}
       // regardless of nesting depth; the path tracker is already set to the property's segment
-      // path so {@code emitGeometry} routes the resulting Geometry to the right downstream slot.
-      Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser, crs, srsDimension);
-      frames.push(Frame.geometryProperty(prop, segment, segmentPathDepth));
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
-        depth++;
-        return false;
-      }
-      // geometry needs more input; the next push will continue via continueDecoding
-      depth++;
-      return true;
-    } else if (prop.isValue()) {
-      Frame frame = Frame.valueProperty(prop, segment, segmentPathDepth);
-      frame.nilOnCurrent = readXsiNil();
-      frame.pendingXlinkHrefValue = readXlinkHrefAsValue(prop);
-      if (frame.pendingXlinkHrefValue == null
-          && prop.getValueType().orElse(prop.getType()) == Type.STRING) {
-        String raw = readRawXlinkHref();
-        frame.pendingXlinkHrefFallback =
-            raw == null
-                ? null
-                : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw).orElse(raw);
-      }
-      frame.valueWrapped = isValueWrapped(prop);
-      validateUom(prop);
+      // path so {@code emitGeometryOrVertical} routes the resulting Geometry (or 1D position) to
+      // the right downstream slot.
+      Frame frame = Frame.geometryProperty(prop, segment, segmentPathDepth);
+      frame.geometryVariants = geometryVariantsFor(prop, lookupOwner);
       frames.push(frame);
+      Optional<Geometry<?>> optGeometry = geometryDecoder.decode(parser, crs, srsDimension);
+      boolean waiting = geometryDecoder.isWaitingForInput();
+      if (!waiting) {
+        emitGeometryOrVertical(optGeometry);
+      }
+      // when waiting, the geometry needs more input; the next push continues via continueDecoding
+      depth++;
+      return waiting;
+    } else if (prop.isValue()) {
+      frames.push(createValueFrame(prop, segment, segmentPathDepth));
     } else if (prop.isObject()) {
       // OBJECT pair anchoring: for non-array OBJECT_PROPERTYs and for FEATURE_REF-as-OBJECT
       // (wrap=OBJECT / OBJECT_ARRAY where the wire is a self-closing prop element with
@@ -715,6 +1001,150 @@ public class FeatureTokenDecoderGml
     return false;
   }
 
+  /**
+   * Builds the VALUE_PROPERTY frame for a scalar property whose element has just been entered,
+   * reading the attribute-borne alternatives to character content ({@code xsi:nil}, {@code
+   * xlink:href}) and validating {@code uom}. Shared by the direct property match and the resolution
+   * of an {@code xmlPaths} chain's innermost segment.
+   */
+  private Frame createValueFrame(FeatureSchema prop, String segment, int pathDepth) {
+    Frame frame = Frame.valueProperty(prop, segment, pathDepth);
+    frame.nilOnCurrent = readXsiNil();
+    frame.pendingXlinkHrefValue = readXlinkHrefAsValue(prop);
+    if (frame.pendingXlinkHrefValue == null
+        && prop.getValueType().orElse(prop.getType()) == Type.STRING) {
+      String raw = readRawXlinkHref();
+      frame.pendingXlinkHrefFallback =
+          raw == null
+              ? null
+              : applyReverseTemplate(inputProfile.getFeatureRefTemplate(), raw).orElse(raw);
+    }
+    frame.valueWrapped = isValueWrapped(prop);
+    validateUom(prop);
+    return frame;
+  }
+
+  /**
+   * Continues an {@code xmlPaths} chain inside {@code parent}: matches the current wire element
+   * against the segment the still-viable chains expect, and either descends further (another chain
+   * element), resolves the property (the innermost segment reached — decoded as a VALUE_PROPERTY at
+   * the chain's container depth), or skips an injected empty element. An element that matches no
+   * candidate is pushed as UNKNOWN, so unmapped extra content inside a chain is ignored as
+   * elsewhere.
+   */
+  // Close the ARRAY a chain frame opened for a repeated innermost element. The path tracker may
+  // have moved on to another property, so re-track the array property's own path first — that is
+  // where ARRAY_END belongs.
+  private void closeChainArray(Frame chain) {
+    if (chain.openArrayChildPath != null) {
+      context.pathTracker().track(chain.openArrayChildPath, chain.chainContainerPathDepth + 1);
+      downstream.onArrayEnd(context);
+      chain.openArrayChildPath = null;
+    }
+  }
+
+  private void continueStructuralChain(Frame parent) {
+    String wireLocalName = parser.getLocalName();
+    String wireNamespaceUri = parser.getNamespaceURI() == null ? "" : parser.getNamespaceURI();
+
+    // The expected segment index may have to advance past injected empty-element segments: the
+    // encoder writes them as siblings of the following segment, and a client may omit them.
+    List<XmlPathChain> matched = new ArrayList<>(parent.chainCandidates.size());
+    int matchedIndex = -1;
+    boolean matchedEmptySegment = false;
+    for (XmlPathChain candidate : parent.chainCandidates) {
+      for (int index = parent.chainIndex; index < candidate.segments.size(); index++) {
+        XmlPathSegment segment = candidate.segments.get(index);
+        if (segment.matches(wireLocalName, wireNamespaceUri)) {
+          if (matchedIndex < 0 || index == matchedIndex) {
+            matchedIndex = index;
+            matchedEmptySegment = segment.emptyElement;
+            matched.add(candidate);
+          }
+          break;
+        }
+        if (!segment.emptyElement) {
+          break;
+        }
+      }
+    }
+
+    if (matched.isEmpty()) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Skipping <{}>: no xmlPaths segment matches.", wireLocalName);
+      }
+      frames.push(Frame.unknown());
+      return;
+    }
+
+    if (matchedEmptySegment) {
+      // An injected constant element (e.g. the ISO 19139 valueUnit): it carries no value, and the
+      // chain continues with the next segment on the following sibling.
+      parent.chainIndex = matchedIndex + 1;
+      frames.push(Frame.unknown());
+      return;
+    }
+
+    XmlPathChain resolved = matched.get(0);
+    if (matchedIndex == resolved.segments.size() - 1) {
+      FeatureSchema prop = resolved.property;
+      String segment = prop.getName();
+      int pathDepth = parent.chainContainerPathDepth + 1;
+      // The innermost element of a chain may repeat inside one wrapper — that is how a
+      // multi-valued property arrives. Its values need an ARRAY bracket anchored at the
+      // property's own path, because the chain's elements contribute no path segment. The
+      // bracket stays open while the same property repeats and closes when another property
+      // starts or the wrapper ends.
+      if (!Objects.equals(parent.openArrayChildPath, segment)
+          && !Objects.equals(parent.chainContainerArrayPath, segment)) {
+        closeChainArray(parent);
+        if (prop.isArray()) {
+          context.pathTracker().track(segment, pathDepth);
+          downstream.onArrayStart(context);
+          parent.openArrayChildPath = segment;
+        }
+      }
+      context.pathTracker().track(segment, pathDepth);
+      if (prop.isObject() && !prop.isFeatureRef()) {
+        // The innermost element of a mapped object's chain takes the role of the object element:
+        // its children are the object's members, resolved against the property's schema —
+        // including the members' own chains, which are relative to this element.
+        downstream.onObjectStart(context);
+        frames.push(Frame.chainObjectElement(prop, segment, pathDepth));
+        return;
+      }
+      frames.push(createValueFrame(prop, segment, pathDepth));
+      return;
+    }
+
+    // Descending an intermediate segment. The segment carrying the repetition marker introduces
+    // one member of a mapped object array: the ARRAY bracket opens here, on the frame whose
+    // children repeat, and stays open while the marker element repeats — so all members land in
+    // one ARRAY pair, closed when this frame ends or a sibling of another property arrives.
+    FeatureSchema repeating =
+        matched.size() == 1
+                && resolved.segments.get(matchedIndex).repeats
+                && resolved.property.isArray()
+            ? resolved.property
+            : null;
+    if (repeating != null && !Objects.equals(parent.chainContainerArrayPath, repeating.getName())) {
+      if (!Objects.equals(parent.openArrayChildPath, repeating.getName())) {
+        closeChainArray(parent);
+        context.pathTracker().track(repeating.getName(), parent.chainContainerPathDepth + 1);
+        downstream.onArrayStart(context);
+        parent.openArrayChildPath = repeating.getName();
+      }
+    } else {
+      closeChainArray(parent);
+    }
+    Frame nested = Frame.xmlPathChain(matched, matchedIndex + 1, parent.chainContainerPathDepth);
+    nested.chainContainerArrayPath =
+        parent.openArrayChildPath != null
+            ? parent.openArrayChildPath
+            : parent.chainContainerArrayPath;
+    frames.push(nested);
+  }
+
   private void onEndElement() throws XMLStreamException, java.io.IOException {
     if (geometryDecoder.isWaitingForInput()) {
       // The geometry decoder paused on EVENT_INCOMPLETE while reading a coordinate element's text
@@ -731,8 +1161,8 @@ public class FeatureTokenDecoderGml
       Optional<Geometry<?>> optGeometry =
           geometryDecoder.continueDecoding(
               parser, crs, srsDimension, parser.getLocalName(), pending);
-      if (optGeometry.isPresent()) {
-        emitGeometry(optGeometry.get());
+      if (!geometryDecoder.isWaitingForInput()) {
+        emitGeometryOrVertical(optGeometry);
       }
       return;
     }
@@ -776,7 +1206,16 @@ public class FeatureTokenDecoderGml
         context.setValueType(Type.STRING);
         downstream.onValue(context);
       } else if (frame.pendingXlinkHrefFallback != null) {
+        // The fallback still wins over an empty value, as it did when the value was dropped.
         context.setValue(frame.pendingXlinkHrefFallback);
+        context.setValueType(Type.STRING);
+        downstream.onValue(context);
+      } else {
+        // The property element was there and carried no value — content that is empty or only
+        // whitespace, the latter never having reached the buffer. That states an empty value, not
+        // an absent one, the way a JSON member does with "": dropping it here silently discarded
+        // what the document states and left the empty value invisible to everything downstream.
+        context.setValue("");
         context.setValueType(Type.STRING);
         downstream.onValue(context);
       }
@@ -790,6 +1229,8 @@ public class FeatureTokenDecoderGml
       if (!arrayOfObjects) {
         downstream.onObjectEnd(context);
       }
+    } else if (frame != null && frame.kind == FrameKind.XML_PATH_CHAIN) {
+      closeChainArray(frame);
     } else if (frame != null && frame.kind == FrameKind.OBJECT_ELEMENT) {
       // Close any array still open inside this OBJECT_ELEMENT before bookkeeping at the enclosing
       // OBJECT_PROPERTY level. The path tracker still points at the array property's path from
@@ -800,14 +1241,21 @@ public class FeatureTokenDecoderGml
       // For array non-FEATURE_REF OBJECT_PROPERTYs the per-peer OBJECT pair is closed here, at
       // the path of the enclosing OBJECT_PROPERTY (the OBJECT_ELEMENT itself contributes no path
       // segment). For non-array OBJECT_PROPERTYs the OBJECT_ELEMENT END is silent — onObjectEnd
-      // fires at the enclosing OBJECT_PROPERTY's END above.
-      Frame enclosing = frames.peek();
-      if (enclosing != null
-          && enclosing.kind == FrameKind.OBJECT_PROPERTY
-          && enclosing.prop.isArray()
-          && !enclosing.prop.isFeatureRef()) {
-        context.pathTracker().track(enclosing.segment, enclosing.pathDepth);
+      // fires at the enclosing OBJECT_PROPERTY's END above. An object element resolved from an
+      // xmlPaths chain carries its own segment and has no enclosing OBJECT_PROPERTY, so its END
+      // closes the OBJECT pair itself.
+      if (frame.segment != null) {
+        context.pathTracker().track(frame.segment, frame.pathDepth);
         downstream.onObjectEnd(context);
+      } else {
+        Frame enclosing = frames.peek();
+        if (enclosing != null
+            && enclosing.kind == FrameKind.OBJECT_PROPERTY
+            && enclosing.prop.isArray()
+            && !enclosing.prop.isFeatureRef()) {
+          context.pathTracker().track(enclosing.segment, enclosing.pathDepth);
+          downstream.onObjectEnd(context);
+        }
       }
     }
 
@@ -1030,10 +1478,16 @@ public class FeatureTokenDecoderGml
     String wireUri = wireNamespaceUri == null ? "" : wireNamespaceUri;
     for (FeatureSchema p : parent.getProperties()) {
       String key = propertyKey(p, useAlias);
-      if (!wireLocalName.equals(stripPrefix(key))) {
+      String base = stripPrefix(key);
+      // The configured set holds property ids (technical full paths), not the on-the-wire
+      // name/alias, so membership is tested against the property's full path; the wire element
+      // base for the suffix match stays the name/alias the encoder emits.
+      boolean suffixed =
+          inputProfile.getObjectTypeSuffixedProperties().contains(p.getFullPathAsString());
+      if (!(wireLocalName.equals(base) || (suffixed && wireLocalName.startsWith(base + "_")))) {
         continue;
       }
-      String expectedUri = expectedNamespaceUri(parent, key);
+      String expectedUri = expectedNamespaceUri(p, parent, key);
       if (expectedUri == null || expectedUri.equals(wireUri)) {
         return Optional.of(p);
       }
@@ -1062,15 +1516,24 @@ public class FeatureTokenDecoderGml
   }
 
   /**
-   * Resolves the XML namespace URI expected for a property of {@code parent} whose schema
-   * name/alias is {@code key}. Mirrors the encoder's qualification chain:
+   * Resolves the XML namespace URI expected for {@code property}, whose schema name/alias is {@code
+   * key}. Mirrors the encoder's qualification chain:
    *
    * <ol>
    *   <li>An explicit {@code prefix:name} in the schema name/alias takes precedence. The prefix is
    *       resolved against the constructor's namespace map (predefined + {@code
    *       applicationNamespaces}).
-   *   <li>Otherwise the parent's {@code objectType} is looked up in {@code objectTypeNamespaces};
-   *       its prefix resolves to the URI.
+   *   <li>Otherwise the property's {@code originObjectType} — the object type from the fragment
+   *       that originally listed this property — is looked up in {@code objectTypeNamespaces}; its
+   *       prefix resolves to the URI. The property's own origin always wins over the parent's
+   *       {@code objectType}; setting it deliberately falls through to the default namespace if the
+   *       type isn't mapped, suppressing the parent walk.
+   *   <li>Otherwise the parent's {@code objectType} is looked up in {@code objectTypeNamespaces} —
+   *       but only when the parent is a NESTED OBJECT, not the feature root. The feature root's
+   *       {@code objectType} pins the namespace of the feature element itself; it must not
+   *       propagate down to property children that inherited from a different schema fragment.
+   *       Nested OBJECTs (e.g. ISO 19115 {@code LI_Lineage}) do propagate, since their inline child
+   *       properties belong to the nested object's own namespace.
    *   <li>Otherwise the input profile's {@code defaultNamespace} prefix resolves to the URI.
    * </ol>
    *
@@ -1078,16 +1541,24 @@ public class FeatureTokenDecoderGml
    * then matches by local name only, preserving the decoder's behaviour when no namespace data is
    * provided in the input profile.
    */
-  private String expectedNamespaceUri(FeatureSchema parent, String key) {
+  private String expectedNamespaceUri(FeatureSchema property, FeatureSchema parent, String key) {
     int colon = key.indexOf(':');
     if (colon > 0) {
       return namespaceNormalizer.getNamespaceURI(key.substring(0, colon));
     }
-    Optional<String> parentObjectType = parent.getObjectType();
-    if (parentObjectType.isPresent()) {
-      String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
+    Optional<String> originObjectType = property.getOriginObjectType();
+    if (originObjectType.isPresent()) {
+      String prefix = inputProfile.getObjectTypeNamespaces().get(originObjectType.get());
       if (prefix != null) {
         return namespaceNormalizer.getNamespaceURI(prefix);
+      }
+    } else if (parent != featureSchema) {
+      Optional<String> parentObjectType = parent.getObjectType();
+      if (parentObjectType.isPresent()) {
+        String prefix = inputProfile.getObjectTypeNamespaces().get(parentObjectType.get());
+        if (prefix != null) {
+          return namespaceNormalizer.getNamespaceURI(prefix);
+        }
       }
     }
     String defaultPrefix = inputProfile.getDefaultNamespace();
@@ -1230,10 +1701,32 @@ public class FeatureTokenDecoderGml
   }
 
   /**
+   * Whether the current START_ELEMENT is part of a value-wrap chain: its parent frame is a {@link
+   * FrameKind#VALUE_WRAPPER}, or a {@link FrameKind#VALUE_PROPERTY} whose path is listed in {@code
+   * xmlPaths} or whose child lives in an ISO 19115 content namespace ({@code gmd}/{@code gco}).
+   * Such elements carry no schema meaning — they only wrap the property's scalar text — so they are
+   * pushed as {@link Frame#valueWrapper()} and exempt from {@link #rejectXsiType()}: ISO 19139
+   * requires typed values like {@code <gco:Record xsi:type="gml:doubleList">} inside {@code
+   * DQ_QuantitativeResult}, where {@code xsi:type} declares the content type of an anyType element
+   * rather than substituting a schema type.
+   */
+  private boolean isValueWrapChainElement() {
+    Frame parent = frames.peek();
+    return parent != null
+        && (parent.kind == FrameKind.VALUE_WRAPPER
+            || parent.kind == FrameKind.XML_PATH_CHAIN
+            || (parent.kind == FrameKind.VALUE_PROPERTY
+                && (parent.valueWrapped || isExternalContentNamespace(parser.getNamespaceURI()))));
+  }
+
+  /**
    * {@code xsi:type} substitution is not supported by this decoder — schema lookup is by element
    * name only, so a substituted type carries no extra information into the token stream and is
    * almost certainly user error. Reject early with a clear message naming the element on which it
-   * appeared.
+   * appeared. Elements inside a value-wrap chain (see {@link #isValueWrapChainElement()}) are
+   * exempt: there {@code xsi:type} types the content of an anyType value element (ISO 19139 {@code
+   * gco:Record}) and is dropped on input; the encoder regenerates it from the attributes declared
+   * on the {@code xmlPaths} chain segment.
    */
   private void rejectXsiType() {
     for (int i = 0; i < parser.getAttributeCount(); i++) {
@@ -1245,6 +1738,190 @@ public class FeatureTokenDecoderGml
                 + "> is not supported by this decoder.");
       }
     }
+  }
+
+  /**
+   * Builds the srsName-keyed routing for a geometry property from its schema-level {@code
+   * crsVariants} declaration: every {@code originalCrsIdentifiers} entry of a variant sibling
+   * routes to that sibling (together with the sibling's {@code falseEastingDifference}); every
+   * identifier of the vertical sibling routes to the vertical property. Cached per geometry
+   * property.
+   */
+  private GmlGeometryVariants geometryVariantsFor(FeatureSchema prop, FeatureSchema lookupOwner) {
+    if (prop.getCrsVariants().isEmpty()) {
+      return null;
+    }
+    return geometryVariantsCache.computeIfAbsent(
+        prop.getFullPathAsString(), ignore -> buildGeometryVariants(prop, lookupOwner));
+  }
+
+  private GmlGeometryVariants buildGeometryVariants(FeatureSchema prop, FeatureSchema lookupOwner) {
+    CrsVariants variants = prop.getCrsVariants().get();
+    Map<String, String> bySrsName = new LinkedHashMap<>();
+
+    Map<String, Double> shiftBySrsName = new LinkedHashMap<>();
+    variants.getGeometryProperties().stream()
+        .map(name -> siblingProperty(lookupOwner, name))
+        .filter(Objects::nonNull)
+        .forEach(
+            sibling ->
+                sibling
+                    .getOriginalCrsIdentifiers()
+                    .forEach(
+                        identifier -> {
+                          bySrsName.put(identifier, sibling.getName());
+                          sibling
+                              .getFalseEastingDifference()
+                              .filter(difference -> difference != 0)
+                              .ifPresent(difference -> shiftBySrsName.put(identifier, difference));
+                        }));
+
+    Map<String, String> verticalBySrsName = new LinkedHashMap<>();
+    variants
+        .getVerticalProperty()
+        .ifPresent(
+            verticalProperty -> {
+              FeatureSchema sibling = siblingProperty(lookupOwner, verticalProperty);
+              if (sibling != null) {
+                sibling
+                    .getOriginalCrsIdentifiers()
+                    .forEach(identifier -> verticalBySrsName.put(identifier, verticalProperty));
+              }
+            });
+
+    return ImmutableGmlGeometryVariants.builder()
+        .bySrsName(bySrsName)
+        .shiftBySrsName(shiftBySrsName)
+        .verticalBySrsName(verticalBySrsName)
+        .srsNameProperty(variants.getCrsProperty())
+        .build();
+  }
+
+  private FeatureSchema siblingProperty(FeatureSchema owner, String name) {
+    return owner == null
+        ? null
+        : owner.getProperties().stream()
+            .filter(prop -> prop.getName().equals(name))
+            .findFirst()
+            .orElse(null);
+  }
+
+  private static void collectVariantReferenceSystems(
+      FeatureSchema schema, Map<String, EpsgCrs> srsNameMappings, Set<String> verticalSrsNames) {
+    for (FeatureSchema child : schema.getProperties()) {
+      child
+          .getCrsVariants()
+          .ifPresent(
+              variants -> {
+                variants
+                    .getGeometryProperties()
+                    .forEach(
+                        name -> {
+                          FeatureSchema sibling =
+                              schema.getProperties().stream()
+                                  .filter(prop -> prop.getName().equals(name))
+                                  .findFirst()
+                                  .orElse(null);
+                          if (sibling != null && sibling.getNativeCrs().isPresent()) {
+                            EpsgCrs wireCrs =
+                                sibling.getOriginalCrs().orElse(sibling.getNativeCrs().get());
+                            sibling
+                                .getOriginalCrsIdentifiers()
+                                .forEach(
+                                    identifier -> srsNameMappings.putIfAbsent(identifier, wireCrs));
+                          }
+                        });
+                variants
+                    .getVerticalProperty()
+                    .flatMap(
+                        name ->
+                            schema.getProperties().stream()
+                                .filter(prop -> prop.getName().equals(name))
+                                .findFirst())
+                    .ifPresent(
+                        sibling -> verticalSrsNames.addAll(sibling.getOriginalCrsIdentifiers()));
+              });
+      collectVariantReferenceSystems(child, srsNameMappings, verticalSrsNames);
+    }
+  }
+
+  /**
+   * Emits the completed result of a geometry decode. Without position-variant routing this is the
+   * decoded {@link Geometry} at the geometry property's own path. With routing (see {@link
+   * GmlGeometryVariants}), a geometry whose verbatim wire srsName maps to a variant property is
+   * emitted at that property's path instead, a 1D position (empty {@code optGeometry} although no
+   * further input is needed) is emitted as a scalar value at the configured vertical property, and
+   * in both cases the verbatim srsName is emitted at the configured srsName property. The path
+   * tracker is restored to the geometry property's own segment afterwards.
+   */
+  private void emitGeometryOrVertical(Optional<Geometry<?>> optGeometry) {
+    Frame frame = frames.peek();
+    GmlGeometryVariants variants =
+        frame != null && frame.kind == FrameKind.GEOMETRY_PROPERTY ? frame.geometryVariants : null;
+    String rawSrsName = geometryDecoder.getRawSrsName().orElse(null);
+
+    // Coordinates whose srsName declares a false-easting difference (e.g. Gauss-Krüger without
+    // the zone prefix) are shifted so the emitted geometry conforms to the mapped CRS.
+    if (optGeometry.isPresent() && rawSrsName != null && variants != null) {
+      Double falseEastingDifference = variants.getShiftBySrsName().get(rawSrsName);
+      if (falseEastingDifference != null && falseEastingDifference != 0) {
+        optGeometry =
+            Optional.of(
+                optGeometry
+                    .get()
+                    .accept(
+                        new de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer(
+                            de.ii.xtraplatform.geometries.domain.transform.ImmutableEastingShift.of(
+                                Optional.empty(), falseEastingDifference))));
+      }
+    }
+
+    if (optGeometry.isPresent()) {
+      String variantProperty =
+          variants != null && rawSrsName != null ? variants.getBySrsName().get(rawSrsName) : null;
+      if (variantProperty != null) {
+        context.pathTracker().track(variantProperty, frame.pathDepth);
+        emitGeometry(optGeometry.get());
+        emitSrsName(variants, rawSrsName, frame.pathDepth);
+        context.pathTracker().track(frame.segment, frame.pathDepth);
+      } else {
+        emitGeometry(optGeometry.get());
+      }
+      return;
+    }
+
+    Optional<String> verticalValue = geometryDecoder.getVerticalValue();
+    if (verticalValue.isEmpty()) {
+      return;
+    }
+    String verticalProperty =
+        variants != null && rawSrsName != null
+            ? variants.getVerticalBySrsName().get(rawSrsName)
+            : null;
+    if (verticalProperty == null) {
+      throw new IllegalArgumentException(
+          "1D position with srsName '"
+              + rawSrsName
+              + "' is not supported for this geometry property.");
+    }
+    context.pathTracker().track(verticalProperty, frame.pathDepth);
+    context.setValue(verticalValue.get());
+    context.setValueType(Type.STRING);
+    downstream.onValue(context);
+    emitSrsName(variants, rawSrsName, frame.pathDepth);
+    context.pathTracker().track(frame.segment, frame.pathDepth);
+  }
+
+  private void emitSrsName(GmlGeometryVariants variants, String rawSrsName, int pathDepth) {
+    variants
+        .getSrsNameProperty()
+        .ifPresent(
+            srsNameProperty -> {
+              context.pathTracker().track(srsNameProperty, pathDepth);
+              context.setValue(rawSrsName);
+              context.setValueType(Type.STRING);
+              downstream.onValue(context);
+            });
   }
 
   private void emitGeometry(Geometry<?> geom) {
