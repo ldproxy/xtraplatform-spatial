@@ -106,10 +106,22 @@ public class CrsTransformerProj extends BoundingBoxTransformer {
               sourceDimension, dimension));
     }
 
-    double[] target = new double[dimension * numberOfPoints];
-
     try {
-      getMathTransform(dimension).transform(coordinates, 0, target, 0, numberOfPoints);
+      MathTransform mathTransform = getMathTransform(dimension);
+      // the operation may return more coordinates than the source has, e.g. for a geocentric CRS
+      int operationDimension = mathTransform.getTargetDimensions();
+      double[] target = new double[Math.max(dimension, operationDimension) * numberOfPoints];
+      mathTransform.transform(coordinates, 0, target, 0, numberOfPoints);
+
+      if (operationDimension > targetDimension) {
+        // only the horizontal coordinates of a 3D target are used
+        double[] reduced = new double[dimension * numberOfPoints];
+        for (int i = 0; i < numberOfPoints; i++) {
+          System.arraycopy(
+              target, i * operationDimension, reduced, i * targetDimension, targetDimension);
+        }
+        return reduced;
+      }
 
       return target;
     } catch (TransformException | IllegalArgumentException | IllegalStateException ex) {

@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.threeten.extra.Interval;
 
 public class SqlDialectPgis implements SqlDialect {
@@ -71,6 +73,8 @@ public class SqlDialectPgis implements SqlDialect {
     return String.format("DROP TABLE IF EXISTS %s", name);
   }
 
+  // the year of an ISO 8601 date, optionally signed, followed by the rest of the value
+  private static final Pattern ISO_YEAR = Pattern.compile("^([+-]?\\d{4,})(-.*)$");
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
   private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
@@ -227,12 +231,25 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public String applyToDateLiteral(String date) {
-    return String.format("DATE '%s'", date);
+    return String.format("DATE '%s'", withEra(date));
   }
 
   @Override
   public String applyToDatetimeLiteral(String datetime) {
-    return String.format("TIMESTAMP '%s'", datetime);
+    return String.format("TIMESTAMP '%s'", withEra(datetime));
+  }
+
+  // PostgreSQL has no year 0 and no negative years: the ISO 8601 year 0 is 1 BC, -1 is 2 BC etc.
+  private static String withEra(String value) {
+    Matcher matcher = ISO_YEAR.matcher(value);
+    if (!matcher.matches()) {
+      return value;
+    }
+    long year = Long.parseLong(matcher.group(1));
+    if (year > 0) {
+      return value;
+    }
+    return String.format("%04d%s BC", 1 - year, matcher.group(2));
   }
 
   @Override

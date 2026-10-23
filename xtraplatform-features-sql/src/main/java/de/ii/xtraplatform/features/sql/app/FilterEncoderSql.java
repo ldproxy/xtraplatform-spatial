@@ -21,6 +21,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.cql.domain.And;
+import de.ii.xtraplatform.cql.domain.ArrayFunction;
 import de.ii.xtraplatform.cql.domain.ArrayLiteral;
 import de.ii.xtraplatform.cql.domain.Bbox;
 import de.ii.xtraplatform.cql.domain.Between;
@@ -893,6 +894,28 @@ public class FilterEncoderSql {
                 && Objects.equals(propertyName, property.getSourcePath().get()));
   }
 
+  private static boolean isEmptyArray(Operand operand) {
+    return operand instanceof ArrayLiteral arrayLiteral
+        && arrayLiteral.getValue() instanceof List<?> values
+        && values.isEmpty();
+  }
+
+  // As in the other array predicates, a property without values (no row in the joined table) does
+  // not match. So only a property with values contains the empty array, and no property overlaps
+  // with it, is contained by it or is equal to it. The SQL `IN ()` would be invalid.
+  private static String encodeEmptyArray(
+      ArrayFunction operator,
+      boolean notInverse,
+      String mainExpression,
+      String alias,
+      String sortKey) {
+    if (notInverse ? operator == A_CONTAINS : operator == A_CONTAINEDBY) {
+      return String.format(
+          mainExpression, "", String.format(" IS NOT NULL GROUP BY %s.%s", alias, sortKey));
+    }
+    return "1=0";
+  }
+
   private class CqlToSql extends CqlToText {
 
     private final SchemaSql rootSchema;
@@ -1724,6 +1747,14 @@ public class FilterEncoderSql {
           getQualifiedColumn(table, propertyName, aliases.get(aliases.size() - 1), false);
 
       if (qualifiedColumn.second().isEmpty()) {
+        if (isEmptyArray(arrayOperation.getArgs().get(notInverse ? 1 : 0))) {
+          return encodeEmptyArray(
+              arrayOperation.getArrayOperator(),
+              notInverse,
+              mainExpression,
+              aliases.get(0),
+              rootSchema.getSortKey().get());
+        }
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
@@ -3066,6 +3097,14 @@ public class FilterEncoderSql {
               table.first(), table.second(), propertyName, aliases.get(aliases.size() - 1), false);
 
       if (qualifiedColumn.second().isEmpty()) {
+        if (isEmptyArray(arrayOperation.getArgs().get(notInverse ? 1 : 0))) {
+          return encodeEmptyArray(
+              arrayOperation.getArrayOperator(),
+              notInverse,
+              mainExpression,
+              aliases.get(0),
+              mapping.getMainTable().getSortKey());
+        }
         if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINS
             : arrayOperation.getArrayOperator() == A_CONTAINEDBY) {
