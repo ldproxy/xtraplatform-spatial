@@ -20,6 +20,7 @@ import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
@@ -177,12 +178,23 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
         (key, path) -> {
           Tuple<String, String> tilesetKey = toTuple(key);
 
-          metadata.put(tilesetKey.first(), loadMetadata(tilesetKey.second(), path));
+          TilesetMbTiles tileset =
+              getData()
+                  .getTilesets()
+                  .get(tilesetKey.first())
+                  .mergeDefaults(getData().getTilesetDefaults());
+          Optional<BoundingBox> configuredExtent =
+              toBoundingBox(
+                  tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent()));
+
+          metadata.put(
+              tilesetKey.first(), loadMetadata(tilesetKey.second(), path, configuredExtent));
           tmsRanges.put(tilesetKey.first(), metadata.get(tilesetKey.first()).getTmsRanges());
         });
   }
 
-  private TilesetMetadata loadMetadata(String tms, Path path) {
+  private TilesetMetadata loadMetadata(
+      String tms, Path path, Optional<BoundingBox> configuredExtent) {
     try {
       MbtilesMetadata metadata = new MbtilesTileset(path, false).getMetadata();
       TileMatrixSet tileMatrixSet =
@@ -210,11 +222,14 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
               tms,
               new ImmutableMinMax.Builder().min(minzoom).max(maxzoom).getDefault(defzoom).build());
       List<Double> bbox = metadata.getBounds();
-      Optional<BoundingBox> bounds =
+      Optional<BoundingBox> boundsFromMetadata =
           bbox.size() == 4
               ? Optional.of(
                   BoundingBox.of(bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3), OgcCrs.CRS84))
               : Optional.empty();
+      // Configured extent takes priority; fall back to bounds from MBTiles metadata
+      Optional<BoundingBox> bounds =
+          configuredExtent.isPresent() ? configuredExtent : boundsFromMetadata;
       TilesFormat format = metadata.getFormat();
       List<FeatureSchema> vectorSchemas =
           metadata.getVectorLayers().stream()
@@ -240,5 +255,32 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
   private Tuple<String, String> toTuple(String tilesetKey) {
     String[] split = tilesetKey.split("/");
     return Tuple.of(split[0], split[1]);
+  }
+
+  private Optional<BoundingBox> toBoundingBox(Optional<SpatialExtent> extent) {
+    return extent
+        .filter(e -> e.getComputed() == null)
+        .flatMap(
+            e -> {
+              if (e.getXmin() == null
+                  || e.getYmin() == null
+                  || e.getXmax() == null
+                  || e.getYmax() == null) {
+                return Optional.empty();
+              }
+              if (e.getZmin() != null && e.getZmax() != null) {
+                return Optional.of(
+                    BoundingBox.of(
+                        e.getXmin(),
+                        e.getYmin(),
+                        e.getZmin(),
+                        e.getXmax(),
+                        e.getYmax(),
+                        e.getZmax(),
+                        OgcCrs.CRS84));
+              }
+              return Optional.of(
+                  BoundingBox.of(e.getXmin(), e.getYmin(), e.getXmax(), e.getYmax(), OgcCrs.CRS84));
+            });
   }
 }
