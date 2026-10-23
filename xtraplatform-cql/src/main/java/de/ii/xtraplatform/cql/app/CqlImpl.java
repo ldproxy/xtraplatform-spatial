@@ -8,6 +8,8 @@
 package de.ii.xtraplatform.cql.app;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.BeanProperty;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.InjectableValues;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -50,6 +52,11 @@ public class CqlImpl implements Cql {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CqlImpl.class);
 
+  // The CRS of the coordinates in a filter is injected into the deserializers. The mapper is
+  // shared by all requests, so the CRS is bound to the thread that reads the filter.
+  private static final ThreadLocal<Optional<EpsgCrs>> FILTER_CRS =
+      ThreadLocal.withInitial(Optional::empty);
+
   private final CqlTextParser cqlTextParser;
   private final ObjectMapper cqlJsonMapper;
 
@@ -67,7 +74,34 @@ public class CqlImpl implements Cql {
             .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
             .enable(SerializationFeature.INDENT_OUTPUT)
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .registerModule(module);
+            .registerModule(module)
+            .setInjectableValues(new FilterCrsInjectableValues());
+  }
+
+  private static final class FilterCrsInjectableValues extends InjectableValues {
+
+    @Override
+    public Object findInjectableValue(
+        DeserializationContext ctxt,
+        Object valueId,
+        BeanProperty forProperty,
+        Object beanInstance,
+        Boolean optional,
+        Boolean useInput) {
+      return findInjectableValue(valueId, ctxt, forProperty, beanInstance);
+    }
+
+    @Override
+    public Object findInjectableValue(
+        Object valueId,
+        DeserializationContext ctxt,
+        BeanProperty forProperty,
+        Object beanInstance) {
+      if ("filterCrs".equals(valueId)) {
+        return FILTER_CRS.get();
+      }
+      throw new IllegalArgumentException(String.format("No injectable value '%s'", valueId));
+    }
   }
 
   @Override
@@ -87,8 +121,7 @@ public class CqlImpl implements Cql {
     }
 
     if (format == Format.JSON) {
-      cqlJsonMapper.setInjectableValues(
-          new InjectableValues.Std().addValue("filterCrs", Optional.ofNullable(crs)));
+      FILTER_CRS.set(Optional.ofNullable(crs));
       try {
         Cql2Expression expression = cqlJsonMapper.readValue(cql, Cql2Expression.class);
 
@@ -103,6 +136,8 @@ public class CqlImpl implements Cql {
         return expression;
       } catch (IOException e) {
         throw new CqlParseException(e.getMessage(), e);
+      } finally {
+        FILTER_CRS.remove();
       }
     }
 

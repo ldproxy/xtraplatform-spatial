@@ -9,9 +9,19 @@ package de.ii.xtraplatform.cql.app
 
 import de.ii.xtraplatform.cql.domain.Cql
 import de.ii.xtraplatform.cql.domain.Cql2Expression
+import de.ii.xtraplatform.cql.domain.BinarySpatialOperation
+import de.ii.xtraplatform.cql.domain.GeometryNode
+import de.ii.xtraplatform.cql.domain.SpatialLiteral
+import de.ii.xtraplatform.crs.domain.EpsgCrs
+import de.ii.xtraplatform.crs.domain.OgcCrs
 import org.skyscreamer.jsonassert.JSONAssert
 import spock.lang.Shared
 import spock.lang.Specification
+
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 class CqlJsonSpec extends Specification {
 
@@ -1369,5 +1379,28 @@ class CqlJsonSpec extends Specification {
 
         then:
         JSONAssert.assertEquals(cqlJson, actual2, true)
+    }
+
+    def 'concurrent reads keep the CRS of each filter'() {
+        given:
+        String filter = '{"op":"s_intersects","args":[{"property":"geometry"},{"type":"Point","coordinates":[455000,5543000]}]}'
+        List<EpsgCrs> crsList = (0..<200).collect { it % 2 == 0 ? EpsgCrs.of(25832) : OgcCrs.CRS84 }
+        ExecutorService executor = Executors.newFixedThreadPool(8)
+
+        when:
+        List<Future<EpsgCrs>> results = crsList.collect { crs ->
+            executor.submit({
+                Cql2Expression expression = cql.read(filter, Cql.Format.JSON, crs)
+                SpatialLiteral literal = (SpatialLiteral) ((BinarySpatialOperation) expression).getArgs().get(1)
+                ((GeometryNode) literal.getValue()).getGeometry().getCrs().orElse(null)
+            } as Callable<EpsgCrs>)
+        }
+        List<EpsgCrs> actual = results.collect { it.get() }
+
+        then:
+        actual == crsList
+
+        cleanup:
+        executor.shutdownNow()
     }
 }
