@@ -225,7 +225,9 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
 
   @Override
   public CqlNode visit(Function function, List<CqlNode> children) {
-    return function;
+    return Function.of(
+        function.getName(),
+        children.stream().map(Operand.class::cast).collect(Collectors.toList()));
   }
 
   @Override

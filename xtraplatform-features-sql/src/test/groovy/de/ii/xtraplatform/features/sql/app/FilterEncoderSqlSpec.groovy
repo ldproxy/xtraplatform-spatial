@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.sql.app
 
+import com.google.common.collect.ImmutableList
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
 import de.ii.xtraplatform.cql.domain.CustomFunction
 import de.ii.xtraplatform.cql.domain.Cql2FunctionArgument
@@ -21,6 +22,11 @@ import de.ii.xtraplatform.cql.app.CqlImpl
 import de.ii.xtraplatform.cql.domain.ScalarLiteral
 import de.ii.xtraplatform.cql.domain.IsNull
 import de.ii.xtraplatform.cql.domain.Not
+import de.ii.xtraplatform.cql.domain.AContainedBy
+import de.ii.xtraplatform.cql.domain.AContains
+import de.ii.xtraplatform.cql.domain.AEquals
+import de.ii.xtraplatform.cql.domain.AOverlaps
+import de.ii.xtraplatform.cql.domain.ArrayLiteral
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
@@ -336,7 +342,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_16)
 
         when:
-        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))))"
+        String expected = "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))) NE_ WHERE NE_.id = A.id)"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -552,7 +558,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = IsNull.of("location")
 
         when:
-        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL))"
+        String expected = "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL) NE_ WHERE NE_.id = A.id)"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -722,7 +728,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_AContains_ValidFor_JOINED_GEOMETRY
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2)"
+        String expected = "(A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id')) AND A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('location')))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -732,14 +738,14 @@ class FilterEncoderSqlSpec extends Specification {
 
     }
 
-    def 'test AContains with a single value omits the tautological HAVING'() {
+    def 'test AContains with a single value omits the tautological HAVING and GROUP BY'() {
 
         given:
         def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
         def filter = CqlFilterExamples.EXAMPLE_AContains_SingleValue_ValidFor_JOINED_GEOMETRY
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id') GROUP BY AA.id)"
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id'))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -756,7 +762,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_AContains_ValidFor_JOINED_GEOMETRY)
 
         when:
-        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2))"
+        String expected = "NOT ((A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id')) AND A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('location'))))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -790,7 +796,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_AOverlaps_ValidFor_JOINED_GEOMETRY
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id)"
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location'))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -814,6 +820,48 @@ class FilterEncoderSqlSpec extends Specification {
 
         actual == expected
 
+    }
+
+    def 'negating a single semi-join becomes an anti-join, anything else is wrapped'() {
+
+        expect:
+        FilterEncoderSql.negate(predicate) == expected
+
+        where:
+        predicate                                                                                          || expected
+        "A.id IN (SELECT AA.id FROM t AA WHERE AA.x = ')(')"                                               || "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM t AA WHERE AA.x = ')(') NE_ WHERE NE_.id = A.id)"
+        "A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2)" || "NOT (A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2))"
+        "(A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2))" || "NOT ((A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2)))"
+        "A.x = 1"                                                                                          || "NOT (A.x = 1)"
+    }
+
+    def 'array predicates with an empty array'() {
+
+        given:
+        def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
+        def property = Property.of("location")
+        def empty = ArrayLiteral.of(ImmutableList.of())
+        def operators = [
+                A_CONTAINS   : { a, b -> AContains.of(a, b) },
+                A_CONTAINEDBY: { a, b -> AContainedBy.of(a, b) },
+                A_OVERLAPS   : { a, b -> AOverlaps.of(a, b) },
+                A_EQUALS     : { a, b -> AEquals.of(a, b) }]
+
+        when:
+        def filter = literalFirst ? operators[operator](empty, property) : operators[operator](property, empty)
+        String actual = filterEncoder.encode(filter, instanceContainer)
+
+        then:
+        actual == expected
+
+        where:
+        operator        | literalFirst || expected
+        "A_CONTAINS"    | false        || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL)"
+        "A_CONTAINEDBY" | true         || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL)"
+        "A_OVERLAPS"    | false        || "1=0"
+        "A_EQUALS"      | false        || "1=0"
+        "A_CONTAINEDBY" | false        || "1=0"
+        "A_CONTAINS"    | true         || "1=0"
     }
 
     def 'interval list test'() {
