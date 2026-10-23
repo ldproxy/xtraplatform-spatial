@@ -124,6 +124,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     // reuse SqlQuerySet instances instead of copying them; this is expensive and unnecessary, since
     // they are immutable
     return new ImmutableSqlQueryBatch.Builder()
+        .jobHook(query.getJobHook())
         .limit(query.getLimit())
         .offset(query.getOffset())
         .chunkSize(chunkSize)
@@ -175,6 +176,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     // reuse SqlQuerySet instances instead of copying them; this is expensive and unnecessary, since
     // they are immutable
     return new ImmutableSqlQueryBatch.Builder()
+        .jobHook(query.getJobHook())
         .limit(query.getLimit())
         .offset(query.getOffset())
         .chunkSize(chunkSize)

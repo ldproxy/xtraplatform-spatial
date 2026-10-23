@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.FeatureProviderConnector;
+import de.ii.xtraplatform.features.domain.JobHook;
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlRowMeta.Builder;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Source;
@@ -220,6 +221,13 @@ public interface SqlConnector
                       if (queryBatch.isSingleFeature() || queryBatch.isUnpaged()) {
                         boolean unpaged = queryBatch.isUnpaged();
                         List<SqlQuerySet> querySets = queryBatch.getQuerySets();
+                        Optional<JobHook> jobHook = queryBatch.getJobHook();
+                        // unpaged queries have no meta phase and therefore no numberReturned to
+                        // count features against; report sub-queries instead (weak progress,
+                        // completion order may differ from emission order)
+                        if (unpaged) {
+                          jobHook.ifPresent(hook -> hook.init(querySets.size()));
+                        }
                         // a single-shot query computes neither count; -1 marks both as absent (the
                         // decoder leaves numberReturned unset and numberMatched stays empty)
                         // instead of reporting 0
@@ -277,7 +285,10 @@ public interface SqlConnector
                               int tables = querySets.get(index).getTableSchemas().size();
                               return Reactive.Source.guarded(
                                   () -> getConnectionBudget().acquireUninterruptibly(tables),
-                                  () -> getConnectionBudget().release(tables),
+                                  () -> {
+                                    getConnectionBudget().release(tables);
+                                    jobHook.ifPresent(hook -> hook.update(1));
+                                  },
                                   merged);
                             };
 
