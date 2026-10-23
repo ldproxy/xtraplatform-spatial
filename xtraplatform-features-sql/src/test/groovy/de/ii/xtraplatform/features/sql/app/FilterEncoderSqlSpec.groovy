@@ -342,7 +342,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_16)
 
         when:
-        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))))"
+        String expected = "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE ST_Intersects(AB.location, ST_GeomFromText('POLYGON((-10.0 -10.0,10.0 -10.0,10.0 10.0,-10.0 -10.0))',4326))) NE_ WHERE NE_.id = A.id)"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -558,7 +558,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = IsNull.of("location")
 
         when:
-        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL))"
+        String expected = "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL) NE_ WHERE NE_.id = A.id)"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -728,7 +728,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_AContains_ValidFor_JOINED_GEOMETRY
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2)"
+        String expected = "(A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id')) AND A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('location')))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -738,14 +738,14 @@ class FilterEncoderSqlSpec extends Specification {
 
     }
 
-    def 'test AContains with a single value omits the tautological HAVING'() {
+    def 'test AContains with a single value omits the tautological HAVING and GROUP BY'() {
 
         given:
         def instanceContainer = QuerySchemaFixtures.JOINED_GEOMETRY
         def filter = CqlFilterExamples.EXAMPLE_AContains_SingleValue_ValidFor_JOINED_GEOMETRY
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id') GROUP BY AA.id)"
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id'))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -762,7 +762,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = Not.of(CqlFilterExamples.EXAMPLE_AContains_ValidFor_JOINED_GEOMETRY)
 
         when:
-        String expected = "NOT (A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id HAVING count(distinct AB.location) = 2))"
+        String expected = "NOT ((A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id')) AND A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('location'))))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -796,7 +796,7 @@ class FilterEncoderSqlSpec extends Specification {
         def filter = CqlFilterExamples.EXAMPLE_AOverlaps_ValidFor_JOINED_GEOMETRY
 
         when:
-        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location') GROUP BY AA.id)"
+        String expected = "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IN ('id','location'))"
 
         String actual = filterEncoder.encode(filter, instanceContainer)
 
@@ -822,6 +822,19 @@ class FilterEncoderSqlSpec extends Specification {
 
     }
 
+    def 'negating a single semi-join becomes an anti-join, anything else is wrapped'() {
+
+        expect:
+        FilterEncoderSql.negate(predicate) == expected
+
+        where:
+        predicate                                                                                          || expected
+        "A.id IN (SELECT AA.id FROM t AA WHERE AA.x = ')(')"                                               || "NOT EXISTS (SELECT 1 FROM (SELECT AA.id FROM t AA WHERE AA.x = ')(') NE_ WHERE NE_.id = A.id)"
+        "A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2)" || "NOT (A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2))"
+        "(A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2))" || "NOT ((A.id IN (SELECT AA.id FROM t AA WHERE AA.x = 1) AND A.id IN (SELECT AA.id FROM t AA WHERE AA.y = 2)))"
+        "A.x = 1"                                                                                          || "NOT (A.x = 1)"
+    }
+
     def 'array predicates with an empty array'() {
 
         given:
@@ -843,8 +856,8 @@ class FilterEncoderSqlSpec extends Specification {
 
         where:
         operator        | literalFirst || expected
-        "A_CONTAINS"    | false        || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL GROUP BY AA.id)"
-        "A_CONTAINEDBY" | true         || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL GROUP BY AA.id)"
+        "A_CONTAINS"    | false        || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL)"
+        "A_CONTAINEDBY" | true         || "A.id IN (SELECT AA.id FROM building AA JOIN geometry AB ON (AA.id=AB.id) WHERE AB.location IS NOT NULL)"
         "A_OVERLAPS"    | false        || "1=0"
         "A_EQUALS"      | false        || "1=0"
         "A_CONTAINEDBY" | false        || "1=0"
