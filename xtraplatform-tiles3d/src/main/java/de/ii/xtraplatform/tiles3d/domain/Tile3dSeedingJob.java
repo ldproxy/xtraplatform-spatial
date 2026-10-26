@@ -9,119 +9,76 @@ package de.ii.xtraplatform.tiles3d.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import de.ii.xtraplatform.jobs.domain.Job;
-import de.ii.xtraplatform.jobs.domain.Job.JobDetails;
-import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
-import jakarta.ws.rs.core.MediaType;
-import java.util.List;
+import com.google.common.collect.ImmutableMap;
+import de.ii.xtralink.jobs.JobConfiguration;
+import de.ii.xtraplatform.xtralink.domain.JobContext.JobContextEntity;
+import de.ii.xtraplatform.xtralink.domain.JobInputs;
+import de.ii.xtraplatform.xtralink.domain.Jobs;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableTile3dSeedingJob.Builder.class)
-public interface Tile3dSeedingJob extends JobDetails {
+public interface Tile3dSeedingJob extends JobInputs {
 
-  String TYPE_SUBTREE = Tile3dSeedingJobSet.type("subtree", "binary");
-  String TYPE_GLTF = Tile3dSeedingJobSet.type("content", "glb");
+  String TYPE = "tile3d-seeding";
+  String TYPE_SETUP = type("setup");
+  String TYPE_CLEANUP = type("cleanup");
+  String LABEL = "3D Tiles cache seeding";
 
-  @SuppressWarnings("PMD.DataClass")
-  final class Context {
-    private final String tileProvider;
-    private final String tileSet;
-    private final String tileMatrixSet;
-    private final Optional<Tile3dGenerationParameters> generationParameters;
-    private final String jobSetId;
-
-    public Context(
-        String tileProvider,
-        String tileSet,
-        String tileMatrixSet,
-        Optional<Tile3dGenerationParameters> generationParameters,
-        String jobSetId) {
-      this.tileProvider = tileProvider;
-      this.tileSet = tileSet;
-      this.tileMatrixSet = tileMatrixSet;
-      this.generationParameters = generationParameters;
-      this.jobSetId = jobSetId;
-    }
-
-    String getTileProvider() {
-      return tileProvider;
-    }
-
-    String getTileSet() {
-      return tileSet;
-    }
-
-    String getTileMatrixSet() {
-      return tileMatrixSet;
-    }
-
-    Optional<Tile3dGenerationParameters> getGenerationParameters() {
-      return generationParameters;
-    }
-
-    String getJobSetId() {
-      return jobSetId;
-    }
+  static String type(String... parts) {
+    return String.join(":", TYPE, String.join(":", parts));
   }
 
-  static Job subtree(
-      int priority, Context context, boolean isReseed, Set<TileSubMatrix> subMatrices) {
-    ImmutableTile3dSeedingJob details =
+  static JobConfiguration of(
+      String tileProvider,
+      Map<String, Tile3dGenerationParameters> tileSets,
+      boolean reseed,
+      int priority) {
+    return Jobs.create(
+        TYPE,
+        priority,
+        LABEL,
+        String.format(" (Tilesets: %s)", tileSets.keySet()),
         new ImmutableTile3dSeedingJob.Builder()
-            .tileProvider(context.getTileProvider())
-            .tileSet(context.getTileSet())
-            .tileMatrixSet(context.getTileMatrixSet())
-            .generationParameters(context.getGenerationParameters())
-            .encoding(MediaType.APPLICATION_OCTET_STREAM_TYPE)
-            .isReseed(isReseed)
-            .addAllSubMatrices(subMatrices)
-            .build();
-
-    return Job.of(
-        TYPE_SUBTREE, priority, details, context.getJobSetId(), (int) details.getNumberOfTiles());
-  }
-
-  static Job content(
-      int priority, Context context, boolean isReseed, Set<TileSubMatrix> subMatrices) {
-    ImmutableTile3dSeedingJob details =
-        new ImmutableTile3dSeedingJob.Builder()
-            .tileProvider(context.getTileProvider())
-            .tileSet(context.getTileSet())
-            .tileMatrixSet(context.getTileMatrixSet())
-            .generationParameters(context.getGenerationParameters())
-            .encoding(new MediaType("model", "gltf-binary"))
-            .isReseed(isReseed)
-            .addAllSubMatrices(subMatrices)
-            .build();
-
-    return Job.of(
-        TYPE_GLTF, priority, details, context.getJobSetId(), (int) details.getNumberOfTiles());
+            .tileProvider(tileProvider)
+            .tileSets(Tileset3dDetails.of(tileSets))
+            .isReseed(reseed)
+            .build(),
+        new JobContextEntity(tileProvider),
+        Map.of(),
+        Optional.of(3600));
   }
 
   String getTileProvider();
 
-  String getTileSet();
+  Map<String, Tileset3dDetails> getTileSets();
 
-  Optional<Tile3dGenerationParameters> getGenerationParameters();
-
-  String getTileMatrixSet();
-
-  MediaType getEncoding();
+  @JsonIgnore
+  @Value.Lazy
+  default Map<String, Tile3dGenerationParameters> getTileSetParameters() {
+    return getTileSets().entrySet().stream()
+        .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, e -> e.getValue().getParameters()));
+  }
 
   boolean isReseed();
 
-  Map<String, String> getStorage();
+  @Value.Immutable
+  @JsonDeserialize(builder = ImmutableTileset3dDetails.Builder.class)
+  interface Tileset3dDetails {
 
-  List<TileSubMatrix> getSubMatrices();
+    static Map<String, Tileset3dDetails> of(Map<String, Tile3dGenerationParameters> tilesets) {
+      return tilesets.entrySet().stream()
+          .collect(
+              ImmutableMap.toImmutableMap(
+                  Map.Entry::getKey, e -> Tileset3dDetails.of(e.getValue())));
+    }
 
-  @Value.Derived
-  @Value.Auxiliary
-  @JsonIgnore
-  default long getNumberOfTiles() {
-    return getSubMatrices().stream().mapToLong(TileSubMatrix::getNumberOfTiles).sum();
+    static Tileset3dDetails of(Tile3dGenerationParameters parameters) {
+      return new ImmutableTileset3dDetails.Builder().parameters(parameters).build();
+    }
+
+    Tile3dGenerationParameters getParameters();
   }
 }

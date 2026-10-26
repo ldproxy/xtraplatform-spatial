@@ -22,13 +22,14 @@ public interface Tile3dSeeding {
   Map<String, Map<String, Set<TileMatrixSetLimits>>> getCoverage(
       Map<String, Tile3dGenerationParameters> tilesets) throws IOException;
 
-  void setupSeeding(Tile3dSeedingJobSet jobSet) throws IOException;
+  void setupSeeding(Tile3dSeedingJob job) throws IOException;
 
-  void cleanupSeeding(Tile3dSeedingJobSet jobSet) throws IOException;
+  void cleanupSeeding(Tile3dSeedingJob job) throws IOException;
 
-  void seedSubtrees(Tile3dSeedingJob job, Consumer<Integer> updateProgress) throws IOException;
+  void seedSubtrees(Tile3dSeedingPartialJob job, Consumer<Integer> updateProgress)
+      throws IOException;
 
   void seedTiles(
-      Tile3dSeedingJob job, Tile3dSeedingJobSet seedingJobSet, Consumer<Integer> updateProgress)
+      Tile3dSeedingPartialJob job, Tile3dSeedingJob seedingJob, Consumer<Integer> updateProgress)
       throws IOException;
 }

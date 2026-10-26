@@ -8,43 +8,49 @@
 package de.ii.xtraplatform.tiles3d.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
+import de.ii.xtralink.jobs.Job;
+import de.ii.xtralink.jobs.JobResult;
+import de.ii.xtralink.jobs.PartialJob;
+import de.ii.xtralink.jobs.PartialJobConfiguration;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
-import de.ii.xtraplatform.jobs.domain.Job;
-import de.ii.xtraplatform.jobs.domain.JobProcessor;
-import de.ii.xtraplatform.jobs.domain.JobQueueMin;
-import de.ii.xtraplatform.jobs.domain.JobResult;
-import de.ii.xtraplatform.jobs.domain.JobSet;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileSubMatrix;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingPartialJob;
 import de.ii.xtraplatform.tiles3d.domain.TileTree;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
+import de.ii.xtraplatform.xtralink.domain.JobContext.JobContextNone;
+import de.ii.xtraplatform.xtralink.domain.JobProcessing;
+import de.ii.xtraplatform.xtralink.domain.JobProcessor;
+import de.ii.xtraplatform.xtralink.domain.JobProcessorBase;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.AmountFormats;
 
 @Singleton
-@AutoBind
+@AutoBind(interfaces = JobProcessorBase.class)
 @SuppressWarnings("PMD.CouplingBetweenObjects")
-public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeedingJobSet> {
+public class Tile3dSeedingJobCreator implements JobProcessor<Tile3dSeedingJob, JobContextNone> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tile3dSeedingJobCreator.class);
 
@@ -58,71 +64,61 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
   }
 
   @Override
-  public String getJobType() {
-    return Tile3dSeedingJobSet.TYPE_SETUP;
+  public Set<String> getKinds() {
+    return Set.of(Tile3dSeedingJob.TYPE_SETUP, Tile3dSeedingJob.TYPE_CLEANUP);
   }
 
   @Override
   public int getPriority() {
-    // should be higher than for the processors of the created jobs (VectorSeedingJobProcessor)
+    // should be higher than for the processors of the created jobs (Tile3dJobProcessor)
     return 1001;
   }
 
   @Override
-  public int getConcurrency(JobSet jobSet) {
-    return concurrency;
-  }
-
-  @Override
   @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
-  public JobResult process(Job job, JobSet jobSet, JobQueueMin jobQueue) {
-    Tile3dSeedingJobSet seedingJobSet = getSetDetails(jobSet, jobQueue);
-    boolean isCleanup = getDetails(job, jobQueue);
+  public JobResult process(PartialJob partialJob, Job job, JobProcessing jobs) throws Exception {
+    boolean isCleanup = Tile3dSeedingJob.TYPE_CLEANUP.equals(partialJob.kind());
+    Tile3dSeedingJob seedingJob = getInputs(job, jobs);
 
     Optional<Tile3dProviderFeatures> optionalTileProvider =
-        getTileProvider(seedingJobSet.getTileProvider());
+        getTileProvider(seedingJob.getTileProvider());
     if (optionalTileProvider.isPresent()) {
       Tile3dProviderFeatures tileProvider = optionalTileProvider.get();
 
       if (!tileProvider.seeding().isSupported()) {
         LOGGER.error("Tile provider does not support seeding: {}", tileProvider.getId());
-        return JobResult.error("Tile provider does not support seeding"); // early return
+        return jobs.failure("Tile provider does not support seeding"); // early return
       }
 
       try {
 
         if (isCleanup) {
-          cleanup(jobSet, tileProvider, seedingJobSet);
+          cleanup(job, tileProvider, seedingJob);
 
-          return JobResult.success(); // early return
-        }
-
-        if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
-          LOGGER.info(
-              MARKER.JOBS,
-              "{} scheduled (Tilesets: {})",
-              jobSet.getLabel(),
-              seedingJobSet.getTileSets().keySet());
+          return jobs.success(); // early return
         }
 
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
-            tileProvider.seeding().get().getCoverage(seedingJobSet.getTileSetParameters());
+            tileProvider.seeding().get().getCoverage(seedingJob.getTileSetParameters());
         final int[] numSubtrees = {0};
+        Map<String, Integer> tileSetTotals = new LinkedHashMap<>();
+        Map<String, Map<String, List<Integer>>> tileSetLevels = new LinkedHashMap<>();
         Map<Integer, TileMatrixPartitions> tileMatrixPartitionsByJobSize = new HashMap<>();
-        Set<String> tilesets = new HashSet<>();
-        Set<Integer> levels = new HashSet<>();
+        List<PartialJobConfiguration> rootJobs = new ArrayList<>();
 
-        tileProvider.seeding().get().setupSeeding(seedingJobSet);
+        tileProvider.seeding().get().setupSeeding(seedingJob);
 
-        for (String tileSet : seedingJobSet.getTileSets().keySet()) {
+        for (String tileSet : seedingJob.getTileSets().keySet()) {
           Tileset3dFeatures cfg = tileProvider.getData().getTilesets().get(tileSet);
           Map<String, Set<TileMatrixSetLimits>> tileMatrixSets =
               coverage.containsKey(tileSet) ? coverage.get(tileSet) : Map.of();
+          tileSetTotals.put(tileSet, 0);
+          tileSetLevels.put(tileSet, new LinkedHashMap<>());
 
           tileMatrixSets.forEach(
               (tileMatrixSet, limits) -> {
-                Tile3dSeedingJob.Context jobContext =
-                    createJobContext(tileProvider, seedingJobSet, jobSet, tileSet, tileMatrixSet);
+                Tile3dSeedingPartialJob.Context jobContext =
+                    createJobContext(tileProvider, seedingJob, job, tileSet, tileMatrixSet);
                 TileTree tileTree = null;
 
                 for (TileMatrixSetLimits limit : limits) {
@@ -134,96 +130,81 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
                   TileMatrixPartitions tileMatrixPartitions =
                       tileMatrixPartitionsByJobSize.computeIfAbsent(
                           jobSize, TileMatrixPartitions::new);
+                  List<Integer> progressLevels =
+                      tileSetLevels
+                          .get(tileSet)
+                          .computeIfAbsent(
+                              tileMatrixSet,
+                              k ->
+                                  IntStream.range(0, 24)
+                                      .mapToObj(i -> -1)
+                                      .collect(Collectors.toCollection(ArrayList::new)));
 
-                  Job rootJob =
+                  rootJobs.add(
                       tileTree.accept(
-                          (tt, followUps) -> {
-                            Job subtreeJob =
-                                Tile3dSeedingJob.subtree(
-                                    jobSet.getPriority(),
-                                    jobContext,
-                                    seedingJobSet.isReseed(),
-                                    Set.of(tt.toSubMatrix()));
-
-                            int total = subtreeJob.getTotal().get();
-                            numSubtrees[0] += total;
-                            subtreeJob = subtreeJob.with(followUps);
-
-                            jobQueue.initJobSet(
-                                jobSet,
-                                total,
-                                Map.<String, Object>of(
-                                    "tileSet",
-                                    tileSet,
-                                    "tileMatrixSet",
-                                    tileMatrixSet,
-                                    "level",
-                                    tt.getLevel(),
-                                    "count",
-                                    total,
-                                    "isFirstTileset",
-                                    tilesets.add(tileSet),
-                                    "isFirstLevel",
-                                    levels.add(tt.getLevel())));
+                          (tt, childSubtreeJobs) -> {
+                            List<PartialJobConfiguration> followUps =
+                                new ArrayList<>(childSubtreeJobs);
 
                             for (TileSubMatrix content : tt.getContent()) {
                               for (TileSubMatrix partition :
                                   tileMatrixPartitions.getSubMatrices(content.toLimits())) {
-                                Job contentJob =
-                                    Tile3dSeedingJob.content(
-                                        jobSet.getPriority(),
+                                followUps.add(
+                                    Tile3dSeedingPartialJob.content(
+                                        job.priority(),
                                         jobContext,
-                                        seedingJobSet.isReseed(),
-                                        Set.of(partition));
-
-                                subtreeJob = subtreeJob.with(contentJob);
-
-                                jobQueue.initJobSet(
-                                    jobSet,
-                                    contentJob.getTotal().get(),
-                                    Map.<String, Object>of(
-                                        "tileSet",
-                                        tileSet,
-                                        "tileMatrixSet",
-                                        tileMatrixSet,
-                                        "level",
-                                        content.getLevel(),
-                                        "count",
-                                        contentJob.getTotal().get(),
-                                        "isFirstLevel",
-                                        levels.add(content.getLevel())));
+                                        seedingJob.isReseed(),
+                                        partition));
+                                countTiles(partition, tileSet, tileSetTotals, progressLevels);
                               }
                             }
 
-                            return subtreeJob;
-                          });
+                            TileSubMatrix subtree = tt.toSubMatrix();
+                            numSubtrees[0] += (int) subtree.getNumberOfTiles();
+                            countTiles(subtree, tileSet, tileSetTotals, progressLevels);
 
-                  jobQueue.push(rootJob);
+                            return Tile3dSeedingPartialJob.subtree(
+                                job.priority(),
+                                jobContext,
+                                seedingJob.isReseed(),
+                                subtree,
+                                followUps);
+                          }));
                 }
               });
         }
 
-        if (jobSet.isDone()) {
-          jobSet.getCleanup().ifPresent(jobQueue::push);
-          return JobResult.success(); // early return
-        }
+        int progressTotal = tileSetTotals.values().stream().mapToInt(Integer::intValue).sum();
+        jobs.init(job.id(), progressTotal, progressDetails(tileSetTotals, tileSetLevels));
+        rootJobs.forEach(jobs::push);
 
         if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
-          String processors = getConcurrency(jobSet) + " local";
           LOGGER.debug(
               MARKER.JOBS,
-              "{}: processing {} subtrees and {} tiles with {} processors",
-              jobSet.getLabel(),
+              "{}: processing {} subtrees and {} tiles with {} local processors",
+              job.label(),
               numSubtrees[0],
-              Math.max(jobSet.getTotal().get() - numSubtrees[0], 0),
-              processors);
+              Math.max(progressTotal - numSubtrees[0], 0),
+              concurrency);
         }
       } catch (IOException e) {
-        return JobResult.error(e.getMessage());
+        return jobs.failure(e.getMessage());
       }
     }
 
-    return JobResult.success();
+    return jobs.success();
+  }
+
+  private static void countTiles(
+      TileSubMatrix subMatrix,
+      String tileSet,
+      Map<String, Integer> tileSetTotals,
+      List<Integer> progressLevels) {
+    int count = (int) subMatrix.getNumberOfTiles();
+    int old = progressLevels.get(subMatrix.getLevel());
+
+    tileSetTotals.merge(tileSet, count, Integer::sum);
+    progressLevels.set(subMatrix.getLevel(), old == -1 ? count : old + count);
   }
 
   private static int getJobSize(TileTree tileTree) {
@@ -250,44 +231,33 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
     return currentTree == null ? next : currentTree.merge(next);
   }
 
-  private static Tile3dSeedingJob.Context createJobContext(
+  private static Tile3dSeedingPartialJob.Context createJobContext(
       Tile3dProviderFeatures tileProvider,
-      Tile3dSeedingJobSet seedingJobSet,
-      JobSet jobSet,
+      Tile3dSeedingJob seedingJob,
+      Job job,
       String tileSet,
       String tileMatrixSet) {
-    return new Tile3dSeedingJob.Context(
+    return new Tile3dSeedingPartialJob.Context(
         tileProvider.getId(),
         tileSet,
         tileMatrixSet,
-        Optional.of(seedingJobSet.getTileSetParameters().get(tileSet)),
-        jobSet.getId());
+        Optional.of(seedingJob.getTileSetParameters().get(tileSet)),
+        job.id());
   }
 
-  private void cleanup(
-      JobSet jobSet, Tile3dProvider tileProvider, Tile3dSeedingJobSet seedingJobSet)
+  private void cleanup(Job job, Tile3dProvider tileProvider, Tile3dSeedingJob seedingJob)
       throws IOException {
-    tileProvider.seeding().get().cleanupSeeding(seedingJobSet);
+    tileProvider.seeding().get().cleanupSeeding(seedingJob);
 
-    long duration = Instant.now().getEpochSecond() - jobSet.getStartedAt().get();
-    List<String> errors = jobSet.getErrors().get();
+    long duration = Instant.now().toEpochMilli() - job.startedAt();
+    List<String> errors = job.errors();
 
     if (!errors.isEmpty() && (LOGGER.isWarnEnabled() || LOGGER.isWarnEnabled(MARKER.JOBS))) {
-      LOGGER.warn(
-          MARKER.JOBS,
-          "{} had {} errors{}",
-          jobSet.getLabel(),
-          errors.size(),
-          jobSet.getDescription().orElse(""));
+      LOGGER.warn(MARKER.JOBS, "{} had {} errors{}", job.label(), errors.size(), job.description());
 
       if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
         for (String error : errors) {
-          LOGGER.debug(
-              MARKER.JOBS,
-              "{} error: {}{}",
-              jobSet.getLabel(),
-              error,
-              jobSet.getDescription().orElse(""));
+          LOGGER.debug(MARKER.JOBS, "{} error: {}{}", job.label(), error, job.description());
         }
       }
     }
@@ -296,37 +266,41 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Boolean, Tile3dSeed
       LOGGER.info(
           MARKER.JOBS,
           "{} finished in {}{}",
-          jobSet.getLabel(),
-          pretty(duration),
-          jobSet.getDescription().orElse(""));
+          job.label(),
+          prettyDuration(duration),
+          job.description());
     }
   }
 
-  @Override
-  public Class<Boolean> getDetailsType() {
-    return Boolean.class;
+  // Tileset progress must be fully initialized here, since the queue only increments existing
+  // paths. Percent is left out because the queue cannot derive it per tileset.
+  private static Map<String, Object> progressDetails(
+      Map<String, Integer> tileSetTotals, Map<String, Map<String, List<Integer>>> tileSetLevels) {
+    Map<String, Object> progressDetails = new LinkedHashMap<>();
+    tileSetTotals.forEach(
+        (tileSet, total) ->
+            progressDetails.put(
+                tileSet,
+                Map.of("current", 0, "total", total, "levels", tileSetLevels.get(tileSet))));
+    return progressDetails;
   }
 
   @Override
-  public Class<Tile3dSeedingJobSet> getSetDetailsType() {
-    return Tile3dSeedingJobSet.class;
+  public Class<Tile3dSeedingJob> getInputsClass() {
+    return Tile3dSeedingJob.class;
   }
 
   @Override
-  public Map<String, Class<?>> getJobTypes() {
-    return Map.of(
-        Tile3dSeedingJobSet.TYPE,
-        Tile3dSeedingJobSet.class,
-        Tile3dSeedingJobSet.TYPE_SETUP,
-        Boolean.class);
+  public Class<JobContextNone> getPartialContextClass() {
+    return JobContextNone.class;
   }
 
   private Optional<Tile3dProviderFeatures> getTileProvider(String id) {
     return entityRegistry.getEntity(Tile3dProviderFeatures.class, id);
   }
 
-  private static String pretty(long seconds) {
-    Duration d = Duration.ofSeconds(seconds);
+  private static String prettyDuration(long millis) {
+    Duration d = millis > 1000 ? Duration.ofSeconds(millis / 1000) : Duration.ofMillis(millis);
     return AmountFormats.wordBased(d, Locale.ENGLISH);
   }
 }

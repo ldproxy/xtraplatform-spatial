@@ -78,10 +78,12 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
     TileSeedingJob seedingJobSet = getInputs(jobSet, jobs);
 
     final int[] progressTotal = {0};
-    Map<String, Map<String, List<Integer>>> progressDetails = new LinkedHashMap<>();
+    List<PartialJobConfiguration> partialJobs = new ArrayList<>();
+    Map<String, Integer> tileSetTotals = new LinkedHashMap<>();
+    Map<String, Map<String, List<Integer>>> tileSetLevels = new LinkedHashMap<>();
     for (String tileSet : seedingJobSet.getTileSets().keySet()) {
-      Map<String, List<Integer>> tileMatrixSetProgress = new LinkedHashMap<>();
-      progressDetails.put(tileSet, tileMatrixSetProgress);
+      tileSetTotals.put(tileSet, 0);
+      tileSetLevels.put(tileSet, new LinkedHashMap<>());
     }
 
     Optional<TileProvider> optionalTileProvider = getTileProvider(seedingJobSet.getTileProvider());
@@ -127,14 +129,6 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
           }
 
           return jobs.success();
-        }
-
-        if (LOGGER.isInfoEnabled() || LOGGER.isInfoEnabled(MARKER.JOBS)) {
-          LOGGER.info(
-              MARKER.JOBS,
-              "{} scheduled (Tilesets: {})",
-              jobSet.label(),
-              seedingJobSet.getTileSets().keySet());
         }
 
         Map<String, Map<String, Set<TileMatrixSetLimits>>> coverage =
@@ -224,8 +218,9 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
                               jobSet.id());
 
                   progressTotal[0] += partial.progress().total();
+                  tileSetTotals.merge(tileSet, partial.progress().total(), Integer::sum);
                   List<Integer> progressLevels =
-                      progressDetails
+                      tileSetLevels
                           .get(tileSet)
                           .computeIfAbsent(
                               tileMatrixSet,
@@ -237,12 +232,14 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
                   int count = partial.progress().total();
                   progressLevels.set(subMatrix.getLevel(), old == -1 ? count : old + count);
 
-                  jobs.push(partial);
+                  partialJobs.add(partial);
                 }
               });
         }
 
-        jobs.init(jobSet.id(), progressTotal[0], progressDetails);
+        // Progress paths have to exist before the first partial job can report to them.
+        jobs.init(jobSet.id(), progressTotal[0], progressDetails(tileSetTotals, tileSetLevels));
+        partialJobs.forEach(jobs::push);
 
         if (LOGGER.isDebugEnabled() || LOGGER.isDebugEnabled(MARKER.JOBS)) {
           String processors =
@@ -276,6 +273,19 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
 
   private Optional<TileProvider> getTileProvider(String id) {
     return entityRegistry.getEntity(TileProvider.class, id);
+  }
+
+  // Tileset progress must be fully initialized here, since the queue only increments existing
+  // paths. Percent is left out because the queue cannot derive it per tileset.
+  private static Map<String, Object> progressDetails(
+      Map<String, Integer> tileSetTotals, Map<String, Map<String, List<Integer>>> tileSetLevels) {
+    Map<String, Object> progressDetails = new LinkedHashMap<>();
+    tileSetTotals.forEach(
+        (tileSet, total) ->
+            progressDetails.put(
+                tileSet,
+                Map.of("current", 0, "total", total, "levels", tileSetLevels.get(tileSet))));
+    return progressDetails;
   }
 
   private static String prettyDuration(long millis) {
