@@ -11,7 +11,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.collect.ImmutableMap;
 import de.ii.xtralink.jobs.JobConfiguration;
-import de.ii.xtraplatform.jobs.domain.JobProgress;
 import de.ii.xtraplatform.tiles.domain.ImmutableTileSeedingJob.Builder;
 import de.ii.xtraplatform.xtralink.domain.JobContext.JobContextEntity;
 import de.ii.xtraplatform.xtralink.domain.JobInputs;
@@ -99,7 +98,24 @@ public interface TileSeedingJob extends JobInputs {
 
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableTilesetProgressXL2.Builder.class)
-  interface TilesetProgressXL2 extends JobProgress {
+  interface TilesetProgressXL2 {
+    @Value.Default
+    default int getTotal() {
+      return -1;
+    }
+
+    @Value.Default
+    default int getCurrent() {
+      return 0;
+    }
+
+    default int getPercent() {
+      if (getTotal() <= 0) {
+        return getTotal() == 0 ? 100 : 0;
+      }
+      return Math.min(100, Math.max(getCurrent(), 0) * 100 / getTotal());
+    }
+
     Map<String, List<Integer>> getLevels();
   }
 }

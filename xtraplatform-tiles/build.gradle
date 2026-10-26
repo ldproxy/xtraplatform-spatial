@@ -7,7 +7,6 @@ descriptionDe = 'Tile-Provider.'
 dependencies {
     provided 'de.interactive_instruments:xtraplatform-entities'
     provided 'de.interactive_instruments:xtraplatform-blobs'
-    provided 'de.interactive_instruments:xtraplatform-jobs'
     provided 'de.interactive_instruments:xtraplatform-services'
     provided 'de.interactive_instruments:xtraplatform-values'
     provided 'de.interactive_instruments:xtraplatform-streams'
