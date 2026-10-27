@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.Semaphore;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -138,6 +139,12 @@ public interface SqlConnector
             .via(
                 Transformer.flatMap(
                     querySet -> {
+                      // single-shot reads have no meta phase; the bounded counts that distribute a
+                      // per-sub-query maximum across main tables run in the value phase
+                      if (queryBatch.isUnpaged()) {
+                        return Source.empty();
+                      }
+
                       // multiple queries may use the same feature type, so the key includes the
                       // query index
                       String currentTable =
@@ -236,14 +243,16 @@ public interface SqlConnector
                                 .build();
                         // a server-side cursor keeps memory bounded while streaming all rows
                         int fetchSize = unpaged ? (int) queryBatch.getChunkSize() : 0;
-                        Function<Integer, Source<SqlRow>> valuePhase =
-                            index -> {
+                        long maxFeatures = queryBatch.getMaxFeaturesPerSubQuery();
+                        // the limit caps the main table of the query set (0 = no limit)
+                        BiFunction<Integer, Long, Source<SqlRow>> valuePhase =
+                            (index, limit) -> {
                               int[] i = {0};
                               Source<SqlRow>[] sqlRows =
                                   querySets
                                       .get(index)
                                       .getValueQueries()
-                                      .apply(sqlRowMeta, 0L, 0L)
+                                      .apply(sqlRowMeta, limit, 0L)
                                       .map(
                                           valueQuery ->
                                               getSqlClient()
@@ -292,6 +301,93 @@ public interface SqlConnector
                                   merged);
                             };
 
+                        // A per-sub-query maximum is shared by all main tables of the sub-query's
+                        // type: bounded counts, one main table after the other, determine how many
+                        // features each main table contributes. These main tables are read as one
+                        // unit; all other query sets are a unit of their own.
+                        Function<List<Integer>, Source<SqlRow>> unitPhase =
+                            unit -> {
+                              if (unit.size() == 1) {
+                                return valuePhase.apply(unit.get(0), maxFeatures);
+                              }
+
+                              long[] limits = new long[unit.size()];
+                              long[] remaining = {maxFeatures};
+                              Source<SqlRowMeta> counts =
+                                  Source.iterable(
+                                          IntStream.range(0, unit.size() - 1)
+                                              .boxed()
+                                              .collect(Collectors.toList()))
+                                      .via(
+                                          Transformer.flatMap(
+                                              k -> {
+                                                if (remaining[0] <= 0) {
+                                                  return Source.empty();
+                                                }
+                                                SqlQuerySet querySet = querySets.get(unit.get(k));
+                                                return getMetaResult(
+                                                        querySet
+                                                            .getMetaQuery()
+                                                            .apply(remaining[0], 0L),
+                                                        options,
+                                                        querySet.getQueryIndex()
+                                                            + "_"
+                                                            + querySet
+                                                                .getTableSchemas()
+                                                                .get(0)
+                                                                .getFullPathAsString())
+                                                    .via(
+                                                        Transformer.map(
+                                                            metaResult -> {
+                                                              limits[k] =
+                                                                  metaResult.getNumberReturned();
+                                                              remaining[0] -= limits[k];
+                                                              return metaResult;
+                                                            }));
+                                              }));
+
+                              return Reactive.Source.guarded(
+                                      () -> getConnectionBudget().acquireUninterruptibly(1),
+                                      () -> getConnectionBudget().release(1),
+                                      counts)
+                                  .via(Transformer.reduce(0L, (n, metaResult) -> n + 1))
+                                  .via(
+                                      Transformer.flatMap(
+                                          n -> {
+                                            limits[unit.size() - 1] = Math.max(0L, remaining[0]);
+                                            return Source.iterable(
+                                                    IntStream.range(0, unit.size())
+                                                        .boxed()
+                                                        .collect(Collectors.toList()))
+                                                .via(
+                                                    Transformer.flatMap(
+                                                        k -> {
+                                                          // nothing left for this main table
+                                                          if (limits[k] <= 0) {
+                                                            jobHook.ifPresent(
+                                                                hook -> hook.update(1));
+                                                            return Source.empty();
+                                                          }
+                                                          return valuePhase.apply(
+                                                              unit.get(k), limits[k]);
+                                                        }));
+                                          }));
+                            };
+
+                        List<List<Integer>> units = new ArrayList<>();
+                        for (int index = 0; index < querySets.size(); index++) {
+                          List<Integer> last = units.isEmpty() ? null : units.get(units.size() - 1);
+                          if (unpaged
+                              && maxFeatures > 0
+                              && Objects.nonNull(last)
+                              && querySets.get(last.get(0)).getQueryIndex()
+                                  == querySets.get(index).getQueryIndex()) {
+                            last.add(index);
+                          } else {
+                            units.add(new ArrayList<>(List.of(index)));
+                          }
+                        }
+
                         // Single-shot multi-queries read every sub-query in one pass with no
                         // cross-sub-query dependency (the result sets are already materialized), so
                         // the sub-queries can run concurrently. Their rows are still emitted
@@ -301,7 +397,7 @@ public interface SqlConnector
                         // Concurrency is bounded so the sub-queries in flight never request more
                         // than
                         // the connection pool can serve. Single-feature reads keep the serial path.
-                        Transformer<Integer, SqlRow> valueTransformer;
+                        Transformer<List<Integer>, SqlRow> valueTransformer;
                         if (unpaged) {
                           int maxTables =
                               Math.max(
@@ -312,20 +408,15 @@ public interface SqlConnector
                                       .orElse(1));
                           int maxConcurrency =
                               Math.max(
-                                  1,
-                                  Math.min(
-                                      querySets.size(), (getMaxConnections() - 1) / maxTables));
+                                  1, Math.min(units.size(), (getMaxConnections() - 1) / maxTables));
                           valueTransformer =
                               Transformer.flatMapConcurrent(
-                                  valuePhase, maxConcurrency, UNPAGED_SUBQUERY_PREFETCH);
+                                  unitPhase, maxConcurrency, UNPAGED_SUBQUERY_PREFETCH);
                         } else {
-                          valueTransformer = Transformer.flatMap(valuePhase);
+                          valueTransformer = Transformer.flatMap(unitPhase);
                         }
 
-                        return Source.iterable(
-                                IntStream.range(0, querySets.size())
-                                    .boxed()
-                                    .collect(Collectors.toList()))
+                        return Source.iterable(units)
                             .via(valueTransformer)
                             .prepend(Source.single(sqlRowMeta));
                       }

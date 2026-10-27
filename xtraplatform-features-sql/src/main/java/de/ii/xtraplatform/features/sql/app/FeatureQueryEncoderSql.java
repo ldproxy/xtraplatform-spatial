@@ -138,7 +138,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     // A multi-query that does not support paging is executed single-shot: every matching row is
     // read in one pass per (sub-query, table), with no meta query, chunking or key-range window.
     // This drops numberReturned/numberMatched in exchange for far fewer statements and round-trips
-    // at large sizes (an optional per-sub-query maximum may still cap each sub-query).
+    // at large sizes (an optional per-sub-query maximum may still cap each sub-query; for a type
+    // with more than one main table, bounded counts distribute it across the main tables).
     boolean unpaged = !query.getSupportPaging() && !query.hitsOnly();
     int chunks =
         unpaged ? 1 : (query.getLimit() / chunkSize) + (query.getLimit() % chunkSize > 0 ? 1 : 0);
@@ -166,7 +167,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                                               typeQuery,
                                               query,
                                               additionalQueryParameters,
-                                              unpaged,
+                                              false,
                                               unpaged,
                                               queryIndex)))
                       .flatMap(s -> s);
@@ -181,6 +182,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .offset(query.getOffset())
         .chunkSize(chunkSize)
         .isUnpaged(unpaged)
+        .maxFeaturesPerSubQuery(unpaged ? query.getMaxFeaturesPerSubQuery() : 0)
         // when paging, count every sub-query so numberMatched is the full invariant total
         .isComputeNumberMatched(query.getSupportPaging() && computeNumberMatched)
         .build()
@@ -209,22 +211,40 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         (maxLimit, skipped) ->
             skipMetaQuery
                 ? Optional.empty()
-                : Optional.of(
-                    queryTemplates
-                        .getMetaQueryTemplate()
-                        .generateMetaQuery(
-                            Math.min(limit, maxLimit),
-                            Math.max(0L, offset - skipped),
-                            chunk * limit,
-                            sortKeys,
-                            typeQuery.getFilter(),
-                            additionalQueryParameters,
-                            query.getOffset() > 0,
-                            maxLimit > 0 && !query.hitsOnly(),
-                            query.hitsOnly(),
-                            // numberMatched is invariant across chunks, so compute it only on the
-                            // first chunk of each collection; later chunks reuse that value
-                            chunk == 0 && supportPaging));
+                : unpaged
+                    // single-shot: only a count bounded by maxLimit, which distributes the
+                    // per-sub-query maximum across the main tables of a type
+                    ? Optional.of(
+                        queryTemplates
+                            .getMetaQueryTemplate()
+                            .generateMetaQuery(
+                                maxLimit,
+                                0L,
+                                0L,
+                                sortKeys,
+                                typeQuery.getFilter(),
+                                additionalQueryParameters,
+                                false,
+                                true,
+                                false,
+                                false))
+                    : Optional.of(
+                        queryTemplates
+                            .getMetaQueryTemplate()
+                            .generateMetaQuery(
+                                Math.min(limit, maxLimit),
+                                Math.max(0L, offset - skipped),
+                                chunk * limit,
+                                sortKeys,
+                                typeQuery.getFilter(),
+                                additionalQueryParameters,
+                                query.getOffset() > 0,
+                                maxLimit > 0 && !query.hitsOnly(),
+                                query.hitsOnly(),
+                                // numberMatched is invariant across chunks, so compute it only
+                                // on the first chunk of each collection; later chunks reuse that
+                                // value
+                                chunk == 0 && supportPaging));
 
     TriFunction<SqlRowMeta, Long, Long, Stream<String>> valueQueries =
         (metaResult, maxLimit, skipped) ->
@@ -234,13 +254,10 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
                         // single-shot reads, and reads without a meta query (single feature),
                         // read matching rows in one pass: no offset and no key-range window
                         // (which would otherwise constrain the result set to the meta query's
-                        // minKey/maxKey); an optional per-sub-query maximum caps each sub-query
-                        // (0 = no limit)
+                        // minKey/maxKey); maxLimit caps the main table (0 = no limit)
                         unpaged || skipMetaQuery
                             ? valueQueryTemplate.generateValueQuery(
-                                query instanceof MultiFeatureQuery
-                                    ? ((MultiFeatureQuery) query).getMaxFeaturesPerSubQuery()
-                                    : 0L,
+                                maxLimit,
                                 0L,
                                 sortKeys,
                                 typeQuery.getFilter(),

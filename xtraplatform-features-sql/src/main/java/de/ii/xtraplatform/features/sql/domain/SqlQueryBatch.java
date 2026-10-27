@@ -40,6 +40,15 @@ public interface SqlQueryBatch {
   }
 
   /**
+   * Single-shot mode only: the maximum number of features read per sub-query, shared by all main
+   * tables of the sub-query's type. {@code 0} means no limit.
+   */
+  @Value.Default
+  default long getMaxFeaturesPerSubQuery() {
+    return 0;
+  }
+
+  /**
    * Whether {@code numberMatched} is reported. When enabled for a multi-query, the count is
    * computed for every sub-query (not only those contributing to the current page) so that the
    * reported {@code numberMatched} is the invariant total across all sub-queries; the value queries
