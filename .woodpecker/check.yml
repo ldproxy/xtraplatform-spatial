@@ -13,7 +13,7 @@ steps:
         - .gradle/wrapper
 
   build:
-    image: eclipse-temurin:17@sha256:7c480ddf72df6c2aaa4280e5297d3b379884a1843519caef0b7f3ec145ed55ff
+    image: eclipse-temurin:17@sha256:91011320978c10ec51d2cde1eb6f616db6d2a739a0e521096c343dd3fed9abe6
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew build -Pbranch=$CI_COMMIT_BRANCH -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -22,7 +22,7 @@ steps:
       event: push
 
   build-release:
-    image: eclipse-temurin:17@sha256:7c480ddf72df6c2aaa4280e5297d3b379884a1843519caef0b7f3ec145ed55ff
+    image: eclipse-temurin:17@sha256:91011320978c10ec51d2cde1eb6f616db6d2a739a0e521096c343dd3fed9abe6
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew build -Prelease=true -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -31,7 +31,7 @@ steps:
       event: tag
 
   publish-snapshot:
-    image: eclipse-temurin:17@sha256:7c480ddf72df6c2aaa4280e5297d3b379884a1843519caef0b7f3ec145ed55ff
+    image: eclipse-temurin:17@sha256:91011320978c10ec51d2cde1eb6f616db6d2a739a0e521096c343dd3fed9abe6
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew publish -Pbranch=$CI_COMMIT_BRANCH -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
@@ -40,7 +40,7 @@ steps:
       event: push
 
   publish-release:
-    image: eclipse-temurin:17@sha256:7c480ddf72df6c2aaa4280e5297d3b379884a1843519caef0b7f3ec145ed55ff
+    image: eclipse-temurin:17@sha256:91011320978c10ec51d2cde1eb6f616db6d2a739a0e521096c343dd3fed9abe6
     commands:
       - export GRADLE_USER_HOME=$${CI_WORKSPACE}/.gradle
       - ./gradlew publish -Prelease=true -PdeployUser=$SNAPSHOT_USER -PdeployPassword=$SNAPSHOT_PASS
