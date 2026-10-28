@@ -63,6 +63,10 @@ public interface FeatureStream {
         // debug level
         LOGGER.debug("Request cancelled due to lost connection.");
         return;
+      } else if (rootError instanceof JobCancelledException jobCancelled) {
+        // the job of the request was cancelled on request, this is not an error
+        LOGGER.debug("Request cancelled, the job was cancelled.");
+        throw jobCancelled;
       } else if (rootError instanceof WebApplicationException) {
         // Cannot handle request
         throw (WebApplicationException) rootError;
