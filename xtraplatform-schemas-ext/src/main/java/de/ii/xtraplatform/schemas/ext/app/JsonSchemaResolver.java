@@ -296,7 +296,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
       return null;
     }
 
-    if (Objects.nonNull(original) && original.getIgnore()) {
+    if (Objects.nonNull(original) && original.isIgnore()) {
       return null;
     }
 
