@@ -12,6 +12,7 @@ import static de.ii.xtraplatform.cql.domain.In.ID_PLACEHOLDER;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.base.domain.util.Tuple;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
+import de.ii.xtraplatform.features.domain.MappingOperationResolver;
 import de.ii.xtraplatform.features.domain.MappingRule;
 import de.ii.xtraplatform.features.domain.SchemaBase.Role;
 import java.util.List;
@@ -54,8 +55,7 @@ public interface SqlQueryMapping {
   Map<String, FeatureSchema> getValueSchemas();
 
   default Optional<SqlQuerySchema> getTableForObject(String propertyName) {
-    // System.out.println("getObjectTables: " + propertyName);
-    return Optional.ofNullable(getObjectTables().get(propertyName));
+    return findProperty(getObjectTables(), propertyName);
   }
 
   default Optional<SqlQuerySchema> getTableForValue(String propertyName) {
@@ -64,10 +64,10 @@ public interface SqlQueryMapping {
 
   default Optional<SqlQuerySchema> getTableForValue(String propertyName, MappingRule.Scope scope) {
     if (scope == MappingRule.Scope.W) {
-      return Optional.ofNullable(getWritableTables().get(propertyName));
+      return findProperty(getWritableTables(), propertyName);
     }
 
-    return Optional.ofNullable(getValueTables().get(propertyName));
+    return findProperty(getValueTables(), propertyName);
   }
 
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForValue(String propertyName) {
@@ -83,10 +83,10 @@ public interface SqlQueryMapping {
     return getTableForValue(propertyName, scope)
         .flatMap(
             table ->
-                Optional.ofNullable(
-                        (scope == MappingRule.Scope.W ? getWritableColumns() : getValueColumns())
-                            .get(propertyName))
-                    .map(index -> Tuple.of(table, index)));
+                findProperty(
+                        scope == MappingRule.Scope.W ? getWritableColumns() : getValueColumns(),
+                        propertyName)
+                    .map(column -> Tuple.of(table, column)));
   }
 
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForId() {
@@ -180,7 +180,7 @@ public interface SqlQueryMapping {
   }
 
   default Optional<FeatureSchema> getSchemaForObject(String propertyName) {
-    return Optional.ofNullable(getObjectSchemas().get(propertyName));
+    return findProperty(getObjectSchemas(), propertyName);
   }
 
   default Optional<FeatureSchema> getSchemaForValue(String propertyName) {
@@ -188,7 +188,28 @@ public interface SqlQueryMapping {
       return getMainSchema().getIdProperty();
     }
 
-    return Optional.ofNullable(getValueSchemas().get(propertyName));
+    return findProperty(getValueSchemas(), propertyName);
+  }
+
+  /**
+   * In a type with multiple main tables, the properties of each table are keyed with the index of
+   * the table as prefix, e.g. `0_name`, while filters and sort keys use the plain name.
+   */
+  private <T> Optional<T> findProperty(Map<String, T> properties, String propertyName) {
+    if (properties.containsKey(propertyName)
+        || Objects.isNull(getMainSchema())
+        || getMainSchema().getConcat().isEmpty()) {
+      return Optional.ofNullable(properties.get(propertyName));
+    }
+
+    return properties.entrySet().stream()
+        .filter(
+            property ->
+                MappingOperationResolver.isConcatPath(property.getKey())
+                    && Objects.equals(
+                        MappingOperationResolver.cleanConcatPath(property.getKey()), propertyName))
+        .map(Map.Entry::getValue)
+        .findFirst();
   }
 
   String IN_CONNECTED_ARRAY = "IN_CONNECTED_ARRAY";
