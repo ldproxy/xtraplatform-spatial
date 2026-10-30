@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty.Access;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
@@ -588,10 +587,14 @@ public interface FeatureSchema
    *     Schemas zu ignorieren, die mit `schema` referenziert werden.
    * @default false
    */
-  @JsonProperty(value = "ignore", access = Access.WRITE_ONLY)
-  @Value.Default
-  default boolean getIgnore() {
-    return false;
+  @JsonProperty(value = "ignore")
+  @Nullable
+  Boolean getIgnore();
+
+  @Value.Lazy
+  @JsonIgnore
+  default boolean isIgnore() {
+    return Boolean.TRUE.equals(getIgnore());
   }
 
   /**

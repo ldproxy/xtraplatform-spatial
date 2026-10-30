@@ -57,7 +57,7 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
   }
 
   private FeatureSchema merge(FeatureSchema original, FeatureSchema resolved) {
-    if (original.getIgnore()) {
+    if (original.isIgnore()) {
       return null;
     }
 
