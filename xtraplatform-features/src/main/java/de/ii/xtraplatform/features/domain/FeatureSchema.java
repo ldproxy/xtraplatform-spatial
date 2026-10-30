@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty.Access;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
@@ -572,10 +571,14 @@ public interface FeatureSchema
    *     Schemas zu ignorieren, die mit `schema` referenziert werden.
    * @default false
    */
-  @JsonProperty(value = "ignore", access = Access.WRITE_ONLY)
-  @Value.Default
-  default boolean getIgnore() {
-    return false;
+  @JsonProperty(value = "ignore")
+  @Nullable
+  Boolean getIgnore();
+
+  @Value.Lazy
+  @JsonIgnore
+  default boolean isIgnore() {
+    return Boolean.TRUE.equals(getIgnore());
   }
 
   /**
@@ -903,12 +906,6 @@ public interface FeatureSchema
           .ifPresent(
               first -> {
                 Preconditions.checkState(
-                    getPrimaryInstants().size() == getConcat().size(),
-                    "The number of primary instants must match the number of concatenated objects, but found only %s properties for %s concatenated objects in type '%s'.",
-                    getPrimaryInstants().size(),
-                    getConcat().size(),
-                    getName());
-                Preconditions.checkState(
                     getPrimaryInstants().stream()
                             .map(FeatureSchema::getFullPathAsString)
                             .distinct()
@@ -935,12 +932,6 @@ public interface FeatureSchema
       getPrimaryInterval()
           .ifPresent(
               first -> {
-                Preconditions.checkState(
-                    getPrimaryIntervals().size() == getConcat().size(),
-                    "The number of primary intervals must match the number of concatenated objects, but found only %s properties for %s concatenated objects in type '%s'.",
-                    getPrimaryIntervals().size(),
-                    getConcat().size(),
-                    getName());
                 Preconditions.checkState(
                     getPrimaryIntervals().stream()
                             .map(Tuple::first)

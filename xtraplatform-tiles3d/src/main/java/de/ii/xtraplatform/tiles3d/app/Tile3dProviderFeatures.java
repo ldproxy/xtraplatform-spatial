@@ -50,7 +50,7 @@ import de.ii.xtraplatform.tiles3d.domain.Tile3dProviderFeaturesData;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dQuery;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeeding;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingPartialJob;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dStore;
 import de.ii.xtraplatform.tiles3d.domain.TileTree;
 import de.ii.xtraplatform.tiles3d.domain.Tileset3dFeatures;
@@ -321,15 +321,15 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   }
 
   @Override
-  public void setupSeeding(Tile3dSeedingJobSet jobSet) throws IOException {
+  public void setupSeeding(Tile3dSeedingJob jobSet) throws IOException {
     /*for (Tuple<TileCache, String> cache : getCaches(jobSet)) {
       cache.first().setupSeeding(jobSet, cache.second());
     }*/
   }
 
   @Override
-  public void cleanupSeeding(Tile3dSeedingJobSet jobSet) throws IOException {
-    LOGGER.debug("{}: cleaning up tile caches", Tile3dSeedingJobSet.LABEL);
+  public void cleanupSeeding(Tile3dSeedingJob jobSet) throws IOException {
+    LOGGER.debug("{}: cleaning up tile caches", Tile3dSeedingJob.LABEL);
 
     /*for (Tuple<TileCache, String> cache : getCaches(jobSet)) {
       cache.first().cleanupSeeding(jobSet, cache.second());
@@ -337,7 +337,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
   }
 
   @Override
-  public void seedSubtrees(Tile3dSeedingJob job, Consumer<Integer> updateProgress)
+  public void seedSubtrees(Tile3dSeedingPartialJob job, Consumer<Integer> updateProgress)
       throws IOException {
 
     Tileset3dFeatures tileset =
@@ -428,7 +428,7 @@ public class Tile3dProviderFeatures extends AbstractTile3dProvider<Tile3dProvide
 
   @Override
   public void seedTiles(
-      Tile3dSeedingJob job, Tile3dSeedingJobSet jobSet, Consumer<Integer> updateProgress)
+      Tile3dSeedingPartialJob job, Tile3dSeedingJob jobSet, Consumer<Integer> updateProgress)
       throws IOException {
     Tileset3dFeatures tileset =
         getData().getTilesets().get(job.getTileSet()).mergeDefaults(getData().getTilesetDefaults());

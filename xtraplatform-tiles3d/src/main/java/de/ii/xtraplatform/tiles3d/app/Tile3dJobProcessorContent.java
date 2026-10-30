@@ -8,39 +8,39 @@
 package de.ii.xtraplatform.tiles3d.app;
 
 import com.github.azahnen.dagger.annotations.AutoBind;
-import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dJobProcessor;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dProvider;
 import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJob;
-import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingJobSet;
+import de.ii.xtraplatform.tiles3d.domain.Tile3dSeedingPartialJob;
+import de.ii.xtraplatform.xtralink.domain.JobProcessorBase;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.io.IOException;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Singleton
-@AutoBind
+@AutoBind(interfaces = JobProcessorBase.class)
 public class Tile3dJobProcessorContent extends Tile3dJobProcessor {
 
   @Inject
-  Tile3dJobProcessorContent(AppContext appContext, EntityRegistry entityRegistry) {
-    super(appContext, entityRegistry);
+  Tile3dJobProcessorContent(EntityRegistry entityRegistry) {
+    super(entityRegistry);
   }
 
   @Override
-  public String getJobType() {
-    return Tile3dSeedingJob.TYPE_GLTF;
+  public Set<String> getKinds() {
+    return Set.of(Tile3dSeedingPartialJob.TYPE_GLTF);
   }
 
   @Override
   protected void executeJob(
-      String jobType,
       Tile3dProvider tileProvider,
+      Tile3dSeedingPartialJob seedingPartialJob,
       Tile3dSeedingJob seedingJob,
-      Tile3dSeedingJobSet seedingJobSet,
       Consumer<Integer> updateProgress)
       throws IOException {
-    tileProvider.seeding().get().seedTiles(seedingJob, seedingJobSet, updateProgress);
+    tileProvider.seeding().get().seedTiles(seedingPartialJob, seedingJob, updateProgress);
   }
 }

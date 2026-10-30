@@ -97,6 +97,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.threeten.extra.Interval;
@@ -740,7 +741,7 @@ public class FilterEncoderSql {
   }
 
   public String encode(Cql2Expression cqlFilter, SqlQueryMapping mapping) {
-    return prepareExpression(cqlFilter).accept(new CqlToSql2(mapping));
+    return prepareExpression(cqlFilter, mapping).accept(new CqlToSql2(mapping));
   }
 
   public String encode(String cqlFilter, SchemaSql schema) {
@@ -753,7 +754,7 @@ public class FilterEncoderSql {
 
   public String encodeNested(
       Cql2Expression cqlFilter, SqlQueryMapping mapping, boolean isUserFilter) {
-    return prepareExpression(cqlFilter)
+    return prepareExpression(cqlFilter, mapping)
         .accept(new CqlToSqlNested2(mapping, mapping.getMainTable().asTablePath(), isUserFilter));
   }
 
@@ -762,8 +763,50 @@ public class FilterEncoderSql {
       Cql2Expression cqlFilter,
       List<? extends SqlQueryTable> tablePath,
       boolean isUserFilter) {
-    return prepareExpression(cqlFilter)
+    return prepareExpression(cqlFilter, mapping)
         .accept(new CqlToSqlNested2(mapping, tablePath, isUserFilter));
+  }
+
+  private CqlNode prepareExpression(Cql2Expression cqlFilter, SqlQueryMapping mapping) {
+    return prepareExpression(
+        cql.mapAbsentProperties(cqlFilter, getAbsentPrimaryTemporals(mapping)));
+  }
+
+  /**
+   * In a type with multiple main tables, the primary instant or interval may be missing in some of
+   * them. Filters treat it as null in those tables.
+   */
+  private static Set<String> getAbsentPrimaryTemporals(SqlQueryMapping mapping) {
+    if (Objects.isNull(mapping)
+        || Objects.isNull(mapping.getMainSchema())
+        || mapping.getMainSchema().getConcat().isEmpty()) {
+      return Set.of();
+    }
+    FeatureSchema type = mapping.getMainSchema();
+
+    return Stream.of(
+            absentProperty(
+                mapping.getColumnForPrimaryInstant(), type.getPrimaryInstants().stream()),
+            absentProperty(
+                mapping.getColumnForPrimaryIntervalStart(),
+                type.getPrimaryIntervals().stream().map(Tuple::first)),
+            absentProperty(
+                mapping.getColumnForPrimaryIntervalEnd(),
+                type.getPrimaryIntervals().stream().map(Tuple::second)))
+        .flatMap(Optional::stream)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
+  private static Optional<String> absentProperty(
+      Optional<?> column, Stream<FeatureSchema> propertiesInOtherTables) {
+    if (column.isPresent()) {
+      return Optional.empty();
+    }
+
+    return propertiesInOtherTables
+        .filter(Objects::nonNull)
+        .findFirst()
+        .map(FeatureSchema::getFullPathAsString);
   }
 
   private CqlNode prepareExpression(Cql2Expression cqlFilter) {

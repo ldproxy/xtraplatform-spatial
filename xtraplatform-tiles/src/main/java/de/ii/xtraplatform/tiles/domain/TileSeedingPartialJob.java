@@ -49,18 +49,13 @@ public interface TileSeedingPartialJob extends JobContext {
             .addAllSubMatrices(subMatrices)
             .build();
 
-    // TODO: only works with single submatrix, needs to be fixed for multiple submatrices
-    List<ProgressUpdate> progressUpdates =
-        List.of(
-            // new ProgressUpdate(String.format("%s.current", tileSet), ProgressOperation.ADD),
-            new ProgressUpdate(
-                String.format(
-                    "%s.%s[%d]",
-                    tileSet, details.getTileMatrixSet(), subMatrices.iterator().next().getLevel()),
-                ProgressOperation.SUBTRACT));
-
     return Jobs.createPartial(
-        TYPE_MVT, priority, jobSetId, details, (int) details.getNumberOfTiles(), progressUpdates);
+        TYPE_MVT,
+        priority,
+        jobSetId,
+        details,
+        (int) details.getNumberOfTiles(),
+        progressUpdates(details));
   }
 
   static PartialJobConfiguration raster(
@@ -83,17 +78,29 @@ public interface TileSeedingPartialJob extends JobContext {
             .storage(storageInfo)
             .build();
 
-    // TODO: only works with single submatrix, needs to be fixed for multiple submatrices
-    List<ProgressUpdate> progressUpdates =
-        List.of(
-            new ProgressUpdate(
-                String.format(
-                    "%s.%s[%d]",
-                    tileSet, details.getTileMatrixSet(), subMatrices.iterator().next().getLevel()),
-                ProgressOperation.SUBTRACT));
-
     return Jobs.createPartial(
-        TYPE_PNG, priority, jobSetId, details, (int) details.getNumberOfTiles(), progressUpdates);
+        TYPE_PNG,
+        priority,
+        jobSetId,
+        details,
+        (int) details.getNumberOfTiles(),
+        progressUpdates(details));
+  }
+
+  // The queue applies the whole delta to every path, so per-level counts are only correct for a
+  // single submatrix. TileSeedingJobCreator always creates one partial job per submatrix.
+  private static List<ProgressUpdate> progressUpdates(TileSeedingPartialJob details) {
+    if (details.getSubMatrices().size() != 1) {
+      throw new IllegalArgumentException("Tile seeding partial jobs need exactly one submatrix");
+    }
+    String tileSet = details.getTileSet();
+    int level = details.getSubMatrices().get(0).getLevel();
+
+    return List.of(
+        new ProgressUpdate(String.format("%s.current", tileSet), ProgressOperation.ADD),
+        new ProgressUpdate(
+            String.format("%s.levels.%s[%d]", tileSet, details.getTileMatrixSet(), level),
+            ProgressOperation.SUBTRACT));
   }
 
   String getTileProvider();

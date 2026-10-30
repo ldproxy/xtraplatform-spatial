@@ -328,8 +328,8 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
 
     LOGGER.warn(
         "Tile generation: cannot convert between axis units '{}' and '{}'.",
-        tmsCrsUnit.getName(),
-        nativeCrsUnit.getName());
+        tmsCrsUnit,
+        nativeCrsUnit);
     return 0;
   }
 }
