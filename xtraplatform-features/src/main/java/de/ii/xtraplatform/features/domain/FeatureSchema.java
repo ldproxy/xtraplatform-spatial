@@ -906,12 +906,6 @@ public interface FeatureSchema
           .ifPresent(
               first -> {
                 Preconditions.checkState(
-                    getPrimaryInstants().size() == getConcat().size(),
-                    "The number of primary instants must match the number of concatenated objects, but found only %s properties for %s concatenated objects in type '%s'.",
-                    getPrimaryInstants().size(),
-                    getConcat().size(),
-                    getName());
-                Preconditions.checkState(
                     getPrimaryInstants().stream()
                             .map(FeatureSchema::getFullPathAsString)
                             .distinct()
@@ -938,12 +932,6 @@ public interface FeatureSchema
       getPrimaryInterval()
           .ifPresent(
               first -> {
-                Preconditions.checkState(
-                    getPrimaryIntervals().size() == getConcat().size(),
-                    "The number of primary intervals must match the number of concatenated objects, but found only %s properties for %s concatenated objects in type '%s'.",
-                    getPrimaryIntervals().size(),
-                    getConcat().size(),
-                    getName());
                 Preconditions.checkState(
                     getPrimaryIntervals().stream()
                             .map(Tuple::first)
