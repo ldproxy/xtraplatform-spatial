@@ -20,7 +20,6 @@ import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
-import de.ii.xtraplatform.features.domain.SpatialExtent;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
@@ -182,8 +181,10 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
                   .get(tilesetKey.first())
                   .mergeDefaults(getData().getTilesetDefaults());
           Optional<BoundingBox> configuredExtent =
-              toBoundingBox(
-                  tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent()));
+              tileset
+                  .getExtent()
+                  .or(() -> getData().getTilesetDefaults().getExtent())
+                  .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84));
 
           metadata.put(
               tilesetKey.first(), loadMetadata(tilesetKey.second(), path, configuredExtent));
@@ -225,9 +226,7 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
               ? Optional.of(
                   BoundingBox.of(bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3), OgcCrs.CRS84))
               : Optional.empty();
-      // Configured extent takes priority; fall back to bounds from MBTiles metadata
-      Optional<BoundingBox> bounds =
-          configuredExtent.isPresent() ? configuredExtent : boundsFromMetadata;
+      Optional<BoundingBox> bounds = configuredExtent.or(() -> boundsFromMetadata);
       TilesFormat format = metadata.getFormat();
       List<FeatureSchema> vectorSchemas =
           metadata.getVectorLayers().stream()
@@ -254,32 +253,5 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
   private Tuple<String, String> toTuple(String tilesetKey) {
     String[] split = tilesetKey.split("/");
     return Tuple.of(split[0], split[1]);
-  }
-
-  private Optional<BoundingBox> toBoundingBox(Optional<SpatialExtent> extent) {
-    return extent
-        .filter(e -> e.getComputed() == null)
-        .flatMap(
-            e -> {
-              if (e.getXmin() == null
-                  || e.getYmin() == null
-                  || e.getXmax() == null
-                  || e.getYmax() == null) {
-                return Optional.empty();
-              }
-              if (e.getZmin() != null && e.getZmax() != null) {
-                return Optional.of(
-                    BoundingBox.of(
-                        e.getXmin(),
-                        e.getYmin(),
-                        e.getZmin(),
-                        e.getXmax(),
-                        e.getYmax(),
-                        e.getZmax(),
-                        OgcCrs.CRS84));
-              }
-              return Optional.of(
-                  BoundingBox.of(e.getXmin(), e.getYmin(), e.getXmax(), e.getYmax(), OgcCrs.CRS84));
-            });
   }
 }
