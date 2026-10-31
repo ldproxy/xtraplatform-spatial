@@ -39,8 +39,10 @@ public interface TilesetMbTilesDefaults extends TilesetCommonDefaults {
   }
 
   /**
-   * @langEn Optional fixed spatial extent for this tileset in native CRS.
-   * @langDe Optionaler fester räumlicher Extent für dieses Tileset im nativen CRS.
+   * @langEn Fixed spatial extent of the tileset in CRS84 (longitude/latitude). If set, `bounds`
+   *     from the MBTiles metadata is ignored.
+   * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite). Wenn gesetzt, wird
+   *     `bounds` aus den MBTiles-Metadaten ignoriert.
    */
   Optional<SpatialExtent> getExtent();
 }
