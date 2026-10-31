@@ -7,6 +7,8 @@
  */
 package de.ii.xtraplatform.features.domain
 
+import de.ii.xtraplatform.crs.domain.BoundingBox
+import de.ii.xtraplatform.crs.domain.EpsgCrs
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import spock.lang.Specification
 
@@ -28,6 +30,31 @@ class SpatialExtentSpec extends Specification {
     def "computed must not be combined with coordinates"() {
         when:
         new ImmutableSpatialExtent.Builder().xmin(0).ymin(0).xmax(1).ymax(1).computed(true).build()
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "coordinates become a bounding box in the given CRS"() {
+        given:
+        def crs = EpsgCrs.of(25832)
+
+        expect:
+        new ImmutableSpatialExtent.Builder().xmin(1).ymin(2).xmax(3).ymax(4).build().toBoundingBox(crs) ==
+                Optional.of(BoundingBox.of(1, 2, 3, 4, crs))
+        new ImmutableSpatialExtent.Builder().xmin(1).ymin(2).zmin(0).xmax(3).ymax(4).zmax(10).build().toBoundingBox(crs) ==
+                Optional.of(BoundingBox.of(1, 2, 0, 3, 4, 10, crs))
+    }
+
+    def "incomplete coordinates are rejected"() {
+        when:
+        new ImmutableSpatialExtent.Builder().xmin(1).ymin(2).xmax(3).build()
+
+        then:
+        thrown(IllegalStateException)
+
+        when:
+        new ImmutableSpatialExtent.Builder().xmin(1).ymin(2).xmax(3).ymax(4).zmin(0).build()
 
         then:
         thrown(IllegalStateException)

@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.domain
 
 import de.ii.xtraplatform.cql.domain.Bbox
+import de.ii.xtraplatform.cql.domain.Cql2Expression
 import de.ii.xtraplatform.cql.domain.Interval
 import de.ii.xtraplatform.cql.domain.Property
 import de.ii.xtraplatform.cql.domain.SIntersects
@@ -68,5 +69,53 @@ class ExtentFiltersSpec extends Specification {
         expect:
         ExtentFilters.of(type([:]), Optional.empty(), Optional.empty()).isEmpty()
         ExtentFilters.of(type([:]), Optional.empty(), Optional.of(INTERVAL)).isEmpty()
+    }
+
+    static Cql2Expression FILTER = SIntersects.of(Property.of("geom"), SpatialLiteral.of(Bbox.of(BBOX)))
+
+    def "queries for multiple features are restricted"() {
+        given:
+        def query = ImmutableFeatureQuery.builder().type("t").build()
+
+        when:
+        def restricted = ExtentFilters.restrict(query, { type -> type == "t" ? [FILTER] : [] }) as FeatureQuery
+
+        then:
+        restricted.filters == [FILTER]
+    }
+
+    def "existing filters are kept"() {
+        given:
+        def existing = SIntersects.of(Property.of("other"), SpatialLiteral.of(Bbox.of(0, 0, 1, 1)))
+        def query = ImmutableFeatureQuery.builder().type("t").addFilters(existing).build()
+
+        when:
+        def restricted = ExtentFilters.restrict(query, { [FILTER] }) as FeatureQuery
+
+        then:
+        restricted.filters == [existing, FILTER]
+    }
+
+    def "queries for a single feature are not restricted"() {
+        given:
+        def query = ImmutableFeatureQuery.builder().type("t").returnsSingleFeature(true).build()
+
+        expect:
+        ExtentFilters.restrict(query, { [FILTER] }).is(query)
+    }
+
+    def "each sub query of a multi query gets the filters of its type"() {
+        given:
+        def other = TIntersects.of(Property.of("date"), new TemporalLiteral.Builder(INTERVAL).build())
+        def query = ImmutableMultiFeatureQuery.builder()
+                .addQueries(ImmutableSubQuery.builder().type("a").collectionId("a").build())
+                .addQueries(ImmutableSubQuery.builder().type("b").collectionId("b").build())
+                .build()
+
+        when:
+        def restricted = ExtentFilters.restrict(query, { type -> type == "a" ? [FILTER] : [other] }) as MultiFeatureQuery
+
+        then:
+        restricted.queries*.filters == [[FILTER], [other]]
     }
 }
