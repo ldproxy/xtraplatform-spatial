@@ -34,8 +34,8 @@ public interface TilesetHttpDefaults
   }
 
   /**
-   * @langEn Optional fixed spatial extent for this tileset in native CRS.
-   * @langDe Optionaler fester räumlicher Extent für dieses Tileset im nativen CRS.
+   * @langEn Fixed spatial extent of the tileset in CRS84 (longitude/latitude).
+   * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite).
    */
   Optional<SpatialExtent> getExtent();
 
