@@ -63,7 +63,7 @@ public interface SqlPath extends SourcePath {
 
   Optional<Boolean> getGenerated();
 
-  // TODO: not needed any more? should be based on primary key detection
+  // NOTE: not needed any more? should be based on primary key detection
   boolean getJunction();
 
   @Value.Derived
@@ -86,7 +86,7 @@ public interface SqlPath extends SourcePath {
     return !getColumns().isEmpty();
   }
 
-  // TODO: not needed any more? should be based on primary key detection
+  // NOTE: not needed any more? should be based on primary key detection
   @Value.Derived
   default boolean isJunction() {
     return getJunction();

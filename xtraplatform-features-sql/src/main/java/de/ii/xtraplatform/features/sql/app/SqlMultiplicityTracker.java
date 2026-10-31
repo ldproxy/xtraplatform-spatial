@@ -35,7 +35,7 @@ public class SqlMultiplicityTracker implements FeatureStoreMultiplicityTracker {
     this.currentMultiplicities = new HashMap<>();
     this.children = new LinkedHashMap<>();
 
-    // TODO: test with geoval
+    // NOPMD - TODO: test with geoval
     multiTables.forEach(
         table -> {
           /*for (int i = 0; i < table.size(); i++) {

@@ -797,7 +797,8 @@ public class FeatureProviderSql
     cache.del(type, CACHE_KEY_STATS, "temporal");
   }
 
-  // TODO: implement auto mode for maxConnections=-1, how to get numberOfQueries in Connector?
+  // NOPMD - TODO: implement auto mode for maxConnections=-1, how to get numberOfQueries in
+  // Connector?
   @Override
   protected int getRunnerCapacity(ConnectionInfo connectionInfo) {
     ConnectionInfoSql connectionInfoSql = (ConnectionInfoSql) connectionInfo;
@@ -825,7 +826,7 @@ public class FeatureProviderSql
         .orElse(1);
   }
 
-  // TODO: move to hydration
+  // NOTE: move to hydration
   @Override
   protected ConnectionInfo getConnectionInfo() {
     ConnectionInfoSql connectionInfo = (ConnectionInfoSql) super.getConnectionInfo();
@@ -859,7 +860,6 @@ public class FeatureProviderSql
       maxConnections = maxQueries * Runtime.getRuntime().availableProcessors();
     }
     int capacity = maxConnections / maxQueries;
-    // TODO
     // LOGGER.info("RUNNERQ: {} {} {} {}", maxQueries ,maxConnections, capacity, queueSize);
     return Math.max(1024, maxConnections * capacity * 2) / maxQueries;
   }
@@ -881,7 +881,7 @@ public class FeatureProviderSql
     return Optional.empty();
   }
 
-  // TODO: migrate types validation from SchemaSql to SqlQueryMapping
+  // NOTE: migrate types validation from SchemaSql to SqlQueryMapping
   // for now SchemaSql is generated lazily when validation is enabled
   // and getSourceSchemas() is called from AbstractFeatureProvider
   @Override
@@ -909,7 +909,7 @@ public class FeatureProviderSql
   protected Optional<Map<String, String>> getStartupInfo() {
     String parallelism = String.valueOf(getStreamRunner().getCapacity());
 
-    // TODO: get other infos from connector
+    // NOPMD - TODO: get other infos from connector
 
     ImmutableMap.Builder<String, String> info =
         new ImmutableMap.Builder<String, String>()
@@ -1224,7 +1224,7 @@ public class FeatureProviderSql
     return Optional.empty();
   }
 
-  // TODO: cache deser does not work, because the the feature schemas have no name
+  // NOPMD - TODO: cache deser does not work, because the the feature schemas have no name
   // (and there are no map keys to get them from)
   // so to implement this we need the split between cfg and internal schemas
   private Map<String, List<SqlQueryMapping>> generateSqlQueryMappings() {
@@ -1451,7 +1451,7 @@ public class FeatureProviderSql
       }
     }
     if (query instanceof MultiFeatureQuery) {
-      // TODO: this is a workaround to support subqueries with different numbers of sort keys
+      // NOTE: this is a workaround to support subqueries with different numbers of sort keys
       // to remove this, we have to
       // - disable optimized paging as soon as a sort key is specified for at least one subquery
       // - fix a bug in SqlRowVals or transformations, it seems that the same number of columns is

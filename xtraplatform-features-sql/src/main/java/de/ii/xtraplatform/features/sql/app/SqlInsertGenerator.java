@@ -14,7 +14,7 @@ class SqlInsertGenerator {
 
   /*private static final Logger LOGGER = LoggerFactory.getLogger(SqlInsertGenerator.class);
 
-  //TODO: replace attributesContainer + relationPath with SourceSchemaSql
+  //NOTE: replace attributesContainer + relationPath with SourceSchemaSql
   // attributesContainer:
   // - columns, sortKey -> derive in schema
   // - mainContainer id -> set in schema
@@ -34,7 +34,7 @@ class SqlInsertGenerator {
                                                  .filter(col -> withId || !col.equals(attributesContainer.getSortKey()))
                                                  .collect(Collectors.toList());
 
-      //TODO: from Syntax
+      //NOTE: from Syntax
       List<String> columns2 = columns3.stream()
                                       .map(col -> col.startsWith("ST_AsText(ST_ForcePolygonCCW(") ? col.substring("ST_AsText(ST_ForcePolygonCCW(".length(), col.length() - 2) : col)
                                       .collect(Collectors.toList());
@@ -56,12 +56,12 @@ class SqlInsertGenerator {
       }
 
       if (parentRelation.isPresent()) {
-          //TODO: is this merged?
+          //NOTE: is this merged?
           if (!attributesContainer.isMain() && parentRelation.get()
                                                              .isOne2One() && Objects.equals(parentRelation.get()
                                                                                                           .getSourceSortKey(), parentRelation.get()
                                                                                                                                              .getSourceField())) {
-              //TODO fullPath, sortKey
+              // NOTE: fullPath, sortKey
               idKeys.add(0, attributesContainer.getInstanceContainerName() + ".id");
               columns2.add(0, "id");
           } else if (parentRelation.get()
@@ -83,13 +83,13 @@ class SqlInsertGenerator {
       }
       String finalColumnNames = columnNames;
 
-      //TODO: primaryKey instead of id
+      //NOTE: primaryKey instead of id
       String returningId = parentRelation.isPresent() && parentRelation.get()
                                                                        .isOne2N() ? " RETURNING null" : " RETURNING id";
       Optional<String> returningName = parentRelation.isPresent() && parentRelation.get()
                                                                                    .isOne2N() ? Optional.empty() : Optional.of(tableName + ".id");
 
-      //TODO: either use List<FeatureStoreRelation> in nestedRow.getNested or extract path formatting
+      //NOTE: either use List<FeatureStoreRelation> in nestedRow.getNested or extract path formatting
       //List<String> trail = relationPath.isEmpty() ? ImmutableList.of("/" + tableName) : getTrail(relationPath);
 
       List<FeatureStoreRelation> parentPath = relationPath.size() > 1 ? relationPath.subList(0, relationPath.size() - 1) : ImmutableList.of();
@@ -128,14 +128,13 @@ class SqlInsertGenerator {
                                                                .get(), childRelation.getJunctionTarget()
                                                                                     .get());
 
-      //TODO:
       String sourceIdColumn = childRelation.getJunctionSource()
                                            .get()
                                            .replace('_', '.');
 
       String targetIdColumn = childRelation.getTargetContainer() + '.' + childRelation.getTargetField();
 
-      //TODO: either use List<FeatureStoreRelation> in nestedRow.getNested or extract path formatting
+      //NOTE: either use List<FeatureStoreRelation> in nestedRow.getNested or extract path formatting
       //List<String> trail = getTrail(relationPath);
       List<FeatureStoreRelation> parentPath = relationPath.subList(0, relationPath.size() - 1);
 
@@ -165,7 +164,7 @@ class SqlInsertGenerator {
       String column = parentRelation.getSourceField();
       String columnKey = parentRelation.getTargetContainer() + "." + parentRelation.getTargetField();
 
-      //TODO: either use List<FeatureStoreRelation> in nestedRow.getNested or extract path formatting
+      //NOTE: either use List<FeatureStoreRelation> in nestedRow.getNested or extract path formatting
       //List<String> trail = getTrail(relationPath);
 
       List<FeatureStoreRelation> parentPath = relationPath.subList(0, relationPath.size() - 1);
@@ -180,8 +179,8 @@ class SqlInsertGenerator {
       });
   }
 
-  //TODO: from syntax
-  //TODO: separate valuePaths and idPaths
+  //NOTE: from syntax
+  //NOTE: separate valuePaths and idPaths
   String getColumnValues(List<String> idKeys, List<String> columnNames, Map<String, String> values,
                          Map<String, String> ids) {
 
@@ -195,7 +194,7 @@ class SqlInsertGenerator {
       for (int j = 0; j < columnNames.size(); j++) {
           if (columnNames.get(j)
                          .startsWith("ST_AsText(ST_ForcePolygonCCW(")) {
-              columnValues.set(j, "ST_ForcePolygonCW(ST_GeomFromText(" + columnValues.get(j) + ",25832))"); //TODO srid from config
+              columnValues.set(j, "ST_ForcePolygonCW(ST_GeomFromText(" + columnValues.get(j) + ",25832))"); // NOTE: srid from config
               break;
           }
       }

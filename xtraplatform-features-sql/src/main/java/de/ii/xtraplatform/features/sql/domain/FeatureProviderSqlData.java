@@ -95,10 +95,8 @@ public interface FeatureProviderSqlData
 
   @Value.Check
   default FeatureProviderSqlData initNestedDefault() {
-    /*
-     workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
-    */
+    // workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // NOPMD - TODO: remove when fixed
     if (Objects.isNull(getConnectionInfo())) {
       ImmutableFeatureProviderSqlData.Builder builder =
           new ImmutableFeatureProviderSqlData.Builder().from(this);
@@ -230,7 +228,6 @@ public interface FeatureProviderSqlData
       return false;
     }
 
-    // TODO
     @DocIgnore
     @Value.Default
     default Optional<String> getAccentiCollation() {

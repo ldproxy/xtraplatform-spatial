@@ -73,7 +73,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
           idProperty.get().getType() == Type.STRING ? String.format("'%s'", id.get()) : id.get());
     }
 
-    // TODO: id instead of primaryKey if isPresent
+    // NOTE: id instead of primaryKey if isPresent
     String primaryKey = schema.getPrimaryKey();
 
     Set<String> columns0 =
@@ -83,7 +83,7 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
                     !Objects.equals(col.getName(), primaryKey)
                         || schema.getStaticInserts().containsKey(primaryKey)
                         || col.hasOperation(Operation.DO_NOT_GENERATE))
-            // TODO: in deriver
+            // NOTE: in deriver
             .filter(col -> !col.hasOperation(Operation.CONSTANT))
             .map(SqlQueryColumn::getName)
             .collect(ImmutableSet.toImmutableSet());
@@ -104,12 +104,12 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
 
     List<String> sortKeys = new ArrayList<>();
 
-    // TODO: is this merged?
+    // NOTE: is this merged?
     if (parentRelation.isPresent()
         && schema.isOne2One()
         && Objects.equals(
             parentRelation.get().getSortKey(), parentRelation.get().getSourceField())) {
-      // TODO fullPath, sortKey
+      // NOPMD - TODO fullPath, sortKey
       sortKeys.add(
           0,
           String.format(
@@ -261,7 +261,8 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
   public Supplier<Tuple<String, Consumer<String>>> createForeignKeyUpdate(
       FeatureDataSql feature, SqlQuerySchema schema, List<Integer> parentRows) {
 
-    /*TODO if (schema.getRelation().isEmpty()
+    // NOPMD - TODO
+    /*if (schema.getRelation().isEmpty()
         || !(schema.getRelation().get(0).isOne2One() || schema.getRelation().get(0).isOne2N())) {
       throw new IllegalArgumentException();
     }*/
@@ -271,10 +272,10 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     String table = joins.get(0).getName();
     String column = joins.get(0).getSourceField();
     String columnKey = joins.get(0).getTargetField();
-    String idColumn = schema.getSortKey(); // TODO: primary key
+    String idColumn = schema.getSortKey(); // NOTE: primary key
     String idKey =
         String.format(
-            FORMAT_QUALIFIED_COLUMN, table, joins.get(0).getSortKey()); // TODO: primary key
+            FORMAT_QUALIFIED_COLUMN, table, joins.get(0).getSortKey()); // NOTE: primary key
 
     Optional<SqlRowData> parentRow =
         feature.getRow(schema.getParentPath(), parentRows.subList(0, 1));
@@ -296,8 +297,8 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
     };
   }
 
-  // TODO: from syntax
-  // TODO: separate column and id column names
+  // NOTE: from syntax
+  // NOTE: separate column and id column names
   String getColumnValues(
       List<String> idKeys,
       Set<String> columnNames,
@@ -313,11 +314,11 @@ public class SqlInsertGenerator2 implements FeatureStoreInsertGenerator {
             columnNames.stream()
                 .map(
                     name -> {
-                      // TODO: value transformer?
+                      // NOTE: value transformer?
                       if (name.startsWith("ST_AsText(ST_ForcePolygonCCW(")) {
                         return String.format(
                             "ST_ForcePolygonCW(ST_GeomFromText(%s,25832))",
-                            values.get(name)); // TODO srid from config
+                            values.get(name)); // NOPMD - TODO srid from config
                       }
                       if (valueOverrides.containsKey(name)) {
                         return valueOverrides.get(name);

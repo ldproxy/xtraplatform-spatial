@@ -104,7 +104,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     this.connectionBudget = new Semaphore(Math.max(1, maxConnections), true);
 
     // int capacity = maxConnections / maxQueries;
-    // TODO
     this.queueSize = 1024; // Math.max(1024, maxConnections * capacity * 2);
 
     // LOGGER.debug("QUEUE {} {} {} {} {}", connectionInfo.getDatabase(), maxQueries,
@@ -432,7 +431,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   })
   public de.ii.xtraplatform.base.domain.util.Tuple<State, String> check() {
     if (Objects.isNull(sqlClient)) {
-      // TODO: retry
+      // NOPMD - TODO: retry
       if (Objects.nonNull(connectionError)) {
         return de.ii.xtraplatform.base.domain.util.Tuple.of(
             State.LIMITED, connectionError.getMessage());
@@ -487,7 +486,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     return Optional.empty();
   }
 
-  // TODO: SQLite
+  // NOPMD - TODO: SQLite
   private static boolean isUnavailable(SQLException e) {
     // see https://www.postgresql.org/docs/current/errcodes-appendix.html
     return Objects.isNull(e.getSQLState()) // no connection

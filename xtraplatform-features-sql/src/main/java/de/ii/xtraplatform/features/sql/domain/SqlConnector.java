@@ -169,7 +169,7 @@ public interface SqlConnector
     }
   }
 
-  // TODO: simplify, class SqlQueryRunner, remove options, singleFeature
+  // NOTE: simplify, class SqlQueryRunner, remove options, singleFeature
   @Override
   @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NcssCount"})
   default Reactive.Source<SqlRow> getSourceStream(
@@ -561,7 +561,7 @@ public interface SqlConnector
     return sqlRowSource1.mapError(PSQL_CONTEXT);
   }
 
-  // TODO: simplify
+  // NOTE: simplify
   default Reactive.Source<SqlRowMeta> getMetaResult(
       Optional<String> metaQuery, SqlQueryOptions options, String table) {
     if (!metaQuery.isPresent()) {

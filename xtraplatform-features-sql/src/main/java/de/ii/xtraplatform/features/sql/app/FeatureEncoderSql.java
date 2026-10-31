@@ -362,7 +362,7 @@ public class FeatureEncoderSql
   public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
-        // TODO: this is only correct for geojson, should be handled in the decoder
+        // NOTE: this is only correct for geojson, should be handled in the decoder
         .or(() -> "id".equals(context.pathAsString()) ? mapping.getColumnForId() : Optional.empty())
         .ifPresentOrElse(
             column -> {
@@ -385,7 +385,7 @@ public class FeatureEncoderSql
 
               if (checkJson(column)) {
                 value = Objects.nonNull(value) ? value.replaceAll("'", "''") : value;
-                // TODO: does this use the sql name or json name?
+                // NOTE: does this use the sql name or json name?
                 currentJson.addValue(context.path(), value);
 
                 if (LOGGER.isTraceEnabled()) {
@@ -513,7 +513,7 @@ public class FeatureEncoderSql
       throw new IllegalStateException(e);
     }
 
-    // TODO: functions from Dialect
+    // NOTE: functions from Dialect
     String result = String.format("ST_GeomFromText('%s',%s)", wkt, storageCrs.getCode());
 
     if (transformedGeometry.getType() == GeometryType.POLYGON

@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// TODO: extensive unit tests for compareTo
+// NOPMD - TODO: extensive unit tests for compareTo
 // compareTo is used purely for sort-merge ordering in the query pipeline; instances are never
 // used in equals()-based collections or hashed, so no equals()/hashCode() are provided.
 @SuppressWarnings({
@@ -165,7 +165,7 @@ class SqlRowVals implements SqlRow {
     return tableSchema.getColumns().get(i).getSchemaIndex();
   }
 
-  // TODO: use result.nextObject when column type info is supported
+  // NOTE: use result.nextObject when column type info is supported
   @SuppressWarnings({
     "PMD.CognitiveComplexity",
     "PMD.CyclomaticComplexity",
@@ -178,7 +178,7 @@ class SqlRowVals implements SqlRow {
     List<Class<?>> columnTypes;
     int cursor = 1;
 
-    // TODO: only returnables
+    // NOPMD - TODO: only returnables
     if (queryOptions.getTableSchema().isPresent()) {
       this.tableSchema = queryOptions.getTableSchema().get();
       this.type = queryOptions.getType();
@@ -290,7 +290,7 @@ class SqlRowVals implements SqlRow {
     this.tableSchema = null;
   }
 
-  // TODO: move comparison to SqlRow
+  // NOTE: move comparison to SqlRow
   @Override
   public int compareTo(SqlRow otherSqlRow) {
     if (Objects.isNull(tableSchema)) {

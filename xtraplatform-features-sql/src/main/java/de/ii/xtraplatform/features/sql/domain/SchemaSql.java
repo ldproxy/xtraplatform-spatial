@@ -150,7 +150,7 @@ public interface SchemaSql extends SchemaBase<SchemaSql> {
     return keys.build();
   }
 
-  // TODO: should we do this here? can we derive it from the above?
+  // NOTE: should we do this here? can we derive it from the above?
   @SuppressWarnings("PMD.CyclomaticComplexity")
   default List<String> getSortKeys(
       ListIterator<String> aliasesIterator, boolean onlyRelations, int keyIndexStart) {

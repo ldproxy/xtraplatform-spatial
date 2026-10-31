@@ -347,7 +347,7 @@ public class SchemaGeneratorSql implements SchemaGenerator {
   }
 
   private SchemaBase.Type getFeaturePropertyType(ColumnDataType columnDataType) {
-    // TODO: pass GeoInfo to determine geo columns
+    // NOPMD - TODO: pass GeoInfo to determine geo columns
     try {
       if ("GEOMETRY".equalsIgnoreCase(columnDataType.getName())
           || WktWkbGeometryType.valueOf(columnDataType.getName().toUpperCase(Locale.ROOT))

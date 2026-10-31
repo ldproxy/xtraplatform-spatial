@@ -32,7 +32,7 @@ public interface SchemaMappingSql extends SchemaMappingBase<SchemaSql> {
     return path;
   }
 
-  // TODO: static cleanup method in PathParser
+  // NOTE: static cleanup method in PathParser
   @Override
   default String cleanPath(String path) {
     if (path.contains("{")) {

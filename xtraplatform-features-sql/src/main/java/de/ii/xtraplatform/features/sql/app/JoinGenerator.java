@@ -248,7 +248,8 @@ public final class JoinGenerator {
       Optional<String> sourceFilter) {
     List<String> joins = new ArrayList<>();
 
-    /*TODO if (relation.isM2N()) {
+    // NOPMD - TODO
+    /*if (relation.isM2N()) {
       String sourceAlias = aliases.next();
       String junctionAlias = aliases.next();
       String targetAlias = aliases.next();

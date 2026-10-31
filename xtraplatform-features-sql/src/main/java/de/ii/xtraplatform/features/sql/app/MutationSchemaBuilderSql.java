@@ -75,7 +75,7 @@ public class MutationSchemaBuilderSql implements SchemaVisitor<SchemaSql, Schema
   private SchemaSql switchRelation(SchemaSql parent, SchemaSql child, List<SchemaSql> allChildren) {
     SqlRelation childRelation = child.getRelation().get(0);
 
-    // TODO: rebuild schema without mainTable and with reverse relation
+    // NOPMD - TODO: rebuild schema without mainTable and with reverse relation
     SqlRelation newChildRelation =
         new ImmutableSqlRelation.Builder()
             .from(childRelation)
@@ -106,9 +106,9 @@ public class MutationSchemaBuilderSql implements SchemaVisitor<SchemaSql, Schema
 
     newChild = replaceInParentPath(parent.getRelation().isEmpty() ? 0 : 1, newChildPath, newChild);
 
-    // TODO: rebuild mainTable without relation, change nested parentPaths
+    // NOPMD - TODO: rebuild mainTable without relation, change nested parentPaths
 
-    // TODO: make schema child of mainTable, change nested parentPaths
+    // NOPMD - TODO: make schema child of mainTable, change nested parentPaths
 
     Optional<SqlRelation> newParentRelation =
         parent.getRelation().isEmpty()
@@ -149,7 +149,6 @@ public class MutationSchemaBuilderSql implements SchemaVisitor<SchemaSql, Schema
                 property.getRole().isPresent() && property.getRole().get() == SchemaBase.Role.ID);
   }
 
-  // TODO
   private boolean isMerge(SchemaSql schemaSql) {
     return !schemaSql.getRelation().isEmpty()
         && schemaSql.getRelation().get(0).isOne2One()

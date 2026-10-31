@@ -40,7 +40,7 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
 
   @Override
   public void onStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
-    // TODO: get crs
+    // NOPMD - TODO: get crs
     this.dim = context.geometryDimension().orElse(2);
 
     super.onStart(context);

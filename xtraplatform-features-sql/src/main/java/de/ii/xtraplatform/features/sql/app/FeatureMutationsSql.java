@@ -70,7 +70,7 @@ public class FeatureMutationsSql {
     .collect(Collectors.toList());*/
   }
 
-  // TODO: to InsertGenerator
+  // NOTE: to InsertGenerator
   Supplier<Tuple<String, Consumer<String>>> createInstanceDelete(
       SqlQueryMapping mapping, String id) {
 
@@ -113,14 +113,14 @@ public class FeatureMutationsSql {
       return createAttributesInserts(schema, feature, newParentRows, id, crs);
     }
 
-    // TODO: what are the keys?
-    // TODO: err
+    // NOTE: what are the keys?
+    // NOPMD - TODO: err
     if (!feature.getRowNesting().containsKey(schema.getFullPath())) {
       // throw new IllegalStateException();
       return ImmutableList.of();
     }
 
-    // TODO: nested m:n test
+    // NOPMD - TODO: nested m:n test
     List<Integer> numberOfRowsPerParentRow =
         feature.getRowNesting().get(schema.getFullPath()); // [1,2] | [2]
     int currentParentRow = rowCursor.getCurrent(schema.getParentPath()); // 0|1 | 0

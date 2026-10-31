@@ -89,14 +89,14 @@ public class MutationSchemaDeriver implements ReverseSchemaDeriver<SchemaSql> {
 
     Optional<SqlPath> sqlPath = pathParser.parse(path, child.isValue());
 
-    // TODO: column?
+    // NOTE: column?
     if (!sqlPath.isPresent()) {
       throw new IllegalArgumentException("Parse error for SQL path: " + path);
     }
 
     List<SqlRelation> relations =
-        ImmutableList
-            .of(); // TODO hasRelation ? pathParser.toRelations(tablePathAsList, ImmutableMap.of())
+        ImmutableList.of(); // NOPMD - TODO hasRelation ? pathParser.toRelations(tablePathAsList,
+    // ImmutableMap.of())
     // : ImmutableList.of();
 
     SchemaSql currentChild = child;

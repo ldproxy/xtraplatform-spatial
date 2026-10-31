@@ -113,7 +113,7 @@ public class FeatureDecoderSql
     this.nestingTracker =
         new NestingTracker(getDownstream(), context, mainTablePaths, false, false, false);
 
-    // TODO: pass context and downstream
+    // NOTE: pass context and downstream
     subDecoderFactories.forEach(
         (connector, factory) -> subDecoders.put(connector, factory.createDecoder()));
   }
@@ -139,7 +139,7 @@ public class FeatureDecoderSql
       return;
     }
 
-    // TODO: should't happen, test with exception in onStart
+    // NOPMD - TODO: should't happen, test with exception in onStart
     if (!started) {
       return;
     }
@@ -231,7 +231,7 @@ public class FeatureDecoderSql
     }
   }
 
-  // TODO: move general parts to NestingTracker
+  // NOTE: move general parts to NestingTracker
   @SuppressWarnings("PMD.CyclomaticComplexity")
   private void handleNesting(SqlRow sqlRow, List<Integer> indexes) {
     while (nestingTracker.isNested()
@@ -271,7 +271,7 @@ public class FeatureDecoderSql
   })
   private void handleColumns(SqlRow sqlRow) {
     for (int i = 0; i < sqlRow.getValues().size() && i < sqlRow.getColumnPaths().size(); i++) {
-      // TODO: this is a workaround, ideally the paths SchemaMapping would contain the column
+      // NOTE: this is a workaround, ideally the paths SchemaMapping would contain the column
       // aliases
       List<String> columnPath =
           sqlRow.isSubDecoderColumn(i)

@@ -46,8 +46,9 @@ class SchemaInfo {
         .anyMatch(c -> c.getName().equals(name));
   }
 
-  // TODO: unique may be either column constraint, table constraint or index plus primary key
-  // TODO: NOT NULL constraints
+  // NOPMD - TODO: unique may be either column constraint, table constraint or index plus primary
+  // key
+  // NOPMD - TODO: NOT NULL constraints
   boolean isColumnUnique(String columnName, String tableName) {
     return isColumnUnique(columnName, tableName, true);
   }

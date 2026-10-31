@@ -907,7 +907,7 @@ public class FilterEncoderSql {
       return Optional.of(encodeNested(cqlFilter.get(), table.get(), true));
     }
 
-    // TODO: add AND to encoded filters so that isUserFilter is unambiguous
+    // NOTE: add AND to encoded filters so that isUserFilter is unambiguous
     Cql2Expression mergedFilter = And.of(targetFilter.get(), cqlFilter.get());
 
     return Optional.of(encodeNested(mergedFilter, table.get(), true));
@@ -937,7 +937,7 @@ public class FilterEncoderSql {
       return Optional.of(encodeNested(null, cqlFilter.get(), table.get(), true));
     }
 
-    // TODO: add AND to encoded filters so that isUserFilter is unambiguous
+    // NOTE: add AND to encoded filters so that isUserFilter is unambiguous
     Cql2Expression mergedFilter = And.of(targetFilter.get(), cqlFilter.get());
 
     return Optional.of(encodeNested(null, mergedFilter, table.get(), true));
@@ -1119,7 +1119,7 @@ public class FilterEncoderSql {
 
     protected Tuple<String, Optional<String>> getQualifiedColumn(
         SchemaSql table, String propertyName, String alias, boolean allowColumnFallback) {
-      // TODO: support nested mapping filters
+      // NOPMD - TODO: support nested mapping filters
       if (Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))
           && "node".equals(propertyName)) {
         return Tuple.of(ROUTE_SEGMENT + propertyName, Optional.<String>empty());
@@ -1201,7 +1201,7 @@ public class FilterEncoderSql {
       boolean allowColumnFallback = !propertyName.contains(".");
       SchemaSql table = getTable(propertyName, false, allowColumnFallback);
 
-      // TODO: pass all parents
+      // NOPMD - TODO: pass all parents
       List<SchemaSql> parents = ImmutableList.of(rootSchema);
       List<String> aliases = AliasGenerator.getAliases(parents, table, 1);
       String qualifiedColumn =
@@ -2009,7 +2009,7 @@ public class FilterEncoderSql {
             String arrayQuery = String.format(" = '%s'", jsonValueArray);
             return String.format(mainExpression, "", arrayQuery);
           } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
-            // TODO: can we express a_overlaps
+            // NOTE: can we express a_overlaps
             throw new IllegalArgumentException("A_OVERLAPS is not supported in JSON columns.");
           } else if (notInverse
               ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -2152,7 +2152,7 @@ public class FilterEncoderSql {
           getQualifiedColumn(schema, propertyName, alias, !isUserFilter && allowColumnFallback)
               .first();
 
-      // TODO: support nested mapping filters
+      // NOPMD - TODO: support nested mapping filters
       if (qualifiedColumn.startsWith(ROUTE_SEGMENT)) {
         qualifiedColumn = "A." + qualifiedColumn.replace(ROUTE_SEGMENT, "");
       }
@@ -2234,14 +2234,14 @@ public class FilterEncoderSql {
                       String.format(ERROR_UNKNOWN_PROPERTY, propertyName)));
     }
 
-    // TODO: move to SqlQueryMapping?
+    // NOTE: move to SqlQueryMapping?
     protected Tuple<String, Optional<String>> getQualifiedColumn(
         SqlQuerySchema table,
         SqlQueryColumn column,
         String propertyName,
         String alias,
         boolean allowColumnFallback) {
-      // TODO: why is this needed? what would a clean solution look like? (original: support nested
+      // NOTE: why is this needed? what would a clean solution look like? (original: support nested
       // mapping filters)
       if (Objects.equals(table.getParentPath(), ImmutableList.of(ROUTE_SEGMENT))
           && "node".equals(propertyName)) {
@@ -3263,7 +3263,6 @@ public class FilterEncoderSql {
       boolean notInverse = true;
       if (op1hasSelect) {
         if (op2hasSelect) {
-          // TODO
           throw new IllegalArgumentException(ERROR_ARRAY_BOTH_PROPERTIES);
           // secondExpression = reduceSelectToColumn(children.get(1));
         }
@@ -3312,7 +3311,7 @@ public class FilterEncoderSql {
       }
 
       if (op1hasSelect && op2hasSelect) {
-        // TODO property op property
+        // NOPMD - TODO property op property
         throw new IllegalArgumentException(ERROR_ARRAY_BOTH_PROPERTIES);
       }
 
@@ -3404,7 +3403,7 @@ public class FilterEncoderSql {
             String arrayQuery = String.format(" = '%s'", jsonValueArray);
             return String.format(mainExpression, "", arrayQuery);
           } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
-            // TODO: can we express a_overlaps
+            // NOTE: can we express a_overlaps
             throw new IllegalArgumentException("A_OVERLAPS is not supported in JSON columns.");
           } else if (notInverse
               ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -3533,6 +3532,7 @@ public class FilterEncoderSql {
     public String visit(Property property, List<String> children) {
       // strip double quotes from the property name
       String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
+      // NOPMD - TODO: only column for specific tablePath
       /*boolean hasPrefix = propertyName.contains(".");
       String prefix = hasPrefix ? propertyName.substring(0, propertyName.lastIndexOf(".") + 1) : "";
       boolean hasAllowedPrefix = hasPrefix && allowedColumnPrefixes.contains(prefix);
@@ -3543,7 +3543,6 @@ public class FilterEncoderSql {
               ? aliases.get(allowedColumnPrefixes.indexOf(prefix))
               : aliases.get(aliases.size() - 1);
 
-      // TODO: only column for specific tablePath
       de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, Integer> table =
           getTableColumn(propertyName, hasPrefix, prefix);
       // getTableColumn(propertyName, false, !isUserFilter && allowColumnFallback);
@@ -3559,7 +3558,7 @@ public class FilterEncoderSql {
 
       String qualifiedColumn = getQualifiedColumn(propertyName);
 
-      // TODO: support nested mapping filters
+      // NOPMD - TODO: support nested mapping filters
       if (qualifiedColumn.startsWith(ROUTE_SEGMENT)) {
         qualifiedColumn = "A." + qualifiedColumn.replace(ROUTE_SEGMENT, "");
       }

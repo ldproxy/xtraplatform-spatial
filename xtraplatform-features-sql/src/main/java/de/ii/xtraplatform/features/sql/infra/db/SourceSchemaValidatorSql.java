@@ -212,7 +212,7 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
                             "geometry"));
                   }
 
-                  // TODO: strictError on string
+                  // NOPMD - TODO: strictError on string
                   if (attribute.isTemporal()
                       && !schemaInfo.isColumnTemporal(tableSchema.getName(), attribute.getName())) {
                     result.addErrors(

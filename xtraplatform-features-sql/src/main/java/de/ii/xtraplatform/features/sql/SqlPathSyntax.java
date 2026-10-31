@@ -154,7 +154,7 @@ public interface SqlPathSyntax {
     return Optional.empty();
   }
 
-  // TODO: start end separator for flags
+  // NOTE: start end separator for flags
   @Value.Derived
   default String getPriorityFlagPattern() {
     return "\\{priority=" + REGEX_GROUP_START + MatcherGroups.PRIORITY + ">[0-9]+)\\}";
@@ -220,7 +220,7 @@ public interface SqlPathSyntax {
       return ".+_2_.+";
     }
 
-    // TODO: optional syntax for flags after table name, allow in Syntax
+    // NOTE: optional syntax for flags after table name, allow in Syntax
     @Value.Default
     default String getJunctionTableFlag() {
       return "{junction}";

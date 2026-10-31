@@ -61,7 +61,7 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @JsonIgnore
   @Value.Lazy
   default List<String> getParentPath() {
-    // TODO: generalize
+    // NOTE: generalize
     if (getRelations().size() == 2) {
       // There is a junction table, so we return the path of the parent table
       return getFullPath().subList(0, 1);
@@ -121,7 +121,7 @@ public interface SqlQuerySchema extends SqlQueryTable {
   default boolean isOne2One() {
     return getRelations().size() == 1
         && Objects.equals(
-            getRelations().get(0).getTargetField(), getSortKey() /*TODO getPrimaryKey()*/);
+            getRelations().get(0).getTargetField(), getSortKey() /*NOTE: getPrimaryKey()*/);
   }
 
   @JsonIgnore

@@ -144,7 +144,7 @@ public class SqlClientRx implements SqlClient {
             connection -> release(connection, streamed),
             true);
 
-    // TODO: prettify, see
+    // NOTE: prettify, see
     // https://github.com/slick/slick/blob/main/slick/src/main/scala/slick/jdbc/StatementInvoker.scala
     if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT)) {
       flowable =

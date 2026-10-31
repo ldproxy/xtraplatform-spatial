@@ -43,7 +43,7 @@ public class PathParserSql {
     if (matcher.find()) {
       String tablePath = matcher.group(SqlPathSyntax.MatcherGroups.PATH);
 
-      // TODO: full parent path?
+      // NOTE: full parent path?
       Map<String, String> tableFlags = new LinkedHashMap<>();
       Matcher tableMatcher = syntax.getTablePattern().matcher(tablePath);
       while (tableMatcher.find()) {
@@ -136,7 +136,7 @@ public class PathParserSql {
     return Stream.of(toRelation(source, link, filters), toRelation(link, target, filters));
   }
 
-  // TODO: support sortKey flag on table instead of getDefaultPrimaryKey
+  // NOPMD - TODO: support sortKey flag on table instead of getDefaultPrimaryKey
   private FeatureStoreRelation toRelation(
       String source, String target, Map<String, Cql2Expression> filters) {
     Matcher sourceMatcher = syntax.getTablePattern().matcher(source);

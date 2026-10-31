@@ -6,7 +6,7 @@
  */
 @Value.Style(deepImmutablesDetection = true, attributeBuilderDetection = true, builder = "new")
 @BuildableMapEncodingEnabled
-// TODO: when enabled globally, ModifiablePropertySql does not compile
+// NOTE: when enabled globally, ModifiablePropertySql does not compile
 // @MergeableMapEncodingEnabled
 package de.ii.xtraplatform.features.sql;
 

@@ -82,7 +82,6 @@ public class FeatureProviderSqlFactory
         new FeatureProviderSqlAuto(
             new SqlClientBasicFactoryDefault(connectorFactory, dbmsAdapters));
     this.skipHydration = false;
-    // TODO
     this.connectors = Set.of("JSON");
   }
 

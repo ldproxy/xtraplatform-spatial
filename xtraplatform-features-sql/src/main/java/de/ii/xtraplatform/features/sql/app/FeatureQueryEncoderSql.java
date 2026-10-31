@@ -60,13 +60,13 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
     this.computeNumberMatched = queryGeneratorSettings.getComputeNumberMatched();
   }
 
-  // TODO: add cql2 classes
+  // NOPMD - TODO: add cql2 classes
   @Override
   public FeatureProviderCapabilities getCapabilities() {
     return ImmutableFeatureProviderCapabilities.builder().level(Level.FULL).build();
   }
 
-  // TODO: cleanup options
+  // NOTE: cleanup options
   @Override
   public SqlQueryBatch encode(Query query, Map<String, String> additionalQueryParameters) {
     if (query instanceof FeatureQuery) {
@@ -283,7 +283,7 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
 
   @Override
   public SqlQueryOptions getOptions(TypeQuery typeQuery, Query query) {
-    // TODO: either pass as parameter, or check for null here
+    // NOTE: either pass as parameter, or check for null here
     SqlQueryTemplates queryTemplates = allQueryTemplates.get(typeQuery.getType()).get(0);
 
     List<SortKey> sortKeys =
