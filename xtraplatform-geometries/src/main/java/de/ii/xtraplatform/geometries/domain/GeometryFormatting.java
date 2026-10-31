@@ -29,10 +29,14 @@ final class GeometryFormatting {
     StringBuilder sb = new StringBuilder(shown * 24);
     sb.append('[');
     for (int p = 0; p < shown; p++) {
-      if (p > 0) sb.append(", ");
+      if (p > 0) {
+        sb.append(", ");
+      }
       sb.append('(');
       for (int i = 0; i < dim; i++) {
-        if (i > 0) sb.append(' ');
+        if (i > 0) {
+          sb.append(' ');
+        }
         sb.append(coordinates[p * dim + i]);
       }
       sb.append(')');

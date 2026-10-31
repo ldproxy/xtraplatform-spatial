@@ -177,7 +177,7 @@ public class GeometryDecoderJson extends AbstractGeometryDecoder {
     };
   }
 
-  @SuppressWarnings("PMD.NPathComplexity")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   public Geometry<?> decode(JsonNode node, Optional<EpsgCrs> crs, Optional<Axes> axes)
       throws IOException {
     if (!node.isObject()) {
