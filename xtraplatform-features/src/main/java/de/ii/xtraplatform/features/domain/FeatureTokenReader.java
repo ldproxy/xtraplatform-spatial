@@ -178,7 +178,7 @@ public class FeatureTokenReader<
 
   private void tryReadPath(Object context) {
     if (contextIndex == 0 && context instanceof List) {
-      // TODO: too expensive
+      // NOTE: too expensive
       this.context.pathTracker().track((List<String>) context);
     }
   }

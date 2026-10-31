@@ -62,7 +62,7 @@ public class SchemaToPathsVisitor<T extends SchemaBase<T>>
     List<List<String>> paths =
         useTargetPath
             ? ImmutableList.of(appendToLast(schema.getPath(), "{priority=" + counter + "}")) // )
-            // TODO: static cleanup method in PathParser
+            // NOTE: static cleanup method in PathParser
             : schema.getEffectiveSourcePaths().stream()
                 .map(
                     sourcePath1 -> {

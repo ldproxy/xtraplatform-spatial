@@ -96,7 +96,7 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
                           })
                       .collect(Collectors.toList());
 
-              // TODO: better double col support
+              // NOTE: better double col support
               String column = path.get(path.size() - 1);
               if (column.contains(":")) {
                 List<String> columns = Splitter.on(':').splitToList(column);

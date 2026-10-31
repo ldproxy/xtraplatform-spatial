@@ -20,8 +20,8 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableFeatureProperty.Builder.class)
 public interface FeatureProperty extends Buildable<FeatureProperty> {
 
-  // TODO: Role with ID, SPATIAL, TEMPORAL, REFERENCE, REFERENCE_EMBED
-  // TODO: more specific types, in addition or instead of Type
+  // NOTE: Role with ID, SPATIAL, TEMPORAL, REFERENCE, REFERENCE_EMBED
+  // NOTE: more specific types, in addition or instead of Type
   enum Role {
     ID,
     TYPE,

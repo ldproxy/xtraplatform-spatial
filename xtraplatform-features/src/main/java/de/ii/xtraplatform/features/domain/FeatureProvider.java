@@ -269,17 +269,17 @@ public interface FeatureProvider extends VolatileComposed {
         MultiFeatureQueries.class, MultiFeatureQueries.CAPABILITY, this);
   }
 
-  // TODO: to QueryCapabilities
+  // NOTE: to QueryCapabilities
   default boolean supportsSorting() {
     return false;
   }
 
-  // TODO: to QueryCapabilities
+  // NOTE: to QueryCapabilities
   default boolean supportsHighLoad() {
     return false;
   }
 
-  // TODO: to QueryCapabilities
+  // NOTE: to QueryCapabilities
   default boolean supportsHitsOnly() {
     return false;
   }

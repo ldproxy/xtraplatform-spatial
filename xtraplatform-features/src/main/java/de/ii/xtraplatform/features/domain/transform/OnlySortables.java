@@ -84,7 +84,7 @@ public class OnlySortables implements SchemaVisitorTopDown<FeatureSchema, Featur
           return null;
         }
 
-        // TODO: In the next major release move to FeatureSchema.sortable() and exclude
+        // NOTE: In the next major release move to FeatureSchema.sortable() and exclude
         //       incompatible properties.
         if (!isCompatible(schema) && shouldSkipIncompatibleSortable(schema)) {
           return null;

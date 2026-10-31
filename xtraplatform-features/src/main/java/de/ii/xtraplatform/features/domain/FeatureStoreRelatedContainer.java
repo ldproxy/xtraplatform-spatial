@@ -83,7 +83,7 @@ public interface FeatureStoreRelatedContainer extends FeatureStoreAttributesCont
     return keys.build();
   }
 
-  // TODO: should we do this here? can we derive it from the above?
+  // NOTE: should we do this here? can we derive it from the above?
   default List<String> getSortKeys(ListIterator<String> aliasesIterator) {
     ImmutableList.Builder<String> keys = ImmutableList.builder();
 

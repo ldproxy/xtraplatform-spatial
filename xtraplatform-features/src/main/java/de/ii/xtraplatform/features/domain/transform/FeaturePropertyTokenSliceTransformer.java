@@ -74,7 +74,7 @@ public interface FeaturePropertyTokenSliceTransformer
         transformed.addAll(slice.subList(lastEnd + 1, start));
       }
 
-      // TODO: +2 is needed for .sublist usage in implementations, should be +1 here and +1 in
+      // NOTE: +2 is needed for .sublist usage in implementations, should be +1 here and +1 in
       // implementations
       transformObject(currentPropertyPath, slice, path, start, end + 2, transformed);
 

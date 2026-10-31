@@ -912,7 +912,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
             .collect(Collectors.toList()));
   }
 
-  // TODO: replace SchemaVisitor with SchemaVisitorTopDown
+  // NOTE: replace SchemaVisitor with SchemaVisitorTopDown
   default <U> U accept(SchemaVisitorTopDown<T, U> visitor) {
     return accept(visitor, ImmutableList.of());
   }

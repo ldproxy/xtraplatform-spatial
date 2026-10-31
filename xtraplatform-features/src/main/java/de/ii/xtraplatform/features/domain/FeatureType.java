@@ -100,7 +100,7 @@ public interface FeatureType extends Buildable<FeatureType> {
                           })
                       .collect(Collectors.toList());
 
-              // TODO: implement double col support as provider transformer and remove this
+              // NOTE: implement double col support as provider transformer and remove this
               String root = path.get(0);
               String column = path.get(path.size() - 1);
               if (column.contains(":") && !root.contains(":")) {

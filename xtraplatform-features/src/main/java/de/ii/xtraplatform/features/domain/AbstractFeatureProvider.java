@@ -345,7 +345,7 @@ public abstract class AbstractFeatureProvider<
     return getData().getNativeCrs();
   }
 
-  // TODO: replace direct getTypes calls everywhere with getSchema
+  // NOTE: replace direct getTypes calls everywhere with getSchema
   @Override
   public Optional<FeatureSchema> getSchema(String type) {
     return Optional.ofNullable(getData().getTypes().get(type));
@@ -620,7 +620,7 @@ public abstract class AbstractFeatureProvider<
     getQueryEncoder().validate(typeQuery, query);
 
     U transformedQuery = getQueryEncoder().encode(query, beforeHookResults);
-    // TODO: remove options, already embedded in SqlQuerySet
+    // NOTE: remove options, already embedded in SqlQuerySet
     V options = getQueryEncoder().getOptions(typeQuery, query);
     Reactive.Source<T> source = getConnector().getSourceStream(transformedQuery, options);
 

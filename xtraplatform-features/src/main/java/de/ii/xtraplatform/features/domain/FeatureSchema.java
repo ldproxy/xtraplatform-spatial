@@ -1062,7 +1062,7 @@ public interface FeatureSchema
             .orElse(getType()),
         getFullPathAsString());
 
-    // TODO OBJECT and OBJECT_ARRAY is only added temporarily, because currently the schema is
+    // NOTE OBJECT and OBJECT_ARRAY is only added temporarily, because currently the schema is
     //      transformed in the process to use these types instead of FEATURE_REF and
     //      FEATURE_REF_ARRAY
     Preconditions.checkState(
@@ -1130,7 +1130,7 @@ public interface FeatureSchema
             .orElse(getType()),
         getFullPathAsString());
 
-    // TODO OBJECT is only added temporarily, because currently the schema is transformed in the
+    // NOTE OBJECT is only added temporarily, because currently the schema is transformed in the
     //      process to use these types instead of FEATURE_REF
     Preconditions.checkState(
         getCoalesce().isEmpty()

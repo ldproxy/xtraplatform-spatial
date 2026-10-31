@@ -85,7 +85,7 @@ public class OnlyQueryables implements SchemaVisitorTopDown<FeatureSchema, Featu
           return null;
         }
 
-        // TODO: In the next major release move to FeatureSchema.queryable() and exclude
+        // NOTE: In the next major release move to FeatureSchema.queryable() and exclude
         //       incompatible properties.
         if (!isCompatible(schema) && shouldSkipIncompatibleQueryable(schema)) {
           return null;
