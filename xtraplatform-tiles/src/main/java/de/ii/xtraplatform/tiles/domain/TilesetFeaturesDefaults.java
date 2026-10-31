@@ -39,10 +39,10 @@ public interface TilesetFeaturesDefaults
   abstract class Builder implements BuildableBuilder<TilesetFeaturesDefaults> {}
 
   /**
-   * @langEn Fixed spatial extent of the tileset in the native CRS of the feature provider. If set,
-   *     the extent is not derived from the feature provider.
-   * @langDe Fester räumlicher Extent des Tilesets im nativen CRS des Feature-Providers. Wenn
-   *     gesetzt, wird der Extent nicht vom Feature-Provider übernommen.
+   * @langEn Fixed spatial extent of the tileset in CRS84 (longitude/latitude). If set, the extent
+   *     is not derived from the feature provider.
+   * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite). Wenn gesetzt, wird der
+   *     Extent nicht vom Feature-Provider übernommen.
    */
   Optional<SpatialExtent> getExtent();
 }

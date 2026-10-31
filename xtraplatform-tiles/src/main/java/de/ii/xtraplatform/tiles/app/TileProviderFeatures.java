@@ -26,7 +26,6 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
-import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
@@ -1015,7 +1014,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
         tileset
             .getExtent()
             .or(() -> getData().getTilesetDefaults().getExtent())
-            .flatMap(extent -> extent.toBoundingBox(resolveNativeCrs(tileset)));
+            .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84));
 
     Optional<BoundingBox> bounds;
     if (configuredExtent.isPresent()) {
@@ -1146,12 +1145,5 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
 
   private String getFeatureProviderId(TilesetFeatures tileset) {
     return tileset.getFeatureProvider().orElse(TileProviderFeatures.clean(getData().getId()));
-  }
-
-  private EpsgCrs resolveNativeCrs(TilesetFeatures tileset) {
-    return tileGenerator
-        .getFeatureProvider(getFeatureProviderId(tileset))
-        .map(provider -> provider.crs().get().getNativeCrs())
-        .orElse(OgcCrs.CRS84);
   }
 }
