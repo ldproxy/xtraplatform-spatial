@@ -32,11 +32,6 @@ import org.threeten.extra.Interval;
 // - identifiers must be unquoted, that is, in uppercase in Oracle
 public class SqlDialectOras implements SqlDialect {
 
-  @Override
-  public String getId() {
-    return SqlDbmsAdapterOras.ID;
-  }
-
   private static final Splitter BBOX_SPLITTER =
       Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
 
@@ -51,6 +46,11 @@ public class SqlDialectOras implements SqlDialect {
           .put(SpatialFunction.S_INTERSECTS, Tuple.of("SDO_ANYINTERACT", Optional.empty()))
           .put(SpatialFunction.S_CONTAINS, Tuple.of("SDO_CONTAINS", Optional.empty()))
           .build();
+
+  @Override
+  public String getId() {
+    return SqlDbmsAdapterOras.ID;
+  }
 
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
