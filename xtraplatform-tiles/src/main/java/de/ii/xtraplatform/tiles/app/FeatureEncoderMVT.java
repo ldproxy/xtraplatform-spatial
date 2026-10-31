@@ -67,7 +67,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
     this.affineTransformation = createTransformNativeToTile();
     this.tileset = encodingContext.getTileset();
     this.tilePrecisionModel =
-        new PrecisionModel((double) tileExtent / (double) tile.getTileMatrixSet().getTileSize());
+        new PrecisionModel((double) tileExtent / tile.getTileMatrixSet().getTileSize());
     this.geometryFactoryTile = new GeometryFactory(tilePrecisionModel);
     this.geometryFactoryWorld = new GeometryFactory();
 

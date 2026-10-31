@@ -291,7 +291,7 @@ public class TileBuilderPgisAsMvt
     int tileExtent = tileset.getTileExtentOrDefault(tms);
     // the buffer is in the units of the internal coordinate system, so it has to be derived from
     // the tile extent to stay proportional to the tile
-    int buffer = (tileExtent / tms.getTileSize()) * TileBuilder.BUFFER_SIZE_FORMAL;
+    int buffer = tileExtent / tms.getTileSize() * BUFFER_SIZE_FORMAL;
 
     String bounds = "bounds AS (SELECT %1$s AS geom, %2$s::box2d AS b2d)";
     String mvtgeom =

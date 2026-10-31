@@ -329,7 +329,7 @@ public final class MbtilesTileset {
     return getTilesetPath(level, row, col).toString();
   }
 
-  @SuppressWarnings({"PMD.CloseResource", "PMD.CognitiveComplexity"})
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private void createMbtilesFile(Path path, boolean acquireMutexOnCreate) throws IOException {
     // acquire the mutex, if necessary (for write operations we already have it)
     boolean acquired = false;
@@ -844,7 +844,7 @@ public final class MbtilesTileset {
     deleteTile(level, row, tmsRow, col, supportsEmtpyTile);
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CloseResource"})
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public void deleteTile(int level, int row, int tmsRow, int col, boolean supportsEmptyTile)
       throws SQLException, IOException {
     Connection connection = null;
@@ -1073,7 +1073,6 @@ public final class MbtilesTileset {
     }
   }
 
-  @SuppressWarnings("PMD.CloseResource")
   private void cleanup(int level, int row, int col) throws SQLException, IOException {
     Connection connection = null;
     boolean acquired = false;

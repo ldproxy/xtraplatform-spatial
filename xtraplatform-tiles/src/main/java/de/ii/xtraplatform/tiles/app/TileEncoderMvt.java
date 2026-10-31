@@ -125,14 +125,11 @@ public class TileEncoderMvt implements TileEncoder {
   }
 
   private boolean isOutsideBounds(String tileset, Optional<BoundingBox> tileBounds) {
-    if (tileBounds.isEmpty()) {
-      return false;
-    }
-
-    return tilesetBounds
-        .apply(tileset)
-        .filter(bounds -> !BoundingBox.intersects(bounds, tileBounds.get()))
-        .isPresent();
+    return tileBounds.isPresent()
+        && tilesetBounds
+            .apply(tileset)
+            .filter(bounds -> !BoundingBox.intersects(bounds, tileBounds.get()))
+            .isPresent();
   }
 
   private List<String> getLayerTilesets(

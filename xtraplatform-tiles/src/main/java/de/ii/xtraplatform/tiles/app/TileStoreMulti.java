@@ -44,7 +44,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass", "PMD.CyclomaticComplexity"})
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
 public class TileStoreMulti implements TileStore, TileStore.Staging {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileStoreMulti.class);
