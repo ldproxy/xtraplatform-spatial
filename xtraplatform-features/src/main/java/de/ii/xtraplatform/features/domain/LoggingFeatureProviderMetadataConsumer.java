@@ -216,13 +216,15 @@ public class LoggingFeatureProviderMetadataConsumer implements FeatureProviderMe
   @Override
   public void analyzeFeatureTypeBoundingBox(
       String featureTypeName, BoundingBoxStrings boundingBox) {
-    LOGGER.debug(
-        "analyzeFeatureTypeBoundingBox {} {} {} {} {}",
-        featureTypeName,
-        boundingBox.getXmin(),
-        boundingBox.getYmin(),
-        boundingBox.getXmax(),
-        boundingBox.getYmax());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug(
+          "analyzeFeatureTypeBoundingBox {} {} {} {} {}",
+          featureTypeName,
+          boundingBox.getXmin(),
+          boundingBox.getYmin(),
+          boundingBox.getXmax(),
+          boundingBox.getYmax());
+    }
   }
 
   @Override
