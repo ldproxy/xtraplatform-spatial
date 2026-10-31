@@ -281,7 +281,11 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
     return builder.build();
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.CognitiveComplexity",
+    "PMD.NPathComplexity"
+  })
   private FeatureSchema toFeatureSchema(
       String name,
       Schema schema,
@@ -301,7 +305,6 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
     }
 
     boolean isRoot = Objects.isNull(root);
-    Schema r = isRoot ? schema : root;
     Type t = toType(s.getExplicitTypes());
     ImmutableFeatureSchema.Builder builder = new ImmutableFeatureSchema.Builder();
 
@@ -333,6 +336,7 @@ public class JsonSchemaResolver implements SchemaFragmentResolver, FeatureQuerie
     }
 
     t = applyTypeRefs(s.getUri().toString(), builder, t, isRoot, data);
+    Schema r = isRoot ? schema : root;
 
     if (t == Type.OBJECT) {
       resolveObjectProperties(resolved, s, originalPropertyMap, r, builder, data);
