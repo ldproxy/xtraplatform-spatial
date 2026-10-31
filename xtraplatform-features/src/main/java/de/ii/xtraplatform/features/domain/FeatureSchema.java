@@ -402,6 +402,7 @@ public interface FeatureSchema
   /**
    * @langEn Optional spatial and temporal extent for this feature type.
    * @langDe Optionaler räumlicher und zeitlicher Extent für diesen Feature-Type.
+   * @since v4.9
    */
   Optional<FeatureTypeExtent> getExtent();
 

@@ -26,6 +26,7 @@ public interface SpatialExtent {
   /**
    * @langEn Minimum x coordinate.
    * @langDe Minimale x-Koordinate.
+   * @since v4.9
    */
   @Nullable
   Double getXmin();
@@ -33,6 +34,7 @@ public interface SpatialExtent {
   /**
    * @langEn Minimum y coordinate.
    * @langDe Minimale y-Koordinate.
+   * @since v4.9
    */
   @Nullable
   Double getYmin();
@@ -40,6 +42,7 @@ public interface SpatialExtent {
   /**
    * @langEn Minimum z coordinate, optional.
    * @langDe Minimale z-Koordinate, optional.
+   * @since v4.9
    */
   @Nullable
   Double getZmin();
@@ -47,6 +50,7 @@ public interface SpatialExtent {
   /**
    * @langEn Maximum x coordinate.
    * @langDe Maximale x-Koordinate.
+   * @since v4.9
    */
   @Nullable
   Double getXmax();
@@ -54,6 +58,7 @@ public interface SpatialExtent {
   /**
    * @langEn Maximum y coordinate.
    * @langDe Maximale y-Koordinate.
+   * @since v4.9
    */
   @Nullable
   Double getYmax();
@@ -61,6 +66,7 @@ public interface SpatialExtent {
   /**
    * @langEn Maximum z coordinate, optional.
    * @langDe Maximale z-Koordinate, optional.
+   * @since v4.9
    */
   @Nullable
   Double getZmax();
@@ -72,6 +78,7 @@ public interface SpatialExtent {
    * @langDe Auf `true` setzen, um den Extent aus den Daten zu berechnen, statt einen festen Extent
    *     der übergeordneten Ebene (Provider für Types, Tileset-Defaults für Tilesets) zu erben. Darf
    *     nicht mit Koordinaten kombiniert werden; `false` ist nicht erlaubt.
+   * @since v4.9
    */
   @Nullable
   Boolean getComputed();
