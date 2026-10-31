@@ -82,7 +82,7 @@ public class FeatureSchemaToTypeVisitor implements SchemaVisitor<FeatureSchema, 
       return additionalInfo;
     }
 
-    // TODO: no longer needed
+    // TODO: no longer needed // NOPMD
     if (schema.getObjectType().isPresent()
         && Objects.equals(schema.getObjectType().get(), "Link")) {
       if (Objects.equals(name, "href")) {

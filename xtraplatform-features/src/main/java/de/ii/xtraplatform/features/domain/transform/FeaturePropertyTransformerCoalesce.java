@@ -136,7 +136,7 @@ public abstract class FeaturePropertyTransformerCoalesce
               }
             });
 
-        // TODO: check if all required props are set, otherwise reset and continue
+        // TODO: check if all required props are set, otherwise reset and continue // NOPMD
 
         found = true;
         break;

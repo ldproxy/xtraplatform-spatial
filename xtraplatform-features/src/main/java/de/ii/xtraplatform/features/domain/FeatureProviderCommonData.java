@@ -26,7 +26,7 @@ import org.immutables.value.Value;
 public interface FeatureProviderCommonData
     extends FeatureProviderDataV2, WithConnectionInfo<ConnectionInfo> {
 
-  // TODO: only needed for MigrationV1V2?
+  // NOTE: only needed for MigrationV1V2?
   @JsonIgnore
   @Nullable
   @Override

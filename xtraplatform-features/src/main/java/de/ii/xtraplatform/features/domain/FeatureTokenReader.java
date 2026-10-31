@@ -27,7 +27,6 @@ public class FeatureTokenReader<
   private List<String> nestingStack;
   private Map<List<String>, Integer> schemaIndexes;
 
-  // TODO
   public FeatureTokenReader(FeatureEventConsumer eventConsumer) {
     this.eventHandler = null;
   }

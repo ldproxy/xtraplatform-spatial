@@ -70,7 +70,6 @@ public interface FeatureProperty extends Buildable<FeatureProperty> {
 
   Map<String, String> getAdditionalInfo();
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
@@ -99,7 +98,6 @@ public interface FeatureProperty extends Buildable<FeatureProperty> {
     return getType() == Type.DATETIME;
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
@@ -107,7 +105,6 @@ public interface FeatureProperty extends Buildable<FeatureProperty> {
     return false;
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
@@ -115,7 +112,6 @@ public interface FeatureProperty extends Buildable<FeatureProperty> {
     return false;
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary

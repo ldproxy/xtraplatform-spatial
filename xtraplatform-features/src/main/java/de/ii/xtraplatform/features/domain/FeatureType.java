@@ -62,7 +62,6 @@ public interface FeatureType extends Buildable<FeatureType> {
   @JsonIgnore
   String getName();
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.UseStringBufferForStringAppends"})
@@ -73,7 +72,6 @@ public interface FeatureType extends Buildable<FeatureType> {
         .values()
         .forEach(
             featureProperty -> {
-              // TODO
               List<String> path =
                   Splitter.on('/')
                       .omitEmptyStrings()

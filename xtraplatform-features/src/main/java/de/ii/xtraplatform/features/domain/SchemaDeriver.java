@@ -511,7 +511,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
         .findFirst();
   }
 
-  // TODO: nested
+  // TODO: nested // NOPMD
   protected Map<String, T> withoutRoles(Map<String, T> properties, Role... roles) {
     return properties.entrySet().stream()
         .filter(
@@ -524,7 +524,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
         .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  // TODO: nested
+  // TODO: nested // NOPMD
   protected Map<String, T> withoutRoles(Map<String, T> properties) {
     return properties.entrySet().stream()
         .filter(

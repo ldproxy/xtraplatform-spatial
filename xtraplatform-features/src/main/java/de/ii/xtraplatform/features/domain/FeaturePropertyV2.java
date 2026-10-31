@@ -142,7 +142,6 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
     return getType() == Type.DATETIME;
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
@@ -150,7 +149,6 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
     return false;
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary
@@ -158,7 +156,6 @@ public interface FeaturePropertyV2 extends Buildable<FeaturePropertyV2> {
     return false;
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   @Value.Auxiliary

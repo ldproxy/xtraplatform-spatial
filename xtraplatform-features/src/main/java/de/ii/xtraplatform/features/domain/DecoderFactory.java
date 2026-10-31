@@ -13,7 +13,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Optional;
 
-// TODO: only for byte decoders?
+// NOTE: only for byte decoders?
 @AutoMultiBind
 public interface DecoderFactory {
 

@@ -73,7 +73,7 @@ public abstract class FeatureObjectTransformerBase<
     this.currentObjectOrArray = null;
   }
 
-  // TODO: if no matching name is found in schema, when inGeometry use primary
+  // TODO: if no matching name is found in schema, when inGeometry use primary // NOPMD
   @Override
   public final void onObjectStart(ModifiableContext<T, U> context) {
     if (context.schema().isEmpty()) {

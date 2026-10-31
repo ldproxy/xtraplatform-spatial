@@ -164,7 +164,7 @@ public interface FeatureEventHandler<
         return List.of();
       }
 
-      // TODO: by target path?
+      // NOTE: by target path?
       List<List<Integer>> positions = parentPositionsForPath();
 
       int schemaIndex = schemaIndex() > -1 ? schemaIndex() : positions.size() - 1;
@@ -374,7 +374,7 @@ public interface FeatureEventHandler<
           || (schema.isSpatial()
               && (typeQueries().isEmpty()
                   || typeQueries().stream().anyMatch(typeQuery -> !typeQuery.skipGeometry())))
-          // TODO: enable if projected output needs to be schema valid
+          // TODO: enable if projected output needs to be schema valid // NOPMD
           // || isRequired(schema, parentSchemas)
           || (!schema.isId() && propertyIsInFields(path));
     }

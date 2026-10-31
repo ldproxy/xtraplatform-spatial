@@ -142,7 +142,7 @@ public interface SchemaMapping extends SchemaMappingBase<FeatureSchema> {
     return path;
   }
 
-  // TODO: still needed?
+  // NOTE: still needed?
   @Override
   default Optional<String> getPathSeparator() {
     // if (useTargetPaths()) {

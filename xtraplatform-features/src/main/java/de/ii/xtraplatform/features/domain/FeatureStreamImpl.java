@@ -564,7 +564,7 @@ public class FeatureStreamImpl implements FeatureStream {
         Map.entry(
             schema.getFullPath().isEmpty() ? WILDCARD : schema.getFullPathAsString(),
             schema.getTransformations().stream()
-                // TODO: mark transformations with scope?
+                // NOTE: mark transformations with scope?
                 .filter(pt -> scope != SchemaBase.Scope.RECEIVABLE || pt.getWrap().isPresent())
                 .toList()));
   }

@@ -56,7 +56,7 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
 
   @Override
   default String transform(String currentPropertyPath, String input) {
-    // TODO: variable fractions
+    // TODO: variable fractions // NOPMD
     try {
       ZonedDateTime zdt = parse(input, getDefaultTimeZone());
 

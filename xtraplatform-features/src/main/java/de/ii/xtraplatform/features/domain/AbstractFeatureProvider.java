@@ -196,7 +196,7 @@ public abstract class AbstractFeatureProvider<
         createConnector(getData().getProviderSubType(), connectorId);
     this.connector.set(connector1);
 
-    // TODO: ignore when startupMode=ASYNC
+    // TODO: ignore when startupMode=ASYNC // NOPMD
     if (!getConnector().isConnected()) {
       connectorFactory.disposeConnector(connector1);
 
@@ -206,7 +206,7 @@ public abstract class AbstractFeatureProvider<
       if (connectionError.isPresent() && LOGGER.isDebugEnabled()) {
         LOGGER.debug("Stacktrace:", connectionError.get());
       }
-      // TODO: volatile defective
+      // TODO: volatile defective // NOPMD
       return false;
     }
 
@@ -219,7 +219,7 @@ public abstract class AbstractFeatureProvider<
     if (runnerError.isPresent()) {
       LOGGER.error(
           "Feature provider with id '{}' could not be started: {}", getId(), runnerError.get());
-      // TODO: volatile defective
+      // TODO: volatile defective // NOPMD
       return false;
     }
 
@@ -239,7 +239,7 @@ public abstract class AbstractFeatureProvider<
             getRunnerCapacity(getConnectionInfo()),
             getRunnerQueueSize(getConnectionInfo()));
 
-    // TODO: validation does not make sense when startupMode=ASYNC, move to editor/CLI
+    // TODO: validation does not make sense when startupMode=ASYNC, move to editor/CLI // NOPMD
     if (getTypeInfoValidator().isPresent() && getData().getTypeValidation() != MODE.NONE) {
       final boolean isSuccess = validate();
 
@@ -249,7 +249,7 @@ public abstract class AbstractFeatureProvider<
             getId(),
             getData().getTypeValidation().name().toLowerCase(Locale.ROOT),
             "validation failed");
-        // TODO: volatile defective
+        // TODO: volatile defective // NOPMD
         return false;
       }
     }
@@ -299,7 +299,7 @@ public abstract class AbstractFeatureProvider<
             extension -> {
               if (extension.isSupported(getConnector(), getData())) {
                 extension.on(LIFECYCLE_HOOK.STARTED, this, getConnector());
-                // TODO: addSubcomponent
+                // TODO: addSubcomponent // NOPMD
               }
             });
   }
@@ -562,7 +562,7 @@ public abstract class AbstractFeatureProvider<
     return getQueryEncoder().getCapabilities();
   }
 
-  // TODO: throw exception when connector absent
+  // TODO: throw exception when connector absent // NOPMD
   @Override
   public FeatureStream getFeatureStream(FeatureQuery query) {
     validateQuery(query);
@@ -582,7 +582,7 @@ public abstract class AbstractFeatureProvider<
         auditLog);
   }
 
-  // TODO: more tests
+  // TODO: more tests // NOPMD
   protected final void validateQuery(Query query) {
     if (query instanceof FeatureQuery featureQuery
         && !getSourceSchemas().containsKey(featureQuery.getType())) {
@@ -606,7 +606,7 @@ public abstract class AbstractFeatureProvider<
     return changeHandler;
   }
 
-  // TODO: encodingOptions vs executionOptions
+  // TODO: encodingOptions vs executionOptions // NOPMD
   private FeatureTokenSource getFeatureTokenSource(
       Query query,
       Map<String, PropertyTransformations> propertyTransformations,
@@ -729,7 +729,7 @@ public abstract class AbstractFeatureProvider<
     return path;
   }
 
-  // TODO: throw exception when connector absent
+  // TODO: throw exception when connector absent // NOPMD
   protected <W extends ResultBase> CompletionStage<W> runQuery(
       BiFunction<FeatureTokenSource, Map<String, String>, Stream<W>> stream,
       Query query,

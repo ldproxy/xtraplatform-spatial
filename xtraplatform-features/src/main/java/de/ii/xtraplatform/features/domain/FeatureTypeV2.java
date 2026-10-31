@@ -66,7 +66,6 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
     return new ImmutableFeatureTypeV2.Builder().from(this);
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   default Map<List<String>, List<FeatureSchema>> getPropertiesByPath() {
@@ -76,7 +75,6 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
         .values()
         .forEach(
             featureProperty -> {
-              // TODO
               List<String> path =
                   Splitter.on('/')
                       .omitEmptyStrings()
