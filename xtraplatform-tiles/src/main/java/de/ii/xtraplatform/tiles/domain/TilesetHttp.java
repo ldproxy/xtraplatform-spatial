@@ -42,8 +42,10 @@ public interface TilesetHttp extends TilesetCommon, WithEncodings, Buildable<Til
   Map<TilesFormat, String> getEncodings();
 
   /**
-   * @langEn Fixed spatial extent of the tileset in CRS84 (longitude/latitude).
-   * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite).
+   * @langEn Fixed spatial extent of the tileset in CRS84 (longitude/latitude). If not set, the
+   *     extent of the tile matrix sets is used.
+   * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite). Wenn nicht gesetzt, wird
+   *     der Extent der Kachelschemas verwendet.
    * @since v4.9
    */
   Optional<SpatialExtent> getExtent();
