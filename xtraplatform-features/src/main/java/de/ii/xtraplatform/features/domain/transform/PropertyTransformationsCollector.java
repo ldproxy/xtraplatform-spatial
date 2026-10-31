@@ -84,15 +84,12 @@ public class PropertyTransformationsCollector
   }
 
   @Override
+  @SuppressWarnings("PMD.FinalizeOverloaded")
   public PropertyTransformations finalize(
       FeatureSchema schema, Map<String, List<PropertyTransformation>> transformations) {
     PropertyTransformations schemaTransformations = () -> transformations;
-
-    PropertyTransformations mergedTransformations =
-        preferSchemaTransformations
-            ? schemaTransformations.mergeInto(additionalTransformations)
-            : additionalTransformations.mergeInto(schemaTransformations);
-
-    return mergedTransformations;
+    return preferSchemaTransformations
+        ? schemaTransformations.mergeInto(additionalTransformations)
+        : additionalTransformations.mergeInto(schemaTransformations);
   }
 }

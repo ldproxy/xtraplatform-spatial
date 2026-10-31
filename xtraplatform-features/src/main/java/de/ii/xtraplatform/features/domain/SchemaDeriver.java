@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
 public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSchema, T> {
 
   private final Map<String, Codelist> codelists;
@@ -62,13 +63,9 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       int k = 0;
 
       for (int i = 0; i < schema.getConcat().size(); i++) {
-        List<T> visitedProperties3 = new ArrayList<>();
-
-        if (!visitedProperties.isEmpty()) {
-          for (int j = 0; j < schema.getConcat().get(i).getProperties().size(); j++) {
-            visitedProperties3.add(visitedProperties.get(k++));
-          }
-        }
+        int count = schema.getConcat().get(i).getProperties().size();
+        List<T> visitedProperties3 = visitedProperties.subList(k, k + count);
+        k += count;
 
         schemas.add(deriveRootSchema(schema.getConcat().get(i), visitedProperties3));
       }
@@ -135,11 +132,9 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       int k = 0;
 
       for (int i = 0; i < schema.getConcat().size(); i++) {
-        List<T> visitedProperties3 = new ArrayList<>();
-
-        for (int j = 0; j < schema.getConcat().get(i).getProperties().size(); j++) {
-          visitedProperties3.add(visitedProperties.get(k++));
-        }
+        int count = schema.getConcat().get(i).getProperties().size();
+        List<T> visitedProperties3 = visitedProperties.subList(k, k + count);
+        k += count;
 
         schemas.add(deriveObjectSchema(schema.getConcat().get(i), visitedProperties3, false));
       }
@@ -157,11 +152,9 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       int k = 0;
 
       for (int i = 0; i < schema.getCoalesce().size(); i++) {
-        List<T> visitedProperties3 = new ArrayList<>();
-
-        for (int j = 0; j < schema.getCoalesce().get(i).getProperties().size(); j++) {
-          visitedProperties3.add(visitedProperties.get(k++));
-        }
+        int count = schema.getCoalesce().get(i).getProperties().size();
+        List<T> visitedProperties3 = visitedProperties.subList(k, k + count);
+        k += count;
 
         schemas.add(deriveObjectSchema(schema.getCoalesce().get(i), visitedProperties3, false));
       }
@@ -232,19 +225,19 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
     return objectSchema;
   }
 
+  @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
   protected T deriveValueSchema(FeatureSchema schema) {
     if (schema.getTransformations().stream()
         .anyMatch(t -> t.getRemove().map(v -> ALWAYS.name().equals(v)).isPresent())) {
       return null;
     }
 
-    T valueSchema = null;
     Type propertyType = schema.getType();
-    if (Type.VALUE.equals(propertyType) && schema.getValueType().isPresent()) {
+    if (Type.VALUE == propertyType && schema.getValueType().isPresent()) {
       propertyType = schema.getValueType().get();
-    } else if (Type.ENCRYPTED.equals(propertyType)) {
+    } else if (Type.ENCRYPTED == propertyType) {
       propertyType = schema.getValueType().orElse(Type.STRING);
-    } else if (Type.ENCRYPTED_ARRAY.equals(propertyType)) {
+    } else if (Type.ENCRYPTED_ARRAY == propertyType) {
       propertyType = Type.VALUE_ARRAY;
     }
     String propertyName = schema.getName();
@@ -254,7 +247,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
     Optional<String> role =
         schema
             .getRole()
-            .filter(r -> !Role.FILTER_GEOMETRY.equals(r))
+            .filter(r -> r != Role.FILTER_GEOMETRY)
             .map(Enum::name)
             .map(r -> CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_HYPHEN, r))
             .or(() -> schema.getRefType().map(ignore -> "reference"))
@@ -275,6 +268,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
                         .replace("__featureId__", "{featureId}"));
     Optional<String> codelistId = schema.getConstraints().flatMap(SchemaConstraints::getCodelist);
 
+    T valueSchema = null;
     switch (propertyType) {
       case VALUE:
         Set<T> valueSchemas =
@@ -517,7 +511,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
         .findFirst();
   }
 
-  // TODO: nested
+  // TODO: nested // NOPMD
   protected Map<String, T> withoutRoles(Map<String, T> properties, Role... roles) {
     return properties.entrySet().stream()
         .filter(
@@ -530,7 +524,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
         .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  // TODO: nested
+  // TODO: nested // NOPMD
   protected Map<String, T> withoutRoles(Map<String, T> properties) {
     return properties.entrySet().stream()
         .filter(

@@ -317,22 +317,22 @@ public interface PropertyTransformation
         .build();
   }
 
+  @SuppressWarnings({"PMD.UnusedReturnValue", "PMD.AvoidCatchingGenericException"})
   default ImmutableValidationResult.Builder validate(
       ImmutableValidationResult.Builder builder,
       String collectionId,
       String property,
       Collection<String> codelists) {
     final Optional<String> remove = getRemove();
-    if (remove.isPresent()) {
-      if (!FeaturePropertyTransformerRemove.CONDITION_VALUES.contains(remove.get())) {
-        builder.addStrictErrors(
-            MessageFormat.format(
-                "The remove transformation in collection ''{0}'' for property ''{1}'' is invalid. The value ''{2}'' is not one of the known values: {3}.",
-                collectionId,
-                property,
-                remove.get(),
-                FeaturePropertyTransformerRemove.CONDITION_VALUES));
-      }
+    if (remove.isPresent()
+        && !FeaturePropertyTransformerRemove.CONDITION_VALUES.contains(remove.get())) {
+      builder.addStrictErrors(
+          MessageFormat.format(
+              "The remove transformation in collection ''{0}'' for property ''{1}'' is invalid. The value ''{2}'' is not one of the known values: {3}.",
+              collectionId,
+              property,
+              remove.get(),
+              FeaturePropertyTransformerRemove.CONDITION_VALUES));
     }
     final Optional<String> dateFormat = getDateFormat();
     if (dateFormat.isPresent()) {
@@ -346,13 +346,11 @@ public interface PropertyTransformation
       }
     }
     final Optional<String> codelist = getCodelist();
-    if (codelist.isPresent()) {
-      if (!codelists.contains(codelist.get())) {
-        builder.addStrictErrors(
-            MessageFormat.format(
-                "The codelist transformation in collection ''{0}'' for property ''{1}'' is invalid. The codelist ''{2}'' is not one of the known values: {3}.",
-                collectionId, property, codelist.get(), codelists));
-      }
+    if (codelist.isPresent() && !codelists.contains(codelist.get())) {
+      builder.addStrictErrors(
+          MessageFormat.format(
+              "The codelist transformation in collection ''{0}'' for property ''{1}'' is invalid. The codelist ''{2}'' is not one of the known values: {3}.",
+              collectionId, property, codelist.get(), codelists));
     }
 
     return builder;

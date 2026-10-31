@@ -16,12 +16,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class SchemaReferenceResolver implements TypesResolver {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SchemaReferenceResolver.class);
 
   private final FeatureProviderDataV2 data;
   private final Lazy<Set<SchemaFragmentResolver>> schemaResolvers;
@@ -109,19 +105,7 @@ public class SchemaReferenceResolver implements TypesResolver {
     }
 
     if (hasMergeWithSchema(property)) {
-      List<PartialObjectSchema> partials = new ArrayList<>();
-
-      for (PartialObjectSchema partial : property.getMerge()) {
-        if (hasSchema(partial)) {
-          PartialObjectSchema resolvedPartial = resolve(partial.getSchema().get(), partial);
-
-          if (Objects.nonNull(resolvedPartial)) {
-            partials.add(resolvedPartial);
-          }
-        } else {
-          partials.add(partial);
-        }
-      }
+      List<PartialObjectSchema> partials = resolveMergePartials(property.getMerge());
 
       return new ImmutableFeatureSchema.Builder().from(property).merge(partials).build();
     }
@@ -147,6 +131,23 @@ public class SchemaReferenceResolver implements TypesResolver {
     }
 
     return property;
+  }
+
+  private List<PartialObjectSchema> resolveMergePartials(List<PartialObjectSchema> partials) {
+    List<PartialObjectSchema> resolved = new ArrayList<>();
+
+    for (PartialObjectSchema partial : partials) {
+      if (hasSchema(partial)) {
+        PartialObjectSchema resolvedPartial = resolve(partial.getSchema().get(), partial);
+
+        if (Objects.nonNull(resolvedPartial)) {
+          resolved.add(resolvedPartial);
+        }
+      } else {
+        resolved.add(partial);
+      }
+    }
+    return resolved;
   }
 
   private List<FeatureSchema> resolvePartials(List<FeatureSchema> partials) {

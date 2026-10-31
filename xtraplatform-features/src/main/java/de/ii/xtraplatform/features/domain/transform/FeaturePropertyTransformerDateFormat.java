@@ -54,19 +54,22 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   default String transform(String currentPropertyPath, String input) {
-    // TODO: variable fractions
+    // TODO: variable fractions // NOPMD
     try {
       ZonedDateTime zdt = parse(input, getDefaultTimeZone());
 
       return formatter().format(zdt);
     } catch (Throwable e) {
-      LOGGER.warn(
-          "{} transformation for property '{}' with value '{}' failed: {}",
-          getType(),
-          getPropertyPath(),
-          input,
-          e.getMessage());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "{} transformation for property '{}' with value '{}' failed: {}",
+            getType(),
+            getPropertyPath(),
+            input,
+            e.getMessage());
+      }
     }
 
     return input;

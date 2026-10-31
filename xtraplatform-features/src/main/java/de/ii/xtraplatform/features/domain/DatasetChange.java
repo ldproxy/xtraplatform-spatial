@@ -13,6 +13,7 @@ import java.util.List;
 import org.immutables.value.Value;
 
 @Value.Immutable
+@FunctionalInterface
 public interface DatasetChange {
 
   List<String> getFeatureTypes();

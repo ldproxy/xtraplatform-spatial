@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.immutables.value.Value;
 
+@SuppressWarnings({"PMD.ExcessivePublicCount", "PMD.TooManyMethods"})
 public interface SchemaBase<T extends SchemaBase<T>> {
 
   enum Role {
@@ -185,7 +186,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
     SORTABLE;
 
     public static List<Scope> allBut(Scope... scopes) {
-      return Arrays.stream(Scope.values())
+      return Arrays.stream(values())
           .filter(s -> Arrays.stream(scopes).noneMatch(scope -> scope == s))
           .collect(Collectors.toList());
     }
@@ -643,10 +644,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   @Value.Derived
   @Value.Auxiliary
   default boolean hasEmbeddedFeature() {
-    if (!isFeature()) {
-      return false;
-    }
-    return getAllNestedProperties().stream().anyMatch(SchemaBase::isEmbeddedFeature);
+    return isFeature() && getAllNestedProperties().stream().anyMatch(SchemaBase::isEmbeddedFeature);
   }
 
   @JsonIgnore
@@ -914,7 +912,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
             .collect(Collectors.toList()));
   }
 
-  // TODO: replace SchemaVisitor with SchemaVisitorTopDown
+  // NOTE: replace SchemaVisitor with SchemaVisitorTopDown
   default <U> U accept(SchemaVisitorTopDown<T, U> visitor) {
     return accept(visitor, ImmutableList.of());
   }

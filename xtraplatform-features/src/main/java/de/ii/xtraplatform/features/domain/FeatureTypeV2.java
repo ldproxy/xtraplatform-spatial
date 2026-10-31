@@ -44,16 +44,17 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
   // deserialization
   // (immutables attributeBuilder does not work with maps yet)
   @JsonMerge
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<FeatureSchema, ImmutableFeatureSchema.Builder> getProperties();
 
   Map<String, String> getAdditionalInfo();
 
   // custom builder to automatically use keys of types as name of FeaturePropertyV2
-  abstract static class Builder implements BuildableBuilder<FeatureTypeV2> {
+  abstract class Builder implements BuildableBuilder<FeatureTypeV2> {
     public abstract ImmutableFeatureTypeV2.Builder putProperties(
         String key, ImmutableFeatureSchema.Builder builder);
 
-    @JsonProperty(value = "properties")
+    @JsonProperty("properties")
     public ImmutableFeatureTypeV2.Builder putProperties2(
         String key, ImmutableFeatureSchema.Builder builder) {
       return putProperties(key, builder.name(key));
@@ -65,7 +66,6 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
     return new ImmutableFeatureTypeV2.Builder().from(this);
   }
 
-  // TODO
   @JsonIgnore
   @Value.Derived
   default Map<List<String>, List<FeatureSchema>> getPropertiesByPath() {
@@ -75,7 +75,6 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
         .values()
         .forEach(
             featureProperty -> {
-              // TODO
               List<String> path =
                   Splitter.on('/')
                       .omitEmptyStrings()
@@ -95,7 +94,7 @@ public interface FeatureTypeV2 extends Buildable<FeatureTypeV2> {
                           })
                       .collect(Collectors.toList());
 
-              // TODO: better double col support
+              // NOTE: better double col support
               String column = path.get(path.size() - 1);
               if (column.contains(":")) {
                 List<String> columns = Splitter.on(':').splitToList(column);

@@ -92,6 +92,7 @@ public class FeatureTokenTransformerPropertyLinks extends FeatureTokenTransforme
     super.onValue(context);
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   static String normalizeToIso(String value) {
     try {
       TemporalAccessor ta =

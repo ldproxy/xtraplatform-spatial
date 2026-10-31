@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.GodClass")
 public class NestingTrackerBase<T> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(NestingTrackerBase.class);
@@ -53,7 +54,7 @@ public class NestingTrackerBase<T> {
   }
 
   public void closeAuto(List<String> path) {
-    while (isNested() && (doesNotStartWithPreviousPath(path))) {
+    while (isNested() && doesNotStartWithPreviousPath(path)) {
 
       if (inObject()) {
         closeObject();
@@ -165,10 +166,8 @@ public class NestingTrackerBase<T> {
   }
 
   public boolean doesStartWithPreviousPath(List<String> nextPath) {
-    if (Objects.equals(nextPath, getCurrentNestingPath())) {
-      return false;
-    }
-    return startsWith(nextPath, getCurrentNestingPath());
+    return !Objects.equals(nextPath, getCurrentNestingPath())
+        && startsWith(nextPath, getCurrentNestingPath());
   }
 
   private static <T> boolean startsWith(List<T> longer, List<T> shorter) {
@@ -183,7 +182,7 @@ public class NestingTrackerBase<T> {
   public String toString() {
     StringBuilder s = new StringBuilder();
     for (int i = 0; i < pathStack.size(); i++) {
-      s.append(pathStack.get(i)).append(" ").append(nestingStack.get(i)).append("\n");
+      s.append(pathStack.get(i)).append(' ').append(nestingStack.get(i)).append('\n');
     }
     return s.toString();
   }

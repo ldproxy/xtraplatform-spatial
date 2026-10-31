@@ -98,8 +98,9 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
 
   interface ModifiableContext<T, U> extends Context<T, U> {
 
-    // TODO: default values are not cached by Modifiable
+    // NOTE: default values are not cached by Modifiable
     @Value.Default
+    @Override
     default ModifiableCollectionMetadata metadata() {
       ModifiableCollectionMetadata collectionMetadata = ModifiableCollectionMetadata.create();
 
@@ -108,7 +109,7 @@ public interface FeatureEventHandlerSimple<T, U, V extends ModifiableContext<T, 
       return collectionMetadata;
     }
 
-    // TODO: default values are not cached by Modifiable
+    // NOTE: default values are not cached by Modifiable
     @Value.Default
     default FeaturePathTracker pathTracker() {
       // when tracking target paths, if present, use path separator from flatten transformation in

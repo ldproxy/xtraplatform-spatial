@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+@SuppressWarnings("PMD.DataClass")
 public final class BoundingBoxStrings {
 
   private final String xmin;

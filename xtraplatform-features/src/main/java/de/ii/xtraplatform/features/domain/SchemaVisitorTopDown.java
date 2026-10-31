@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.function.Function;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface SchemaVisitorTopDown<T extends SchemaBase<T>, U> {
 
   U visit(T schema, List<T> parents, List<U> visitedProperties);

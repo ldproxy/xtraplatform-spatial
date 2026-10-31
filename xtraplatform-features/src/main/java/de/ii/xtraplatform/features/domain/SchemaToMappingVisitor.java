@@ -43,7 +43,7 @@ public class SchemaToMappingVisitor<T extends SchemaBase<T>>
     List<String> path2 =
         useTargetPath
             ? schema.getPath()
-            // TODO: static cleanup method in PathParser
+            // NOTE: static cleanup method in PathParser
             : SPLITTER.splitToList(
                 schema
                     .getSourcePath()

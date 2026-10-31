@@ -48,6 +48,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -63,10 +64,17 @@ import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings({
+  "PMD.CouplingBetweenObjects",
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods",
+  "PMD.DoNotUseThreads"
+})
 public abstract class AbstractFeatureProvider<
         T, U, V extends FeatureProviderConnector.QueryOptions, W extends SchemaBase<W>>
     extends AbstractPersistentEntity<FeatureProviderDataV2>
-    implements FeatureProviderEntity, FeatureProvider, FeatureInfo, FeatureQueries {
+    implements FeatureProviderEntity, FeatureInfo, FeatureQueries {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractFeatureProvider.class);
   protected static final WithScope WITH_SCOPE_RETURNABLE = new WithScope(Scope.RETURNABLE);
@@ -86,7 +94,6 @@ public abstract class AbstractFeatureProvider<
   private final Values<Codelist> codelistStore;
   private final FeatureChanges changeHandler;
   private final ScheduledExecutorService delayedDisposer;
-  private final VolatileRegistry volatileRegistry;
   private Reactive.Runner streamRunner;
   private final DelayedVolatile<FeatureProviderConnector<T, U, V>> connector;
   private boolean datasetChanged;
@@ -113,12 +120,11 @@ public abstract class AbstractFeatureProvider<
     this.codelistStore = codelistStore;
     this.auditLog = auditLog;
     this.encryption = encryption;
-    this.volatileRegistry = volatileRegistry;
     this.changeHandler = new FeatureChangeHandlerImpl();
     this.connector =
         new DelayedVolatile<>(
             volatileRegistry,
-            String.format("connector.%s", data.getProviderSubType().toLowerCase()));
+            String.format("connector.%s", data.getProviderSubType().toLowerCase(Locale.ROOT)));
     this.delayedDisposer =
         MoreExecutors.getExitingScheduledExecutorService(
             (ScheduledThreadPoolExecutor)
@@ -132,16 +138,12 @@ public abstract class AbstractFeatureProvider<
   }
 
   @Override
-  public FeatureProviderDataV2 getData() {
-    return super.getData();
-  }
-
-  @Override
   protected State reconcileStateNoComponents(@Nullable String capability) {
     return State.AVAILABLE;
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   protected boolean onStartup() throws InterruptedException {
     onVolatileStart();
 
@@ -193,7 +195,7 @@ public abstract class AbstractFeatureProvider<
         createConnector(getData().getProviderSubType(), connectorId);
     this.connector.set(connector1);
 
-    // TODO: ignore when startupMode=ASYNC
+    // TODO: ignore when startupMode=ASYNC // NOPMD
     if (!getConnector().isConnected()) {
       connectorFactory.disposeConnector(connector1);
 
@@ -203,7 +205,7 @@ public abstract class AbstractFeatureProvider<
       if (connectionError.isPresent() && LOGGER.isDebugEnabled()) {
         LOGGER.debug("Stacktrace:", connectionError.get());
       }
-      // TODO: volatile defective
+      // TODO: volatile defective // NOPMD
       return false;
     }
 
@@ -216,7 +218,7 @@ public abstract class AbstractFeatureProvider<
     if (runnerError.isPresent()) {
       LOGGER.error(
           "Feature provider with id '{}' could not be started: {}", getId(), runnerError.get());
-      // TODO: volatile defective
+      // TODO: volatile defective // NOPMD
       return false;
     }
 
@@ -236,7 +238,7 @@ public abstract class AbstractFeatureProvider<
             getRunnerCapacity(getConnectionInfo()),
             getRunnerQueueSize(getConnectionInfo()));
 
-    // TODO: validation does not make sense when startupMode=ASYNC, move to editor/CLI
+    // TODO: validation does not make sense when startupMode=ASYNC, move to editor/CLI // NOPMD
     if (getTypeInfoValidator().isPresent() && getData().getTypeValidation() != MODE.NONE) {
       final boolean isSuccess = validate();
 
@@ -244,9 +246,9 @@ public abstract class AbstractFeatureProvider<
         LOGGER.error(
             "Feature provider with id '{}' could not be started: {} {}",
             getId(),
-            getData().getTypeValidation().name().toLowerCase(),
+            getData().getTypeValidation().name().toLowerCase(Locale.ROOT),
             "validation failed");
-        // TODO: volatile defective
+        // TODO: volatile defective // NOPMD
         return false;
       }
     }
@@ -268,7 +270,9 @@ public abstract class AbstractFeatureProvider<
 
     onStateChange(
         (from, to) -> {
-          LOGGER.info("Feature provider with id '{}' state changed: {}", getId(), getState());
+          if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("Feature provider with id '{}' state changed: {}", getId(), getState());
+          }
         },
         true);
 
@@ -277,7 +281,9 @@ public abstract class AbstractFeatureProvider<
             .map(map -> String.format(" (%s)", map.toString().replace("{", "").replace("}", "")))
             .orElse("");
 
-    LOGGER.info("Feature provider with id '{}' started successfully.{}", getId(), startupInfo);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Feature provider with id '{}' started successfully.{}", getId(), startupInfo);
+    }
 
     if (datasetChangedForced) {
       LOGGER.info("Dataset has changed (forced).");
@@ -292,7 +298,7 @@ public abstract class AbstractFeatureProvider<
             extension -> {
               if (extension.isSupported(getConnector(), getData())) {
                 extension.on(LIFECYCLE_HOOK.STARTED, this, getConnector());
-                // TODO: addSubcomponent
+                // TODO: addSubcomponent // NOPMD
               }
             });
   }
@@ -304,12 +310,14 @@ public abstract class AbstractFeatureProvider<
             .map(map -> String.format(" (%s)", map.toString().replace("{", "").replace("}", "")))
             .orElse("");
 
-    LOGGER.info("Feature provider with id '{}' reloaded successfully.{}", getId(), startupInfo);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Feature provider with id '{}' reloaded successfully.{}", getId(), startupInfo);
+    }
 
     if (datasetChanged || datasetChangedForced || (forceReload && allowForceReload())) {
       if (datasetChangedForced || forceReload) {
         LOGGER.info("Dataset has changed (forced).");
-      } else {
+      } else if (LOGGER.isInfoEnabled()) {
         LOGGER.info(
             "Dataset has changed ({} -> {}).",
             previousDataset,
@@ -326,7 +334,9 @@ public abstract class AbstractFeatureProvider<
     if (connector.isPresent()) {
       connectorFactory.disposeConnector(connector.get());
     }
-    LOGGER.info("Feature provider with id '{}' stopped.", getId());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Feature provider with id '{}' stopped.", getId());
+    }
   }
 
   @Override
@@ -334,7 +344,7 @@ public abstract class AbstractFeatureProvider<
     return getData().getNativeCrs();
   }
 
-  // TODO: replace direct getTypes calls everywhere with getSchema
+  // NOTE: replace direct getTypes calls everywhere with getSchema
   @Override
   public Optional<FeatureSchema> getSchema(String type) {
     return Optional.ofNullable(getData().getTypes().get(type));
@@ -407,9 +417,10 @@ public abstract class AbstractFeatureProvider<
                         i -> {
                           try {
                             return Optional.of(Integer.parseInt(i));
-                          } catch (Throwable e) {
+                          } catch (NumberFormatException e) {
+                            // not a valid iteration number, fall back to 1
+                            return Optional.of(1);
                           }
-                          return Optional.of(1);
                         })
                 : Optional.of(1)
             : Optional.empty();
@@ -421,15 +432,18 @@ public abstract class AbstractFeatureProvider<
         previousIteration.map(i -> "." + (i + 1)).orElse(""));
   }
 
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.AvoidInstanceofChecksInCatchClause"})
   private boolean validate() throws InterruptedException {
     boolean isSuccess = true;
 
     try {
       for (Map.Entry<String, List<W>> sourceSchema : getSourceSchemas().entrySet()) {
-        LOGGER.info(
-            "Validating type '{}' ({})",
-            sourceSchema.getKey(),
-            getData().getTypeValidation().name().toLowerCase());
+        if (LOGGER.isInfoEnabled()) {
+          LOGGER.info(
+              "Validating type '{}' ({})",
+              sourceSchema.getKey(),
+              getData().getTypeValidation().name().toLowerCase(Locale.ROOT));
+        }
 
         ValidationResult result =
             getTypeInfoValidator()
@@ -551,7 +565,7 @@ public abstract class AbstractFeatureProvider<
     return getQueryEncoder().getCapabilities();
   }
 
-  // TODO: throw exception when connector absent
+  // TODO: throw exception when connector absent // NOPMD
   @Override
   public FeatureStream getFeatureStream(FeatureQuery query) {
     validateQuery(query);
@@ -571,12 +585,11 @@ public abstract class AbstractFeatureProvider<
         auditLog);
   }
 
-  // TODO: more tests
+  // TODO: more tests // NOPMD
   protected final void validateQuery(Query query) {
-    if (query instanceof FeatureQuery) {
-      if (!getSourceSchemas().containsKey(((FeatureQuery) query).getType())) {
-        throw new IllegalArgumentException("No features available for type");
-      }
+    if (query instanceof FeatureQuery featureQuery
+        && !getSourceSchemas().containsKey(featureQuery.getType())) {
+      throw new IllegalArgumentException("No features available for type");
     }
     if (query instanceof MultiFeatureQuery) {
       for (TypeQuery typeQuery : ((MultiFeatureQuery) query).getQueries()) {
@@ -596,7 +609,7 @@ public abstract class AbstractFeatureProvider<
     return changeHandler;
   }
 
-  // TODO: encodingOptions vs executionOptions
+  // TODO: encodingOptions vs executionOptions // NOPMD
   private FeatureTokenSource getFeatureTokenSource(
       Query query,
       Map<String, PropertyTransformations> propertyTransformations,
@@ -610,7 +623,7 @@ public abstract class AbstractFeatureProvider<
     getQueryEncoder().validate(typeQuery, query);
 
     U transformedQuery = getQueryEncoder().encode(query, beforeHookResults);
-    // TODO: remove options, already embedded in SqlQuerySet
+    // NOTE: remove options, already embedded in SqlQuerySet
     V options = getQueryEncoder().getOptions(typeQuery, query);
     Reactive.Source<T> source = getConnector().getSourceStream(transformedQuery, options);
 
@@ -719,7 +732,7 @@ public abstract class AbstractFeatureProvider<
     return path;
   }
 
-  // TODO: throw exception when connector absent
+  // TODO: throw exception when connector absent // NOPMD
   protected <W extends ResultBase> CompletionStage<W> runQuery(
       BiFunction<FeatureTokenSource, Map<String, String>, Stream<W>> stream,
       Query query,

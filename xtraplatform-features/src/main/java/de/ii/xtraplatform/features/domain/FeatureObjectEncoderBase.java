@@ -38,6 +38,7 @@ public abstract class FeatureObjectEncoderBase<
   public void onEnd(ModifiableContext<T, U> context) {}
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public final void onFeatureStart(ModifiableContext<T, U> context) {
     if (context.schema().isEmpty()) {
       return;
@@ -52,6 +53,7 @@ public abstract class FeatureObjectEncoderBase<
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public final void onFeatureEnd(ModifiableContext<T, U> context) {
     onFeature(currentFeature);
 

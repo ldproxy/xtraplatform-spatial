@@ -26,7 +26,7 @@ public class FeatureTokenBufferSimple<U, V, W extends ModifiableContext<U, V>>
   public FeatureTokenBufferSimple(FeatureEventHandlerSimple<U, V, W> downstream, W context) {
     this.downstream = downstream;
     this.buffer = new ArrayList<>();
-    this.bufferIn = (FeatureTokenEmitterSimple<U, V, W>) (buffer::add);
+    this.bufferIn = (FeatureTokenEmitterSimple<U, V, W>) buffer::add;
     this.bufferOut = new FeatureTokenReaderSimple<>(downstream, context);
     this.doBuffer = false;
     this.mark = -1;

@@ -14,6 +14,7 @@ import de.ii.xtraplatform.geometries.domain.Geometry;
 import java.util.List;
 import java.util.OptionalLong;
 
+@FunctionalInterface
 public interface FeatureTokenEmitterSimple<T, U, V extends ModifiableContext<T, U>>
     extends FeatureEventHandlerSimple<T, U, V> {
 

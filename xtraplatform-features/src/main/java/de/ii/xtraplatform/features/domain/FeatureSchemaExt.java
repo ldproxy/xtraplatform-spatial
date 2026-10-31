@@ -74,7 +74,8 @@ public interface FeatureSchemaExt
   // behaves exactly like Map<String, FeaturePropertyV2>, but supports mergeable builder
   // deserialization
   // (immutables attributeBuilder does not work with maps yet)
-  @JsonProperty(value = "properties")
+  @JsonProperty("properties")
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<FeatureSchemaExt, ImmutableFeatureSchemaExt.Builder> getPropertyMap();
 
   // custom builder to automatically use keys of properties as name
@@ -84,7 +85,7 @@ public interface FeatureSchemaExt
         String key, ImmutableFeatureSchemaExt.Builder builder);
 
     // @JsonMerge
-    @JsonProperty(value = "properties")
+    @JsonProperty("properties")
     public ImmutableFeatureSchemaExt.Builder putProperties2(
         Map<String, ImmutableFeatureSchemaExt.Builder> builderMap) {
       ImmutableFeatureSchemaExt.Builder builder1 = null;
@@ -97,7 +98,7 @@ public interface FeatureSchemaExt
       // return putPropertyMap(key, builder.name(key));
     }
 
-    // @JsonProperty(value = "properties")
+    // @JsonProperty("properties")
     // @JsonAnySetter
     public ImmutableFeatureSchemaExt.Builder putProperties2(
         String key, ImmutableFeatureSchemaExt.Builder builder) {

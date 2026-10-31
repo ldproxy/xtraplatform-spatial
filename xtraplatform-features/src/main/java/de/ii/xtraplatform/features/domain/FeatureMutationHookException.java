@@ -18,6 +18,8 @@ import java.util.List;
  */
 public class FeatureMutationHookException extends RuntimeException {
 
+  private static final long serialVersionUID = 1L;
+
   private final List<String> warnings;
 
   public FeatureMutationHookException(String message, Throwable cause, List<String> warnings) {

@@ -32,10 +32,12 @@ public class ConstantsResolver implements TypesResolver {
         schema.getType() == SchemaBase.Type.STRING
             ? String.format("'%s'", schema.getConstantValue().get())
             : schema.getConstantValue().get();
+    int currentConstantCounter = constantCounter[0];
+    constantCounter[0] = currentConstantCounter + 1;
     String constantSourcePath =
         String.format(
             "%sconstant_%s_%d{constant=%s}",
-            schema.getSourcePath().orElse(""), parentName, constantCounter[0]++, constantValue);
+            schema.getSourcePath().orElse(""), parentName, currentConstantCounter, constantValue);
 
     return new ImmutableFeatureSchema.Builder().from(schema).sourcePath(constantSourcePath).build();
   }

@@ -20,11 +20,13 @@ public class FeatureTokenTransformerWeakETag extends FeatureTokenTransformer {
   private final ETag.Incremental eTag;
 
   public FeatureTokenTransformerWeakETag(Builder resultBuilder) {
+    super();
     this.builder = resultBuilder::eTag;
     this.eTag = ETag.incremental();
   }
 
   public <X> FeatureTokenTransformerWeakETag(ImmutableResultReduced.Builder<X> resultBuilder) {
+    super();
     this.builder = resultBuilder::eTag;
     this.eTag = ETag.incremental();
   }

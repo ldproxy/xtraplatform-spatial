@@ -14,6 +14,7 @@ import java.util.OptionalLong;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.SignatureDeclareThrowsException")
 public interface FeatureConsumer {
   void onStart(
       OptionalLong numberReturned, OptionalLong numberMatched, Map<String, String> additionalInfos)

@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.domain.transform;
 
 import de.ii.xtraplatform.features.domain.FeatureSchema;
-import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema.Builder;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
@@ -41,17 +40,15 @@ public interface FeaturePropertyTransformerObjectReduceSelect
         schema.getSourcePath().map(s -> s + "/").orElse("")
             + selected.get().getSourcePath().orElse("");
 
-    ImmutableFeatureSchema build =
-        new Builder()
-            .from(selected.get())
-            .type(schema.isArray() ? Type.VALUE_ARRAY : Type.VALUE)
-            .valueType(selected.get().getValueType().orElse(selected.get().getType()))
-            .name(schema.getName())
-            .sourcePath(mergedSourcePath)
-            .path(schema.getPath())
-            .parentPath(schema.getParentPath())
-            .build();
-    return build;
+    return new Builder()
+        .from(selected.get())
+        .type(schema.isArray() ? Type.VALUE_ARRAY : Type.VALUE)
+        .valueType(selected.get().getValueType().orElse(selected.get().getType()))
+        .name(schema.getName())
+        .sourcePath(mergedSourcePath)
+        .path(schema.getPath())
+        .parentPath(schema.getParentPath())
+        .build();
   }
 
   @Override

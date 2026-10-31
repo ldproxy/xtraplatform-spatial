@@ -15,6 +15,7 @@ import java.util.OptionalLong;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.SignatureDeclareThrowsException")
 public interface FeatureTransformer {
   String getTargetFormat();
 
@@ -22,23 +23,22 @@ public interface FeatureTransformer {
 
   void onEnd() throws Exception;
 
-  void onFeatureStart(final TargetMapping mapping) throws Exception;
+  void onFeatureStart(TargetMapping mapping) throws Exception;
 
   void onFeatureEnd() throws Exception;
 
-  void onPropertyStart(final TargetMapping mapping, List<Integer> multiplicities) throws Exception;
+  void onPropertyStart(TargetMapping mapping, List<Integer> multiplicities) throws Exception;
 
-  void onPropertyText(final String text) throws Exception;
+  void onPropertyText(String text) throws Exception;
 
   void onPropertyEnd() throws Exception;
 
-  void onGeometryStart(
-      final TargetMapping mapping, final GeometryType type, final Integer dimension)
+  void onGeometryStart(TargetMapping mapping, GeometryType type, Integer dimension)
       throws Exception;
 
   void onGeometryNestedStart() throws Exception;
 
-  void onGeometryCoordinates(final String text) throws Exception;
+  void onGeometryCoordinates(String text) throws Exception;
 
   void onGeometryNestedEnd() throws Exception;
 

@@ -38,15 +38,15 @@ public abstract class FeatureTokenTransformerBaseSimple<T, U, V extends Modifiab
     boolean isTransformerFuseable =
         TransformerCustomFuseable.super.canFuse(transformerCustomFuseableIn);
 
-    if (isTransformerFuseable && transformerCustomFuseableIn instanceof FeatureTokenContext<?>) {
-      if (!ModifiableContext.class.isAssignableFrom(
-          ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface())) {
-        throw new IllegalStateException(
-            "Cannot fuse FeatureTokenTransformer: "
-                + ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface()
-                + " does not extend "
-                + this.getContextInterface());
-      }
+    if (isTransformerFuseable
+        && transformerCustomFuseableIn instanceof FeatureTokenContext<?>
+        && !ModifiableContext.class.isAssignableFrom(
+            ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface())) {
+      throw new IllegalStateException(
+          "Cannot fuse FeatureTokenTransformer: "
+              + ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface()
+              + " does not extend "
+              + this.getContextInterface());
     }
 
     return isTransformerFuseable;
@@ -61,7 +61,7 @@ public abstract class FeatureTokenTransformerBaseSimple<T, U, V extends Modifiab
     }
     if (Objects.isNull(downstream)) {
       this.downstream = transformerCustomFuseableIn.fuseableSink();
-      // TODO this.tokenReader = new FeatureTokenReader<>(this, createContext());
+      // TODO this.tokenReader = new FeatureTokenReader<>(this, createContext()); // NOPMD
 
       transformerCustomFuseableIn.afterInit(this::init);
       // init();
@@ -72,7 +72,7 @@ public abstract class FeatureTokenTransformerBaseSimple<T, U, V extends Modifiab
   public final void init(Consumer<Object> push) {
     if (Objects.isNull(downstream)) {
       this.downstream = (FeatureTokenEmitterSimple<T, U, V>) push::accept;
-      // TODO this.tokenReader = new FeatureTokenReader<>(this, createContext());
+      // TODO this.tokenReader = new FeatureTokenReader<>(this, createContext()); // NOPMD
       init();
     }
   }

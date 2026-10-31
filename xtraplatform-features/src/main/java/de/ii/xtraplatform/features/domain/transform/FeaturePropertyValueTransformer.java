@@ -25,7 +25,7 @@ public interface FeaturePropertyValueTransformer extends FeaturePropertyTransfor
     boolean isTypeMatching =
         getSupportedPropertyTypes().isEmpty() || getSupportedPropertyTypes().contains(valueType);
 
-    if (!isTypeMatching) {
+    if (!isTypeMatching && LOGGER.isWarnEnabled()) {
       LOGGER.warn(
           "Skipping {} transformation for property '{}', type {} is not supported. Supported types: {}",
           getType(),

@@ -24,6 +24,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 @Value.Style(builder = "new")
 @JsonDeserialize(builder = ImmutableProfileTransformations.Builder.class)
+@FunctionalInterface
 public interface ProfileTransformations extends PropertyTransformations {
 
   String REL_AS_KEY = "rel-as-key";
@@ -76,6 +77,8 @@ public interface ProfileTransformations extends PropertyTransformations {
                     } else {
                       mapToLink(property, builder);
                     }
+                    break;
+                  default:
                     break;
                 }
               });

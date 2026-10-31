@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.TooManyMethods")
 public class AbstractFeatureProviderMetadataConsumer implements FeatureProviderMetadataConsumer {
   @Override
   public void analyzeStart() {}
