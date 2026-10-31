@@ -17,7 +17,9 @@ import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
+import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -63,6 +65,7 @@ import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.threeten.extra.Interval;
 
 @SuppressWarnings({
   "PMD.CouplingBetweenObjects",
@@ -602,6 +605,36 @@ public abstract class AbstractFeatureProvider<
 
   protected Query preprocessQuery(Query query) {
     return query;
+  }
+
+  protected Optional<BoundingBox> getConfiguredSpatialExtent(String typeName) {
+    return getConfiguredExtent(typeName)
+        .getSpatial()
+        .flatMap(extent -> extent.toBoundingBox(getData().getNativeCrs().orElse(OgcCrs.CRS84)));
+  }
+
+  protected Optional<Interval> getConfiguredTemporalExtent(String typeName) {
+    return getConfiguredExtent(typeName).getTemporal().flatMap(TemporalExtent::toInterval);
+  }
+
+  private FeatureTypeExtent getConfiguredExtent(String typeName) {
+    return FeatureTypeExtent.inherit(
+        Optional.ofNullable(getData().getTypes().get(typeName)).flatMap(FeatureSchema::getExtent),
+        getData().getExtent());
+  }
+
+  protected Optional<BoundingBox> transformSpatialExtent(
+      BoundingBox boundingBox, EpsgCrs targetCrs) {
+    return crsTransformerFactory
+        .getTransformer(getData().getNativeCrs().orElse(OgcCrs.CRS84), targetCrs, false)
+        .flatMap(
+            crsTransformer -> {
+              try {
+                return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
+              } catch (CrsTransformationException e) {
+                return Optional.empty();
+              }
+            });
   }
 
   @Override
