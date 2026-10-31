@@ -46,9 +46,6 @@ import de.ii.xtraplatform.streams.domain.Reactive.Runner;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.Values;
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -620,7 +617,6 @@ public abstract class AbstractFeatureProvider<
 
     return fromType
         .or(() -> fromProvider)
-        .filter(extent -> !Boolean.TRUE.equals(extent.getComputed()))
         .flatMap(extent -> extent.toBoundingBox(getData().getNativeCrs().orElse(OgcCrs.CRS84)));
   }
 
@@ -632,24 +628,7 @@ public abstract class AbstractFeatureProvider<
     Optional<TemporalExtent> fromProvider =
         getData().getExtent().flatMap(FeatureTypeExtent::getTemporal);
 
-    return fromType
-        .or(() -> fromProvider)
-        .filter(extent -> !Boolean.TRUE.equals(extent.getComputed()))
-        .flatMap(
-            extent -> {
-              if (extent.getStart() == null && extent.getEnd() == null) {
-                return Optional.empty();
-              }
-              OffsetDateTime start =
-                  extent.getStart() != null
-                      ? parseConfiguredTemporalBound(extent.getStart(), false)
-                      : OffsetDateTime.parse("0001-01-01T00:00:00Z");
-              OffsetDateTime end =
-                  extent.getEnd() != null
-                      ? parseConfiguredTemporalBound(extent.getEnd(), true)
-                      : OffsetDateTime.parse("9999-12-31T23:59:59Z");
-              return Optional.of(Interval.of(start.toInstant(), end.toInstant()));
-            });
+    return fromType.or(() -> fromProvider).flatMap(TemporalExtent::toInterval);
   }
 
   protected Optional<BoundingBox> transformSpatialExtent(
@@ -664,16 +643,6 @@ public abstract class AbstractFeatureProvider<
                 return Optional.empty();
               }
             });
-  }
-
-  private static OffsetDateTime parseConfiguredTemporalBound(String value, boolean endOfDay) {
-    if (value.contains("T")) {
-      return OffsetDateTime.parse(value);
-    }
-
-    return endOfDay
-        ? LocalDate.parse(value).atTime(23, 59, 59).atOffset(ZoneOffset.UTC)
-        : LocalDate.parse(value).atStartOfDay().atOffset(ZoneOffset.UTC);
   }
 
   @Override
