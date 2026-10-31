@@ -23,7 +23,7 @@ import de.ii.xtraplatform.features.domain.pipeline.FeatureEventHandlerSimple.Mod
  * string can be empty, so where the request body is also validated against a schema this check adds
  * exactly what the schema cannot express.
  */
-public class FeatureEventHandlerEmptyValues<T, U, V extends ModifiableContext<T, U>>
+public final class FeatureEventHandlerEmptyValues<T, U, V extends ModifiableContext<T, U>>
     implements FeatureEventHandlerSimple<T, U, V> {
 
   private final FeatureEventHandlerSimple<T, U, V> delegate;

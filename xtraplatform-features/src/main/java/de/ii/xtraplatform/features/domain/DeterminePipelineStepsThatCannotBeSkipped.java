@@ -59,7 +59,12 @@ public class DeterminePipelineStepsThatCannotBeSkipped
   }
 
   @Override
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   public Set<PipelineSteps> visit(
       FeatureSchema schema,
       List<FeatureSchema> parents,

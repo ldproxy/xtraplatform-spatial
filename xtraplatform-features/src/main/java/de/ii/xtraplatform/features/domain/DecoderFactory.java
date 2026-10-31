@@ -42,7 +42,6 @@ public interface DecoderFactory {
     return Optional.empty();
   }
 
-  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   default Tuple<String, String> parseSourcePath(
       String path, String column, String flags, String connectorSpec) {
     return Tuple.of(column, "");

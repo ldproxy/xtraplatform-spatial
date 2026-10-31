@@ -575,7 +575,7 @@ public interface FeatureSchema
    *     Schemas zu ignorieren, die mit `schema` referenziert werden.
    * @default false
    */
-  @JsonProperty(value = "ignore")
+  @JsonProperty("ignore")
   @Nullable
   Boolean getIgnore();
 

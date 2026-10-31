@@ -14,6 +14,8 @@ package de.ii.xtraplatform.features.domain;
  */
 public class JobCancelledException extends RuntimeException {
 
+  private static final long serialVersionUID = 1L;
+
   public JobCancelledException() {
     super("The request was cancelled");
   }

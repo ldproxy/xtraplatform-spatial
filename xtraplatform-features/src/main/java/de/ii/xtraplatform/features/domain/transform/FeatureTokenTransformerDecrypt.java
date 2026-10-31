@@ -25,6 +25,7 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
   private final PropertyEncryption encryptedValues;
 
   public FeatureTokenTransformerDecrypt(PropertyEncryption encryptedValues) {
+    super();
     this.encryptedValues = encryptedValues;
   }
 
@@ -47,7 +48,8 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
       throw new IllegalStateException(
           String.format(
               "Decryption failed for property '%s': the stored value is not valid Base64.",
-              describe(schema)));
+              describe(schema)),
+          e);
     }
 
     return normalize(encryptedValues.decrypt(encrypted, describe(schema)), schema);
@@ -58,7 +60,7 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
       return encryptedValues.normalize(
           plaintext, schema.getValueType().orElse(Type.STRING), describe(schema));
     } catch (IllegalArgumentException e) {
-      throw new IllegalStateException(e.getMessage());
+      throw new IllegalStateException(e.getMessage(), e);
     }
   }
 

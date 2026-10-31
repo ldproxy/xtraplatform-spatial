@@ -24,6 +24,7 @@ public class WithoutProperties implements SchemaVisitorTopDown<FeatureSchema, Fe
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public FeatureSchema visit(
       FeatureSchema schema, List<FeatureSchema> parents, List<FeatureSchema> visitedProperties) {
 

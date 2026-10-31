@@ -232,13 +232,12 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
       return null;
     }
 
-    T valueSchema = null;
     Type propertyType = schema.getType();
     if (Type.VALUE == propertyType && schema.getValueType().isPresent()) {
       propertyType = schema.getValueType().get();
-    } else if (Type.ENCRYPTED.equals(propertyType)) {
+    } else if (Type.ENCRYPTED == propertyType) {
       propertyType = schema.getValueType().orElse(Type.STRING);
-    } else if (Type.ENCRYPTED_ARRAY.equals(propertyType)) {
+    } else if (Type.ENCRYPTED_ARRAY == propertyType) {
       propertyType = Type.VALUE_ARRAY;
     }
     String propertyName = schema.getName();
@@ -269,6 +268,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
                         .replace("__featureId__", "{featureId}"));
     Optional<String> codelistId = schema.getConstraints().flatMap(SchemaConstraints::getCodelist);
 
+    T valueSchema = null;
     switch (propertyType) {
       case VALUE:
         Set<T> valueSchemas =

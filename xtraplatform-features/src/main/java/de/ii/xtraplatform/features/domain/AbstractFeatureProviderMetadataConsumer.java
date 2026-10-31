@@ -127,7 +127,6 @@ public class AbstractFeatureProviderMetadataConsumer implements FeatureProviderM
   public void analyzeFeatureTypeKeywords(String featureTypeName, String... keywords) {}
 
   @Override
-  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   public void analyzeFeatureTypeBoundingBox(
       String featureTypeName, BoundingBoxStrings boundingBox) {}
 

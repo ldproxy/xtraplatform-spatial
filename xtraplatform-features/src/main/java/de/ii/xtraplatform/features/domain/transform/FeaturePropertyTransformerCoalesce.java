@@ -70,7 +70,11 @@ public abstract class FeaturePropertyTransformerCoalesce
     return transformed;
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private List<Object> coalesceValues(List<Object> slice) {
     List<Object> transformed = new ArrayList<>();
     boolean skip = false;

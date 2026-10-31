@@ -368,7 +368,12 @@ public class FeatureRefResolver implements TypesResolver {
         .collect(Collectors.toList());
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.NPathComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   public FeatureSchema resolve(
       FeatureSchema schema,
       List<FeatureSchema> properties,

@@ -139,8 +139,10 @@ public class MappingRulesDeriver
             MappingRule.endsWithConnector(effectiveRule.getSourceParent())
                 ? ROOT_TARGET
                 : effectiveRule.getTarget().contains(".")
-                ? effectiveRule.getTarget().substring(0, effectiveRule.getTarget().lastIndexOf('.'))
-                : ROOT_TARGET)
+                    ? effectiveRule
+                        .getTarget()
+                        .substring(0, effectiveRule.getTarget().lastIndexOf('.'))
+                    : ROOT_TARGET)
         .type(
             effectiveRule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
                 ? Type.VALUE_ARRAY

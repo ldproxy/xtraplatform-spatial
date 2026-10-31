@@ -38,6 +38,8 @@ import java.util.function.BiFunction;
 @SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureStreamImpl implements FeatureStream {
 
+  private static final ZoneId DEFAULT_TIME_ZONE = ZoneId.of("UTC");
+
   private final Query query;
   private final FeatureProviderDataV2 data;
   private final CrsTransformerFactory crsTransformerFactory;
@@ -207,7 +209,7 @@ public class FeatureStreamImpl implements FeatureStream {
             source =
                 source.via(
                     new FeatureTokenTransformerMetadata(
-                        resultBuilder, data.getNativeTimeZone().orElse(ZoneId.of("UTC"))));
+                        resultBuilder, data.getNativeTimeZone().orElse(DEFAULT_TIME_ZONE)));
           }
 
           FeatureTokenTransformerAudit auditTransformer = null;
@@ -313,7 +315,7 @@ public class FeatureStreamImpl implements FeatureStream {
             source =
                 source.via(
                     new FeatureTokenTransformerMetadata(
-                        resultBuilder, data.getNativeTimeZone().orElse(ZoneId.of("UTC"))));
+                        resultBuilder, data.getNativeTimeZone().orElse(DEFAULT_TIME_ZONE)));
           }
 
           FeatureTokenTransformerAudit auditTransformer = null;
@@ -373,14 +375,14 @@ public class FeatureStreamImpl implements FeatureStream {
           new FeatureTokenTransformerMappings(
               propertyTransformations,
               codelists,
-              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
+              data.getNativeTimeZone().orElse(DEFAULT_TIME_ZONE));
       tokenSourceTransformed = tokenSourceTransformed.via(schemaMapper);
     } else if (stepMappingValues) {
       FeatureTokenTransformerMappingValuesOnly valueMapper =
           new FeatureTokenTransformerMappingValuesOnly(
               propertyTransformations,
               codelists,
-              data.getNativeTimeZone().orElse(ZoneId.of("UTC")));
+              data.getNativeTimeZone().orElse(DEFAULT_TIME_ZONE));
       tokenSourceTransformed = tokenSourceTransformed.via(valueMapper);
     }
     if (stepGeometry) {

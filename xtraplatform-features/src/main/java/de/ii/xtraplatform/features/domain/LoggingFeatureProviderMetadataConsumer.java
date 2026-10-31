@@ -214,7 +214,6 @@ public class LoggingFeatureProviderMetadataConsumer implements FeatureProviderMe
   }
 
   @Override
-  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   public void analyzeFeatureTypeBoundingBox(
       String featureTypeName, BoundingBoxStrings boundingBox) {
     LOGGER.debug(

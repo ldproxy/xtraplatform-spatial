@@ -286,7 +286,6 @@ public class MultiFeatureProviderMetadataConsumer implements FeatureProviderMeta
   }
 
   @Override
-  @SuppressWarnings("PMD.UseObjectForClearerAPI")
   public void analyzeFeatureTypeBoundingBox(
       String featureTypeName, BoundingBoxStrings boundingBox) {
     for (FeatureProviderMetadataConsumer analyzer : analyzers) {

@@ -105,7 +105,11 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   }
 
   @Override
-  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
+  @SuppressWarnings({
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.CognitiveComplexity"
+  })
   public void onEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     try {
       if (minMax != null) {
@@ -182,7 +186,7 @@ public class FeatureTokenTransformerMetadata extends FeatureTokenTransformer {
   }
 
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (context.schema().filter(SchemaBase::isPrimaryGeometry).isPresent()
         && Objects.nonNull(context.geometry())) {

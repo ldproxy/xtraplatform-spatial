@@ -50,7 +50,7 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
 
   // Since properties must be "flat" (no arrays or objects), we map any arrays or objects to
   // a string using a JSON representation of arrays and objects.
-  @SuppressWarnings("PMD.CyclomaticComplexity")
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   private Object getValue(PropertySfFlat property, boolean withQuotes) {
     switch (property.getType()) {
       case VALUE:

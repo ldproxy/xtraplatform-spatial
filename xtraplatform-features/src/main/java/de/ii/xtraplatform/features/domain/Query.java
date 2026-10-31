@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Optional;
 import org.immutables.value.Value;
 
-@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface Query {
 
   Optional<EpsgCrs> getCrs();
