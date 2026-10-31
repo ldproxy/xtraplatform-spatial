@@ -27,6 +27,7 @@ final class SqlLiterals {
 
   private SqlLiterals() {}
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   static String forType(SchemaBase.Type type, String value) {
     if (value == null) {
       return "NULL";

@@ -109,11 +109,8 @@ public interface SqlQueryMapping {
       return true;
     }
 
-    if (!Objects.equals(column.get().first().getPrimaryKey(), column.get().second().getName())) {
-      return false;
-    }
-
-    return !column.get().second().hasOperation(SqlQueryColumn.Operation.DO_NOT_GENERATE);
+    return Objects.equals(column.get().first().getPrimaryKey(), column.get().second().getName())
+        && !column.get().second().hasOperation(SqlQueryColumn.Operation.DO_NOT_GENERATE);
   }
 
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForFilterGeometry() {

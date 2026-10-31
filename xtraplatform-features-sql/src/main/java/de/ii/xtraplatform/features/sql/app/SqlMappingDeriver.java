@@ -256,7 +256,11 @@ public class SqlMappingDeriver {
     }
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private void addToMapping(
       FeatureSchema schema,
       FeatureSchema tableOwner,

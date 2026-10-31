@@ -35,7 +35,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.threeten.extra.Interval;
 
-@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
 public class SqlDialectPgis implements SqlDialect {
 
   // the year of an ISO 8601 date, optionally signed, followed by the rest of the value

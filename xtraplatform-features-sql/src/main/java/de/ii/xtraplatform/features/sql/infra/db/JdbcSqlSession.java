@@ -426,7 +426,9 @@ class JdbcSqlSession implements SqlSession {
     try {
       connection.setAutoCommit(true);
     } catch (SQLException e) {
-      LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+      }
     }
     try {
       connection.close();

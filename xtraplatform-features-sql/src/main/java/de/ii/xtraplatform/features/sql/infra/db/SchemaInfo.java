@@ -112,7 +112,7 @@ class SchemaInfo {
    * Whether the column has a time zone, e.g. PostgreSQL {@code timestamptz}. Drivers differ in the
    * JDBC type they report for such columns, so the database-specific type name is checked, too.
    */
-  public boolean isColumnTemporalWithTimeZone(String table, String name) {
+  boolean isColumnTemporalWithTimeZone(String table, String name) {
     return getColumn(table, name)
         .map(Column::getColumnDataType)
         .filter(
@@ -136,7 +136,7 @@ class SchemaInfo {
         || name.contains("with local time zone");
   }
 
-  public Optional<Column> getColumn(String tableName, String columnName) {
+  Optional<Column> getColumn(String tableName, String columnName) {
     return getColumn(tableName, columnName, false, false);
   }
 

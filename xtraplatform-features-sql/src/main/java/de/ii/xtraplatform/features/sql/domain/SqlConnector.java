@@ -171,7 +171,7 @@ public interface SqlConnector
 
   // TODO: simplify, class SqlQueryRunner, remove options, singleFeature
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.NcssCount"})
   default Reactive.Source<SqlRow> getSourceStream(
       SqlQueryBatch queryBatch, SqlQueryOptions options) {
     Paging paging =

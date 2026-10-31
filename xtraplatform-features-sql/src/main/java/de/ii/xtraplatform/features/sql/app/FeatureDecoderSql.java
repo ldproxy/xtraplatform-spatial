@@ -264,7 +264,11 @@ public class FeatureDecoderSql
     }
   }
 
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private void handleColumns(SqlRow sqlRow) {
     for (int i = 0; i < sqlRow.getValues().size() && i < sqlRow.getColumnPaths().size(); i++) {
       // TODO: this is a workaround, ideally the paths SchemaMapping would contain the column

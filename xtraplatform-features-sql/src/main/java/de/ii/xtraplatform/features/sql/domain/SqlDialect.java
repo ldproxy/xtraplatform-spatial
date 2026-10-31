@@ -209,6 +209,7 @@ public interface SqlDialect {
    * @param min the lower corner of the bounding box, in the native CRS
    * @param max the upper corner of the bounding box, in the native CRS
    */
+  @SuppressWarnings("PMD.UseVarargs")
   default Optional<String> getSpatialIndexPredicate(
       String table, String column, String alias, String keyColumn, double[] min, double[] max) {
     return Optional.empty();

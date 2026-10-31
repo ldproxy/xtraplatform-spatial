@@ -103,7 +103,8 @@ public class ResultSetMaterializer {
     "PMD.CognitiveComplexity",
     "PMD.CyclomaticComplexity",
     "PMD.NPathComplexity",
-    "PMD.AvoidInstantiatingObjectsInLoops"
+    "PMD.AvoidInstantiatingObjectsInLoops",
+    "PMD.NcssCount"
   })
   public MultiFeatureQuery materialize(MultiFeatureQuery query, List<String> createdTables) {
     Map<String, ResultSetReference> sets = new LinkedHashMap<>();

@@ -479,6 +479,7 @@ public class FeatureProviderSql
   private List<CustomFunction> cql2Functions;
   private String cronJob;
 
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @AssistedInject
   public FeatureProviderSql(
       CrsTransformerFactory crsTransformerFactory,
@@ -669,6 +670,7 @@ public class FeatureProviderSql
    * make use of. Without it, spatial queries keep working, only without the index, so a failure to
    * determine it is logged and does not keep the provider from starting.
    */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private Map<String, String> getSpatialIndexes() {
     try {
       return getSqlClient().getSpatialIndexes();
@@ -1065,7 +1067,7 @@ public class FeatureProviderSql
   }
 
   @Override
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.AvoidInstanceofChecksInCatchClause"})
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
@@ -1137,7 +1139,11 @@ public class FeatureProviderSql
   }
 
   @Override
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidCatchingGenericException"})
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.AvoidInstanceofChecksInCatchClause"
+  })
   public Optional<Interval> getTemporalExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
@@ -1310,11 +1316,8 @@ public class FeatureProviderSql
     Optional<List<SqlQueryMapping>> queryMapping =
         Optional.ofNullable(queryMappings.get(featureType));
 
-    if (queryMapping.isPresent()) {
-      return queryMapping.get().stream().allMatch(SqlQueryMapping::hasGeneratedId);
-    }
-
-    return true;
+    return queryMapping.isEmpty()
+        || queryMapping.get().stream().allMatch(SqlQueryMapping::hasGeneratedId);
   }
 
   /**
@@ -1322,6 +1325,7 @@ public class FeatureProviderSql
    * back otherwise, and the connection is returned to the pool in every case, including a failed
    * COMMIT or a connection the database has terminated.
    */
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.UseTryWithResources"})
   private MutationResult runInSession(Type type, Function<Session, MutationResult> mutation) {
     Session session;
     try {
@@ -1366,6 +1370,7 @@ public class FeatureProviderSql
    * notably a lost database connection or an exhausted pool, is passed through and reported as a
    * server error.
    */
+  @SuppressWarnings({"PMD.CompareObjectsWithEquals", "PMD.NullAssignment"})
   private static Throwable toMutationError(Throwable error) {
     for (Throwable t = error; Objects.nonNull(t); t = t.getCause() == t ? null : t.getCause()) {
       if (t instanceof JsonParseException) {

@@ -34,7 +34,7 @@ public interface SqlQueryColumnOperations {
     return getQualifiedColumnResolved(tableAlias, column, sqlDialect, Set.of(), false);
   }
 
-  @SuppressWarnings("PMD.CyclomaticComplexity")
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   static String getQualifiedColumnResolved(
       String tableAlias,
       SqlQueryColumn column,

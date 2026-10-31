@@ -105,7 +105,8 @@ import org.threeten.extra.Interval;
   "PMD.CouplingBetweenObjects",
   "PMD.TooManyStaticImports",
   "PMD.GodClass",
-  "PMD.CyclomaticComplexity"
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods"
 })
 public class FilterEncoderSql {
 
@@ -147,6 +148,11 @@ public class FilterEncoderSql {
   private static final String REGEX_STRIP_BRACKETS = "\\[|\\]";
   private static final String SQL_TRUE = "1=1";
   private static final String SQL_FALSE = "1=0";
+  private static final String FORMAT_IN = " IN %1$s";
+  // Alias of the result set in the semi-join of a composite-key predicate.
+  private static final String RESULT_SET_ALIAS = "_rsk";
+  private static final Pattern SEMI_JOIN =
+      Pattern.compile("^A\\.(\\w+) IN \\((SELECT .*)\\)$", Pattern.DOTALL);
 
   private final EpsgCrs nativeCrs;
   private final SqlDialect sqlDialect;
@@ -640,9 +646,6 @@ public class FilterEncoderSql {
         .orElse(de.ii.xtraplatform.features.domain.SchemaBase.Type.STRING);
   }
 
-  /** Alias of the result set in the semi-join of a composite-key predicate. */
-  private static final String RESULT_SET_ALIAS = "_rsk";
-
   /** Column names a composite-key result set projects, one per key part in canonical part order. */
   public static List<String> resultSetValueColumns(int keyParts) {
     List<String> columns = new ArrayList<>(keyParts);
@@ -659,6 +662,7 @@ public class FilterEncoderSql {
    * of the producing feature type — for a key with few distinct values that is the difference
    * between a handful of rows and one row per feature.
    */
+  @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
   String resultSetProducerSelectByKey(
       InResultSetByKey inResultSet, boolean withValueAlias, CteCollector collector) {
     String setName = inResultSet.getSetName();
@@ -1012,9 +1016,6 @@ public class FilterEncoderSql {
         && arrayLiteral.getValue() instanceof List<?> values
         && values.isEmpty();
   }
-
-  private static final Pattern SEMI_JOIN =
-      Pattern.compile("^A\\.(\\w+) IN \\((SELECT .*)\\)$", Pattern.DOTALL);
 
   // The negation of a predicate on a joined property, i.e. of a semi-join
   // `A.<key> IN (SELECT <alias>.<key> FROM ...)`. As `NOT (A.<key> IN (...))` the planner can only
@@ -1780,7 +1781,7 @@ public class FilterEncoderSql {
           .findFirst()
           .flatMap(
               property -> {
-                String propertyName = property.getName().replaceAll("^\"|\"$", "");
+                String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
                 boolean allowColumnFallback = !propertyName.contains(".");
                 SchemaSql table = getTable(propertyName, false, allowColumnFallback);
                 return plainColumnOfMainTable(
@@ -1851,7 +1852,12 @@ public class FilterEncoderSql {
     }
 
     @Override
-    @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
+    @SuppressWarnings({
+      "PMD.NcssCount",
+      "PMD.CognitiveComplexity",
+      "PMD.NPathComplexity",
+      "PMD.AvoidDeeplyNestedIfStmts"
+    })
     public String visit(BinaryArrayOperation arrayOperation, List<String> children) {
       // The two operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
@@ -1954,7 +1960,7 @@ public class FilterEncoderSql {
           // joined table per candidate instead of materializing every matching row
           String arrayQuery =
               elementCount == 1
-                  ? String.format(" IN %1$s", secondExpression)
+                  ? String.format(FORMAT_IN, secondExpression)
                   : String.format(
                       " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
                       secondExpression,
@@ -1976,7 +1982,7 @@ public class FilterEncoderSql {
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
           // no GROUP BY: in the `IN` semi-join it would only prevent the planner from probing the
           // joined table per candidate
-          String arrayQuery = String.format(" IN %1$s", secondExpression);
+          String arrayQuery = String.format(FORMAT_IN, secondExpression);
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
@@ -2162,17 +2168,16 @@ public class FilterEncoderSql {
     // non-null while encoding the producer filter of an enclosing inResultSet, so that nested
     // result sets register their CTEs with the same collector instead of nesting inline
     private final CteCollector collector;
-
-    private CqlToSql2(SqlQueryMapping mapping) {
-      this(mapping, null);
-    }
-
     // bounding boxes of the geometry literals of the filter being encoded, keyed by the SQL they
     // were encoded to; a visitor encodes a single filter, so this neither leaks nor is shared
     private final Map<String, double[][]> literalEnvelopes = new LinkedHashMap<>();
     // spatial predicates that a spatial index predicate was added to, mapped to the predicate
     // without it
     private final Map<String, String> acceleratedPredicates = new LinkedHashMap<>();
+
+    private CqlToSql2(SqlQueryMapping mapping) {
+      this(mapping, null);
+    }
 
     private CqlToSql2(SqlQueryMapping mapping, CteCollector collector) {
       super(coordinatesTransformer);
@@ -2545,8 +2550,7 @@ public class FilterEncoderSql {
 
     // the ALIKE template matches the pattern against the column value, which for an array in a
     // JSON document is the JSON text of the whole array; match each array item instead
-    private Optional<String> encodeLikeInJsonArray(
-        de.ii.xtraplatform.cql.domain.Function function, List<String> children) {
+    private Optional<String> encodeLikeInJsonArray(Function function, List<String> children) {
       if (!"ALIKE".equalsIgnoreCase(function.getName())
           || children.size() != 2
           || !(function.getArgs().get(0) instanceof Property)
@@ -2555,7 +2559,7 @@ public class FilterEncoderSql {
       }
 
       String propertyName =
-          ((Property) function.getArgs().get(0)).getName().replaceAll("^\"|\"$", "");
+          ((Property) function.getArgs().get(0)).getName().replaceAll(REGEX_STRIP_QUOTES, "");
       SqlQueryColumn column =
           getTableColumn(propertyName, false, !propertyName.contains(".")).second();
       if (Objects.isNull(column)
@@ -2818,11 +2822,12 @@ public class FilterEncoderSql {
      * member" is what the filter asks for. EXISTS also keeps the three sources of a result set —
      * materialized table, inlined values, re-derived producer — in one shape.
      */
+    @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
     private String encodeInResultSetByKey(InResultSetByKey inResultSet) {
       List<String> keyColumns = new ArrayList<>();
 
       for (Property property : inResultSet.getProperties()) {
-        String name = property.getName().replaceAll("^\"|\"$", "");
+        String name = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
 
         // the same structural check the producer side makes: a key part has to resolve to a column
         // of the main table. A property in a child or junction table would encode as a semi-join
@@ -3161,7 +3166,7 @@ public class FilterEncoderSql {
           .findFirst()
           .flatMap(
               property -> {
-                String propertyName = property.getName().replaceAll("^\"|\"$", "");
+                String propertyName = property.getName().replaceAll(REGEX_STRIP_QUOTES, "");
                 boolean allowColumnFallback = !propertyName.contains(".");
                 de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn> table =
                     getTableColumn(propertyName, false, allowColumnFallback);
@@ -3239,7 +3244,12 @@ public class FilterEncoderSql {
     }
 
     @Override
-    @SuppressWarnings({"PMD.NcssCount", "PMD.CognitiveComplexity", "PMD.NPathComplexity"})
+    @SuppressWarnings({
+      "PMD.NcssCount",
+      "PMD.CognitiveComplexity",
+      "PMD.NPathComplexity",
+      "PMD.AvoidDeeplyNestedIfStmts"
+    })
     public String visit(BinaryArrayOperation arrayOperation, List<String> children) {
       // The two operands may be either a property reference or a literal.
       // If there is at least one property reference, that fragment will
@@ -3345,7 +3355,7 @@ public class FilterEncoderSql {
           // joined table per candidate instead of materializing every matching row
           String arrayQuery =
               elementCount == 1
-                  ? String.format(" IN %1$s", secondExpression)
+                  ? String.format(FORMAT_IN, secondExpression)
                   : String.format(
                       " IN %1$s GROUP BY %2$s.%3$s HAVING count(distinct %4$s) = %5$s",
                       secondExpression,
@@ -3367,7 +3377,7 @@ public class FilterEncoderSql {
         } else if (arrayOperation.getArrayOperator() == A_OVERLAPS) {
           // no GROUP BY: in the `IN` semi-join it would only prevent the planner from probing the
           // joined table per candidate
-          String arrayQuery = String.format(" IN %1$s", secondExpression);
+          String arrayQuery = String.format(FORMAT_IN, secondExpression);
           return String.format(mainExpression, "", arrayQuery);
         } else if (notInverse
             ? arrayOperation.getArrayOperator() == A_CONTAINEDBY
