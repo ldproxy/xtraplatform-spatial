@@ -211,7 +211,7 @@ public class FeatureProviderSqlFactory
 
       return data;
 
-    } catch (RuntimeException e) {
+    } catch (Throwable e) {
       LogContext.error(
           LOGGER, e, "Feature provider with id '{}' could not be started", data.getId());
     }

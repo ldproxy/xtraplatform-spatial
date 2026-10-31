@@ -23,7 +23,6 @@ import de.ii.xtraplatform.features.sql.domain.ImmutablePoolSettings;
 import de.ii.xtraplatform.features.sql.domain.SqlClientBasic;
 import de.ii.xtraplatform.features.sql.domain.SqlClientBasicFactory;
 import de.ii.xtraplatform.features.sql.infra.db.SchemaGeneratorSql;
-import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Comparator;
@@ -48,6 +47,7 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
     return Map.of();
   }
 
+  @SuppressWarnings({"PMD.UseTryWithResources", "PMD.AvoidCatchingGenericException"})
   @Override
   public <T extends AutoEntity> Map<String, List<String>> analyze(T entityData) {
     if (!(entityData instanceof FeatureProviderSqlData)) {
@@ -62,21 +62,25 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
             data.getId(),
             getConnectionInfoWith4Connections(data.getConnectionInfo()));
 
-    try (SchemaGeneratorSql schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic)) {
-      return schemaGeneratorSql.analyze();
-    } catch (IOException e) {
-      return Map.of();
-    } finally {
-      disposeQuietly(sqlClientBasic);
-    }
-  }
+    SchemaGeneratorSql schemaGeneratorSql = null;
 
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private void disposeQuietly(SqlClientBasic sqlClientBasic) {
     try {
-      sqlClientBasicFactory.dispose(sqlClientBasic);
-    } catch (RuntimeException e) {
-      // ignore
+      schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic);
+
+      return schemaGeneratorSql.analyze();
+    } finally {
+      if (Objects.nonNull(schemaGeneratorSql)) {
+        try {
+          schemaGeneratorSql.close();
+        } catch (Throwable e) {
+          // ignore
+        }
+        try {
+          sqlClientBasicFactory.dispose(sqlClientBasic);
+        } catch (Throwable e) {
+          // ignore
+        }
+      }
     }
   }
 
@@ -95,6 +99,11 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
                         (FeatureProviderSqlData) entityData, types, tracker))));
   }
 
+  @SuppressWarnings({
+    "PMD.UseTryWithResources",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.CognitiveComplexity"
+  })
   private FeatureProviderSqlData generateTypesIfNecessary(
       FeatureProviderSqlData data,
       Map<String, List<String>> types,
@@ -106,7 +115,11 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
               data.getId(),
               getConnectionInfoWith4Connections(data.getConnectionInfo()));
 
-      try (SchemaGeneratorSql schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic)) {
+      SchemaGeneratorSql schemaGeneratorSql = null;
+
+      try {
+        schemaGeneratorSql = new SchemaGeneratorSql(sqlClientBasic);
+
         List<FeatureSchema> featureSchemas = schemaGeneratorSql.generate(types, tracker);
 
         Map<String, Integer> idCounter = new LinkedHashMap<>();
@@ -166,10 +179,19 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
         }
 
         return builder.build();
-      } catch (IOException e) {
-        throw new IllegalStateException(e);
       } finally {
-        disposeQuietly(sqlClientBasic);
+        if (Objects.nonNull(schemaGeneratorSql)) {
+          try {
+            schemaGeneratorSql.close();
+          } catch (Throwable e) {
+            // ignore
+          }
+          try {
+            sqlClientBasicFactory.dispose(sqlClientBasic);
+          } catch (Throwable e) {
+            // ignore
+          }
+        }
       }
     }
 

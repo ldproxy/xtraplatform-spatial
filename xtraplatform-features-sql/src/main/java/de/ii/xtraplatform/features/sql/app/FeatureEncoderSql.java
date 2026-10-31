@@ -28,7 +28,6 @@ import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryEncoderWkt;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
 import java.io.IOException;
-import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -86,6 +85,8 @@ public class FeatureEncoderSql
     this.mapping = mapping;
     this.inputCrs = inputCrs;
     this.crsTransformerFactory = crsTransformerFactory;
+    // fails fast if the input CRS is not supported
+    crsTransformerFactory.getTransformer(inputCrs, nativeCrs);
     this.nativeCrs = nativeCrs;
     this.timeZone = timeZone;
     this.nullValue = nullValue;
@@ -146,6 +147,7 @@ public class FeatureEncoderSql
     push(currentFeature);
   }
 
+  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void onObjectStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     if (LOGGER.isTraceEnabled()) {
@@ -182,10 +184,11 @@ public class FeatureEncoderSql
     }
 
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("onObjectStart: no table found for {}", context.pathAsString());
+      LOGGER.warn("onObjectStart: no table found for {}", context.pathAsString());
     }
   }
 
+  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void onObjectEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     if (LOGGER.isTraceEnabled()) {
@@ -216,10 +219,11 @@ public class FeatureEncoderSql
     }
 
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("onObjectEnd: no table found for {}", context.pathAsString());
+      LOGGER.warn("onObjectEnd: no table found for {}", context.pathAsString());
     }
   }
 
+  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void onArrayStart(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     if (LOGGER.isTraceEnabled()) {
@@ -254,13 +258,13 @@ public class FeatureEncoderSql
             },
             () -> {
               if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("onArrayStart: JSON {} not found in mapping", context.pathAsString());
+                LOGGER.warn("onArrayStart: JSON {} not found in mapping", context.pathAsString());
               }
             });
   }
 
   @Override
-  @SuppressWarnings("PMD.NullAssignment")
+  @SuppressWarnings({"PMD.NullAssignment", "PMD.GuardLogStatement"})
   public void onArrayEnd(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("onArrayEnd: {}", context.pathAsString());
@@ -280,13 +284,14 @@ public class FeatureEncoderSql
             },
             () -> {
               if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("onArrayEnd: JSON {} not found in mapping", context.pathAsString());
+                LOGGER.warn("onArrayEnd: JSON {} not found in mapping", context.pathAsString());
               }
             });
 
     currentArrayJunctionTable = null;
   }
 
+  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void onGeometry(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     Geometry<?> geometry = context.geometry();
@@ -327,7 +332,7 @@ public class FeatureEncoderSql
             },
             () -> {
               if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("onGeometry: {} not found in mapping", context.pathAsString());
+                LOGGER.warn("onGeometry: {} not found in mapping", context.pathAsString());
               }
             });
   }
@@ -358,7 +363,7 @@ public class FeatureEncoderSql
   }
 
   @Override
-  @SuppressWarnings("PMD.CognitiveComplexity")
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.GuardLogStatement"})
   public void onValue(ModifiableContext<SqlQuerySchema, SqlQueryMapping> context) {
     mapping
         .getColumnForValue(context.pathAsString(), MappingRule.Scope.W)
@@ -431,7 +436,7 @@ public class FeatureEncoderSql
             },
             () -> {
               if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("onValue: {} not found in mapping", context.pathAsString());
+                LOGGER.warn("onValue: {} not found in mapping", context.pathAsString());
               }
             });
   }
@@ -469,6 +474,7 @@ public class FeatureEncoderSql
     return false;
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private static String toTimeZone(String path, String value, ZoneId timeZone) {
     try {
       DateTimeFormatter parser = DateTimeFormatter.ISO_DATE_TIME;
@@ -487,7 +493,7 @@ public class FeatureEncoderSql
       }
 
       return newValue;
-    } catch (DateTimeException e) {
+    } catch (Throwable e) {
       if (LOGGER.isWarnEnabled()) {
         LOGGER.warn("Error while parsing datetime value for {}: {}", path, e.getMessage());
       }

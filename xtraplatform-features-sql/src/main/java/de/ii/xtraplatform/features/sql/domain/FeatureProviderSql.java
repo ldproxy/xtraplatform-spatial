@@ -24,7 +24,6 @@ import de.ii.xtraplatform.cql.domain.CqlBuiltInFunctions;
 import de.ii.xtraplatform.cql.domain.CustomFunction;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
-import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -708,7 +707,7 @@ public class FeatureProviderSql
         sourceSchema.put(
             fs.getName(), fs.accept(WITH_SCOPE_RECEIVABLE).accept(mutationSchemaDeriver));
       }
-    } catch (RuntimeException e) {
+    } catch (Throwable e) {
       // ignore
     }
 
@@ -1122,6 +1121,7 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
         .flatMap(
@@ -1132,7 +1132,7 @@ public class FeatureProviderSql
                         crsTransformer -> {
                           try {
                             return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
-                          } catch (CrsTransformationException e) {
+                          } catch (Exception e) {
                             return Optional.empty();
                           }
                         }));
