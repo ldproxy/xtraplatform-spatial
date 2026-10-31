@@ -42,6 +42,7 @@ import de.ii.xtraplatform.features.domain.ConnectorFactory;
 import de.ii.xtraplatform.features.domain.DatasetChangeListener;
 import de.ii.xtraplatform.features.domain.DecoderFactories;
 import de.ii.xtraplatform.features.domain.DecoderFactory;
+import de.ii.xtraplatform.features.domain.ExtentFilters;
 import de.ii.xtraplatform.features.domain.FeatureChangeListener;
 import de.ii.xtraplatform.features.domain.FeatureCrs;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
@@ -1405,7 +1406,9 @@ public class FeatureProviderSql
     return preprocessQuery(query, new ArrayList<>());
   }
 
-  protected Query preprocessQuery(Query query, List<String> resultSetTables) {
+  protected Query preprocessQuery(Query originalQuery, List<String> resultSetTables) {
+    Query query = restrictToExtent(originalQuery);
+
     if (query instanceof FeatureQuery
         && (((FeatureQuery) query).getFields().size() > 1
             || !"*".equals(((FeatureQuery) query).getFields().get(0)))) {
@@ -1476,6 +1479,51 @@ public class FeatureProviderSql
     }
 
     return query;
+  }
+
+  private Query restrictToExtent(Query query) {
+    boolean restrictToExtent =
+        Optional.ofNullable(getData().getQueryGeneration())
+            .map(QueryGeneratorSettings::getRestrictToExtent)
+            .orElse(true);
+    if (!restrictToExtent) {
+      return query;
+    }
+    if (query instanceof FeatureQuery featureQuery) {
+      return featureQuery.returnsSingleFeature()
+          ? query
+          : ImmutableFeatureQuery.builder()
+              .from(featureQuery)
+              .addAllFilters(extentFilters(featureQuery.getType()))
+              .build();
+    }
+    if (query instanceof MultiFeatureQuery multiQuery) {
+      return ImmutableMultiFeatureQuery.builder()
+          .from(multiQuery)
+          .queries(
+              multiQuery.getQueries().stream()
+                  .map(
+                      subQuery ->
+                          (SubQuery)
+                              ImmutableSubQuery.builder()
+                                  .from(subQuery)
+                                  .addAllFilters(extentFilters(subQuery.getType()))
+                                  .build())
+                  .toList())
+          .build();
+    }
+    return query;
+  }
+
+  private List<Cql2Expression> extentFilters(String typeName) {
+    return Optional.ofNullable(getData().getTypes().get(typeName))
+        .map(
+            type ->
+                ExtentFilters.of(
+                    type,
+                    getConfiguredSpatialExtent(typeName),
+                    getConfiguredTemporalExtent(typeName)))
+        .orElse(List.of());
   }
 
   @Override

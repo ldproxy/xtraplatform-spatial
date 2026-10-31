@@ -232,6 +232,22 @@ public interface FeatureProviderSqlData
       return false;
     }
 
+    /**
+     * @langEn Restrict all queries for multiple features to the extent of the type, if a fixed
+     *     extent is configured. Features are selected if they intersect the extent, so they may
+     *     reach beyond it. Queries for a single feature by id are not affected.
+     * @langDe Schränkt alle Abfragen mehrerer Features auf den Extent des Types ein, wenn ein
+     *     fester Extent konfiguriert ist. Selektiert werden Features, die den Extent schneiden, sie
+     *     können also über ihn hinausreichen. Abfragen eines einzelnen Features per Id sind nicht
+     *     betroffen.
+     * @default true
+     * @since v4.9
+     */
+    @Value.Default
+    default boolean getRestrictToExtent() {
+      return true;
+    }
+
     // TODO
     @DocIgnore
     @Value.Default
