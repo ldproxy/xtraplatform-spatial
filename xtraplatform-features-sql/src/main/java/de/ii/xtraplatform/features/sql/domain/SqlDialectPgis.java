@@ -229,6 +229,13 @@ public class SqlDialectPgis implements SqlDialect {
         .orElse(String.format("%s::timestamp(0)", column));
   }
 
+  // without the cast, the column keeps its statistics and indexes; a column with a format holds
+  // text and still needs the conversion
+  @Override
+  public String applyToDatetimeForNativeComparison(String column, Optional<String> format) {
+    return format.isPresent() ? applyToDatetime(column, format) : column;
+  }
+
   @Override
   public String applyToDateLiteral(String date) {
     return String.format("DATE '%s'", withEra(date));

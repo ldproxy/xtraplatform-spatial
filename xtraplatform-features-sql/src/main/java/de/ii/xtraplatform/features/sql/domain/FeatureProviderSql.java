@@ -606,7 +606,9 @@ public class FeatureProviderSql
                 Optional.ofNullable(queryMappings.get(type))
                     .filter(mappings -> mappings.size() == 1)
                     .map(mappings -> mappings.get(0)),
-            getSpatialIndexes());
+            getSpatialIndexes(),
+            Objects.nonNull(getData().getQueryGeneration())
+                && getData().getQueryGeneration().getNativeDatetimeComparison());
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
