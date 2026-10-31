@@ -75,7 +75,7 @@ public class Tile3dSeedingJobCreator implements JobProcessor<Tile3dSeedingJob, J
   }
 
   @Override
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.AvoidInstantiatingObjectsInLoops", "PMD.CognitiveComplexity"})
   public JobResult process(PartialJob partialJob, Job job, JobProcessing jobs) throws Exception {
     boolean isCleanup = Tile3dSeedingJob.TYPE_CLEANUP.equals(partialJob.kind());
     Tile3dSeedingJob seedingJob = getInputs(job, jobs);
