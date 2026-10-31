@@ -39,8 +39,6 @@ import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProvider.FeatureVolatileCapability;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
-import de.ii.xtraplatform.features.domain.SpatialExtent;
-import de.ii.xtraplatform.jobs.domain.JobQueue;
 import de.ii.xtraplatform.tiles.domain.Cache;
 import de.ii.xtraplatform.tiles.domain.Cache.Storage;
 import de.ii.xtraplatform.tiles.domain.Cache.Type;
@@ -1014,8 +1012,10 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             .collect(Collectors.toList());
 
     Optional<BoundingBox> configuredExtent =
-        toBoundingBox(
-            tileset.getExtent().or(() -> getData().getTilesetDefaults().getExtent()), tileset);
+        tileset
+            .getExtent()
+            .or(() -> getData().getTilesetDefaults().getExtent())
+            .flatMap(extent -> extent.toBoundingBox(resolveNativeCrs(tileset)));
 
     Optional<BoundingBox> bounds;
     if (configuredExtent.isPresent()) {
@@ -1146,35 +1146,6 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
 
   private String getFeatureProviderId(TilesetFeatures tileset) {
     return tileset.getFeatureProvider().orElse(TileProviderFeatures.clean(getData().getId()));
-  }
-
-  private Optional<BoundingBox> toBoundingBox(
-      Optional<SpatialExtent> extent, TilesetFeatures tileset) {
-    EpsgCrs nativeCrs = resolveNativeCrs(tileset);
-    return extent
-        .filter(e -> e.getComputed() == null)
-        .flatMap(
-            e -> {
-              if (e.getXmin() == null
-                  || e.getYmin() == null
-                  || e.getXmax() == null
-                  || e.getYmax() == null) {
-                return Optional.empty();
-              }
-              if (e.getZmin() != null && e.getZmax() != null) {
-                return Optional.of(
-                    BoundingBox.of(
-                        e.getXmin(),
-                        e.getYmin(),
-                        e.getZmin(),
-                        e.getXmax(),
-                        e.getYmax(),
-                        e.getZmax(),
-                        nativeCrs));
-              }
-              return Optional.of(
-                  BoundingBox.of(e.getXmin(), e.getYmin(), e.getXmax(), e.getYmax(), nativeCrs));
-            });
   }
 
   private EpsgCrs resolveNativeCrs(TilesetFeatures tileset) {
