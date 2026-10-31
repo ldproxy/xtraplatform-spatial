@@ -58,4 +58,15 @@ class TemporalExtentSpec extends Specification {
         then:
         thrown(IllegalStateException)
     }
+
+    def "computed may only be true"() {
+        expect:
+        new ImmutableTemporalExtent.Builder().computed(true).build().toInterval().isEmpty()
+
+        when:
+        new ImmutableTemporalExtent.Builder().computed(false).build()
+
+        then:
+        thrown(IllegalStateException)
+    }
 }
