@@ -17,7 +17,14 @@ import org.immutables.value.Value;
 @Value.Immutable
 @Value.Style(builder = "new", deepImmutablesDetection = true)
 @JsonDeserialize(builder = ImmutableFeatureTokens.Builder.class)
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FeatureTokens {
+
+  Splitter SOURCE_SPLITTER = Splitter.on('/').omitEmptyStrings();
+
+  Splitter TARGET_SPLITTER = Splitter.on('.').omitEmptyStrings();
+
+  Splitter SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
 
   List<FeatureToken> getTokens();
 
@@ -37,10 +44,7 @@ public interface FeatureTokens {
     return asTokens(false, onlyIf);
   }
 
-  Splitter SOURCE_SPLITTER = Splitter.on('/').omitEmptyStrings();
-
-  Splitter TARGET_SPLITTER = Splitter.on('.').omitEmptyStrings();
-
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   default List<Object> asTokens(boolean isSource, String onlyIf) {
     List<Object> tokens = new ArrayList<>();
 
@@ -76,8 +80,6 @@ public interface FeatureTokens {
 
     return tokens;
   }
-
-  Splitter SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
 
   static boolean skip(String onlyIf, String filter) {
     if (Objects.isNull(onlyIf) || Objects.isNull(filter)) {
