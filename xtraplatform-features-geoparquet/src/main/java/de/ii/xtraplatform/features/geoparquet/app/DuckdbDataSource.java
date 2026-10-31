@@ -21,7 +21,7 @@ public class DuckdbDataSource implements javax.sql.DataSource {
     try {
       Class.forName("org.duckdb.DuckDBDriver");
     } catch (ClassNotFoundException e) {
-      throw new RuntimeException(e);
+      throw new IllegalStateException(e);
     }
     return DriverManager.getConnection("jdbc:duckdb:");
   }

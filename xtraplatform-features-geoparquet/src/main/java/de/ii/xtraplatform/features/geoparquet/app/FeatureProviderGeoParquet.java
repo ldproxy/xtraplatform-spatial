@@ -205,6 +205,7 @@ public class FeatureProviderGeoParquet extends FeatureProviderSql {
   public static final String ENTITY_SUB_TYPE = "feature/geoparquet";
   public static final String PROVIDER_SUB_TYPE = "GEOPARQUET";
 
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @AssistedInject
   public FeatureProviderGeoParquet(
       CrsTransformerFactory crsTransformerFactory,

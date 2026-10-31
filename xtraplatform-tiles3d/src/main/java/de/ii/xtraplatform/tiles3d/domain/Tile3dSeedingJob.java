@@ -66,6 +66,7 @@ public interface Tile3dSeedingJob extends JobInputs {
 
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableTileset3dDetails.Builder.class)
+  @SuppressWarnings("PMD.ImplicitFunctionalInterface")
   interface Tileset3dDetails {
 
     static Map<String, Tileset3dDetails> of(Map<String, Tile3dGenerationParameters> tilesets) {
