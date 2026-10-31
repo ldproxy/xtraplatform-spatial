@@ -84,7 +84,8 @@ public class PropertyTransformationsCollector
   }
 
   @Override
-  public PropertyTransformations finalizeVisit(
+  @SuppressWarnings("PMD.FinalizeOverloaded")
+  public PropertyTransformations finalize(
       FeatureSchema schema, Map<String, List<PropertyTransformation>> transformations) {
     PropertyTransformations schemaTransformations = () -> transformations;
     return preferSchemaTransformations

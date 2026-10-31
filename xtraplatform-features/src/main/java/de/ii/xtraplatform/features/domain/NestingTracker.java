@@ -108,7 +108,11 @@ public class NestingTracker {
     if (!nestingStack.contains("O")) {
       context.setInObject(false);
     }
-    context.pathTracker().track(getCurrentNestingPath());
+    if (pathStack.isEmpty()) {
+      context.pathTracker().track(List.of());
+    } else {
+      context.pathTracker().track(getCurrentNestingPath());
+    }
   }
 
   public void closeArray() {
@@ -165,15 +169,17 @@ public class NestingTracker {
     pathStack.remove(pathStack.size() - 1);
   }
 
+  // null signals "not nested"; an empty path pushed onto the stack is still nested
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
   public List<String> getCurrentNestingPath() {
     if (pathStack.isEmpty()) {
-      return List.of();
+      return null;
     }
     return pathStack.get(pathStack.size() - 1);
   }
 
   public boolean isNested() {
-    return !getCurrentNestingPath().isEmpty();
+    return Objects.nonNull(getCurrentNestingPath());
   }
 
   public boolean inArray() {

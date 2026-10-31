@@ -88,11 +88,12 @@ public class FeatureRefEmbedder implements TypesResolver {
   private List<List<String>> typesByRound;
   private int currentRound;
 
+  @SuppressWarnings("PMD.NullAssignment")
   public FeatureRefEmbedder(String providerId) {
     this.providerId = providerId;
     this.withoutRoles = new WithoutRoles();
-    this.allTypes = Map.of();
-    this.typesByRound = List.of();
+    this.allTypes = null;
+    this.typesByRound = null;
     this.currentRound = -1;
   }
 
@@ -103,7 +104,7 @@ public class FeatureRefEmbedder implements TypesResolver {
 
   @Override
   public boolean needsResolving(Map<String, FeatureSchema> types) {
-    if (allTypes.isEmpty()) {
+    if (Objects.isNull(allTypes)) {
       this.allTypes = new LinkedHashMap<>(types);
       this.typesByRound = getTypesByRound(types, providerId);
     }

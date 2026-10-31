@@ -9,7 +9,6 @@ package de.ii.xtraplatform.features.domain.transform;
 
 import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.SchemaBase;
-import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -55,13 +54,14 @@ public interface FeaturePropertyTransformerDateFormat extends FeaturePropertyVal
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   default String transform(String currentPropertyPath, String input) {
     // TODO: variable fractions // NOPMD
     try {
       ZonedDateTime zdt = parse(input, getDefaultTimeZone());
 
       return formatter().format(zdt);
-    } catch (DateTimeException e) {
+    } catch (Throwable e) {
       if (LOGGER.isWarnEnabled()) {
         LOGGER.warn(
             "{} transformation for property '{}' with value '{}' failed: {}",

@@ -918,7 +918,7 @@ public interface SchemaBase<T extends SchemaBase<T>> {
   }
 
   default <U, V> V accept(SchemaVisitorWithFinalizer<T, U, V> visitor) {
-    return visitor.finalizeVisit((T) this, accept(visitor, ImmutableList.of()));
+    return visitor.finalize((T) this, accept(visitor, ImmutableList.of()));
   }
 
   default <U> U accept(SchemaVisitorTopDown<T, U> visitor, List<T> parents) {

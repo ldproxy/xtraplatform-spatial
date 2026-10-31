@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,6 +92,7 @@ public class FeatureTokenTransformerPropertyLinks extends FeatureTokenTransforme
     super.onValue(context);
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   static String normalizeToIso(String value) {
     try {
       TemporalAccessor ta =
@@ -107,7 +107,7 @@ public class FeatureTokenTransformerPropertyLinks extends FeatureTokenTransforme
         odt = ((LocalDate) ta).atStartOfDay(ZoneId.of("UTC")).toOffsetDateTime();
       }
       return DateTimeFormatter.ISO_INSTANT.format(odt.toInstant());
-    } catch (DateTimeParseException ignore) {
+    } catch (Throwable ignore) {
       return value;
     }
   }

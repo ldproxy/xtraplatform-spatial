@@ -44,7 +44,6 @@ import de.ii.xtraplatform.streams.domain.Reactive.Runner;
 import de.ii.xtraplatform.streams.domain.Reactive.Stream;
 import de.ii.xtraplatform.values.domain.Values;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -433,6 +432,7 @@ public abstract class AbstractFeatureProvider<
         previousIteration.map(i -> "." + (i + 1)).orElse(""));
   }
 
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.AvoidInstanceofChecksInCatchClause"})
   private boolean validate() throws InterruptedException {
     boolean isSuccess = true;
 
@@ -461,7 +461,10 @@ public abstract class AbstractFeatureProvider<
 
         checkForStartupCancel();
       }
-    } catch (IllegalArgumentException | IllegalStateException | UncheckedIOException e) {
+    } catch (Throwable e) {
+      if (e instanceof InterruptedException) {
+        throw e;
+      }
       LogContext.error(LOGGER, e, "Cannot validate types");
       isSuccess = false;
     }

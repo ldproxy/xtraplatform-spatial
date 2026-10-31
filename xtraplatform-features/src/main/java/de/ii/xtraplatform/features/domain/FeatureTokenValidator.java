@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.domain;
 
 import java.util.List;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,7 +132,12 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
   private enum Type {
     OBJECT,
     ARRAY,
-    VALUE
+    VALUE;
+
+    @Override
+    public String toString() {
+      return name().toLowerCase(Locale.ROOT);
+    }
   }
 
   private void error(List<String> path, Type type, boolean isOpen) {

@@ -70,6 +70,9 @@ public interface FeatureSfFlat extends FeatureBase<PropertySfFlat, FeatureSchema
           }
 
           case FLOAT -> {
+            if (Objects.isNull(property.getValue())) {
+              yield null;
+            }
             try {
               yield Double.parseDouble(property.getValue());
             } catch (NumberFormatException e) {

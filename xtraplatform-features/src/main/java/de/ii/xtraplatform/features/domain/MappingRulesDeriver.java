@@ -60,9 +60,12 @@ public class MappingRulesDeriver
   }
 
   @Override
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
-  public List<MappingRule> finalizeVisit(
-      FeatureSchema featureSchema, List<MappingRule> mappingRules) {
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.FinalizeOverloaded"
+  })
+  public List<MappingRule> finalize(FeatureSchema featureSchema, List<MappingRule> mappingRules) {
     Map<String, List<MappingRule>> rulesByTable = new LinkedHashMap<>();
     Map<String, Integer> schemaIndexes = new HashMap<>();
 

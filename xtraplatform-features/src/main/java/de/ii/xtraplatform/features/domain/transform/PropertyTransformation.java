@@ -20,7 +20,7 @@ import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import java.text.MessageFormat;
-import java.time.DateTimeException;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
@@ -317,6 +317,7 @@ public interface PropertyTransformation
         .build();
   }
 
+  @SuppressWarnings({"PMD.UnusedReturnValue", "PMD.AvoidCatchingGenericException"})
   default ImmutableValidationResult.Builder validate(
       ImmutableValidationResult.Builder builder,
       String collectionId,
@@ -336,8 +337,8 @@ public interface PropertyTransformation
     final Optional<String> dateFormat = getDateFormat();
     if (dateFormat.isPresent()) {
       try {
-        DateTimeFormatter.ofPattern(dateFormat.get());
-      } catch (IllegalArgumentException | DateTimeException e) {
+        LocalDate.now().format(DateTimeFormatter.ofPattern(dateFormat.get()));
+      } catch (Exception e) {
         builder.addWarnings(
             MessageFormat.format(
                 "The dateFormat transformation in collection ''{0}'' for property ''{1}'' with  value ''{2}'' is invalid, if used with a timestamp: {3}.",

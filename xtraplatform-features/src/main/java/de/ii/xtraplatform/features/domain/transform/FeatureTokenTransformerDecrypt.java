@@ -40,6 +40,10 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
     super.onValue(context);
   }
 
+  // The IllegalArgumentException is not kept as the cause on purpose: FeatureStream turns an
+  // IllegalArgumentException anywhere in the cause chain into a 400, but a stored value that cannot
+  // be decrypted is a server-side error.
+  @SuppressWarnings("PMD.PreserveStackTrace")
   String decrypt(String encodedValue, FeatureSchema schema) {
     byte[] encrypted;
     try {
@@ -48,19 +52,19 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
       throw new IllegalStateException(
           String.format(
               "Decryption failed for property '%s': the stored value is not valid Base64.",
-              describe(schema)),
-          e);
+              describe(schema)));
     }
 
     return normalize(encryptedValues.decrypt(encrypted, describe(schema)), schema);
   }
 
+  @SuppressWarnings("PMD.PreserveStackTrace")
   String normalize(String plaintext, FeatureSchema schema) {
     try {
       return encryptedValues.normalize(
           plaintext, schema.getValueType().orElse(Type.STRING), describe(schema));
     } catch (IllegalArgumentException e) {
-      throw new IllegalStateException(e.getMessage(), e);
+      throw new IllegalStateException(e.getMessage());
     }
   }
 
