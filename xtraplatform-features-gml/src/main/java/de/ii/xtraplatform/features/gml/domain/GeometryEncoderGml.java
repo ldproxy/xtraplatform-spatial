@@ -38,6 +38,12 @@ import java.util.function.Function;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+@SuppressWarnings({
+  "PMD.GodClass",
+  "PMD.TooManyMethods",
+  "PMD.CyclomaticComplexity",
+  "PMD.CouplingBetweenObjects"
+})
 public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   public static final String SPACE = " ";
@@ -62,8 +68,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private static final String MULTI_POLYGON = "MultiPolygon";
   private static final String SOLID = "Solid";
   private static final String SHELL = "Shell";
-  // these will be needed for the AdV LoD2 CityGML profile
-  private static final String COMPOSITE_SURFACE = "CompositeSurface";
+  // this will be needed for the AdV LoD2 CityGML profile
   private static final String COMPOSITE_CURVE = "CompositeCurve";
   private static final String POS = "pos";
   private static final String POS_LIST = "posList";
@@ -135,7 +140,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   private final Optional<GeometryEncoderGml> encodeAsEmbeddedGeometry;
   private final GmlVersion version;
   private final Function<EpsgCrs, String> srsNameMapper;
-  private int nextGmlId = 0;
+  private int nextGmlId;
   private String srsName;
 
   public GeometryEncoderGml(XMLStreamWriter xmlWriter) {
@@ -165,7 +170,6 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
                 Optional.empty(),
                 List.of(),
                 this.srsNameMapper));
-    this.srsName = null;
     this.version = GmlVersion.GML32;
   }
 
@@ -229,7 +233,6 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
         precision.stream().anyMatch(v -> v > 0)
             ? precision.stream().mapToInt(v -> v).toArray()
             : null;
-    this.srsName = null;
     this.version = version;
   }
 
@@ -307,8 +310,9 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
       }
       if (isObject) {
         if (options.contains(Options.WITH_GML_ID)) {
-          writeAttribute(
-              gmlPrefix.map(pre -> pre + ':' + ID).orElse(ID), gmlIdPrefix + nextGmlId++);
+          String gmlId = gmlIdPrefix + nextGmlId;
+          nextGmlId++;
+          writeAttribute(gmlPrefix.map(pre -> pre + ':' + ID).orElse(ID), gmlId);
         }
         if (options.contains(Options.WITH_SRS_NAME) && !suppressSrsName) {
           writeAttribute(SRS_NAME, srsName);
@@ -328,6 +332,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     }
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void writeCoordinates(double[] coordinates, Axes axes) {
     int dimensionWithoutM = axes == Axes.XY || axes == Axes.XYM ? 2 : 3;
     for (int i = 0; i < coordinates.length / axes.size(); i++) {
@@ -353,28 +358,24 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   private void writePosition(double[] coordinates, Axes axes) {
-    if (version != GmlVersion.GML21) {
-      if (options.contains(Options.WITH_SRS_DIMENSION)) {
-        writeStartTagProperty(POS, Map.of("srsDimension", String.valueOf(axes.size())));
-      } else {
-        writeStartTagProperty(POS);
-      }
-    } else {
+    if (version == GmlVersion.GML21) {
       writeStartTagProperty(COORDINATES);
+    } else if (options.contains(Options.WITH_SRS_DIMENSION)) {
+      writeStartTagProperty(POS, Map.of("srsDimension", String.valueOf(axes.size())));
+    } else {
+      writeStartTagProperty(POS);
     }
     writeCoordinates(coordinates, axes);
     writeEndTag();
   }
 
   private void writePositionList(double[] coordinates, Axes axes) {
-    if (version != GmlVersion.GML21) {
-      if (options.contains(Options.WITH_SRS_DIMENSION)) {
-        writeStartTagProperty(POS_LIST, Map.of("srsDimension", String.valueOf(axes.size())));
-      } else {
-        writeStartTagProperty(POS_LIST);
-      }
-    } else {
+    if (version == GmlVersion.GML21) {
       writeStartTagProperty(COORDINATES);
+    } else if (options.contains(Options.WITH_SRS_DIMENSION)) {
+      writeStartTagProperty(POS_LIST, Map.of("srsDimension", String.valueOf(axes.size())));
+    } else {
+      writeStartTagProperty(POS_LIST);
     }
     writeCoordinates(coordinates, axes);
     writeEndTag();
@@ -461,10 +462,10 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(MultiLineString geometry) {
-    writeStartTagObject(version != GmlVersion.GML21 ? MULTI_CURVE : MULTI_LINE_STRING, false);
+    writeStartTagObject(version == GmlVersion.GML21 ? MULTI_LINE_STRING : MULTI_CURVE, false);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       LineString lineString = geometry.getValue().get(i);
-      writeStartTagProperty(version != GmlVersion.GML21 ? CURVE_MEMBER : LINE_STRING_MEMBER);
+      writeStartTagProperty(version == GmlVersion.GML21 ? LINE_STRING_MEMBER : CURVE_MEMBER);
       lineString.accept(encodeAsEmbeddedGeometry.orElse(this));
       writeEndTag();
     }
@@ -473,6 +474,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Void visit(Polygon geometry) {
     boolean asPatch = options.contains(Options.POLYGON_AS_PATCH);
     boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);
@@ -488,9 +490,9 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     for (int i = 0; i < geometry.getNumRings(); i++) {
       LineString ring = geometry.getValue().get(i);
       if (i == 0) {
-        writeStartTagProperty(version != GmlVersion.GML21 ? EXTERIOR : OUTER_BOUNDARY_IS);
+        writeStartTagProperty(version == GmlVersion.GML21 ? OUTER_BOUNDARY_IS : EXTERIOR);
       } else {
-        writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
+        writeStartTagProperty(version == GmlVersion.GML21 ? INNER_BOUNDARY_IS : INTERIOR);
       }
       if (useSurfaceAndCurve) {
         writeStartTagObject(RING, true);
@@ -514,10 +516,10 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
 
   @Override
   public Void visit(MultiPolygon geometry) {
-    writeStartTagObject(version != GmlVersion.GML21 ? MULTI_SURFACE : MULTI_POLYGON, false);
+    writeStartTagObject(version == GmlVersion.GML21 ? MULTI_POLYGON : MULTI_SURFACE, false);
     for (int i = 0; i < geometry.getNumGeometries(); i++) {
       Polygon polygon = geometry.getValue().get(i);
-      writeStartTagProperty(version != GmlVersion.GML21 ? SURFACE_MEMBER : POLYGON_MEMBER);
+      writeStartTagProperty(version == GmlVersion.GML21 ? POLYGON_MEMBER : SURFACE_MEMBER);
       polygon.accept(encodeAsEmbeddedGeometry.orElse(this));
       writeEndTag();
     }
@@ -590,6 +592,7 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
   }
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public Void visit(CurvePolygon geometry) {
     boolean useSurfaceAndCurve = options.contains(Options.USE_SURFACE_RING_CURVE);
     if (useSurfaceAndCurve) {
@@ -602,9 +605,9 @@ public class GeometryEncoderGml implements GeometryVisitor<Void> {
     for (int i = 0; i < geometry.getNumRings(); i++) {
       Curve<?> ring = geometry.getValue().get(i);
       if (i == 0) {
-        writeStartTagProperty(version != GmlVersion.GML21 ? EXTERIOR : OUTER_BOUNDARY_IS);
+        writeStartTagProperty(version == GmlVersion.GML21 ? OUTER_BOUNDARY_IS : EXTERIOR);
       } else {
-        writeStartTagProperty(version != GmlVersion.GML21 ? INTERIOR : INNER_BOUNDARY_IS);
+        writeStartTagProperty(version == GmlVersion.GML21 ? INNER_BOUNDARY_IS : INTERIOR);
       }
       writeStartTagObject(RING, true);
       if (useSurfaceAndCurve && ring instanceof CompoundCurve compoundCurve) {

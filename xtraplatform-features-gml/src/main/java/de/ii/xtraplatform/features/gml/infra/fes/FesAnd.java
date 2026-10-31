@@ -20,13 +20,14 @@ public class FesAnd extends FesExpression {
   private final List<FesExpression> operands;
 
   public FesAnd(List<FesExpression> operands) {
+    super();
     this.operands = operands;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
     if (operands.size() == 1) {
-      operands.get(0).toXML(version, e, doc);
+      operands.get(0).appendXml(version, e, doc);
     } else if (operands.size() > 1) {
       doc.addNamespace(FES.getNS(version), FES.getPR(version));
       Element ex =
@@ -34,7 +35,7 @@ public class FesAnd extends FesExpression {
       e.appendChild(ex);
 
       for (FesExpression expr : operands) {
-        expr.toXML(version, ex, doc);
+        expr.appendXml(version, ex, doc);
       }
     }
   }

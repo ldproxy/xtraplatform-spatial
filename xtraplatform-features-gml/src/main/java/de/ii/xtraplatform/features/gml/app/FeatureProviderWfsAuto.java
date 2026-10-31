@@ -42,7 +42,7 @@ public class FeatureProviderWfsAuto implements AutoEntityFactory {
 
   @Override
   public <T extends AutoEntity> Map<String, String> check(T entityData) {
-    return null;
+    return Map.of();
   }
 
   @Override
@@ -105,7 +105,7 @@ public class FeatureProviderWfsAuto implements AutoEntityFactory {
 
   private FeatureProviderWfsData completeConnectionInfoIfNecessary(
       WfsClientBasic wfsClient, FeatureProviderWfsData data) {
-    ConnectionInfoWfsHttp connectionInfo = (ConnectionInfoWfsHttp) data.getConnectionInfo();
+    ConnectionInfoWfsHttp connectionInfo = data.getConnectionInfo();
 
     if (connectionInfo.getNamespaces().isEmpty()) {
 
@@ -128,13 +128,13 @@ public class FeatureProviderWfsAuto implements AutoEntityFactory {
       Map<String, List<String>> includeTypes,
       Consumer<Map<String, List<String>>> tracker) {
     if (data.getTypes().isEmpty()) {
-      ConnectionInfoWfsHttp connectionInfo = (ConnectionInfoWfsHttp) data.getConnectionInfo();
+      ConnectionInfoWfsHttp connectionInfo = data.getConnectionInfo();
 
       WfsSchemaCrawler schemaCrawler = new WfsSchemaCrawler(wfsClient, connectionInfo);
 
       List<FeatureSchema> types = schemaCrawler.parseSchema(includeTypes, tracker);
 
-      ImmutableMap<String, FeatureSchema> typeMap =
+      Map<String, FeatureSchema> typeMap =
           types.stream()
               .map(type -> new AbstractMap.SimpleImmutableEntry<>(type.getName(), type))
               .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -148,7 +148,7 @@ public class FeatureProviderWfsAuto implements AutoEntityFactory {
   private FeatureProviderWfsData generateNativeCrsIfNecessary(
       WfsClientBasic wfsClient, FeatureProviderWfsData data) {
     if (!data.getNativeCrs().isPresent()) {
-      ConnectionInfoWfsHttp connectionInfo = (ConnectionInfoWfsHttp) data.getConnectionInfo();
+      ConnectionInfoWfsHttp connectionInfo = data.getConnectionInfo();
 
       WfsSchemaCrawler schemaCrawler = new WfsSchemaCrawler(wfsClient, connectionInfo);
 

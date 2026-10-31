@@ -11,11 +11,13 @@ import com.google.common.base.Strings;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.features.domain.AbstractFeatureProviderMetadataConsumer;
+import de.ii.xtraplatform.features.domain.BoundingBoxStrings;
 import de.ii.xtraplatform.features.domain.ImmutableMetadata;
 import de.ii.xtraplatform.features.domain.Metadata;
 import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 public class WfsCapabilitiesAnalyzer extends AbstractFeatureProviderMetadataConsumer {
@@ -26,6 +28,7 @@ public class WfsCapabilitiesAnalyzer extends AbstractFeatureProviderMetadataCons
   private String lastVersion;
 
   public WfsCapabilitiesAnalyzer() {
+    super();
     this.namespaceNormalizer = new XMLNamespaceNormalizer();
     this.metadata = new ImmutableMetadata.Builder();
     this.usedShortNames = new ArrayList<>();
@@ -62,14 +65,13 @@ public class WfsCapabilitiesAnalyzer extends AbstractFeatureProviderMetadataCons
   }
 
   @Override
-  public void analyzeFeatureTypeBoundingBox(
-      String featureTypeName, String xmin, String ymin, String xmax, String ymax) {
+  public void analyzeFeatureTypeBoundingBox(String featureTypeName, BoundingBoxStrings bbox) {
     BoundingBox boundingBox =
         BoundingBox.of(
-            Double.parseDouble(xmin),
-            Double.parseDouble(ymin),
-            Double.parseDouble(xmax),
-            Double.parseDouble(ymax),
+            Double.parseDouble(bbox.getXmin()),
+            Double.parseDouble(bbox.getYmin()),
+            Double.parseDouble(bbox.getXmax()),
+            Double.parseDouble(bbox.getYmax()),
             OgcCrs.CRS84);
 
     metadata.putFeatureTypesBoundingBox(
@@ -109,8 +111,7 @@ public class WfsCapabilitiesAnalyzer extends AbstractFeatureProviderMetadataCons
 
   @Override
   public void analyzeAccessConstraints(String accessConstraints) {
-    if (!Strings.isNullOrEmpty(accessConstraints)
-        && !Objects.equals(accessConstraints.toLowerCase(), "none")) {
+    if (!Strings.isNullOrEmpty(accessConstraints) && !"none".equalsIgnoreCase(accessConstraints)) {
       metadata.accessConstraints(accessConstraints);
     }
   }
@@ -141,16 +142,17 @@ public class WfsCapabilitiesAnalyzer extends AbstractFeatureProviderMetadataCons
 
   public static String getShortFeatureTypeId(
       String prefixedName, XMLNamespaceNormalizer namespaceNormalizer) {
-    return namespaceNormalizer.getLocalName(prefixedName).toLowerCase();
+    return namespaceNormalizer.getLocalName(prefixedName).toLowerCase(Locale.ROOT);
   }
 
   public static String getLongFeatureTypeId(
       String prefixedName, XMLNamespaceNormalizer namespaceNormalizer) {
-    if (!prefixedName.contains(":"))
+    if (!prefixedName.contains(":")) {
       return getShortFeatureTypeId(prefixedName, namespaceNormalizer);
+    }
     return String.format(
         "%s_%s",
-        namespaceNormalizer.extractPrefix(prefixedName).toLowerCase(),
-        namespaceNormalizer.getLocalName(prefixedName).toLowerCase());
+        namespaceNormalizer.extractPrefix(prefixedName).toLowerCase(Locale.ROOT),
+        namespaceNormalizer.getLocalName(prefixedName).toLowerCase(Locale.ROOT));
   }
 }

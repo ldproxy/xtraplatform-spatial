@@ -88,8 +88,7 @@ public interface FeatureProviderMetadataConsumer {
 
   void analyzeFeatureTypeKeywords(String featureTypeName, String... keywords);
 
-  void analyzeFeatureTypeBoundingBox(
-      String featureTypeName, String xmin, String ymin, String xmax, String ymax);
+  void analyzeFeatureTypeBoundingBox(String featureTypeName, BoundingBoxStrings boundingBox);
 
   void analyzeFeatureTypeDefaultCrs(String featureTypeName, String crs);
 
