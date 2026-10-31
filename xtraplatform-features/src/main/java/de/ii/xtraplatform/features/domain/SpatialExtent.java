@@ -15,29 +15,64 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
-/** Spatial extent in native CRS. */
+/**
+ * Spatial extent. The coordinates are in the native CRS of the feature provider for providers and
+ * types, and in CRS84 (longitude/latitude) for tilesets.
+ */
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableSpatialExtent.Builder.class)
 public interface SpatialExtent {
 
+  /**
+   * @langEn Minimum x coordinate.
+   * @langDe Minimale x-Koordinate.
+   */
   @Nullable
   Double getXmin();
 
+  /**
+   * @langEn Minimum y coordinate.
+   * @langDe Minimale y-Koordinate.
+   */
   @Nullable
   Double getYmin();
 
+  /**
+   * @langEn Minimum z coordinate, optional.
+   * @langDe Minimale z-Koordinate, optional.
+   */
   @Nullable
   Double getZmin();
 
+  /**
+   * @langEn Maximum x coordinate.
+   * @langDe Maximale x-Koordinate.
+   */
   @Nullable
   Double getXmax();
 
+  /**
+   * @langEn Maximum y coordinate.
+   * @langDe Maximale y-Koordinate.
+   */
   @Nullable
   Double getYmax();
 
+  /**
+   * @langEn Maximum z coordinate, optional.
+   * @langDe Maximale z-Koordinate, optional.
+   */
   @Nullable
   Double getZmax();
 
+  /**
+   * @langEn Set to `true` to compute the extent from the data instead of inheriting a fixed extent
+   *     from the parent level (provider for types, tileset defaults for tilesets). Must not be
+   *     combined with coordinates; `false` is not allowed.
+   * @langDe Auf `true` setzen, um den Extent aus den Daten zu berechnen, statt einen festen Extent
+   *     der übergeordneten Ebene (Provider für Types, Tileset-Defaults für Tilesets) zu erben. Darf
+   *     nicht mit Koordinaten kombiniert werden; `false` ist nicht erlaubt.
+   */
   @Nullable
   Boolean getComputed();
 
@@ -52,6 +87,9 @@ public interface SpatialExtent {
             || getZmax() != null;
     boolean autoCompute = Boolean.TRUE.equals(getComputed());
 
+    Preconditions.checkState(
+        !Boolean.FALSE.equals(getComputed()),
+        "SpatialExtent: 'computed' may only be true, omit it for a fixed extent.");
     Preconditions.checkState(
         !(hasCoordinates && autoCompute),
         "SpatialExtent: 'computed' and explicit coordinates must not be set at the same time.");

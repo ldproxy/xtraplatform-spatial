@@ -30,12 +30,32 @@ import org.threeten.extra.Interval;
 @JsonDeserialize(builder = ImmutableTemporalExtent.Builder.class)
 public interface TemporalExtent {
 
+  /**
+   * @langEn Start of the extent, either a date (`yyyy-MM-dd`, UTC) or a date-time with offset. Open
+   *     if not set.
+   * @langDe Beginn des Extents, entweder ein Datum (`yyyy-MM-dd`, UTC) oder ein Zeitpunkt mit
+   *     Offset. Offen, wenn nicht gesetzt.
+   */
   @Nullable
   String getStart();
 
+  /**
+   * @langEn End of the extent, either a date (`yyyy-MM-dd`, inclusive, UTC) or a date-time with
+   *     offset. Open if not set.
+   * @langDe Ende des Extents, entweder ein Datum (`yyyy-MM-dd`, inklusive, UTC) oder ein Zeitpunkt
+   *     mit Offset. Offen, wenn nicht gesetzt.
+   */
   @Nullable
   String getEnd();
 
+  /**
+   * @langEn Set to `true` to compute the extent from the data instead of inheriting a fixed extent
+   *     from the parent level (provider for types). Must not be combined with `start` or `end`;
+   *     `false` is not allowed.
+   * @langDe Auf `true` setzen, um den Extent aus den Daten zu berechnen, statt einen festen Extent
+   *     der übergeordneten Ebene (Provider für Types) zu erben. Darf nicht mit `start` oder `end`
+   *     kombiniert werden; `false` ist nicht erlaubt.
+   */
   @Nullable
   Boolean getComputed();
 
@@ -54,6 +74,10 @@ public interface TemporalExtent {
   @Value.Check
   default void check() {
     boolean hasBounds = getStart() != null || getEnd() != null;
+
+    Preconditions.checkState(
+        !Boolean.FALSE.equals(getComputed()),
+        "TemporalExtent: 'computed' may only be true, omit it for a fixed extent.");
 
     Preconditions.checkState(
         !(hasBounds && Boolean.TRUE.equals(getComputed())),
