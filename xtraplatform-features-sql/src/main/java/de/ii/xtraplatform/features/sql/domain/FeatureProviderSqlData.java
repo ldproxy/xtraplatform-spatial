@@ -11,7 +11,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.docs.DocMarker;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.features.domain.ExtensionConfiguration;
@@ -96,10 +95,8 @@ public interface FeatureProviderSqlData
 
   @Value.Check
   default FeatureProviderSqlData initNestedDefault() {
-    /*
-     workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
-    */
+    // workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // NOPMD - TODO: remove when fixed
     if (Objects.isNull(getConnectionInfo())) {
       ImmutableFeatureProviderSqlData.Builder builder =
           new ImmutableFeatureProviderSqlData.Builder().from(this);
@@ -127,8 +124,7 @@ public interface FeatureProviderSqlData
   }
 
   abstract class Builder
-      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderSqlData.Builder>
-      implements EntityDataBuilder<FeatureProviderDataV2> {
+      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderSqlData.Builder> {
 
     public abstract ImmutableFeatureProviderSqlData.Builder connectionInfo(
         ConnectionInfoSql connectionInfo);
@@ -232,7 +228,6 @@ public interface FeatureProviderSqlData
       return false;
     }
 
-    // TODO
     @DocIgnore
     @Value.Default
     default Optional<String> getAccentiCollation() {
@@ -336,6 +331,7 @@ public interface FeatureProviderSqlData
    */
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableDatasetChangeSettings.Builder.class)
+  @SuppressWarnings("PMD.ImplicitFunctionalInterface")
   interface DatasetChangeSettings {
 
     /**

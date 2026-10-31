@@ -13,9 +13,11 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 public interface SqlQueryColumnOperations {
 
@@ -32,6 +34,7 @@ public interface SqlQueryColumnOperations {
     return getQualifiedColumnResolved(tableAlias, column, sqlDialect, Set.of(), false);
   }
 
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   static String getQualifiedColumnResolved(
       String tableAlias,
       SqlQueryColumn column,
@@ -52,13 +55,13 @@ public interface SqlQueryColumnOperations {
 
     if (ops.containsKey(Operation.EXPRESSION)
         && !excludeOperations.contains(Operation.EXPRESSION)) {
-      final int[] i = {0};
+      List<String> expressionParams = column.getOperationParameters(Operation.EXPRESSION);
       return sqlDialect.applyToExpression(
           tableAlias,
           column.getName(),
-          column.getOperationParameters(Operation.EXPRESSION).stream()
-              .map(param -> Map.entry("" + i[0]++, param))
-              .collect(ImmutableMap.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)),
+          IntStream.range(0, expressionParams.size())
+              .boxed()
+              .collect(ImmutableMap.toImmutableMap(String::valueOf, expressionParams::get)),
           geometryOperation(ops, excludeOperations),
           isForcePolygonCCW,
           shouldLinearizeCurves);

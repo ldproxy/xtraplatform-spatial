@@ -15,6 +15,7 @@ import org.immutables.value.Value;
 
 @Value.Immutable
 @Value.Style(deepImmutablesDetection = true, builder = "new", attributeBuilderDetection = true)
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface SchemaMappingSql extends SchemaMappingBase<SchemaSql> {
 
   @Override
@@ -31,7 +32,7 @@ public interface SchemaMappingSql extends SchemaMappingBase<SchemaSql> {
     return path;
   }
 
-  // TODO: static cleanup method in PathParser
+  // NOTE: static cleanup method in PathParser
   @Override
   default String cleanPath(String path) {
     if (path.contains("{")) {

@@ -44,9 +44,10 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
 
   @Override
   public <T extends AutoEntity> Map<String, String> check(T entityData) {
-    return null;
+    return Map.of();
   }
 
+  @SuppressWarnings({"PMD.UseTryWithResources", "PMD.AvoidCatchingGenericException"})
   @Override
   public <T extends AutoEntity> Map<String, List<String>> analyze(T entityData) {
     if (!(entityData instanceof FeatureProviderSqlData)) {
@@ -98,6 +99,11 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
                         (FeatureProviderSqlData) entityData, types, tracker))));
   }
 
+  @SuppressWarnings({
+    "PMD.UseTryWithResources",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.CognitiveComplexity"
+  })
   private FeatureProviderSqlData generateTypesIfNecessary(
       FeatureProviderSqlData data,
       Map<String, List<String>> types,
@@ -139,7 +145,7 @@ public class FeatureProviderSqlAuto implements AutoEntityFactory {
                 .map(Entry::getKey)
                 .orElse("id");
 
-        ImmutableMap<String, FeatureSchema> typeMap =
+        Map<String, FeatureSchema> typeMap =
             featureSchemas.stream()
                 .map(
                     type -> {

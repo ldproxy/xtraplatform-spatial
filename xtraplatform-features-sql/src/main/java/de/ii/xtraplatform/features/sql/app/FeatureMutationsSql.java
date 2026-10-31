@@ -11,7 +11,6 @@ import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.SchemaBase.Type;
 import de.ii.xtraplatform.features.domain.Tuple;
-import de.ii.xtraplatform.features.sql.domain.SqlPathDefaults;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
@@ -23,20 +22,13 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeatureMutationsSql {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FeatureMutationsSql.class);
-
   private final FeatureStoreInsertGenerator generator;
-  private final SqlPathDefaults sqlPathDefaults;
 
-  public FeatureMutationsSql(
-      FeatureStoreInsertGenerator generator, SqlPathDefaults sqlPathDefaults) {
+  public FeatureMutationsSql(FeatureStoreInsertGenerator generator) {
     this.generator = generator;
-    this.sqlPathDefaults = sqlPathDefaults;
   }
 
   List<Supplier<Tuple<String, Consumer<String>>>> createInstanceInserts(
@@ -78,7 +70,7 @@ public class FeatureMutationsSql {
     .collect(Collectors.toList());*/
   }
 
-  // TODO: to InsertGenerator
+  // NOTE: to InsertGenerator
   Supplier<Tuple<String, Consumer<String>>> createInstanceDelete(
       SqlQueryMapping mapping, String id) {
 
@@ -86,7 +78,7 @@ public class FeatureMutationsSql {
     SqlQueryColumn idColumn =
         mapping
             .getColumnForId()
-            .map(col -> col.second())
+            .map(de.ii.xtraplatform.base.domain.util.Tuple::second)
             .orElseThrow(
                 () ->
                     new IllegalStateException(
@@ -121,14 +113,14 @@ public class FeatureMutationsSql {
       return createAttributesInserts(schema, feature, newParentRows, id, crs);
     }
 
-    // TODO: what are the keys?
-    // TODO: err
+    // NOTE: what are the keys?
+    // NOPMD - TODO: err
     if (!feature.getRowNesting().containsKey(schema.getFullPath())) {
       // throw new IllegalStateException();
       return ImmutableList.of();
     }
 
-    // TODO: nested m:n test
+    // NOPMD - TODO: nested m:n test
     List<Integer> numberOfRowsPerParentRow =
         feature.getRowNesting().get(schema.getFullPath()); // [1,2] | [2]
     int currentParentRow = rowCursor.getCurrent(schema.getParentPath()); // 0|1 | 0

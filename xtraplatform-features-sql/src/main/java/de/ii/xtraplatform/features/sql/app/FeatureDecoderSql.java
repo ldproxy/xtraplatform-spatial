@@ -40,6 +40,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class FeatureDecoderSql
     extends FeatureTokenDecoder<
         SqlRow, FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>
@@ -67,7 +68,7 @@ public class FeatureDecoderSql
   private GeometryDecoderWkt geometryDecoderWkt;
   private GeometryDecoderWkb geometryDecoderWkb;
   private NestingTracker nestingTracker;
-  private Map<List<String>, Integer> schemaIndexes;
+  private final Map<List<String>, Integer> schemaIndexes;
 
   public FeatureDecoderSql(
       Map<String, SchemaMapping> mappings,
@@ -76,6 +77,7 @@ public class FeatureDecoderSql
       Map<String, DecoderFactory> subDecoderFactories,
       boolean geometryAsWkb,
       WkbDialect wkbDialect) {
+    super();
     this.mappings = mappings;
     this.query = query;
     this.geometryAsWkb = geometryAsWkb;
@@ -111,7 +113,7 @@ public class FeatureDecoderSql
     this.nestingTracker =
         new NestingTracker(getDownstream(), context, mainTablePaths, false, false, false);
 
-    // TODO: pass context and downstream
+    // NOTE: pass context and downstream
     subDecoderFactories.forEach(
         (connector, factory) -> subDecoders.put(connector, factory.createDecoder()));
   }
@@ -137,7 +139,7 @@ public class FeatureDecoderSql
       return;
     }
 
-    // TODO: should't happen, test with exception in onStart
+    // NOPMD - TODO: should't happen, test with exception in onStart
     if (!started) {
       return;
     }
@@ -174,6 +176,7 @@ public class FeatureDecoderSql
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void handleValueRow(SqlRow sqlRow) {
 
     if (LOGGER.isTraceEnabled()) {
@@ -204,7 +207,6 @@ public class FeatureDecoderSql
         || currentQueryIndex != sqlRow.getQueryIndex()) {
       if (featureStarted) {
         getDownstream().onFeatureEnd(context);
-        this.featureStarted = false;
         multiplicityTracker.reset();
         subDecoders.values().forEach(Decoder::reset);
       }
@@ -229,14 +231,15 @@ public class FeatureDecoderSql
     }
   }
 
-  // TODO: move general parts to NestingTracker
+  // NOTE: move general parts to NestingTracker
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void handleNesting(SqlRow sqlRow, List<Integer> indexes) {
     while (nestingTracker.isNested()
         && (nestingTracker.doesNotStartWithPreviousPath(sqlRow.getPath())
-            || (nestingTracker.inObject() && nestingTracker.isSamePath(sqlRow.getPath())
-                || (nestingTracker.inArray()
-                    && nestingTracker.isSamePath(sqlRow.getPath())
-                    && nestingTracker.hasParentIndexChanged(indexes))))) {
+            || nestingTracker.inObject() && nestingTracker.isSamePath(sqlRow.getPath())
+            || (nestingTracker.inArray()
+                && nestingTracker.isSamePath(sqlRow.getPath())
+                && nestingTracker.hasParentIndexChanged(indexes)))) {
       nestingTracker.close();
     }
 
@@ -261,9 +264,14 @@ public class FeatureDecoderSql
     }
   }
 
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts"
+  })
   private void handleColumns(SqlRow sqlRow) {
     for (int i = 0; i < sqlRow.getValues().size() && i < sqlRow.getColumnPaths().size(); i++) {
-      // TODO: this is a workaround, ideally the paths SchemaMapping would contain the column
+      // NOTE: this is a workaround, ideally the paths SchemaMapping would contain the column
       // aliases
       List<String> columnPath =
           sqlRow.isSubDecoderColumn(i)

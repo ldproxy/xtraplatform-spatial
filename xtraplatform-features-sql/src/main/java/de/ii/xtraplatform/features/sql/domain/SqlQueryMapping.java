@@ -30,6 +30,9 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableSqlQueryMapping.Builder.class)
 public interface SqlQueryMapping {
 
+  String IN_CONNECTED_ARRAY = "IN_CONNECTED_ARRAY";
+  String PATH_IN_CONNECTOR = "PATH_IN_CONNECTOR";
+
   List<SqlQuerySchema> getTables();
 
   @Value.Lazy
@@ -106,11 +109,8 @@ public interface SqlQueryMapping {
       return true;
     }
 
-    if (!Objects.equals(column.get().first().getPrimaryKey(), column.get().second().getName())) {
-      return false;
-    }
-
-    return !column.get().second().hasOperation(SqlQueryColumn.Operation.DO_NOT_GENERATE);
+    return Objects.equals(column.get().first().getPrimaryKey(), column.get().second().getName())
+        && !column.get().second().hasOperation(SqlQueryColumn.Operation.DO_NOT_GENERATE);
   }
 
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForFilterGeometry() {
@@ -211,9 +211,6 @@ public interface SqlQueryMapping {
         .map(Map.Entry::getValue)
         .findFirst();
   }
-
-  String IN_CONNECTED_ARRAY = "IN_CONNECTED_ARRAY";
-  String PATH_IN_CONNECTOR = "PATH_IN_CONNECTOR";
 
   default boolean isInConnectedArray(FeatureSchema schema) {
     return Boolean.parseBoolean(schema.getAdditionalInfo().get(IN_CONNECTED_ARRAY));

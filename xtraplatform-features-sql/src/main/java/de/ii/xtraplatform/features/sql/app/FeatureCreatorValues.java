@@ -69,7 +69,7 @@ class FeatureCreatorValues {
     return values.get(row);
   }
 
-  // TODO: value escaping to SqlSyntax
+  // NOTE: value escaping to SqlSyntax
   void addValue(List<FeatureStoreRelation> path, String attribute, String value) {
     FeatureCreatorValues related = getCurrentRelatedValues(path);
     related.values.put(attribute, value != null ? "'" + value.replaceAll("'", "''") + "'" : null);

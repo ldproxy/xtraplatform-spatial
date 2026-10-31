@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public class ValueTypeMapping {
+public final class ValueTypeMapping {
 
   private static final List<SQLType> SQL_BOOLEANS = ImmutableList.of(JDBCType.BOOLEAN);
 
@@ -62,7 +62,7 @@ public class ValueTypeMapping {
             }
           });
 
-  private static final Map<Type, List<SQLType>> mappings =
+  private static final Map<Type, List<SQLType>> MAPPINGS =
       new ImmutableMap.Builder<Type, List<SQLType>>()
           .put(Type.BOOLEAN, SQL_BOOLEANS)
           .put(Type.INTEGER, SQL_INTEGERS)
@@ -72,8 +72,10 @@ public class ValueTypeMapping {
           .put(Type.GEOMETRY, SQL_GEOMETRIES)
           .build();
 
+  private ValueTypeMapping() {}
+
   public static List<SQLType> getSourceTypes(Type type) {
-    return mappings.getOrDefault(type, ImmutableList.of());
+    return MAPPINGS.getOrDefault(type, ImmutableList.of());
   }
 
   public static boolean matches(SQLType sqlType, String databaseSpecificTypeName, Type type) {

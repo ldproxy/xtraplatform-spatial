@@ -61,7 +61,7 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @JsonIgnore
   @Value.Lazy
   default List<String> getParentPath() {
-    // TODO: generalize
+    // NOTE: generalize
     if (getRelations().size() == 2) {
       // There is a junction table, so we return the path of the parent table
       return getFullPath().subList(0, 1);
@@ -83,17 +83,17 @@ public interface SqlQuerySchema extends SqlQueryTable {
   @Value.Lazy
   default List<String> getSortKeys() {
     List<String> keys = new ArrayList<>();
-    String prefix = "";
+    StringBuilder prefix = new StringBuilder();
 
     for (SqlQueryJoin join : getRelations()) {
-      prefix += join.getPathSegment();
+      prefix.append(join.getPathSegment());
       if (!join.isJunction()) {
-        keys.add(String.format("%s.%s", prefix, join.getSortKey()));
+        keys.add(String.format("%s.%s", prefix.toString(), join.getSortKey()));
       }
     }
-    prefix += this.getPathSegment();
+    prefix.append(this.getPathSegment());
 
-    keys.add(String.format("%s.%s", prefix, this.getSortKey()));
+    keys.add(String.format("%s.%s", prefix.toString(), this.getSortKey()));
 
     return keys;
   }
@@ -121,7 +121,7 @@ public interface SqlQuerySchema extends SqlQueryTable {
   default boolean isOne2One() {
     return getRelations().size() == 1
         && Objects.equals(
-            getRelations().get(0).getTargetField(), getSortKey() /*TODO getPrimaryKey()*/);
+            getRelations().get(0).getTargetField(), getSortKey() /*NOTE: getPrimaryKey()*/);
   }
 
   @JsonIgnore

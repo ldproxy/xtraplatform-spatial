@@ -26,6 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Collator;
+import java.util.IllformedLocaleException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -117,6 +118,8 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
                 case "sslpassword":
                   ds.setSslPassword(value);
                   break;
+                default:
+                  break;
               }
             });
 
@@ -131,7 +134,7 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
           connectionInfo.getSchemas().stream()
               .map(
                   schema -> {
-                    if (!Objects.equals(schema, schema.toLowerCase())) {
+                    if (!Objects.equals(schema, schema.toLowerCase(Locale.ROOT))) {
                       return String.format("\"%s\"", schema);
                     }
                     return schema;
@@ -178,39 +181,43 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
             GeoInfo.SRID,
             GeoInfo.TYPE);
 
-    Statement stmt = connection.createStatement();
-    ResultSet rs = stmt.executeQuery(query);
-    Map<String, GeoInfo> result = new LinkedHashMap<>();
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(query)) {
+      Map<String, GeoInfo> result = new LinkedHashMap<>();
 
-    while (rs.next()) {
-      String schema = rs.getString(GeoInfo.SCHEMA);
-      String table = rs.getString(GeoInfo.TABLE);
-      String key = String.format("%s.%s", schema, table).toLowerCase(Locale.ROOT);
+      while (rs.next()) {
+        String schema = rs.getString(GeoInfo.SCHEMA);
+        String table = rs.getString(GeoInfo.TABLE);
+        String key = String.format("%s.%s", schema, table).toLowerCase(Locale.ROOT);
 
-      result.put(
-          key,
-          ImmutableGeoInfo.of(
-              schema,
-              table,
-              rs.getString(GeoInfo.COLUMN),
-              rs.getString(GeoInfo.DIMENSION),
-              rs.getString(GeoInfo.SRID),
-              Force.NONE.name(),
-              rs.getString(GeoInfo.TYPE)));
+        result.put(
+            key,
+            ImmutableGeoInfo.of(
+                schema,
+                table,
+                rs.getString(GeoInfo.COLUMN),
+                rs.getString(GeoInfo.DIMENSION),
+                rs.getString(GeoInfo.SRID),
+                Force.NONE.name(),
+                rs.getString(GeoInfo.TYPE)));
+      }
+
+      return result;
     }
-
-    return result;
   }
 
   @Override
   public DbInfo getDbInfo(Connection connection) throws SQLException {
     String query = "SELECT version(), PostGIS_Lib_Version();";
 
-    Statement stmt = connection.createStatement();
-    ResultSet rs = stmt.executeQuery(query);
-    rs.next();
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(query)) {
+      if (!rs.next()) {
+        throw new SQLException("Could not determine PostgreSQL/PostGIS version info.");
+      }
 
-    return ImmutableDbInfoPgis.of(rs.getString(1), rs.getString(2));
+      return ImmutableDbInfoPgis.of(rs.getString(1), rs.getString(2));
+    }
   }
 
   @Override
@@ -224,14 +231,16 @@ public class SqlDbmsAdapterPgis implements SqlDbmsAdapter {
     Locale locale;
     try {
       locale = new Builder().setLanguageTag(languageTag).build();
-    } catch (Exception e) {
+    } catch (IllformedLocaleException e) {
       locale = Locale.US;
 
-      LOGGER.warn(
-          "Invalid default collation '{}', falling back to '{}' for sorting: {}",
-          languageTag,
-          Locale.US.toLanguageTag(),
-          e.getMessage());
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Invalid default collation '{}', falling back to '{}' for sorting: {}",
+            languageTag,
+            Locale.US.toLanguageTag(),
+            e.getMessage());
+      }
     }
 
     return Collator.getInstance(locale);
