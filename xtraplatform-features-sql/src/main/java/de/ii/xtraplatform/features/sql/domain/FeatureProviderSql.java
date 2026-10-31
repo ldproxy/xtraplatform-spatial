@@ -1127,7 +1127,6 @@ public class FeatureProviderSql
   }
 
   @Override
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
         .flatMap(boundingBox -> transformSpatialExtent(boundingBox, crs));
