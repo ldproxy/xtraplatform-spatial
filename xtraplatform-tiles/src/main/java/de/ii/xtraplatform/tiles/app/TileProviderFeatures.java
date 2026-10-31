@@ -26,6 +26,7 @@ import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
+import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
@@ -1008,20 +1009,32 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
         getLayers(tileset).stream()
             .map(id -> tileGenerator.getVectorSchema(id, FeatureEncoderMVT.FORMAT))
             .collect(Collectors.toList());
-    Optional<BoundingBox> bounds =
-        getLayers(tileset).stream()
-            .map(tileGenerator::getBounds)
-            .reduce(
-                Optional.empty(),
-                (a, b) -> {
-                  if (b.isEmpty()) {
-                    return a;
-                  }
-                  if (a.isPresent()) {
-                    return Optional.of(BoundingBox.merge(b.get(), a.get()));
-                  }
-                  return b;
-                });
+
+    Optional<BoundingBox> configuredExtent =
+        tileset
+            .getExtent()
+            .or(() -> getData().getTilesetDefaults().getExtent())
+            .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84));
+
+    Optional<BoundingBox> bounds;
+    if (configuredExtent.isPresent()) {
+      bounds = configuredExtent;
+    } else {
+      bounds =
+          getLayers(tileset).stream()
+              .map(tileGenerator::getBounds)
+              .reduce(
+                  Optional.empty(),
+                  (a, b) -> {
+                    if (b.isEmpty()) {
+                      return a;
+                    }
+                    if (a.isPresent()) {
+                      return Optional.of(BoundingBox.merge(b.get(), a.get()));
+                    }
+                    return b;
+                  });
+    }
 
     return ImmutableTilesetMetadata.builder()
         .addEncodings(TilesFormat.MVT)

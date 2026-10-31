@@ -232,6 +232,38 @@ public interface FeatureProviderSqlData
       return false;
     }
 
+    /**
+     * @langEn Restrict all queries for multiple features to the spatial extent of the type, if a
+     *     fixed spatial extent is configured. Features are selected if they intersect the extent,
+     *     so they may reach beyond it. Queries for a single feature by id are not affected.
+     * @langDe Schränkt alle Abfragen mehrerer Features auf den räumlichen Extent des Types ein,
+     *     wenn ein fester räumlicher Extent konfiguriert ist. Selektiert werden Features, die den
+     *     Extent schneiden, sie können also über ihn hinausreichen. Abfragen eines einzelnen
+     *     Features per Id sind nicht betroffen.
+     * @default true
+     * @since v4.9
+     */
+    @Value.Default
+    default boolean getRestrictToSpatialExtent() {
+      return true;
+    }
+
+    /**
+     * @langEn Restrict all queries for multiple features to the temporal extent of the type, if a
+     *     fixed temporal extent is configured. Features are selected if they intersect the extent,
+     *     so they may reach beyond it. Queries for a single feature by id are not affected.
+     * @langDe Schränkt alle Abfragen mehrerer Features auf den zeitlichen Extent des Types ein,
+     *     wenn ein fester zeitlicher Extent konfiguriert ist. Selektiert werden Features, die den
+     *     Extent schneiden, sie können also über ihn hinausreichen. Abfragen eines einzelnen
+     *     Features per Id sind nicht betroffen.
+     * @default true
+     * @since v4.9
+     */
+    @Value.Default
+    default boolean getRestrictToTemporalExtent() {
+      return true;
+    }
+
     // TODO
     @DocIgnore
     @Value.Default

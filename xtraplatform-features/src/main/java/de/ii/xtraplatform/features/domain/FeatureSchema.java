@@ -400,6 +400,13 @@ public interface FeatureSchema
   Optional<String> getDescription();
 
   /**
+   * @langEn Optional spatial and temporal extent for this feature type.
+   * @langDe Optionaler räumlicher und zeitlicher Extent für diesen Feature-Type.
+   * @since v4.9
+   */
+  Optional<FeatureTypeExtent> getExtent();
+
+  /**
    * @langEn The unit of measurement of the value, only relevant for numeric properties.
    * @langDe Die Maßeinheit des Wertes, nur relevant bei numerischen Eigenschaften.
    */
