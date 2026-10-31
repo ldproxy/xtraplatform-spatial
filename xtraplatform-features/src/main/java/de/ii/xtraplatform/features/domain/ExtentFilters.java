@@ -18,9 +18,11 @@ import de.ii.xtraplatform.cql.domain.TIntersects;
 import de.ii.xtraplatform.cql.domain.Temporal;
 import de.ii.xtraplatform.cql.domain.TemporalLiteral;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
+import de.ii.xtraplatform.features.domain.MultiFeatureQuery.SubQuery;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Filters that restrict a query to a fixed extent. Intersects is used instead of contains so that
@@ -45,6 +47,37 @@ public final class ExtentFilters {
         .ifPresent(filters::add);
 
     return filters;
+  }
+
+  /**
+   * Adds the extent filters of each queried type to a query. Queries for a single feature are not
+   * restricted, so every feature stays reachable by its id.
+   */
+  public static Query restrict(Query query, Function<String, List<Cql2Expression>> filtersForType) {
+    if (query instanceof FeatureQuery featureQuery && !featureQuery.returnsSingleFeature()) {
+      return ImmutableFeatureQuery.builder()
+          .from(featureQuery)
+          .addAllFilters(filtersForType.apply(featureQuery.getType()))
+          .build();
+    }
+    if (query instanceof MultiFeatureQuery multiQuery) {
+      return ImmutableMultiFeatureQuery.builder()
+          .from(multiQuery)
+          .queries(
+              multiQuery.getQueries().stream()
+                  .map(subQuery -> restrictSubQuery(subQuery, filtersForType))
+                  .toList())
+          .build();
+    }
+    return query;
+  }
+
+  private static SubQuery restrictSubQuery(
+      SubQuery subQuery, Function<String, List<Cql2Expression>> filtersForType) {
+    return ImmutableSubQuery.builder()
+        .from(subQuery)
+        .addAllFilters(filtersForType.apply(subQuery.getType()))
+        .build();
   }
 
   private static Cql2Expression spatial(FeatureSchema geometry, BoundingBox extent) {

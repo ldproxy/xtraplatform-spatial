@@ -1486,33 +1486,7 @@ public class FeatureProviderSql
         Optional.ofNullable(getData().getQueryGeneration())
             .map(QueryGeneratorSettings::getRestrictToExtent)
             .orElse(true);
-    if (!restrictToExtent) {
-      return query;
-    }
-    if (query instanceof FeatureQuery featureQuery) {
-      return featureQuery.returnsSingleFeature()
-          ? query
-          : ImmutableFeatureQuery.builder()
-              .from(featureQuery)
-              .addAllFilters(extentFilters(featureQuery.getType()))
-              .build();
-    }
-    if (query instanceof MultiFeatureQuery multiQuery) {
-      return ImmutableMultiFeatureQuery.builder()
-          .from(multiQuery)
-          .queries(
-              multiQuery.getQueries().stream()
-                  .map(
-                      subQuery ->
-                          (SubQuery)
-                              ImmutableSubQuery.builder()
-                                  .from(subQuery)
-                                  .addAllFilters(extentFilters(subQuery.getType()))
-                                  .build())
-                  .toList())
-          .build();
-    }
-    return query;
+    return restrictToExtent ? ExtentFilters.restrict(query, this::extentFilters) : query;
   }
 
   private List<Cql2Expression> extentFilters(String typeName) {

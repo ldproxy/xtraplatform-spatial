@@ -595,27 +595,19 @@ public abstract class AbstractFeatureProvider<
   }
 
   protected Optional<BoundingBox> getConfiguredSpatialExtent(String typeName) {
-    Optional<SpatialExtent> fromType =
-        Optional.ofNullable(getData().getTypes().get(typeName))
-            .flatMap(FeatureSchema::getExtent)
-            .flatMap(FeatureTypeExtent::getSpatial);
-    Optional<SpatialExtent> fromProvider =
-        getData().getExtent().flatMap(FeatureTypeExtent::getSpatial);
-
-    return fromType
-        .or(() -> fromProvider)
+    return getConfiguredExtent(typeName)
+        .getSpatial()
         .flatMap(extent -> extent.toBoundingBox(getData().getNativeCrs().orElse(OgcCrs.CRS84)));
   }
 
   protected Optional<Interval> getConfiguredTemporalExtent(String typeName) {
-    Optional<TemporalExtent> fromType =
-        Optional.ofNullable(getData().getTypes().get(typeName))
-            .flatMap(FeatureSchema::getExtent)
-            .flatMap(FeatureTypeExtent::getTemporal);
-    Optional<TemporalExtent> fromProvider =
-        getData().getExtent().flatMap(FeatureTypeExtent::getTemporal);
+    return getConfiguredExtent(typeName).getTemporal().flatMap(TemporalExtent::toInterval);
+  }
 
-    return fromType.or(() -> fromProvider).flatMap(TemporalExtent::toInterval);
+  private FeatureTypeExtent getConfiguredExtent(String typeName) {
+    return FeatureTypeExtent.inherit(
+        Optional.ofNullable(getData().getTypes().get(typeName)).flatMap(FeatureSchema::getExtent),
+        getData().getExtent());
   }
 
   protected Optional<BoundingBox> transformSpatialExtent(
