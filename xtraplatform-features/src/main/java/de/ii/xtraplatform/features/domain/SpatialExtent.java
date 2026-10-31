@@ -85,13 +85,7 @@ public interface SpatialExtent {
 
   @Value.Check
   default void checkExclusiveComputed() {
-    boolean hasCoordinates =
-        getXmin() != null
-            || getYmin() != null
-            || getZmin() != null
-            || getXmax() != null
-            || getYmax() != null
-            || getZmax() != null;
+    boolean hasCoordinates = hasCoordinates();
     boolean autoCompute = Boolean.TRUE.equals(getComputed());
 
     Preconditions.checkState(
@@ -102,14 +96,27 @@ public interface SpatialExtent {
         "SpatialExtent: 'computed' and explicit coordinates must not be set at the same time.");
 
     if (hasCoordinates) {
-      Preconditions.checkState(
-          getXmin() != null && getYmin() != null && getXmax() != null && getYmax() != null,
-          "SpatialExtent: xmin, ymin, xmax, ymax are required when coordinates are used.");
-
-      Preconditions.checkState(
-          (getZmin() == null && getZmax() == null) || (getZmin() != null && getZmax() != null),
-          "SpatialExtent: zmin and zmax must both be set or both be absent.");
+      checkCoordinatesComplete();
     }
+  }
+
+  private boolean hasCoordinates() {
+    return getXmin() != null
+        || getYmin() != null
+        || getZmin() != null
+        || getXmax() != null
+        || getYmax() != null
+        || getZmax() != null;
+  }
+
+  private void checkCoordinatesComplete() {
+    Preconditions.checkState(
+        getXmin() != null && getYmin() != null && getXmax() != null && getYmax() != null,
+        "SpatialExtent: xmin, ymin, xmax, ymax are required when coordinates are used.");
+
+    Preconditions.checkState(
+        (getZmin() == null && getZmax() == null) || (getZmin() != null && getZmax() != null),
+        "SpatialExtent: zmin and zmax must both be set or both be absent.");
   }
 
   default Optional<BoundingBox> toBoundingBox(EpsgCrs nativeCrs) {

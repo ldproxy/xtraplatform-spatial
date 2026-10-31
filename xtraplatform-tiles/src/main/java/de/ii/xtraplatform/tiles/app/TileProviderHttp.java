@@ -165,10 +165,12 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
     try {
       return Optional.of(tileMatrixSet.getBoundingBoxCrs84(crsTransformerFactory));
     } catch (CrsTransformationException e) {
-      LOGGER.debug(
-          "Could not transform the extent of tile matrix set '{}' to CRS84: {}",
-          tileMatrixSet.getId(),
-          e.getMessage());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug(
+            "Could not transform the extent of tile matrix set '{}' to CRS84: {}",
+            tileMatrixSet.getId(),
+            e.getMessage());
+      }
       return Optional.empty();
     }
   }
