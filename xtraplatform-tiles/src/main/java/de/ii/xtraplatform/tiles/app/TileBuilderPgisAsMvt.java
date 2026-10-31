@@ -115,7 +115,7 @@ public class TileBuilderPgisAsMvt
   @Override
   public boolean isSupported(
       FeatureProviderConnector<?, ?, ?> connector, FeatureProviderDataV2 data) {
-    // TODO: check mapping: ignore, warn, error
+    // TODO: check mapping: ignore, warn, error // NOPMD
     return connector instanceof SqlConnector
         && Objects.equals(((SqlConnector) connector).getDialect(), SqlDbmsPgis.ID)
         && (data instanceof FeatureProviderSqlData)
@@ -187,7 +187,7 @@ public class TileBuilderPgisAsMvt
             tileset.getId());
       }
 
-      // TODO: duplicate
+      // NOTE: duplicate
       String featureType = tileset.getFeatureType().orElse(tileset.getId());
       FeatureSchema schema = featureProvider.info().getSchema(featureType).orElse(null);
 

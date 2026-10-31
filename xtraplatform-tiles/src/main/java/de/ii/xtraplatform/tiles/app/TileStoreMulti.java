@@ -282,7 +282,6 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
     }
   }
 
-  // TODO
   private TileStore getTileStore(ResourceStore blobStore) {
     return storage == Storage.PER_TILESET || storage == Storage.PER_JOB
         ? TileStoreMbTiles.readWrite(

@@ -247,7 +247,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
             .filter(type -> Objects.equals(type.getName(), featureType))
             .findFirst()
             .orElse(null);
-    // TODO: validate tileset during provider startup
+    // NOTE: validate tileset during provider startup
     if (featureSchema == null) {
       throw new IllegalStateException(
           String.format(
@@ -270,7 +270,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
     if (tileset.getFilters().containsKey(tile.getTileMatrixSet().getId())) {
       tileset.getFilters().get(tile.getTileMatrixSet().getId()).stream()
           .filter(levelFilter -> levelFilter.matches(tile.getLevel()))
-          // TODO: parse and validate filter, preferably in hydration or provider startup
+          // NOTE: parse and validate filter, preferably in hydration or provider startup
           .forEach(filter -> queryBuilder.addFilters(cql.read(filter.getFilter(), Format.TEXT)));
     }
 
@@ -286,7 +286,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
                               Property.of(spatialProperty), SpatialLiteral.of(Bbox.of(bbox)))),
                   () -> queryBuilder.addFilters(BooleanValue2.of(false)));
             },
-            // TODO: validate feature schema during provider startup
+            // NOTE: validate feature schema during provider startup
             () -> queryBuilder.addFilters(BooleanValue2.of(false)));
 
     if (userParameters.isPresent()) {

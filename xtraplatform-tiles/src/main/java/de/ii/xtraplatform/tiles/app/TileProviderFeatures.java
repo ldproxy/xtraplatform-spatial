@@ -735,7 +735,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
                         vectorSubMatrix))
             .orElseGet(LinkedHashMap::new);
 
-    // TODO: get style from api/values
+    // NOTE: get style from api/values
     getStyleId(vectorTileset, rasterTileset)
         .ifPresent(
             style -> {
@@ -829,7 +829,7 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
       cache.first().cleanupSeeding(jobSet, cache.second());
     }
 
-    // TODO: cleanup all orphaned tiles that are not within current cache limits
+    // TODO: cleanup all orphaned tiles that are not within current cache limits // NOPMD
   }
 
   private List<Tuple<TileCache, String>> getCaches(TileSeedingJob jobSet) {

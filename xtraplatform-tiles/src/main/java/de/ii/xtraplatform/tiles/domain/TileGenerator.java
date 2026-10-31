@@ -22,14 +22,12 @@ public interface TileGenerator extends ChainedTileProvider, VolatileComposed {
 
   byte[] generateTile(TileQuery tileQuery);
 
-  // TODO: create on startup for all layers
+  // NOTE: create on startup for all layers
   TileGenerationSchema getGenerationSchema(String tileset);
 
   Optional<BoundingBox> getBounds(String tilesetId);
 
-  // TODO
   FeatureSchema getVectorSchema(String tilesetId, MediaType encoding);
 
-  // TODO
   Optional<FeatureProvider> getFeatureProvider(String featureProviderId);
 }

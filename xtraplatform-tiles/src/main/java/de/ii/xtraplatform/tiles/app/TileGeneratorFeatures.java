@@ -170,7 +170,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
     if (async) {
       DelayedVolatile<FeatureProvider> provider = featureProviders.get(featureProviderId);
 
-      // TODO: only crs, extents, queries needed
+      // NOTE: only crs, extents, queries needed
       if (!provider.isAvailable()) {
         throw new VolatileUnavailableException(
             String.format("Feature provider with id '%s' is not available.", featureProviderId));
@@ -333,7 +333,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
                             }));
   }
 
-  // TODO: create on startup for all tilesets
+  // NOTE: create on startup for all tilesets
   @Override
   public TileGenerationSchema getGenerationSchema(String tilesetId) {
     TilesetFeatures tileset =
@@ -357,7 +357,7 @@ public class TileGeneratorFeatures extends AbstractVolatileComposed implements T
                     String.format(
                         "%s%s%s",
                         interval.first().getFullPathAsString(),
-                        "/", // TODO use constant
+                        "/", // NOTE: use constant
                         interval.second().getFullPathAsString()))
             .or(() -> featureSchema.getPrimaryInstant().map(SchemaBase::getFullPathAsString));
       }

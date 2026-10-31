@@ -80,7 +80,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
     return false;
   }
 
-  // TODO: use HttpClient
+  // NOTE: use HttpClient
   private TileResult request(TileQuery tile, boolean dryRun) throws IOException {
     if (!tilesetSources.containsKey(tile.getTileset())) {
       return TileResult.notFound();

@@ -423,7 +423,7 @@ public final class TileStoreMbTiles implements TileStore {
         .collect(Collectors.toList());
   }
 
-  // TODO: fields, minzoom, maxzoom
+  // TODO: fields, minzoom, maxzoom // NOPMD
   private static VectorLayer getVectorLayer(String layer, TileGenerationSchema generationSchema) {
     return ImmutableVectorLayer.builder()
         .id(layer)
@@ -437,7 +437,7 @@ public final class TileStoreMbTiles implements TileStore {
         .build();
   }
 
-  // TODO: minzoom, maxzoom, bounds, center
+  // TODO: minzoom, maxzoom, bounds, center // NOPMD
   @SuppressWarnings("PMD.CyclomaticComplexity")
   private static MbtilesTileset createTileSet(
       ResourceStore rootStore,

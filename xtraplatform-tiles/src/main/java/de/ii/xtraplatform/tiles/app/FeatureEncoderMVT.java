@@ -245,7 +245,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
     push(mvt);
 
     if (featureCount == 0) {
-      // TODO header/trailer/field "OATiles-hint: empty", also include info in tile cache
+      // TODO header/trailer/field "OATiles-hint: empty", also include info in tile cache // NOPMD
       if (LOGGER.isTraceEnabled()) {
         LOGGER.trace(
             "Tileset {}, tile {}/{}/{}/{} is empty.",
@@ -256,7 +256,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
             tile.getCol());
       }
     } else if (featureCount == written && full && LOGGER.isTraceEnabled()) {
-      // TODO header/trailer/field "OATiles-hint: full", also include info in tile cache
+      // TODO header/trailer/field "OATiles-hint: full", also include info in tile cache // NOPMD
       LOGGER.trace(
           "Tileset {}, tile {}/{}/{}/{} is full.",
           tileset,
