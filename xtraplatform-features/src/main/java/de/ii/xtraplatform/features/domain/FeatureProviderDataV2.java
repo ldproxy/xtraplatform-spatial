@@ -224,6 +224,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    *     automatic calculation.
    * @langDe Optionaler räumlicher und zeitlicher Extent für alle Types dieses Providers. Wenn
    *     gesetzt, wird keine automatische Berechnung durchgeführt.
+   * @since v4.9
    */
   Optional<FeatureTypeExtent> getExtent();
 
