@@ -171,7 +171,7 @@ public final class TileStoreMbTiles implements TileStore {
   }
 
   @Override
-  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
     try {
       if (tileSets.containsKey(key(tile))) {
         return tileSets.get(key(tile)).tileIsEmpty(tile);
@@ -455,7 +455,7 @@ public final class TileStoreMbTiles implements TileStore {
 
     try {
       filePath = rootStore.asLocalPath(relPath, true);
-    } catch (IOException e) {
+    } catch (Throwable e) { // NOPMD
       throw new IllegalStateException("Could not create MBTiles file.", e);
     }
 
@@ -482,9 +482,8 @@ public final class TileStoreMbTiles implements TileStore {
     try {
       return new MbtilesTileset(filePath.get(), md, Optional.empty(), isRaster, strictlySeeded);
     } catch (FileAlreadyExistsException e) {
-      throw new IllegalStateException(
-          "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.",
-          e);
+      throw new IllegalStateException( // NOPMD
+          "A MBTiles file already exists. It must have been created by a parallel thread, which should not occur. MBTiles file creation must be synchronized.");
     }
   }
 

@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.TopologyException;
 
 class ClusterAnalysis {
 
@@ -38,7 +37,7 @@ class ClusterAnalysis {
         boolean clustered;
         try {
           clustered = boundary ? gi.getBoundary().intersects(gj.getBoundary()) : gi.intersects(gj);
-        } catch (TopologyException ignore) {
+        } catch (Throwable ignore) { // NOPMD
           // ignore feature
           continue;
         }

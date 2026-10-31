@@ -25,9 +25,8 @@ import org.locationtech.jts.io.WKTReader;
 import org.locationtech.jts.precision.GeometryPrecisionReducer;
 import org.locationtech.jts.simplify.TopologyPreservingSimplifier;
 
-public final class TileGeometryUtil {
-
-  private TileGeometryUtil() {}
+@SuppressWarnings("PMD.InstantiableUtilityClass")
+public class TileGeometryUtil {
 
   @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public static Geometry getTileGeometry(

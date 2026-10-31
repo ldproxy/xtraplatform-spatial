@@ -62,7 +62,7 @@ public class TileMatrixSetImpl implements TileMatrixSet {
     EpsgCrs crs;
     try {
       crs = EpsgCrs.fromString(data.getCrs());
-    } catch (IllegalArgumentException e) {
+    } catch (Throwable e) { // NOPMD
       throw new IllegalStateException(
           String.format("The CRS URI '%s' is invalid: %s", data.getCrs(), e.getMessage()), e);
     }

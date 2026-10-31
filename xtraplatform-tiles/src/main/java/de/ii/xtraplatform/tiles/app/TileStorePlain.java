@@ -63,7 +63,7 @@ class TileStorePlain implements TileStore {
   }
 
   @Override
-  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
     long size = blobStore.size(path(tile));
 
     return size < 0 ? Optional.empty() : Optional.of(size == 0);
@@ -130,13 +130,15 @@ class TileStorePlain implements TileStore {
 
       try {
         matchingFiles.forEach(consumerMayThrow(blobStore::delete));
-      } catch (UncheckedIOException e) {
-        if (e.getCause() instanceof NoSuchFileException) {
+      } catch (RuntimeException e) { // NOPMD
+        if (e instanceof UncheckedIOException // NOPMD
+            && e.getCause() instanceof NoSuchFileException) {
           return;
         }
-        IOException cause = e.getCause();
-        cause.addSuppressed(e);
-        throw cause;
+        if (e.getCause() instanceof IOException) {
+          throw (IOException) e.getCause(); // NOPMD
+        }
+        throw e;
       }
     }
   }

@@ -223,12 +223,10 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
       return result;
 
     } catch (CompletionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof WebApplicationException) {
-        cause.addSuppressed(e);
-        throw (WebApplicationException) cause;
+      if (e.getCause() instanceof WebApplicationException) {
+        throw (WebApplicationException) e.getCause(); // NOPMD
       }
-      throw new IllegalStateException("Feature stream error.", e);
+      throw new IllegalStateException("Feature stream error.", e.getCause()); // NOPMD
     }
   }
 
@@ -334,8 +332,8 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
     if (LOGGER.isWarnEnabled()) {
       LOGGER.warn(
           "Tile generation: cannot convert between axis units '{}' and '{}'.",
-          tmsCrsUnit.getName(),
-          nativeCrsUnit.getName());
+          tmsCrsUnit,
+          nativeCrsUnit);
     }
     return 0;
   }

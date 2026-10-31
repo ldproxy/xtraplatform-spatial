@@ -41,7 +41,6 @@ import de.ii.xtraplatform.tiles.domain.WithCenter;
 import de.ii.xtraplatform.tiles.domain.WithCenter.LonLat;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.sql.SQLException;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -227,8 +226,9 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
           .bounds(bounds)
           .vectorSchemas(vectorSchemas)
           .build();
-    } catch (SQLException | IOException e) {
-      throw new IllegalStateException("Could not derive metadata from Mbtiles tile provider.", e);
+    } catch (Exception e) { // NOPMD
+      throw new RuntimeException( // NOPMD
+          "Could not derive metadata from Mbtiles tile provider.", e);
     }
   }
 

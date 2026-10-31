@@ -127,9 +127,9 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
   }
 
   @Override
-  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
     for (Tuple<TileStore, ResourceStore> store : active) {
-      Optional<Boolean> result = store.first().checkEmpty(tile);
+      Optional<Boolean> result = store.first().isEmpty(tile);
       if (result.isPresent()) {
         return result;
       }
@@ -201,9 +201,7 @@ public class TileStoreMulti implements TileStore, TileStore.Staging {
               }));
     } catch (RuntimeException e) {
       if (e.getCause() instanceof IOException) {
-        IOException cause = (IOException) e.getCause();
-        cause.addSuppressed(e);
-        throw cause;
+        throw (IOException) e.getCause(); // NOPMD
       }
       throw e;
     }

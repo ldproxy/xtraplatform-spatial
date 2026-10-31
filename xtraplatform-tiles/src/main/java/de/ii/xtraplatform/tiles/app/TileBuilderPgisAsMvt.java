@@ -222,7 +222,7 @@ public class TileBuilderPgisAsMvt
           return (byte[]) row.get(0);
         }
       }
-    } catch (Exception e) {
+    } catch (Throwable e) {
       LOGGER.error(
           "Error during optimized PostGIS MVT tile generation, using an empty tile: {}",
           e.getMessage());

@@ -9,7 +9,6 @@ package de.ii.xtraplatform.tiles.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -19,23 +18,23 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableMbtilesMetadata.Builder.class)
 public abstract class MbtilesMetadata {
 
+  @SuppressWarnings({
+    "PMD.FieldNamingConventions",
+    "PMD.TooFewBranchesForSwitch",
+    "PMD.NonExhaustiveSwitch"
+  })
   public enum MbtilesType {
-    OVERLAY,
-    BASELAYER;
+    overlay,
+    baselayer;
 
     public static MbtilesType of(String value) {
-      if ("overlay".equals(value)) {
-        return OVERLAY;
-      }
-      if ("baselayer".equals(value)) {
-        return BASELAYER;
+      switch (value) {
+        case "overlay":
+          return overlay;
+        case "baselayer":
+          return baselayer;
       }
       return null;
-    }
-
-    @Override
-    public String toString() {
-      return name().toLowerCase(Locale.ROOT);
     }
   }
 

@@ -29,7 +29,6 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.locationtech.jts.geom.TopologyException;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.locationtech.jts.geom.util.GeometryFixer;
 import org.slf4j.Logger;
@@ -144,7 +143,7 @@ public class FeatureEncoderMVT extends FeatureEncoderSfFlat {
       // in "full" tiles all features cover then whole tile
       try {
         full = full && tileGeometry.equals(clipGeometry);
-      } catch (TopologyException ignore) {
+      } catch (Exception ignore) {
       }
 
       // if polygons have to be merged, store them for now and process at the end

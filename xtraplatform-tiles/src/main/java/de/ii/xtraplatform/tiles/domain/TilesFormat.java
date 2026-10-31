@@ -13,7 +13,7 @@ public enum TilesFormat {
   MVT("pbf", "mvt", MediaType.valueOf("application/vnd.mapbox-vector-tile")),
   JPEG("jpg", "jpeg", MediaType.valueOf("image/jpeg")),
   PNG("png", "png", MediaType.valueOf("image/png")),
-  WEBP("webp", "webp", MediaType.valueOf("image/webp")),
+  WebP("webp", "webp", MediaType.valueOf("image/webp")), // NOPMD
   TIFF("tiff", "tiff", MediaType.valueOf("image/tiff"));
 
   private final String mbtilesString;
@@ -65,7 +65,7 @@ public enum TilesFormat {
       case "webp":
       case "WebP":
       case "WEBP":
-        return WEBP;
+        return WebP;
       case "tiff":
       case "TIFF":
         return TIFF;

@@ -12,7 +12,6 @@ import de.ii.xtraplatform.strings.domain.StringTemplateFilters;
 import de.ii.xtraplatform.tiles.domain.TileQuery;
 import de.ii.xtraplatform.tiles.domain.TileResult;
 import de.ii.xtraplatform.tiles.domain.TileStoreReadOnly;
-import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.core.MediaType;
@@ -63,7 +62,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
 
   // we cannot determine this information
   @Override
-  public Optional<Boolean> checkEmpty(TileQuery tile) throws IOException {
+  public Optional<Boolean> isEmpty(TileQuery tile) throws IOException {
     return Optional.empty();
   }
 
@@ -110,7 +109,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
                         StandardCharsets.UTF_8)
                     : ""));
       }
-    } catch (ProcessingException | IOException e) {
+    } catch (Throwable e) { // NOPMD
       return TileResult.error(e.getMessage());
     }
   }

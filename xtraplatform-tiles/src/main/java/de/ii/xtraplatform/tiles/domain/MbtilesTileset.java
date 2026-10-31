@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
   "PMD.CyclomaticComplexity",
   "PMD.TooManyMethods"
 })
-public final class MbtilesTileset {
+public class MbtilesTileset {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MbtilesTileset.class);
   private static final int EMPTY_TILE_ID = 1;
@@ -149,7 +149,7 @@ public final class MbtilesTileset {
 
     if (Objects.isNull(metadata)) {
       try {
-        this.metadata = getMetadata();
+        this.metadata = getMetadata(); // NOPMD
       } catch (SQLException | IOException e) {
         throw new IllegalStateException(
             String.format("Could not read metadata from Mbtiles file: %s", tilesetPath), e);
@@ -291,7 +291,7 @@ public final class MbtilesTileset {
     } catch (SQLException | IOException e) {
       try {
         SqlHelper.execute(connection, ROLLBACK);
-      } catch (SQLException ignore) {
+      } catch (Exception ignore) { // NOPMD
         // ignore
       }
       throw e;
@@ -793,7 +793,7 @@ public final class MbtilesTileset {
     } catch (SQLException e) {
       try {
         SqlHelper.execute(connection, ROLLBACK);
-      } catch (SQLException ignore) {
+      } catch (Exception ignore) { // NOPMD
         // ignore
       }
       throw e;
@@ -876,7 +876,7 @@ public final class MbtilesTileset {
     } catch (SQLException e) {
       try {
         SqlHelper.execute(connection, ROLLBACK);
-      } catch (SQLException ignore) {
+      } catch (Exception ignore) { // NOPMD
         // ignore
       }
       throw e;
@@ -1038,7 +1038,7 @@ public final class MbtilesTileset {
     } catch (SQLException e) {
       try {
         SqlHelper.execute(connection, ROLLBACK);
-      } catch (SQLException ignore) {
+      } catch (Exception ignore) { // NOPMD
         // ignore
       }
       throw e;

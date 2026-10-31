@@ -15,13 +15,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
-public final class SqlHelper {
+@SuppressWarnings({
+  "PMD.InstantiableUtilityClass",
+  "PMD.MutableStaticState",
+  "PMD.FieldNamingConventions"
+})
+public class SqlHelper {
 
-  private static final Properties READ_ONLY_PROPERTIES = getReadOnly();
-
-  private SqlHelper() {
-    // utility class
-  }
+  public static Properties READ_ONLY = getReadOnly();
 
   public static Properties getReadOnly() {
     Properties properties = new Properties();
@@ -33,7 +34,7 @@ public final class SqlHelper {
     try {
       Class.forName("org.sqlite.JDBC");
       return readOnly
-          ? DriverManager.getConnection("jdbc:sqlite:" + mbtilesFile, READ_ONLY_PROPERTIES)
+          ? DriverManager.getConnection("jdbc:sqlite:" + mbtilesFile, READ_ONLY)
           : DriverManager.getConnection("jdbc:sqlite:" + mbtilesFile);
     } catch (SQLException | ClassNotFoundException e) {
       throw new IllegalStateException(

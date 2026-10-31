@@ -154,7 +154,7 @@ public class TileProviderFeaturesFactory
                 .from(data)
                 .auto(Optional.empty())
                 .build();
-      } catch (RuntimeException e) {
+      } catch (Throwable e) {
         if (LOGGER.isErrorEnabled()) {
           LogContext.error(LOGGER, e, "Provider with id '{}' could not be started", data.getId());
         }

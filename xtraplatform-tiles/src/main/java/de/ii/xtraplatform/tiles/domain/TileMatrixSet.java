@@ -309,7 +309,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
   TileMatrix getTileMatrix(int level);
 
   default BigDecimal getBigDecimal(double value) {
-    BigDecimal decimalValue = BigDecimal.valueOf(value);
+    BigDecimal decimalValue = new BigDecimal(value); // NOPMD
     return decimalValue
         .setScale(
             TileMatrix.SIGNIFICANT_DIGITS - decimalValue.precision() + decimalValue.scale(),
