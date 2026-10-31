@@ -13,6 +13,7 @@ import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.SpatialExtent;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +49,14 @@ public interface TilesetFeatures
   @DocIgnore
   @Override
   Optional<String> getFeatureProvider();
+
+  /**
+   * @langEn Fixed spatial extent of the tileset in the native CRS of the feature provider. If set,
+   *     the extent is not derived from the feature provider.
+   * @langDe Fester räumlicher Extent des Tilesets im nativen CRS des Feature-Providers. Wenn
+   *     gesetzt, wird der Extent nicht vom Feature-Provider übernommen.
+   */
+  Optional<SpatialExtent> getExtent();
 
   @DocIgnore
   @Nullable
