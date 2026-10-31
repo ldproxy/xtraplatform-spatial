@@ -1498,21 +1498,22 @@ public class FeatureProviderSql
   }
 
   private Query restrictToExtent(Query query) {
-    boolean restrictToExtent =
-        Optional.ofNullable(getData().getQueryGeneration())
-            .map(QueryGeneratorSettings::getRestrictToExtent)
-            .orElse(true);
-    return restrictToExtent ? ExtentFilters.restrict(query, this::extentFilters) : query;
+    return ExtentFilters.restrict(query, this::extentFilters);
   }
 
   private List<Cql2Expression> extentFilters(String typeName) {
+    Optional<QueryGeneratorSettings> settings = Optional.ofNullable(getData().getQueryGeneration());
+    boolean spatial = settings.map(QueryGeneratorSettings::getRestrictToSpatialExtent).orElse(true);
+    boolean temporal =
+        settings.map(QueryGeneratorSettings::getRestrictToTemporalExtent).orElse(true);
+
     return Optional.ofNullable(getData().getTypes().get(typeName))
         .map(
             type ->
                 ExtentFilters.of(
                     type,
-                    getConfiguredSpatialExtent(typeName),
-                    getConfiguredTemporalExtent(typeName)))
+                    spatial ? getConfiguredSpatialExtent(typeName) : Optional.empty(),
+                    temporal ? getConfiguredTemporalExtent(typeName) : Optional.empty()))
         .orElse(List.of());
   }
 
