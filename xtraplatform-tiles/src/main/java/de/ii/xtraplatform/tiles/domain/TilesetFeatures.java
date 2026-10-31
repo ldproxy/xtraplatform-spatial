@@ -55,6 +55,7 @@ public interface TilesetFeatures
    *     is not derived from the feature provider.
    * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite). Wenn gesetzt, wird der
    *     Extent nicht vom Feature-Provider übernommen.
+   * @since v4.9
    */
   Optional<SpatialExtent> getExtent();
 

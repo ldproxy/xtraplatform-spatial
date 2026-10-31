@@ -35,6 +35,7 @@ public interface TemporalExtent {
    *     if not set.
    * @langDe Beginn des Extents, entweder ein Datum (`yyyy-MM-dd`, UTC) oder ein Zeitpunkt mit
    *     Offset. Offen, wenn nicht gesetzt.
+   * @since v4.9
    */
   @Nullable
   String getStart();
@@ -44,6 +45,7 @@ public interface TemporalExtent {
    *     offset. Open if not set.
    * @langDe Ende des Extents, entweder ein Datum (`yyyy-MM-dd`, inklusive, UTC) oder ein Zeitpunkt
    *     mit Offset. Offen, wenn nicht gesetzt.
+   * @since v4.9
    */
   @Nullable
   String getEnd();
@@ -55,6 +57,7 @@ public interface TemporalExtent {
    * @langDe Auf `true` setzen, um den Extent aus den Daten zu berechnen, statt einen festen Extent
    *     der übergeordneten Ebene (Provider für Types) zu erben. Darf nicht mit `start` oder `end`
    *     kombiniert werden; `false` ist nicht erlaubt.
+   * @since v4.9
    */
   @Nullable
   Boolean getComputed();

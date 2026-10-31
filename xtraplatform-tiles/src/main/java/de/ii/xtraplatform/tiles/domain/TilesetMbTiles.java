@@ -44,6 +44,7 @@ public interface TilesetMbTiles extends TilesetCommon, Buildable<TilesetMbTiles>
    *     from the MBTiles metadata is ignored.
    * @langDe Fester räumlicher Extent des Tilesets in CRS84 (Länge/Breite). Wenn gesetzt, wird
    *     `bounds` aus den MBTiles-Metadaten ignoriert.
+   * @since v4.9
    */
   Optional<SpatialExtent> getExtent();
 
