@@ -67,7 +67,7 @@ public class CqlAbsentPropertiesMapper {
     return expression.accept(new AbsentPropertyFinder(), true);
   }
 
-  private class AbsentPropertyFinder extends CqlVisitorBase<Boolean> {
+  private final class AbsentPropertyFinder extends CqlVisitorBase<Boolean> {
 
     private boolean found;
 
