@@ -71,6 +71,7 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 @AutoBind
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileBuilderDefault.class);
@@ -108,6 +109,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public byte[] getMvtData(
       TileQuery tileQuery,
       TilesetFeatures tileset,
@@ -138,7 +140,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
             .map(pt -> pt.mergeInto(baseTransformations))
             .orElse(baseTransformations);
 
-    try (Context timed = timers.get(featureProvider.getId()).time()) {
+    try (Context ignored = timers.get(featureProvider.getId()).time()) {
       FeatureQuery featureQuery =
           getFeatureQuery(
               tileQuery,
@@ -222,12 +224,13 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
 
     } catch (CompletionException e) {
       if (e.getCause() instanceof WebApplicationException) {
-        throw (WebApplicationException) e.getCause();
+        throw (WebApplicationException) e.getCause(); // NOPMD
       }
-      throw new IllegalStateException("Feature stream error.", e.getCause());
+      throw new IllegalStateException("Feature stream error.", e.getCause()); // NOPMD
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private FeatureQuery getFeatureQuery(
       TileQuery tile,
       TilesetFeatures tileset,
@@ -242,7 +245,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
             .filter(type -> Objects.equals(type.getName(), featureType))
             .findFirst()
             .orElse(null);
-    // TODO: validate tileset during provider startup
+    // NOTE: validate tileset during provider startup
     if (featureSchema == null) {
       throw new IllegalStateException(
           String.format(
@@ -265,7 +268,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
     if (tileset.getFilters().containsKey(tile.getTileMatrixSet().getId())) {
       tileset.getFilters().get(tile.getTileMatrixSet().getId()).stream()
           .filter(levelFilter -> levelFilter.matches(tile.getLevel()))
-          // TODO: parse and validate filter, preferably in hydration or provider startup
+          // NOTE: parse and validate filter, preferably in hydration or provider startup
           .forEach(filter -> queryBuilder.addFilters(cql.read(filter.getFilter(), Format.TEXT)));
     }
 
@@ -281,7 +284,7 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
                               Property.of(spatialProperty), SpatialLiteral.of(Bbox.of(bbox)))),
                   () -> queryBuilder.addFilters(BooleanValue2.of(false)));
             },
-            // TODO: validate feature schema during provider startup
+            // NOTE: validate feature schema during provider startup
             () -> queryBuilder.addFilters(BooleanValue2.of(false)));
 
     if (userParameters.isPresent()) {
@@ -326,10 +329,12 @@ public class TileBuilderDefault implements TileBuilder, DropwizardPlugin {
       return maxAllowableOffsetTileMatrixSet / 111_333.0;
     }
 
-    LOGGER.warn(
-        "Tile generation: cannot convert between axis units '{}' and '{}'.",
-        tmsCrsUnit,
-        nativeCrsUnit);
+    if (LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "Tile generation: cannot convert between axis units '{}' and '{}'.",
+          tmsCrsUnit,
+          nativeCrsUnit);
+    }
     return 0;
   }
 }

@@ -9,6 +9,7 @@ package de.ii.xtraplatform.tiles.domain;
 
 import java.util.Optional;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface WithFeatureProvider {
   /**
    * @langEn The id of the feature provider. By default the tile provider id without `-tiles` is

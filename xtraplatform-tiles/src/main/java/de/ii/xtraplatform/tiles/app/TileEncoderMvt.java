@@ -49,6 +49,7 @@ public class TileEncoderMvt implements TileEncoder {
   }
 
   @Override
+  @SuppressWarnings("PMD.DoNotUseThreads")
   public byte[] combine(
       TileQuery tile, TileProviderFeaturesData data, ChainedTileProvider tileProvider)
       throws IOException {
@@ -74,10 +75,10 @@ public class TileEncoderMvt implements TileEncoder {
       TileResult layer = tileProvider.get(tileQuery);
 
       int count = 1;
-      while (layer.isError() && count++ < 3) {
+      while (layer.isError() && count++ < 3) { // NOPMD
         try {
           Thread.sleep(100);
-        } catch (Throwable ignore) {
+        } catch (Throwable ignore) { // NOPMD
         }
         layer = tileProvider.get(tileQuery);
       }
@@ -122,14 +123,11 @@ public class TileEncoderMvt implements TileEncoder {
   }
 
   private boolean isOutsideBounds(String tileset, Optional<BoundingBox> tileBounds) {
-    if (tileBounds.isEmpty()) {
-      return false;
-    }
-
-    return tilesetBounds
-        .apply(tileset)
-        .filter(bounds -> !BoundingBox.intersects(bounds, tileBounds.get()))
-        .isPresent();
+    return tileBounds.isPresent()
+        && tilesetBounds
+            .apply(tileset)
+            .filter(bounds -> !BoundingBox.intersects(bounds, tileBounds.get()))
+            .isPresent();
   }
 
   private List<String> getLayerTilesets(

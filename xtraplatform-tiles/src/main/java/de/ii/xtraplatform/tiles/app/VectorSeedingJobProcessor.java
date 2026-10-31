@@ -54,6 +54,11 @@ public class VectorSeedingJobProcessor
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.AvoidCatchingGenericException"
+  })
   public JobResult process(PartialJob job, de.ii.xtralink.jobs.Job jobSet, JobProcessing jobs)
       throws Exception {
     TileSeedingPartialJob seedingJob = getPartialContext(job, jobs);

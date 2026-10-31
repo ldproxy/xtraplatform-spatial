@@ -98,6 +98,7 @@ public interface TileSeedingJob extends JobInputs {
 
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableTilesetProgressXL2.Builder.class)
+  @SuppressWarnings("PMD.ImplicitFunctionalInterface")
   interface TilesetProgressXL2 {
     @Value.Default
     default int getTotal() {

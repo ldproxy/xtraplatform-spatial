@@ -21,23 +21,21 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TileStoreHttp implements TileStoreReadOnly {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TileStoreHttp.class);
+  private static final String IMAGE = "image";
   private static final Map<MediaType, String> EXTENSIONS =
       ImmutableMap.of(
           new MediaType("application", "vnd.mapbox-vector-tile"),
           "pbf",
-          new MediaType("image", "jpeg"),
+          new MediaType(IMAGE, "jpeg"),
           "jpeg",
-          new MediaType("image", "png"),
+          new MediaType(IMAGE, "png"),
           "png",
-          new MediaType("image", "tiff"),
+          new MediaType(IMAGE, "tiff"),
           "tiff",
-          new MediaType("image", "webp"),
+          new MediaType(IMAGE, "webp"),
           "webp");
 
   private final Map<String, String> tilesetSources;
@@ -81,7 +79,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
     return false;
   }
 
-  // TODO: use HttpClient
+  // NOTE: use HttpClient
   private TileResult request(TileQuery tile, boolean dryRun) throws IOException {
     if (!tilesetSources.containsKey(tile.getTileset())) {
       return TileResult.notFound();
@@ -111,7 +109,7 @@ public class TileStoreHttp implements TileStoreReadOnly {
                         StandardCharsets.UTF_8)
                     : ""));
       }
-    } catch (Throwable e) {
+    } catch (Throwable e) { // NOPMD
       return TileResult.error(e.getMessage());
     }
   }

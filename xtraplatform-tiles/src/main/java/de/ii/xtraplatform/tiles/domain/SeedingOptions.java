@@ -32,18 +32,12 @@ public interface SeedingOptions {
     XL;
 
     public int getNumberOfTiles() {
-      switch (this) {
-        case S:
-          return 256;
-        case M:
-          return 1024;
-        case L:
-          return 16_384;
-        case XL:
-          return 65_536;
-        default:
-          return 1024;
-      }
+      return switch (this) {
+        case S -> 256;
+        case M -> 1024;
+        case L -> 16_384;
+        case XL -> 65_536;
+      };
     }
   }
 

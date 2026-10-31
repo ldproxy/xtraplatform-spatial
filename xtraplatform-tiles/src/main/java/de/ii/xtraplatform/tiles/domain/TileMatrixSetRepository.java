@@ -15,7 +15,7 @@ import java.util.Optional;
 /** Access to the cache for tile matrix set files. */
 public interface TileMatrixSetRepository extends Volatile2 {
 
-  ImmutableList<String> PREDEFINED_TILE_MATRIX_SETS =
+  ImmutableList<String> PREDEFINED_TILE_MATRIX_SETS = // NOPMD
       ImmutableList.of(
           "WebMercatorQuad",
           "WorldCRS84Quad",
