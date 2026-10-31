@@ -71,7 +71,6 @@ public class FeatureQueryEncoderWfs implements FeatureQueryEncoder<String, Query
     this.filterEncoder = new FilterEncoderWfs(nativeCrs, crsTransformerFactory, cql);
   }
 
-  // TODO: add cql2 classes
   @Override
   public FeatureProviderCapabilities getCapabilities() {
     return ImmutableFeatureProviderCapabilities.builder().level(Level.DEFAULT).build();

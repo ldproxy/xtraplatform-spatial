@@ -1576,6 +1576,7 @@ public class FeatureTokenDecoderGml
    * then matches by local name only, preserving the decoder's behaviour when no namespace data is
    * provided in the input profile.
    */
+  @SuppressWarnings("PMD.CompareObjectsWithEquals") // identity check for the root schema
   private String expectedNamespaceUri(FeatureSchema property, FeatureSchema parent, String key) {
     int colon = key.indexOf(':');
     if (colon > 0) {
@@ -1587,8 +1588,7 @@ public class FeatureTokenDecoderGml
       if (prefix != null) {
         return namespaceNormalizer.getNamespaceURI(prefix);
       }
-    } else if (parent
-        != featureSchema) { // NOPMD CompareObjectsWithEquals - identity check for the root
+    } else if (parent != featureSchema) {
       Optional<String> parentObjectType = parent.getObjectType();
       String prefix =
           parentObjectType.isPresent()

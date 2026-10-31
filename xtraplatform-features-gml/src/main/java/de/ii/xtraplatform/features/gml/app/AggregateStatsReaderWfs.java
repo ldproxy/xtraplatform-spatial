@@ -39,7 +39,6 @@ public class AggregateStatsReaderWfs implements AggregateStatsReader<FeatureSche
 
   @Override
   public Stream<Long> getCount(List<FeatureSchema> sourceSchemas) {
-    // TODO: hits query
     return Reactive.Source.single(-1L).to(Reactive.Sink.head());
   }
 

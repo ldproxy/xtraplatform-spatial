@@ -54,7 +54,6 @@ public class FeatureStorePathParserWfs implements FeatureStorePathParser {
     instanceContainerBuilders
         .get(instanceContainerName)
         .name(instanceContainerName)
-        // TODO.path(path)
         .sortKey("none")
         // .attributes(ImmutableList.of(attribute))
         .attributesPosition(0);

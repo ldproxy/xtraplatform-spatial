@@ -61,7 +61,6 @@ public class OGCEntityResolver implements EntityResolver {
   public InputSource resolveEntity(String publicId, String systemId)
       throws SAXException, IOException {
 
-    // TODO: temporary basic auth hack
     // protected schema files
     if (systemId != null && systemId.startsWith("https://") && useBasicAuth) {
       LOGGER.debug("resolving protected schema: {}", systemId);

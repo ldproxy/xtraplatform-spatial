@@ -31,8 +31,8 @@ public class GmlMultiplicityTracker {
     currentMultiplicities.clear();
   }
 
-  // TODO multilevel, mark multiple properties in mapping and pass multi-elements to constructor,
-  // see SqlMultiplicityMapping
+  // NOPMD TODO multilevel, mark multiple properties in mapping and pass multi-elements to
+  // constructor, see SqlMultiplicityMapping
   public void track(List<String> path) {
     if (!path.isEmpty()) {
       String pathId = JOINER.join(path);

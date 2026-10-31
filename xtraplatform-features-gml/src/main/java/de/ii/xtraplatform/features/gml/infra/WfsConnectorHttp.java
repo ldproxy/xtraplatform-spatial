@@ -62,7 +62,6 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
       VolatileRegistry volatileRegistry,
       @Assisted String providerId,
       @Assisted ConnectionInfoWfsHttp connectionInfo) {
-    // TODO
     super(volatileRegistry);
 
     Map<String, Map<WFS.METHOD, URI>> urls =
@@ -83,7 +82,6 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
 
     /*
      workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
     */
     Optional.ofNullable(
             Strings.emptyToNull(
@@ -96,7 +94,6 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
 
     URI host = connectionInfo.getUri();
 
-    // TODO: get maxParallelRequests and idleTimeout from connectionInfo
     this.httpClient = http.getHostClient(host, 16, 30);
 
     this.metadata = crawlMetadata();
@@ -139,7 +136,6 @@ public class WfsConnectorHttp extends AbstractVolatile implements WfsConnector {
 
   @Override
   public void start() {
-    // TODO: implement polling
     setState(State.AVAILABLE);
   }
 

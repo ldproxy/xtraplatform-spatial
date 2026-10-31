@@ -18,6 +18,8 @@ public abstract class Geometry {
   protected EpsgCrs crs;
   protected double[] coordinates;
 
+  // keeps the existing null contract for unset coordinates
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
   public double[] getCoordinates() {
     return coordinates == null ? null : coordinates.clone();
   }

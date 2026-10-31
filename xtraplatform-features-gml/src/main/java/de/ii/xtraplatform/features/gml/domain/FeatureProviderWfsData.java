@@ -48,7 +48,6 @@ public interface FeatureProviderWfsData
   default FeatureProviderWfsData initNestedDefault() {
     /*
      workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
     */
     if (Objects.isNull(getConnectionInfo()) || Objects.isNull(getConnectionInfo().getUri())) {
       ImmutableFeatureProviderWfsData.Builder builder =

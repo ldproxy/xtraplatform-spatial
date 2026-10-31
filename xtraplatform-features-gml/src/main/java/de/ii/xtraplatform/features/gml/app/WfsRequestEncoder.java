@@ -27,7 +27,6 @@ import org.xml.sax.SAXException;
 /**
  * @author zahnen
  */
-// TODO: merge into FeatureQueryEncoderWfs
 public class WfsRequestEncoder {
 
   private final Map<String, Map<WFS.METHOD, URI>> urls;

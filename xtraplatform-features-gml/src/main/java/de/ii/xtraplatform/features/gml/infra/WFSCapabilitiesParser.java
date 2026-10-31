@@ -39,7 +39,6 @@ public class WFSCapabilitiesParser {
       InputSource is = new InputSource(inputStream);
       parse(is);
     } catch (Exception ex) { // NOPMD AvoidCatchingGenericException
-      // TODO: move to analyzer for XtraProxy
       // LOGGER.error(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
       // throw new SchemaParseException(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
 
@@ -89,7 +88,6 @@ public class WFSCapabilitiesParser {
         capabilitiesChild = capabilitiesChild.advance();
       }
     } catch (XMLStreamException ex) {
-      // TODO: move to analyzer for XtraProxy
       // LOGGER.error(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
       // throw new ParseError(FrameworkMessages.ERROR_PARSING_WFS_CAPABILITIES);
 
@@ -119,7 +117,6 @@ public class WFSCapabilitiesParser {
 
     boolean exceptionFound = false;
 
-    // TODO: make version agnostic
     if (OWS.findKey(cursor.getLocalName()) == OWS.VOCABULARY.EXCEPTION_REPORT) {
 
       exceptionFound = true;
@@ -137,7 +134,6 @@ public class WFSCapabilitiesParser {
 
         exceptionReportChild = exceptionReportChild.advance();
 
-        // TODO: move to analyzer for XtraProxy
         /*LOGGER.error(FrameworkMessages.EXCEPTION_COMING_FROM_WFS, exceptionCode + " " + exceptionText + "");
         WFSException wfse = new WFSException(FrameworkMessages.EXCEPTION_COMING_FROM_WFS, exceptionText);
         wfse.addDetail(FrameworkMessages.EXCEPTION_COMING_FROM_WFS, exceptionCode);

@@ -183,7 +183,7 @@ public class XMLNamespaceNormalizer {
     return prefix + ":" + ftn;
   }
 
-  // TODO: change path serialization format
+  // NOPMD TODO: change path serialization format
   public String getPrefixedPath(String qualifiedPath) {
     String prefixedPath = qualifiedPath;
     for (Map.Entry<String, String> ns : namespaces.entrySet()) {

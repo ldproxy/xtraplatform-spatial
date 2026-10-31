@@ -13,7 +13,7 @@ import java.util.Map;
 /**
  * @author zahnen
  */
-@SuppressWarnings({"PMD.UseUtilityClass", "PMD.FieldNamingConventions"})
+@SuppressWarnings({"PMD.InstantiableUtilityClass", "PMD.FieldNamingConventions"})
 public class VersionedVocabulary {
 
   public enum NAMESPACE {
@@ -29,7 +29,6 @@ public class VersionedVocabulary {
   static {
     vocabulary = new HashMap<>();
 
-    // TODO: this is a dirty hack to execute the static initializers of the subclasses
     for (Class c : children) {
       try {
         c.newInstance();

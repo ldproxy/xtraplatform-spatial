@@ -117,7 +117,6 @@ public class FilterEncoderWfs {
     return Doubles.asList(transformed);
   }
 
-  // TODO: reverse FeatureSchema for nested mappings?
   private Optional<String> getPrefixedPropertyName(FeatureSchema schema, String property) {
     String normalizedProperty = property.replace(ID_PLACEHOLDER, "id");
     return schema.getProperties().stream()

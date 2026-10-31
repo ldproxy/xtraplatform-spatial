@@ -64,7 +64,7 @@ public class FesPolygonExpression extends FesExpression {
 
     for (List<List<Double>> rings : poly.getRings()) {
 
-      // TODO: interior ...
+      // NOPMD TODO: interior ...
       Element exterior =
           doc.createElementNS(
               GML.getNS(gmlversion), GML.getWord(gmlversion, GML.VOCABULARY.EXTERIOR));

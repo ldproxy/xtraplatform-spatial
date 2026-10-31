@@ -112,9 +112,6 @@ public class GetFeature implements WfsOperation {
     builder.put("SERVICE", "WFS");
     builder.put("REQUEST", getOperationName(versions.getWfsVersion()));
 
-    // TODO builder.put(GML.getWord(versions.getWfsVersion(),
-    // WFS.VOCABULARY.OUTPUT_FORMAT).toUpperCase(), GML.getWord(versions.getGmlVersion(),
-    // GML.VOCABULARY.OUTPUTFORMAT_VALUE));
     builder.put(
         WFS.getWord(versions.getWfsVersion(), WFS.VOCABULARY.VERSION).toUpperCase(Locale.ROOT),
         versions.getWfsVersion().toString());
