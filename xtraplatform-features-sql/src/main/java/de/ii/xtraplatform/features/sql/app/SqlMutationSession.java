@@ -40,6 +40,7 @@ import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -502,6 +503,52 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                         + " add a new version)."))
             .build();
       }
+    } catch (RuntimeException e) {
+      builder.error(e);
+    }
+    return builder.build();
+  }
+
+  // Batch variant of the versioned-Insert pre-flight: one SELECT on the main table for all ids, the
+  // ids found are returned in `ids`.
+  @Override
+  public FeatureTransactions.MutationResult findConflictingVersions(
+      String featureType, Collection<String> featureIds) {
+    SqlQueryMapping mapping = requireMapping(featureType);
+    ImmutableMutationResult.Builder builder =
+        ImmutableMutationResult.builder()
+            .type(FeatureTransactions.MutationResult.Type.CREATE)
+            .hasFeatures(false);
+    if (featureIds.isEmpty()) {
+      return builder.build();
+    }
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> idColumn =
+        mapping.getColumnForId();
+    if (idColumn.isEmpty()) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  ERROR_FEATURE_TYPE
+                      + featureType
+                      + "' has no id column; cannot run the versioned-insert pre-flight."))
+          .build();
+    }
+    String idCol = idColumn.get().second().getName();
+    String sql =
+        "SELECT DISTINCT "
+            + idCol
+            + SQL_FROM
+            + idColumn.get().first().getName()
+            + SQL_WHERE
+            + idCol
+            + " IN ("
+            + featureIds.stream()
+                .distinct()
+                .map(SqlMutationSession::sqlString)
+                .collect(Collectors.joining(", "))
+            + ");";
+    try {
+      builder.ids(sqlSession.runReturning(sql));
     } catch (RuntimeException e) {
       builder.error(e);
     }

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.FeatureStream.ResultBase;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -203,6 +204,20 @@ public interface FeatureTransactions {
      * implementation returns success (no check) for providers that have not adopted the API.
      */
     default MutationResult assertNoConflictingVersion(String featureType, String featureId) {
+      return ImmutableMutationResult.builder()
+          .type(MutationResult.Type.CREATE)
+          .hasFeatures(false)
+          .build();
+    }
+
+    /**
+     * Batch variant of {@link #assertNoConflictingVersion(String, String)}: returns in {@code ids}
+     * those of the {@code featureIds} of which a version already exists (open or retired), with one
+     * query instead of one per id. {@code error} is set when the check itself fails. The default
+     * implementation returns no ids (no check) for providers that have not adopted the API.
+     */
+    default MutationResult findConflictingVersions(
+        String featureType, Collection<String> featureIds) {
       return ImmutableMutationResult.builder()
           .type(MutationResult.Type.CREATE)
           .hasFeatures(false)

@@ -76,6 +76,39 @@ class VersionedMutationSqlSpec extends Specification {
         }) >> []
     }
 
+    def 'Insert pre-flight for a batch: findConflictingVersions checks all ids with one SELECT'() {
+        when:
+        FeatureTransactions.MutationResult result = session.findConflictingVersions(
+                FEATURE_TYPE, ['DEABCDEF12345678', 'DEABCDEF00000001', 'DEABCDEF12345678'])
+
+        then:
+        1 * sqlSession.runReturning({ String sql ->
+            sql == "SELECT DISTINCT ${COL_ID} FROM ${TABLE} WHERE ${COL_ID} IN " +
+                    "('DEABCDEF12345678', 'DEABCDEF00000001');"
+        }) >> ['DEABCDEF12345678']
+        result.ids == ['DEABCDEF12345678']
+        result.error.isEmpty()
+    }
+
+    def 'Insert pre-flight for a batch: no ids, no query'() {
+        when:
+        FeatureTransactions.MutationResult result = session.findConflictingVersions(FEATURE_TYPE, [])
+
+        then:
+        0 * sqlSession.runReturning(_)
+        result.ids.isEmpty()
+        result.error.isEmpty()
+    }
+
+    def 'Insert pre-flight for a batch: a failing query is returned as the error'() {
+        when:
+        FeatureTransactions.MutationResult result = session.findConflictingVersions(FEATURE_TYPE, ['a'])
+
+        then:
+        1 * sqlSession.runReturning(_) >> { throw new IllegalStateException('connection lost') }
+        result.error.get().message == 'connection lost'
+    }
+
     def 'Replace retire: retireFeature SQL sets end + successor and gates on the composite expectedStart'() {
         given:
         // retire v1 (started at 05:24:49Z) using v2's start (05:46:11Z) as
