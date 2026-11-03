@@ -14,7 +14,6 @@ import de.ii.xtraplatform.crs.domain.CoordinateTupleWithPrecision;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import java.util.Optional;
 import javax.measure.Unit;
-import org.kortforsyningen.proj.Units;
 import org.opengis.referencing.crs.CompoundCRS;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.crs.SingleCRS;
@@ -22,6 +21,7 @@ import org.opengis.referencing.datum.GeodeticDatum;
 import org.opengis.referencing.operation.CoordinateOperation;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
+import org.osgeo.proj.Units;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 public class CrsTransformerProj extends BoundingBoxTransformer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CrsTransformerProj.class);
+  private static final double ENSEMBLE_SEMI_MAJOR_AXIS = 6_378_137;
 
   private final EpsgCrs sourceCrs;
   private final EpsgCrs targetCrs;
@@ -159,12 +160,20 @@ public class CrsTransformerProj extends BoundingBoxTransformer {
   }
 
   private double getUnitEquivalentInMeters(SingleCRS horizontalCrs, boolean isSource) {
-    return (isSource ? isSourceMetric : isTargetMetric)
-            || !(horizontalCrs.getDatum() instanceof GeodeticDatum)
-        ? 1
-        : Math.PI
-            / 180.00
-            * ((GeodeticDatum) horizontalCrs.getDatum()).getEllipsoid().getSemiMajorAxis();
+    if (isSource ? isSourceMetric : isTargetMetric) {
+      return 1;
+    }
+    if (horizontalCrs.getDatum() instanceof GeodeticDatum) {
+      return Math.PI
+          / 180.00
+          * ((GeodeticDatum) horizontalCrs.getDatum()).getEllipsoid().getSemiMajorAxis();
+    }
+    // PROJ-JNI returns no datum for datum ensembles, all of them (WGS 84, ETRS89, GR96) use an
+    // ellipsoid with this semi-major axis
+    if (horizontalCrs.getDatum() == null) {
+      return Math.PI / 180.00 * ENSEMBLE_SEMI_MAJOR_AXIS;
+    }
+    return 1;
   }
 
   private SingleCRS getHorizontalCrs(CoordinateReferenceSystem crs) {

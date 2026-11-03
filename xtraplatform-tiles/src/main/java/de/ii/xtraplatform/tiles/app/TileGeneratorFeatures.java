@@ -51,7 +51,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import javax.measure.Unit;
-import org.kortforsyningen.proj.Units;
+import org.osgeo.proj.Units;
 
 @SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileGeneratorFeatures extends AbstractVolatileComposed implements TileGenerator {

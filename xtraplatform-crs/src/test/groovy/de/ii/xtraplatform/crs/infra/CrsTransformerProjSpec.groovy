@@ -11,7 +11,7 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry
 import de.ii.xtraplatform.blobs.domain.ResourceStore
 import de.ii.xtraplatform.crs.domain.*
 import de.ii.xtraplatform.proj.domain.ProjLoaderImpl
-import org.kortforsyningen.proj.Units
+import org.osgeo.proj.Units
 import org.opengis.referencing.cs.AxisDirection
 import spock.lang.Shared
 import spock.lang.Specification
