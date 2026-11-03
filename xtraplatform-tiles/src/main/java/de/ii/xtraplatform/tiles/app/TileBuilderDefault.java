@@ -65,7 +65,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.measure.Unit;
-import org.kortforsyningen.proj.Units;
+import org.osgeo.proj.Units;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
