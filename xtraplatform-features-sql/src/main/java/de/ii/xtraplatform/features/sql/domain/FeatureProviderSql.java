@@ -42,6 +42,7 @@ import de.ii.xtraplatform.features.domain.ConnectorFactory;
 import de.ii.xtraplatform.features.domain.DatasetChangeListener;
 import de.ii.xtraplatform.features.domain.DecoderFactories;
 import de.ii.xtraplatform.features.domain.DecoderFactory;
+import de.ii.xtraplatform.features.domain.ExtentFilters;
 import de.ii.xtraplatform.features.domain.FeatureChangeListener;
 import de.ii.xtraplatform.features.domain.FeatureCrs;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
@@ -1072,6 +1073,11 @@ public class FeatureProviderSql
       return Optional.empty();
     }
 
+    Optional<BoundingBox> configured = getConfiguredSpatialExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
+    }
+
     String[] cacheKey = {typeName, CACHE_KEY_STATS, "spatial"};
     String cacheValidator = getData().getStableHash();
 
@@ -1121,21 +1127,9 @@ public class FeatureProviderSql
   }
 
   @Override
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
-        .flatMap(
-            boundingBox ->
-                crsTransformerFactory
-                    .getTransformer(getNativeCrs(), crs, false)
-                    .flatMap(
-                        crsTransformer -> {
-                          try {
-                            return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
-                          } catch (Exception e) {
-                            return Optional.empty();
-                          }
-                        }));
+        .flatMap(boundingBox -> transformSpatialExtent(boundingBox, crs));
   }
 
   @Override
@@ -1147,6 +1141,11 @@ public class FeatureProviderSql
   public Optional<Interval> getTemporalExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
+    }
+
+    Optional<Interval> configured = getConfiguredTemporalExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
     }
 
     String[] cacheKey = {typeName, CACHE_KEY_STATS, "temporal"};
@@ -1422,7 +1421,9 @@ public class FeatureProviderSql
   }
 
   @SuppressWarnings("PMD.CognitiveComplexity")
-  protected Query preprocessQuery(Query query, List<String> resultSetTables) {
+  protected Query preprocessQuery(Query originalQuery, List<String> resultSetTables) {
+    Query query = restrictToExtent(originalQuery);
+
     if (query instanceof FeatureQuery
         && (((FeatureQuery) query).getFields().size() > 1
             || !"*".equals(((FeatureQuery) query).getFields().get(0)))) {
@@ -1493,6 +1494,26 @@ public class FeatureProviderSql
     }
 
     return query;
+  }
+
+  private Query restrictToExtent(Query query) {
+    return ExtentFilters.restrict(query, this::extentFilters);
+  }
+
+  private List<Cql2Expression> extentFilters(String typeName) {
+    Optional<QueryGeneratorSettings> settings = Optional.ofNullable(getData().getQueryGeneration());
+    boolean spatial = settings.map(QueryGeneratorSettings::getRestrictToSpatialExtent).orElse(true);
+    boolean temporal =
+        settings.map(QueryGeneratorSettings::getRestrictToTemporalExtent).orElse(true);
+
+    return Optional.ofNullable(getData().getTypes().get(typeName))
+        .map(
+            type ->
+                ExtentFilters.of(
+                    type,
+                    spatial ? getConfiguredSpatialExtent(typeName) : Optional.empty(),
+                    temporal ? getConfiguredTemporalExtent(typeName) : Optional.empty()))
+        .orElse(List.of());
   }
 
   @Override

@@ -28,7 +28,12 @@ import de.ii.xtraplatform.cql.domain.AEquals
 import de.ii.xtraplatform.cql.domain.AOverlaps
 import de.ii.xtraplatform.cql.domain.ArrayLiteral
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
+import de.ii.xtraplatform.crs.domain.BoundingBox
 import de.ii.xtraplatform.crs.domain.OgcCrs
+import de.ii.xtraplatform.features.domain.ExtentFilters
+import de.ii.xtraplatform.features.domain.FeatureSchema
+import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema
+import de.ii.xtraplatform.features.domain.SchemaBase
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
 import de.ii.xtraplatform.features.sql.domain.SqlDialectGpkg
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
@@ -37,6 +42,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import java.nio.file.Path
+import java.time.Instant
 import java.util.concurrent.CompletableFuture
 
 class FilterEncoderSqlSpec extends Specification {
@@ -368,6 +374,64 @@ class FilterEncoderSqlSpec extends Specification {
 
         actual == expected
     }
+    static FeatureSchema typeWithExtentProperties(Map<String, SchemaBase.Role> properties) {
+        def builder = new ImmutableFeatureSchema.Builder().name("building").sourcePath("/building").type(SchemaBase.Type.OBJECT)
+        properties.each { name, role ->
+            builder.putProperties2(name, new ImmutableFeatureSchema.Builder()
+                    .sourcePath(name)
+                    .type(role == SchemaBase.Role.PRIMARY_GEOMETRY ? SchemaBase.Type.GEOMETRY : SchemaBase.Type.DATETIME)
+                    .role(role))
+        }
+        builder.build()
+    }
+
+    def 'extent restriction, spatial'() {
+
+        given:
+        def type = typeWithExtentProperties(["location": SchemaBase.Role.PRIMARY_GEOMETRY])
+        def extent = BoundingBox.of(-118.0, 33.8, -117.9, 34.0, OgcCrs.CRS84)
+
+        when:
+        def filters = ExtentFilters.of(type, Optional.of(extent), Optional.empty())
+        String actual = filterEncoder.encode(filters[0], QuerySchemaFixtures.SIMPLE_GEOMETRY)
+
+        then: 'intersects, not within, so features reaching beyond the extent are kept'
+        filters.size() == 1
+        actual == "ST_Intersects(A.location, ST_GeomFromText('POLYGON((-118.0 33.8,-117.9 33.8,-117.9 34.0,-118.0 34.0,-118.0 33.8))',4326))"
+    }
+
+    def 'extent restriction, temporal with open end'() {
+
+        given:
+        def type = typeWithExtentProperties(["updated": SchemaBase.Role.PRIMARY_INSTANT])
+        def extent = org.threeten.extra.Interval.of(Instant.parse("2017-06-10T00:00:00Z"), Instant.MAX)
+
+        when:
+        def filters = ExtentFilters.of(type, Optional.empty(), Optional.of(extent))
+        String actual = filterEncoder.encode(filters[0], QuerySchemaFixtures.SIMPLE_INTERVAL)
+
+        then: 'the open end of the extent becomes infinity'
+        filters.size() == 1
+        actual == "(A.updated::timestamp(0),A.updated::timestamp(0)) OVERLAPS (TIMESTAMP '2017-06-10T00:00:00Z',TIMESTAMP 'infinity')"
+    }
+
+    def 'extent restriction, temporal on an interval'() {
+
+        given:
+        def type = typeWithExtentProperties([
+                "start": SchemaBase.Role.PRIMARY_INTERVAL_START,
+                "end"  : SchemaBase.Role.PRIMARY_INTERVAL_END])
+        def extent = org.threeten.extra.Interval.of(Instant.parse("2017-06-10T00:00:00Z"), Instant.parse("2017-06-12T00:00:00Z"))
+
+        when:
+        def filters = ExtentFilters.of(type, Optional.empty(), Optional.of(extent))
+        String actual = filterEncoder.encode(filters[0], QuerySchemaFixtures.SIMPLE_INTERVAL)
+
+        then:
+        filters.size() == 1
+        actual == "(COALESCE(A.start,TIMESTAMP '-infinity'), COALESCE(A.end,TIMESTAMP 'infinity')) OVERLAPS (TIMESTAMP '2017-06-10T00:00:00Z',TIMESTAMP '2017-06-12T00:00:00Z')"
+    }
+
     def 'temporal operation, timestamp'() {
 
         given:
