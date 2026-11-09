@@ -17,7 +17,7 @@ import org.immutables.value.Value;
 
 /**
  * Spatial extent. The coordinates are in the native CRS of the feature provider for providers and
- * types, and in CRS84 (longitude/latitude) for tilesets.
+ * types, and in CRS84 (longitude/latitude) for tilesets and APIs.
  */
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableSpatialExtent.Builder.class)

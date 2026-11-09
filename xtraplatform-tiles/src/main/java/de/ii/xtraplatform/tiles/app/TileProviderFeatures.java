@@ -32,6 +32,7 @@ import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
 import de.ii.xtraplatform.features.domain.DatasetChange;
 import de.ii.xtraplatform.features.domain.DatasetChangeListener;
+import de.ii.xtraplatform.features.domain.Extent;
 import de.ii.xtraplatform.features.domain.FeatureChange;
 import de.ii.xtraplatform.features.domain.FeatureChangeListener;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
@@ -1045,9 +1046,8 @@ public class TileProviderFeatures extends AbstractTileProvider<TileProviderFeatu
             .collect(Collectors.toList());
 
     Optional<BoundingBox> configuredExtent =
-        tileset
-            .getExtent()
-            .or(() -> getData().getTilesetDefaults().getExtent())
+        Extent.inherit(tileset.getExtent(), getData().getTilesetDefaults().getExtent())
+            .getSpatial()
             .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84));
 
     Optional<BoundingBox> bounds;

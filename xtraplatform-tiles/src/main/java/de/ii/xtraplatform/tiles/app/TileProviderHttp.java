@@ -17,6 +17,7 @@ import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
+import de.ii.xtraplatform.features.domain.Extent;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
 import de.ii.xtraplatform.tiles.domain.ImmutableTilesetMetadata;
@@ -135,9 +136,8 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
             ? getData().getTilesetDefaults().getLevels()
             : tileset.getLevels();
     Optional<BoundingBox> bounds =
-        tileset
-            .getExtent()
-            .or(() -> getData().getTilesetDefaults().getExtent())
+        Extent.inherit(tileset.getExtent(), getData().getTilesetDefaults().getExtent())
+            .getSpatial()
             .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84))
             .or(() -> getTileMatrixSetsExtent(levels.keySet()));
 
