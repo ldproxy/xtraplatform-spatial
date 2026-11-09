@@ -16,6 +16,7 @@ import de.ii.xtraplatform.codelists.domain.Codelist;
 import de.ii.xtraplatform.cql.domain.Cql;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
+import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -169,9 +170,7 @@ public class FeatureProviderWfs
             getData().getNativeCrs().orElse(OgcCrs.CRS84),
             crsTransformerFactory,
             cql);
-    this.aggregateStatsReader =
-        new AggregateStatsReaderWfs(
-            this, crsTransformerFactory, getData().getNativeCrs().orElse(OgcCrs.CRS84));
+    this.aggregateStatsReader = new AggregateStatsReaderWfs(this);
 
     return true;
   }
@@ -327,8 +326,23 @@ public class FeatureProviderWfs
 
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
+    // a configured extent is in the native CRS, one from the capabilities in CRS84
     return getSpatialExtent(typeName)
-        .flatMap(boundingBox -> transformSpatialExtent(boundingBox, crs));
+        .flatMap(
+            boundingBox ->
+                Objects.equals(boundingBox.getEpsgCrs(), crs)
+                    ? Optional.of(boundingBox)
+                    : crsTransformerFactory
+                        .getTransformer(boundingBox.getEpsgCrs(), crs, false)
+                        .flatMap(
+                            crsTransformer -> {
+                              try {
+                                return Optional.of(
+                                    crsTransformer.transformBoundingBox(boundingBox));
+                              } catch (CrsTransformationException e) {
+                                return Optional.empty();
+                              }
+                            }));
   }
 
   @Override
