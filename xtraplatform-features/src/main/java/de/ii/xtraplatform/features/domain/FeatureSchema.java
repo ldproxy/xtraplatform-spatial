@@ -406,7 +406,7 @@ public interface FeatureSchema
    * @langDe Optionaler räumlicher und zeitlicher Extent für diesen Feature-Type.
    * @since v4.9
    */
-  Optional<FeatureTypeExtent> getExtent();
+  Optional<Extent> getExtent();
 
   /**
    * @langEn The unit of measurement of the value, only relevant for numeric properties.

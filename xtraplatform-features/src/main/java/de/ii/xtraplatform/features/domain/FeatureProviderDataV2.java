@@ -226,7 +226,7 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    *     gesetzt, wird keine automatische Berechnung durchgeführt.
    * @since v4.9
    */
-  Optional<FeatureTypeExtent> getExtent();
+  Optional<Extent> getExtent();
 
   // custom builder to automatically use keys of types as name of FeatureTypeV2
   abstract class Builder<T extends Builder<T>> implements EntityDataBuilder<FeatureProviderDataV2> {

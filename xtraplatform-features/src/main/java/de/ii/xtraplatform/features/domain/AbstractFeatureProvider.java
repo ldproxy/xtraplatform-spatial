@@ -617,8 +617,8 @@ public abstract class AbstractFeatureProvider<
     return getConfiguredExtent(typeName).getTemporal().flatMap(TemporalExtent::toInterval);
   }
 
-  private FeatureTypeExtent getConfiguredExtent(String typeName) {
-    return FeatureTypeExtent.inherit(
+  private Extent getConfiguredExtent(String typeName) {
+    return Extent.inherit(
         Optional.ofNullable(getData().getTypes().get(typeName)).flatMap(FeatureSchema::getExtent),
         getData().getExtent());
   }

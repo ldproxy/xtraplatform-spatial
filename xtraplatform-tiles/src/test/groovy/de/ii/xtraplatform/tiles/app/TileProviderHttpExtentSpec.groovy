@@ -12,7 +12,9 @@ import de.ii.xtraplatform.crs.domain.BoundingBox
 import de.ii.xtraplatform.crs.domain.CrsTransformationException
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory
 import de.ii.xtraplatform.crs.domain.OgcCrs
+import de.ii.xtraplatform.features.domain.ImmutableExtent
 import de.ii.xtraplatform.features.domain.ImmutableSpatialExtent
+import de.ii.xtraplatform.features.domain.ImmutableTemporalExtent
 import de.ii.xtraplatform.features.domain.SpatialExtent
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax
 import de.ii.xtraplatform.tiles.domain.ImmutableTileProviderHttpData
@@ -46,7 +48,7 @@ class TileProviderHttpExtentSpec extends Specification {
                 .putLevels("Unknown", new ImmutableMinMax.Builder().min(0).max(10))
                 .putEncodings(TilesFormat.MVT, "pbf")
         if (defaultsExtent != null) {
-            defaults.extent(defaultsExtent)
+            defaults.extent(ImmutableExtent.builder().spatial(defaultsExtent).build())
         }
         def data = new ImmutableTileProviderHttpData.Builder()
                 .id("tiles")
@@ -61,7 +63,7 @@ class TileProviderHttpExtentSpec extends Specification {
         def builder = new ImmutableTilesetHttp.Builder().id("ts").urlTemplate("https://example.com/{z}/{y}/{x}")
         tileMatrixSetIds.each { builder.putLevels(it, new ImmutableMinMax.Builder().min(0).max(10)) }
         if (extent != null) {
-            builder.extent(extent)
+            builder.extent(ImmutableExtent.builder().spatial(extent).build())
         }
         builder.build()
     }
@@ -105,5 +107,20 @@ class TileProviderHttpExtentSpec extends Specification {
 
         expect:
         provider(null).loadMetadata(tileset(null, ["broken"])).bounds.isEmpty()
+    }
+
+    def "a temporal extent is rejected for a tileset"() {
+
+        when:
+        new ImmutableTilesetHttp.Builder().id("ts").urlTemplate("https://example.com/{z}/{y}/{x}")
+                .extent(ImmutableExtent.builder()
+                        .spatial(TILESET_EXTENT)
+                        .temporal(new ImmutableTemporalExtent.Builder().start("2020-01-01").build())
+                        .build())
+                .build()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "Extent: 'temporal' is not supported for tiles, only 'spatial'."
     }
 }

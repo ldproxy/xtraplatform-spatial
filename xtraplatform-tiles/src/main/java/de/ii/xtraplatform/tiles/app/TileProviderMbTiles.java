@@ -18,6 +18,7 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
+import de.ii.xtraplatform.features.domain.Extent;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
@@ -181,9 +182,8 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
                   .get(tilesetKey.first())
                   .mergeDefaults(getData().getTilesetDefaults());
           Optional<BoundingBox> configuredExtent =
-              tileset
-                  .getExtent()
-                  .or(() -> getData().getTilesetDefaults().getExtent())
+              Extent.inherit(tileset.getExtent(), getData().getTilesetDefaults().getExtent())
+                  .getSpatial()
                   .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84));
 
           metadata.put(
