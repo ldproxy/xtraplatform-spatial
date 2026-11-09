@@ -76,18 +76,51 @@ class VersionedMutationSqlSpec extends Specification {
         }) >> []
     }
 
-    def 'Insert pre-flight for a batch: findConflictingVersions checks all ids with one SELECT'() {
+    def 'Insert pre-flight for a batch: findConflictingVersions checks all ids with one query'() {
         when:
         FeatureTransactions.MutationResult result = session.findConflictingVersions(
                 FEATURE_TYPE, ['DEABCDEF12345678', 'DEABCDEF00000001', 'DEABCDEF12345678'])
 
         then:
         1 * sqlSession.runReturning({ String sql ->
-            sql == "SELECT DISTINCT ${COL_ID} FROM ${TABLE} WHERE ${COL_ID} IN " +
-                    "('DEABCDEF12345678', 'DEABCDEF00000001');"
+            sql == "SELECT 'DEABCDEF12345678' WHERE EXISTS " +
+                    "(SELECT 1 FROM ${TABLE} WHERE ${COL_ID} = 'DEABCDEF12345678')" +
+                    " UNION ALL SELECT 'DEABCDEF00000001' WHERE EXISTS " +
+                    "(SELECT 1 FROM ${TABLE} WHERE ${COL_ID} = 'DEABCDEF00000001');"
         }) >> ['DEABCDEF12345678']
         result.ids == ['DEABCDEF12345678']
         result.error.isEmpty()
+    }
+
+    def 'Insert pre-flight for a batch: an id is found also in another text form of the database: #given'() {
+        when:
+        FeatureTransactions.MutationResult result = session.findConflictingVersions(FEATURE_TYPE, given)
+
+        then:
+        1 * sqlSession.runReturning(_) >> { String sql -> integerColumnWithSeven(sql) }
+        result.ids as Set == found as Set
+
+        where:
+        given          | found
+        ['007', '8']   | ['007']
+        ['7', '007']   | ['7', '007']
+        ['8']          | []
+    }
+
+    /**
+     * Answers the query as PostgreSQL does for an integer id column with the row 7: a literal is
+     * compared as a number, the column value is returned as '7'.
+     */
+    private static List<String> integerColumnWithSeven(String sql) {
+        def isSeven = { String literal -> literal.isInteger() && literal.toInteger() == 7 }
+        def inList = sql =~ /^SELECT DISTINCT \w+ FROM \w+ WHERE \w+ IN \((.*)\);$/
+        if (inList.matches()) {
+            def literals = (inList.group(1) =~ /'([^']*)'/).collect { it[1] }
+            return literals.any(isSeven) ? ['7'] : []
+        }
+        return (sql =~ /SELECT '([^']*)' WHERE EXISTS \(SELECT 1 FROM \w+ WHERE \w+ = '([^']*)'\)/)
+                .findAll { isSeven(it[2]) }
+                .collect { it[1] }
     }
 
     def 'Insert pre-flight for a batch: no ids, no query'() {

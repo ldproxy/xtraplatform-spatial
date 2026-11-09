@@ -509,8 +509,11 @@ public class SqlMutationSession implements FeatureTransactions.Session {
     return builder.build();
   }
 
-  // Batch variant of the versioned-Insert pre-flight: one SELECT on the main table for all ids, the
-  // ids found are returned in `ids`.
+  // Batch variant of the versioned-Insert pre-flight: one query for all ids, the ids of which a
+  // version exists are returned in `ids`, as they were given. Each id is checked for existence as
+  // in the single-id check and the query returns the given literal, not the column value: the text
+  // form of the column value can differ from the given id, e.g. 7 for '007' in an integer column, a
+  // UUID in lower case or a char(n) value with padding.
   @Override
   public FeatureTransactions.MutationResult findConflictingVersions(
       String featureType, Collection<String> featureIds) {
@@ -533,20 +536,26 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                       + "' has no id column; cannot run the versioned-insert pre-flight."))
           .build();
     }
+    String mainTableName = idColumn.get().first().getName();
     String idCol = idColumn.get().second().getName();
     String sql =
-        "SELECT DISTINCT "
-            + idCol
-            + SQL_FROM
-            + idColumn.get().first().getName()
-            + SQL_WHERE
-            + idCol
-            + " IN ("
-            + featureIds.stream()
+        featureIds.stream()
                 .distinct()
                 .map(SqlMutationSession::sqlString)
-                .collect(Collectors.joining(", "))
-            + ");";
+                .map(
+                    id ->
+                        SQL_SELECT
+                            + id
+                            + " WHERE EXISTS (SELECT 1"
+                            + SQL_FROM
+                            + mainTableName
+                            + SQL_WHERE
+                            + idCol
+                            + SQL_EQ
+                            + id
+                            + ")")
+                .collect(Collectors.joining(" UNION ALL "))
+            + ";";
     try {
       builder.ids(sqlSession.runReturning(sql));
     } catch (RuntimeException e) {

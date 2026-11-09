@@ -212,9 +212,11 @@ public interface FeatureTransactions {
 
     /**
      * Batch variant of {@link #assertNoConflictingVersion(String, String)}: returns in {@code ids}
-     * those of the {@code featureIds} of which a version already exists (open or retired), with one
-     * query instead of one per id. {@code error} is set when the check itself fails. The default
-     * implementation returns no ids (no check) for providers that have not adopted the API.
+     * those of the {@code featureIds} of which a version already exists (open or retired), as they
+     * were given, also when the stored id has another text form (e.g. {@code 7} for {@code 007} in
+     * an integer column), with one query instead of one per id. {@code error} is set when the check
+     * itself fails. The default implementation returns no ids (no check) for providers that have
+     * not adopted the API.
      */
     default MutationResult findConflictingVersions(
         String featureType, Collection<String> featureIds) {
