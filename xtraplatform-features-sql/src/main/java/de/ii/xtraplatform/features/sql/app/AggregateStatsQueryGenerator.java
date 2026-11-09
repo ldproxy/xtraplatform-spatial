@@ -7,11 +7,14 @@
  */
 package de.ii.xtraplatform.features.sql.app;
 
+import de.ii.xtraplatform.cql.domain.And;
+import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.features.sql.domain.SqlDialect;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryColumn.Operation;
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping;
 import de.ii.xtraplatform.features.sql.domain.SqlQuerySchema;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,13 +34,30 @@ public class AggregateStatsQueryGenerator {
   }
 
   public String getCountQuery(SqlQueryMapping mapping) {
+    return getCountQuery(mapping, List.of());
+  }
+
+  /**
+   * Counts the features that match the filter of the main table and the additional filters, e.g.
+   * the restriction of all queries to a fixed extent.
+   */
+  public String getCountQuery(SqlQueryMapping mapping, List<Cql2Expression> additionalFilters) {
     SqlQuerySchema sourceSchema = mapping.getMainTable();
 
     List<String> aliases = AliasGenerator.getAliases(sourceSchema);
 
     String mainTable = String.format(FORMAT_TABLE_ALIAS, sourceSchema.getName(), aliases.get(0));
 
-    Optional<String> filter = getFilter(mapping, sourceSchema);
+    List<Cql2Expression> filters = new ArrayList<>();
+    sourceSchema.getFilter().ifPresent(filters::add);
+    filters.addAll(additionalFilters);
+
+    Optional<String> filter =
+        filters.isEmpty()
+            ? Optional.empty()
+            : Optional.of(
+                filterEncoder.encode(
+                    filters.size() == 1 ? filters.get(0) : And.of(filters), mapping));
     String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
     return String.format("SELECT COUNT(*) FROM %s%s", mainTable, where);

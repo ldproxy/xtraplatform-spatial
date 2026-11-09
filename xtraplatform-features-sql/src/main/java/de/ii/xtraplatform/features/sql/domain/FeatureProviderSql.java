@@ -36,7 +36,6 @@ import de.ii.xtraplatform.docs.DocVar;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
 import de.ii.xtraplatform.features.domain.AbstractFeatureProvider;
-import de.ii.xtraplatform.features.domain.AggregateStatsReader;
 import de.ii.xtraplatform.features.domain.ConnectionInfo;
 import de.ii.xtraplatform.features.domain.ConnectorFactory;
 import de.ii.xtraplatform.features.domain.DatasetChangeListener;
@@ -467,7 +466,7 @@ public class FeatureProviderSql
   private final Scheduler scheduler;
 
   private FeatureQueryEncoderSql queryTransformer;
-  private AggregateStatsReader<SqlQueryMapping> aggregateStatsReader;
+  private AggregateStatsReaderSql aggregateStatsReader;
   private FeatureMutationsSql featureMutationsSql;
   private PathParserSql pathParser2;
   private SqlPathParser pathParser3;
@@ -1042,7 +1041,9 @@ public class FeatureProviderSql
     }
 
     try {
-      Stream<Long> countGraph = aggregateStatsReader.getCount(queryMappings.get(typeName));
+      // count what queries for multiple features return, i.e. within a fixed extent if restricted
+      Stream<Long> countGraph =
+          aggregateStatsReader.getCount(queryMappings.get(typeName), extentFilters(typeName));
 
       Long count =
           countGraph
