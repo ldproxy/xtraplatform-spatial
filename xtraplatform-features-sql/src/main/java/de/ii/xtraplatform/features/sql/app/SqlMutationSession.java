@@ -40,6 +40,7 @@ import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -502,6 +503,61 @@ public class SqlMutationSession implements FeatureTransactions.Session {
                         + " add a new version)."))
             .build();
       }
+    } catch (RuntimeException e) {
+      builder.error(e);
+    }
+    return builder.build();
+  }
+
+  // Batch variant of the versioned-Insert pre-flight: one query for all ids, the ids of which a
+  // version exists are returned in `ids`, as they were given. Each id is checked for existence as
+  // in the single-id check and the query returns the given literal, not the column value: the text
+  // form of the column value can differ from the given id, e.g. 7 for '007' in an integer column, a
+  // UUID in lower case or a char(n) value with padding.
+  @Override
+  public FeatureTransactions.MutationResult findConflictingVersions(
+      String featureType, Collection<String> featureIds) {
+    SqlQueryMapping mapping = requireMapping(featureType);
+    ImmutableMutationResult.Builder builder =
+        ImmutableMutationResult.builder()
+            .type(FeatureTransactions.MutationResult.Type.CREATE)
+            .hasFeatures(false);
+    if (featureIds.isEmpty()) {
+      return builder.build();
+    }
+    Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>> idColumn =
+        mapping.getColumnForId();
+    if (idColumn.isEmpty()) {
+      return builder
+          .error(
+              new IllegalStateException(
+                  ERROR_FEATURE_TYPE
+                      + featureType
+                      + "' has no id column; cannot run the versioned-insert pre-flight."))
+          .build();
+    }
+    String mainTableName = idColumn.get().first().getName();
+    String idCol = idColumn.get().second().getName();
+    String sql =
+        featureIds.stream()
+                .distinct()
+                .map(SqlMutationSession::sqlString)
+                .map(
+                    id ->
+                        SQL_SELECT
+                            + id
+                            + " WHERE EXISTS (SELECT 1"
+                            + SQL_FROM
+                            + mainTableName
+                            + SQL_WHERE
+                            + idCol
+                            + SQL_EQ
+                            + id
+                            + ")")
+                .collect(Collectors.joining(" UNION ALL "))
+            + ";";
+    try {
+      builder.ids(sqlSession.runReturning(sql));
     } catch (RuntimeException e) {
       builder.error(e);
     }

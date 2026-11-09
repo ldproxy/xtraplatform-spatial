@@ -55,6 +55,8 @@ public interface TileSeedingJob extends JobInputs {
         tileSeedingJob.getTileSets().entrySet().stream()
             .collect(
                 ImmutableMap.toImmutableMap(Map.Entry::getKey, e -> e.getValue().getProgress2())),
+        // setup queues the seeding partials itself, they depend on the tiles to seed
+        List.of(),
         Optional.of(3600));
   }
 

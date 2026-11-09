@@ -14,6 +14,7 @@ import de.ii.xtralink.jobs.JobConfiguration;
 import de.ii.xtraplatform.xtralink.domain.JobContext.JobContextEntity;
 import de.ii.xtraplatform.xtralink.domain.JobInputs;
 import de.ii.xtraplatform.xtralink.domain.Jobs;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -48,6 +49,8 @@ public interface Tile3dSeedingJob extends JobInputs {
             .build(),
         new JobContextEntity(tileProvider),
         Map.of(),
+        // setup queues the seeding partials itself, they depend on the tiles to seed
+        List.of(),
         Optional.of(3600));
   }
 
