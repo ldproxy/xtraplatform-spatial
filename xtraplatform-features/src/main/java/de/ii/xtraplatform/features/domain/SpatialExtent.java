@@ -73,11 +73,13 @@ public interface SpatialExtent {
 
   /**
    * @langEn Set to `true` to compute the extent from the data instead of inheriting a fixed extent
-   *     from the parent level (provider for types, tileset defaults for tilesets). Must not be
-   *     combined with coordinates; `false` is not allowed.
+   *     from the parent level (provider for types, tileset defaults for tilesets). Without a fixed
+   *     extent on the parent level, this is the same as omitting the extent. Either the coordinates
+   *     or `computed: true` must be set; `false` is not allowed.
    * @langDe Auf `true` setzen, um den Extent aus den Daten zu berechnen, statt einen festen Extent
-   *     der übergeordneten Ebene (Provider für Types, Tileset-Defaults für Tilesets) zu erben. Darf
-   *     nicht mit Koordinaten kombiniert werden; `false` ist nicht erlaubt.
+   *     der übergeordneten Ebene (Provider für Types, Tileset-Defaults für Tilesets) zu erben. Ohne
+   *     festen Extent auf der übergeordneten Ebene ist das dasselbe, wie den Extent wegzulassen.
+   *     Anzugeben sind entweder die Koordinaten oder `computed: true`; `false` ist nicht erlaubt.
    * @since v4.9
    */
   @Nullable
@@ -94,6 +96,8 @@ public interface SpatialExtent {
     Preconditions.checkState(
         !(hasCoordinates && autoCompute),
         "SpatialExtent: 'computed' and explicit coordinates must not be set at the same time.");
+    Preconditions.checkState(
+        hasCoordinates || autoCompute, "SpatialExtent: set the coordinates or 'computed: true'.");
 
     if (hasCoordinates) {
       checkCoordinatesComplete();
