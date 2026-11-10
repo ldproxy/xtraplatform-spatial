@@ -177,6 +177,12 @@ public interface SqlDialect {
 
   Optional<BoundingBox> parseExtent(String extent, EpsgCrs crs);
 
+  /**
+   * @param start the earliest start, or null if the start is unbounded
+   * @param end the latest end, or null if the end is unbounded
+   * @param timeZone the time zone of values without an offset
+   * @return the temporal extent
+   */
   Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone);
 
   String escapeString(String value);
