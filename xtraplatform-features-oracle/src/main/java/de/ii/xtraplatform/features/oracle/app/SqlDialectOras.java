@@ -124,17 +124,11 @@ public class SqlDialectOras implements SqlDialect {
 
   @Override
   public Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone) {
-    if (Objects.isNull(start)) {
-      return Optional.empty();
-    }
     DateTimeFormatter parser =
         DateTimeFormatter.ofPattern("yyyy-MM-dd[['T'][' ']HH:mm:ss][.SSS][X]")
             .withZone(ZoneOffset.UTC);
-    Instant parsedStart = parser.parse(start, Instant::from);
-    if (Objects.isNull(end)) {
-      return Optional.of(Interval.of(parsedStart, Instant.MAX));
-    }
-    Instant parsedEnd = parser.parse(end, Instant::from);
+    Instant parsedStart = Objects.isNull(start) ? Instant.MIN : parser.parse(start, Instant::from);
+    Instant parsedEnd = Objects.isNull(end) ? Instant.MAX : parser.parse(end, Instant::from);
     return Optional.of(Interval.of(parsedStart, parsedEnd));
   }
 

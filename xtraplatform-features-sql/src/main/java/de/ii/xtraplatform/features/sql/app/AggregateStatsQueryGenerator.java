@@ -25,6 +25,13 @@ public class AggregateStatsQueryGenerator {
   private static final String FORMAT_TABLE_ALIAS = "%s %s";
   private static final String FORMAT_WHERE = " WHERE %s";
 
+  /**
+   * The temporal extent queries return no row if there is nothing to aggregate, so that NULL in the
+   * result always stands for an unbounded start or end.
+   */
+  private static final String FORMAT_TEMPORAL_EXTENT =
+      "SELECT T.extent_start, T.extent_end FROM (%s) T WHERE T.row_count > 0";
+
   private final SqlDialect sqlDialect;
   private final FilterEncoderSql filterEncoder;
 
@@ -111,8 +118,10 @@ public class AggregateStatsQueryGenerator {
     String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
     return String.format(
-        "SELECT MIN(%s), MAX(%s) FROM %s%s%s%s",
-        column, column, mainTable, join.isEmpty() ? "" : " ", join, where);
+        FORMAT_TEMPORAL_EXTENT,
+        String.format(
+            "SELECT MIN(%s) AS extent_start, MAX(%s) AS extent_end, COUNT(%s) AS row_count FROM %s%s%s%s",
+            column, column, column, mainTable, join.isEmpty() ? "" : " ", join, where));
   }
 
   public String getTemporalExtentQuery(
@@ -148,8 +157,15 @@ public class AggregateStatsQueryGenerator {
       String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
       return String.format(
-          "SELECT MIN(%s), MAX(%s) FROM %s%s%s%s",
-          columnStart, columnEnd, mainTable, join.isEmpty() ? "" : " ", join, where);
+          FORMAT_TEMPORAL_EXTENT,
+          String.format(
+              "SELECT %s AS extent_start, %s AS extent_end, COUNT(*) AS row_count FROM %s%s%s%s",
+              minOrUnbounded(columnStart),
+              maxOrUnbounded(columnEnd),
+              mainTable,
+              join.isEmpty() ? "" : " ",
+              join,
+              where));
 
     } else {
       List<String> startAliases = AliasGenerator.getAliases(intervalStart);
@@ -179,9 +195,26 @@ public class AggregateStatsQueryGenerator {
       String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
 
       return String.format(
-          "SELECT * FROM (SELECT MIN(%s) FROM %s%s) AS A, (SELECT MAX(%s) from %s%s) AS B;",
-          columnStart, startTableWithJoins, where, columnEnd, endTableWithJoins, where);
+          "SELECT S.extent_start, E.extent_end FROM (SELECT %s AS extent_start, COUNT(*) AS"
+              + " row_count FROM %s%s) S, (SELECT %s AS extent_end FROM %s%s) E WHERE S.row_count >"
+              + " 0",
+          minOrUnbounded(columnStart),
+          startTableWithJoins,
+          where,
+          maxOrUnbounded(columnEnd),
+          endTableWithJoins,
+          where);
     }
+  }
+
+  /** The earliest start, or NULL (unbounded) if any start is NULL. */
+  private static String minOrUnbounded(String column) {
+    return String.format("CASE WHEN COUNT(*) > COUNT(%1$s) THEN NULL ELSE MIN(%1$s) END", column);
+  }
+
+  /** The latest end, or NULL (unbounded) if any end is NULL. */
+  private static String maxOrUnbounded(String column) {
+    return String.format("CASE WHEN COUNT(*) > COUNT(%1$s) THEN NULL ELSE MAX(%1$s) END", column);
   }
 
   private Optional<String> getFilter(SqlQueryMapping mapping, SqlQuerySchema schemaSql) {

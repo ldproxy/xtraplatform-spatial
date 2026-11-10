@@ -175,15 +175,8 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone) {
-    if (Objects.isNull(start)) {
-      return Optional.empty();
-    }
-
-    Instant parsedStart = parseInstant(start, timeZone);
-    if (Objects.isNull(end)) {
-      return Optional.of(Interval.of(parsedStart, Instant.MAX));
-    }
-    Instant parsedEnd = parseInstant(end, timeZone);
+    Instant parsedStart = Objects.isNull(start) ? Instant.MIN : parseInstant(start, timeZone);
+    Instant parsedEnd = Objects.isNull(end) ? Instant.MAX : parseInstant(end, timeZone);
     return Optional.of(Interval.of(parsedStart, parsedEnd));
   }
 

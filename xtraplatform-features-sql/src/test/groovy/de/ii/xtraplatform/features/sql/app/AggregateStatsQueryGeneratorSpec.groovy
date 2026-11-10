@@ -21,6 +21,7 @@ import de.ii.xtraplatform.features.domain.MappingRuleFixtures
 import de.ii.xtraplatform.features.json.app.DecoderFactoryJson
 import de.ii.xtraplatform.features.sql.domain.ImmutableQueryGeneratorSettings
 import de.ii.xtraplatform.features.sql.domain.ImmutableSqlPathDefaults
+import de.ii.xtraplatform.features.sql.domain.ImmutableSqlQuerySchema
 import de.ii.xtraplatform.features.sql.domain.SqlDialectPgis
 import de.ii.xtraplatform.features.sql.domain.SqlPathParser
 import de.ii.xtraplatform.features.sql.domain.SqlQueryMapping
@@ -88,5 +89,42 @@ class AggregateStatsQueryGeneratorSpec extends Specification {
         then: 'both predicates are part of a single conjunction'
         actual.startsWith("SELECT COUNT(*) FROM unfaelle_point A WHERE (${INTERSECTS} AND ")
         actual.contains("OVERLAPS (TIMESTAMP '2019-01-01T00:00:00Z',TIMESTAMP '2019-12-31T23:59:59Z')")
+    }
+
+    def 'the temporal extent of an instant is empty if there is no value'() {
+
+        given:
+        def instant = unfaelleMapping.getColumnForPrimaryInstant().get()
+
+        when:
+        String actual = generator.getTemporalExtentQuery(unfaelleMapping, instant.first(), instant.second())
+
+        then: 'no row without a value, so that a NULL can only stand for an unbounded start or end'
+        actual == "SELECT T.extent_start, T.extent_end FROM (SELECT MIN(A.unfzeit::timestamp(0)) AS extent_start, MAX(A.unfzeit::timestamp(0)) AS extent_end, COUNT(A.unfzeit::timestamp(0)) AS row_count FROM unfaelle_point A) T WHERE T.row_count > 0"
+    }
+
+    def 'the temporal extent of an interval is unbounded at the start or end if any start or end is open'() {
+
+        given: 'start and end in the same table'
+        def column = unfaelleMapping.getColumnForPrimaryInstant().get()
+
+        when:
+        String actual = generator.getTemporalExtentQuery(unfaelleMapping, column.first(), column.second(), column.first(), column.second())
+
+        then: 'a NULL start or end is not ignored by MIN or MAX but makes that side unbounded'
+        actual == "SELECT T.extent_start, T.extent_end FROM (SELECT CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MIN(A.unfzeit::timestamp(0)) END AS extent_start, CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MAX(A.unfzeit::timestamp(0)) END AS extent_end, COUNT(*) AS row_count FROM unfaelle_point A) T WHERE T.row_count > 0"
+    }
+
+    def 'the temporal extent of an interval with start and end in different tables'() {
+
+        given:
+        def column = unfaelleMapping.getColumnForPrimaryInstant().get()
+        def endTable = new ImmutableSqlQuerySchema.Builder().from(column.first()).name("unfaelle_end").build()
+
+        when:
+        String actual = generator.getTemporalExtentQuery(unfaelleMapping, column.first(), column.second(), endTable, column.second())
+
+        then:
+        actual == "SELECT S.extent_start, E.extent_end FROM (SELECT CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MIN(A.unfzeit::timestamp(0)) END AS extent_start, COUNT(*) AS row_count FROM unfaelle_point A) S, (SELECT CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MAX(A.unfzeit::timestamp(0)) END AS extent_end FROM unfaelle_point A) E WHERE S.row_count > 0"
     }
 }
