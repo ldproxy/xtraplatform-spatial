@@ -207,6 +207,46 @@ public class AggregateStatsQueryGenerator {
     }
   }
 
+  /**
+   * The temporal extent of an interval with only a start or only an end; the other side is
+   * unbounded.
+   *
+   * @param mapping the type
+   * @param bound the table of the start or end
+   * @param boundColumn the column of the start or end
+   * @param isStart whether the column is the start
+   * @return the query
+   */
+  public String getTemporalExtentQuery(
+      SqlQueryMapping mapping, SqlQuerySchema bound, SqlQueryColumn boundColumn, boolean isStart) {
+    SqlQuerySchema mainSchema = mapping.getMainTable();
+
+    List<String> aliases = AliasGenerator.getAliases(bound);
+    String boundAlias = aliases.get(aliases.size() - 1);
+
+    String mainTable = String.format(FORMAT_TABLE_ALIAS, mainSchema.getName(), aliases.get(0));
+
+    String column =
+        SqlQueryColumnOperations.getQualifiedColumnResolved(
+            boundAlias, SqlQueryColumnOperations.dateToDatetime(boundColumn), sqlDialect);
+
+    String join = JoinGenerator.getJoins(bound, aliases, filterEncoder);
+
+    Optional<String> filter = getFilter(mapping, mainSchema);
+    String where = filter.isPresent() ? String.format(FORMAT_WHERE, filter.get()) : "";
+
+    return String.format(
+        FORMAT_TEMPORAL_EXTENT,
+        String.format(
+            "SELECT %s AS extent_start, %s AS extent_end, COUNT(*) AS row_count FROM %s%s%s%s",
+            isStart ? minOrUnbounded(column) : "NULL",
+            isStart ? "NULL" : maxOrUnbounded(column),
+            mainTable,
+            join.isEmpty() ? "" : " ",
+            join,
+            where));
+  }
+
   /** The earliest start, or NULL (unbounded) if any start is NULL. */
   private static String minOrUnbounded(String column) {
     return String.format("CASE WHEN COUNT(*) > COUNT(%1$s) THEN NULL ELSE MIN(%1$s) END", column);

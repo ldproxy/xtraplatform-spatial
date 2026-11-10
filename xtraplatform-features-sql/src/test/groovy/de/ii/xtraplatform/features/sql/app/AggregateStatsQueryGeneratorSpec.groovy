@@ -127,4 +127,18 @@ class AggregateStatsQueryGeneratorSpec extends Specification {
         then:
         actual == "SELECT S.extent_start, E.extent_end FROM (SELECT CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MIN(A.unfzeit::timestamp(0)) END AS extent_start, COUNT(*) AS row_count FROM unfaelle_point A) S, (SELECT CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MAX(A.unfzeit::timestamp(0)) END AS extent_end FROM unfaelle_point A) E WHERE S.row_count > 0"
     }
+
+    def 'the temporal extent of an interval with only a start or only an end is unbounded on the other side'() {
+
+        given:
+        def column = unfaelleMapping.getColumnForPrimaryInstant().get()
+
+        when:
+        String startOnly = generator.getTemporalExtentQuery(unfaelleMapping, column.first(), column.second(), true)
+        String endOnly = generator.getTemporalExtentQuery(unfaelleMapping, column.first(), column.second(), false)
+
+        then:
+        startOnly == "SELECT T.extent_start, T.extent_end FROM (SELECT CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MIN(A.unfzeit::timestamp(0)) END AS extent_start, NULL AS extent_end, COUNT(*) AS row_count FROM unfaelle_point A) T WHERE T.row_count > 0"
+        endOnly == "SELECT T.extent_start, T.extent_end FROM (SELECT NULL AS extent_start, CASE WHEN COUNT(*) > COUNT(A.unfzeit::timestamp(0)) THEN NULL ELSE MAX(A.unfzeit::timestamp(0)) END AS extent_end, COUNT(*) AS row_count FROM unfaelle_point A) T WHERE T.row_count > 0"
+    }
 }
