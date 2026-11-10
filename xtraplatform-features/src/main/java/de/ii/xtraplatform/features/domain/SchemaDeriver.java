@@ -248,7 +248,7 @@ public abstract class SchemaDeriver<T> implements SchemaVisitorTopDown<FeatureSc
         schema
             .getRole()
             // roles that are not a role in the sense of OGC API Features Part 5
-            .filter(r -> !Role.FILTER_GEOMETRY.equals(r) && !Role.AUXILIARY.equals(r))
+            .filter(r -> Role.FILTER_GEOMETRY != r && Role.AUXILIARY != r)
             .map(Enum::name)
             .map(r -> CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_HYPHEN, r))
             .or(() -> schema.getRefType().map(ignore -> "reference"))

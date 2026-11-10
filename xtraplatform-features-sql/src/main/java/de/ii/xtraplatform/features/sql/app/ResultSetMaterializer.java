@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import de.ii.xtraplatform.base.domain.LogContext;
-import de.ii.xtraplatform.cql.domain.And;
 import de.ii.xtraplatform.cql.domain.BinaryScalarOperation;
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.cql.domain.CqlNode;
@@ -17,8 +16,6 @@ import de.ii.xtraplatform.cql.domain.ImmutableInResultSet;
 import de.ii.xtraplatform.cql.domain.ImmutableInResultSetByKey;
 import de.ii.xtraplatform.cql.domain.InResultSet;
 import de.ii.xtraplatform.cql.domain.InResultSetByKey;
-import de.ii.xtraplatform.cql.domain.Not;
-import de.ii.xtraplatform.cql.domain.Or;
 import de.ii.xtraplatform.cql.domain.ResultSetReference;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableSubQuery;
@@ -41,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -139,7 +137,7 @@ public class ResultSetMaterializer {
             maxSetSize);
       }
       return false;
-    } catch (RuntimeException e) {
+    } catch (CompletionException e) {
       LogContext.errorAsWarn(
           LOGGER,
           e,
@@ -210,7 +208,8 @@ public class ResultSetMaterializer {
         // producer's filter false, the producer can only be empty too — record the empty set and
         // skip its query. Consumers encode IN () for it either way, so the output is unchanged.
         if (node.getProducerFilter().isPresent()
-            && isProvablyEmpty(node.getProducerFilter().get(), materialized, materializedKeys)) {
+            && ResultSetTruth.isProvablyEmpty(
+                node.getProducerFilter().get(), materialized, materializedKeys)) {
           if (node instanceof InResultSetByKey) {
             materializedKeys.put(name, List.of());
           } else {
@@ -481,80 +480,6 @@ public class ResultSetMaterializer {
         }
       }
     }
-  }
-
-  /**
-   * True if the filter can only ever be false given the result sets materialized so far, i.e. it
-   * references a set that materialized to no members in a boolean position that forces the whole
-   * filter false. Conservative: any leaf whose value is not pinned by an empty set is treated as
-   * indeterminate, so a producer is skipped only when boolean algebra guarantees an empty result.
-   */
-  private static boolean isProvablyEmpty(
-      Cql2Expression filter,
-      Map<String, List<Object>> materialized,
-      Map<String, List<List<Object>>> materializedKeys) {
-    return truth(filter, materialized, materializedKeys) == Truth.FALSE;
-  }
-
-  private enum Truth {
-    TRUE,
-    FALSE,
-    UNKNOWN
-  }
-
-  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
-  private static Truth truth(
-      CqlNode node,
-      Map<String, List<Object>> materialized,
-      Map<String, List<List<Object>>> materializedKeys) {
-    if (node instanceof InResultSetByKey) {
-      List<List<Object>> keys = materializedKeys.get(((InResultSetByKey) node).getSetName());
-      // as below: a materialized-empty set makes the semi-join always false
-      return keys != null && keys.isEmpty() ? Truth.FALSE : Truth.UNKNOWN;
-    }
-    if (node instanceof InResultSet) {
-      List<Object> values = materialized.get(((InResultSet) node).getSetName());
-      // a materialized-empty set makes the IN / A_OVERLAPS predicate always false; a non-empty or
-      // not-yet-materialized (oversized) set is indeterminate at the query level
-      return values != null && values.isEmpty() ? Truth.FALSE : Truth.UNKNOWN;
-    }
-    if (node instanceof And) {
-      Truth result = Truth.TRUE;
-      for (Cql2Expression child : ((And) node).getArgs()) {
-        Truth childTruth = truth(child, materialized, materializedKeys);
-        if (childTruth == Truth.FALSE) {
-          return Truth.FALSE;
-        }
-        if (childTruth == Truth.UNKNOWN) {
-          result = Truth.UNKNOWN;
-        }
-      }
-      return result;
-    }
-    if (node instanceof Or) {
-      Truth result = Truth.FALSE;
-      for (Cql2Expression child : ((Or) node).getArgs()) {
-        Truth childTruth = truth(child, materialized, materializedKeys);
-        if (childTruth == Truth.TRUE) {
-          return Truth.TRUE;
-        }
-        if (childTruth == Truth.UNKNOWN) {
-          result = Truth.UNKNOWN;
-        }
-      }
-      return result;
-    }
-    if (node instanceof Not) {
-      Truth child = truth(((Not) node).getArgs().get(0), materialized, materializedKeys);
-      if (child == Truth.TRUE) {
-        return Truth.FALSE;
-      }
-      if (child == Truth.FALSE) {
-        return Truth.TRUE;
-      }
-      return Truth.UNKNOWN;
-    }
-    return Truth.UNKNOWN;
   }
 
   private static Object coerce(Object value, SchemaBase.Type type) {

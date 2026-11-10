@@ -34,6 +34,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlRow
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.sql.SQLException
 import java.util.concurrent.CompletableFuture
 import java.util.function.Function
 import java.util.function.Supplier
@@ -321,6 +322,23 @@ class ResultSetMaterializerSpec extends Specification {
         1 * sqlClient.run({ it.startsWith("CREATE UNLOGGED TABLE _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
         1 * sqlClient.run({ it.startsWith("CREATE INDEX ON _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
         ((InResultSet) after.getQueries().get(0).getFilters().get(0)).getMaterializedTable().isPresent()
+    }
+
+    def 'a table is assumed to be possible when the privilege query fails'() {
+        given:
+        def filter = resolved("s1", "simple", Eq.of(Property.of("id"), ScalarLiteral.of("foo")))
+        def sqlClient = Mock(SqlClient)
+        def materializer = new ResultSetMaterializer({ -> sqlClient } as Supplier, filterEncoder, 1, new SqlDialectPgis())
+
+        when:
+        def result = materializer.materialize(query(filter))
+
+        then:
+        1 * sqlClient.run({ it.contains("LIMIT 2") }, _) >> CompletableFuture.completedFuture([row("x"), row("y")])
+        1 * sqlClient.run({ it.contains("has_schema_privilege") }, _) >> CompletableFuture.failedFuture(new SQLException("permission denied for function has_schema_privilege"))
+        1 * sqlClient.run({ it.startsWith("CREATE UNLOGGED TABLE _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
+        1 * sqlClient.run({ it.startsWith("CREATE INDEX ON _rs_mat_") }, _) >> CompletableFuture.completedFuture([])
+        ((InResultSet) result.getQueries().get(0).getFilters().get(0)).getMaterializedTable().isPresent()
     }
 
     def 'a query without result sets is returned unchanged'() {
