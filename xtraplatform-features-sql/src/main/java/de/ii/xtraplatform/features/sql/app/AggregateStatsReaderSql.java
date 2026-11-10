@@ -143,6 +143,21 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
                             SqlQueryOptions.tuple());
                   }
 
+                  // only a start or only an end, the other side is unbounded
+                  Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> bound =
+                      intervalStart.or(() -> intervalEnd);
+                  if (bound.isPresent()) {
+                    return sqlClient
+                        .get()
+                        .getSourceStream(
+                            queryGenerator.getTemporalExtentQuery(
+                                mapping,
+                                bound.get().first(),
+                                bound.get().second(),
+                                intervalStart.isPresent()),
+                            SqlQueryOptions.tuple());
+                  }
+
                   return Source.empty();
                 }))
         .via(
