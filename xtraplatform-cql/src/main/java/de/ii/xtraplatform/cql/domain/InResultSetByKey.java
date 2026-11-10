@@ -74,10 +74,12 @@ public interface InResultSetByKey extends BinaryScalarOperation, ResultSetRefere
   List<String> getKeyNames();
 
   /** Feature type of the query that defines the result set. */
+  @Override
   @JsonIgnore
   Optional<String> getProducerType();
 
   /** Effective filter of the query that defines the result set. */
+  @Override
   @JsonIgnore
   Optional<Cql2Expression> getProducerFilter();
 
@@ -102,9 +104,11 @@ public interface InResultSetByKey extends BinaryScalarOperation, ResultSetRefere
    * Name of a table the service has materialized the result set into, with one column per key part.
    * Used for sets that are too large to inline as a literal list.
    */
+  @Override
   @JsonIgnore
   Optional<String> getMaterializedTable();
 
+  @Override
   @JsonIgnore
   @Value.Lazy
   default String getSetName() {
@@ -194,6 +198,7 @@ public interface InResultSetByKey extends BinaryScalarOperation, ResultSetRefere
     }
 
     @Override
+    @SuppressWarnings("PMD.CyclomaticComplexity")
     public InResultSetByKey deserialize(JsonParser parser, DeserializationContext ctxt)
         throws IOException {
       JsonNode node = parser.getCodec().readTree(parser);
@@ -232,7 +237,7 @@ public interface InResultSetByKey extends BinaryScalarOperation, ResultSetRefere
             parser, String.format("The key of %s must have at least one part.", TYPE));
       }
 
-      return InResultSetByKey.of(key, args.get(1).asText());
+      return of(key, args.get(1).asText());
     }
   }
 

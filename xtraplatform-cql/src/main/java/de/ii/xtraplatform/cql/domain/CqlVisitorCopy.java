@@ -32,6 +32,7 @@ public class CqlVisitorCopy implements CqlVisitor<CqlNode> {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public CqlNode visit(BinaryScalarOperation scalarOperation, List<CqlNode> children) {
     if (scalarOperation instanceof InResultSetByKey) {
       // keep the resolved producer context, only the args are copied

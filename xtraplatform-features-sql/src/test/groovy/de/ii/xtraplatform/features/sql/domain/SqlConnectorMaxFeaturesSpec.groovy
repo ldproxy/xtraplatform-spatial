@@ -67,7 +67,7 @@ class SqlConnectorMaxFeaturesSpec extends Specification {
         assert templates.size() == 2
 
         encoder = new FeatureQueryEncoderSql(Map.of("concat", templates), Map.of("concat", templates),
-                new ImmutableQueryGeneratorSettings.Builder().build(), new SqlDialectPgis())
+                new ImmutableQueryGeneratorSettings.Builder().build())
     }
 
     def cleanupSpec() {

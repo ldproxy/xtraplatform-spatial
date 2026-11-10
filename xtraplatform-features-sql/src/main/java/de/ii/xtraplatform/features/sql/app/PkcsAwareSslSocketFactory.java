@@ -40,6 +40,7 @@ public final class PkcsAwareSslSocketFactory extends SSLSocketFactory {
   private final SSLSocketFactory delegate;
 
   public PkcsAwareSslSocketFactory(Properties info) throws GeneralSecurityException, IOException {
+    super();
     Path keyFile = requiredPath(info, "sslkey");
     Path certificateFile = requiredPath(info, "sslcert");
     String rootCertificate = info.getProperty("sslrootcert");
@@ -73,7 +74,8 @@ public final class PkcsAwareSslSocketFactory extends SSLSocketFactory {
     trustStore.load(null, null);
     int index = 0;
     for (Certificate certificate : readCertificates(rootCertificateFile)) {
-      trustStore.setCertificateEntry("ca-" + index++, certificate);
+      trustStore.setCertificateEntry("ca-" + index, certificate);
+      index++;
     }
 
     TrustManagerFactory trustManagers =

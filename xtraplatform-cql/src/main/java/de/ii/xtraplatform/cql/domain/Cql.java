@@ -57,4 +57,6 @@ public interface Cql {
   Cql2Expression mapEnvelopes(Cql2Expression cqlFilter, CrsInfo crsInfo);
 
   Cql2Expression mapNots(Cql2Expression cqlFilter);
+
+  Cql2Expression mapAbsentProperties(Cql2Expression cqlFilter, Set<String> absentProperties);
 }

@@ -107,6 +107,7 @@ public interface FeatureDataSql {
   }
 
   // NOTE: json columns work using special handling in the encoder, the patch is applied to original
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   default FeatureDataSql patchWith(FeatureDataSql partial) {
     // joins not supported yet
     if (getRows().size() == 1 && partial.getRows().size() == 1) {
@@ -147,9 +148,11 @@ public interface FeatureDataSql {
       return merged;
     }
 
-    LOGGER.warn(
-        "Patch is not supported for type '{}': the mapping contains joins",
-        getMapping().getMainSchema().getName());
+    if (LOGGER.isWarnEnabled()) {
+      LOGGER.warn(
+          "Patch is not supported for type '{}': the mapping contains joins",
+          getMapping().getMainSchema().getName());
+    }
 
     return this;
   }

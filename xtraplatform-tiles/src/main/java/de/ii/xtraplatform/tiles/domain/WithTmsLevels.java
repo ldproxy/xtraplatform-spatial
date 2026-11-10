@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface WithTmsLevels {
   /**
    * @langEn Controls the zoom levels available for each active tiling scheme as well as which zoom

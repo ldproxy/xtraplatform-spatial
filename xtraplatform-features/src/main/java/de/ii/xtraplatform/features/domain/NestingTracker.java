@@ -8,7 +8,6 @@
 package de.ii.xtraplatform.features.domain;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
 import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +19,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.GodClass")
 public class NestingTracker {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(NestingTracker.class);
@@ -82,6 +82,7 @@ public class NestingTracker {
     context.setInObject(true);
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   public void closeObject() {
     if (nestingStack.isEmpty() || !Objects.equals(nestingStack.get(nestingStack.size() - 1), "O")) {
       if (LOGGER.isDebugEnabled()) {
@@ -107,10 +108,10 @@ public class NestingTracker {
     if (!nestingStack.contains("O")) {
       context.setInObject(false);
     }
-    if (!pathStack.isEmpty()) {
-      context.pathTracker().track(getCurrentNestingPath());
+    if (pathStack.isEmpty()) {
+      context.pathTracker().track(List.of());
     } else {
-      context.pathTracker().track(ImmutableList.of());
+      context.pathTracker().track(getCurrentNestingPath());
     }
   }
 
@@ -168,6 +169,8 @@ public class NestingTracker {
     pathStack.remove(pathStack.size() - 1);
   }
 
+  // null signals "not nested"; an empty path pushed onto the stack is still nested
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
   public List<String> getCurrentNestingPath() {
     if (pathStack.isEmpty()) {
       return null;
@@ -198,7 +201,7 @@ public class NestingTracker {
   }
 
   public boolean isFirst(List<Integer> indexes) {
-    return indexes.size() > 0 && indexes.get(indexes.size() - 1) == 1;
+    return !indexes.isEmpty() && indexes.get(indexes.size() - 1) == 1;
   }
 
   public boolean isSamePath(List<String> nextPath) {
@@ -210,10 +213,8 @@ public class NestingTracker {
   }
 
   public boolean doesStartWithPreviousPath(List<String> nextPath) {
-    if (Objects.equals(nextPath, getCurrentNestingPath())) {
-      return false;
-    }
-    return startsWith(nextPath, getCurrentNestingPath());
+    return !Objects.equals(nextPath, getCurrentNestingPath())
+        && startsWith(nextPath, getCurrentNestingPath());
   }
 
   public boolean hasIndexChanged(List<Integer> nextIndexes) {

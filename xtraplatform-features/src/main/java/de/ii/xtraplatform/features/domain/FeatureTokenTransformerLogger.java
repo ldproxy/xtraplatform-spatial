@@ -16,56 +16,64 @@ public class FeatureTokenTransformerLogger extends FeatureTokenTransformer {
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("START FEATURE {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("START FEATURE {} {}", context.pathAsString(), context.indexes());
+    }
 
     super.onFeatureStart(context);
   }
 
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("END FEATURE {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("END FEATURE {} {}", context.pathAsString(), context.indexes());
+    }
 
     super.onFeatureEnd(context);
   }
 
   @Override
   public void onObjectStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("START OBJECT {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("START OBJECT {} {}", context.pathAsString(), context.indexes());
+    }
 
     super.onObjectStart(context);
   }
 
   @Override
   public void onObjectEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("END OBJECT {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("END OBJECT {} {}", context.pathAsString(), context.indexes());
+    }
 
     super.onObjectEnd(context);
   }
 
   @Override
   public void onArrayStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("START ARRAY {}", context.pathAsString());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("START ARRAY {}", context.pathAsString());
+    }
 
     super.onArrayStart(context);
   }
 
   @Override
   public void onArrayEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("END ARRAY {}", context.pathAsString());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("END ARRAY {}", context.pathAsString());
+    }
 
     super.onArrayEnd(context);
   }
 
   @Override
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.debug("GEOMETRY {}", context.pathAsString());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("GEOMETRY {}", context.pathAsString());
+    }
 
     super.onGeometry(context);
-  }
-
-  @Override
-  public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-
-    super.onValue(context);
   }
 }

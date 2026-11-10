@@ -10,7 +10,6 @@ package de.ii.xtraplatform.features.domain;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
-// TODO: move to xtraplatform-base
 @Value.Immutable
 public interface Tuple<T, U> {
 

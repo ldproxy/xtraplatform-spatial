@@ -35,7 +35,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.threeten.extra.Interval;
 
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
 public class SqlDialectPgis implements SqlDialect {
+
+  // the year of an ISO 8601 date, optionally signed, followed by the rest of the value
+  private static final Pattern ISO_YEAR = Pattern.compile("^([+-]?\\d{4,})(-.*)$");
+  private static final Splitter BBOX_SPLITTER =
+      Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
+  private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
+      new ImmutableMap.Builder<SpatialFunction, String>()
+          .put(SpatialFunction.S_INTERSECTS, "ST_3DIntersects")
+          .build();
+  public static final Map<TemporalFunction, String> TEMPORAL_OPERATORS =
+      new ImmutableMap.Builder<TemporalFunction, String>()
+          .put(
+              TemporalFunction.T_INTERSECTS,
+              "OVERLAPS") // "({start1},{end1}) OVERLAPS ({start2},{end2})"
+          .build();
 
   @Override
   public String getId() {
@@ -80,24 +96,9 @@ public class SqlDialectPgis implements SqlDialect {
     return String.format("DROP TABLE IF EXISTS %s", name);
   }
 
-  // the year of an ISO 8601 date, optionally signed, followed by the rest of the value
-  private static final Pattern ISO_YEAR = Pattern.compile("^([+-]?\\d{4,})(-.*)$");
-  private static final Splitter BBOX_SPLITTER =
-      Splitter.onPattern("[(), ]").omitEmptyStrings().trimResults();
-  private static final Map<SpatialFunction, String> SPATIAL_OPERATORS_3D =
-      new ImmutableMap.Builder<SpatialFunction, String>()
-          .put(SpatialFunction.S_INTERSECTS, "ST_3DIntersects")
-          .build();
-  public static final Map<TemporalFunction, String> TEMPORAL_OPERATORS =
-      new ImmutableMap.Builder<TemporalFunction, String>()
-          .put(
-              TemporalFunction.T_INTERSECTS,
-              "OVERLAPS") // "({start1},{end1}) OVERLAPS ({start2},{end2})"
-          .build();
-
   @Override
   public String applyToWkt(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    StringBuilder queryBuilder = new StringBuilder("ST_AsText(");
+    StringBuilder queryBuilder = new StringBuilder(80).append("ST_AsText(");
     if (linearizeCurves) {
       queryBuilder.append("ST_CurveToLine(");
     }
@@ -106,12 +107,12 @@ public class SqlDialectPgis implements SqlDialect {
     }
     queryBuilder.append(column);
     if (forcePolygonCCW) {
-      queryBuilder.append(")");
+      queryBuilder.append(')');
     }
     if (linearizeCurves) {
       queryBuilder.append(",32,0,1)");
     }
-    return queryBuilder.append(")").toString();
+    return queryBuilder.append(')').toString();
   }
 
   @Override
@@ -121,7 +122,7 @@ public class SqlDialectPgis implements SqlDialect {
 
   @Override
   public String applyToWkb(String column, boolean forcePolygonCCW, boolean linearizeCurves) {
-    StringBuilder binaryBuilder = new StringBuilder("ST_AsBinary(");
+    StringBuilder binaryBuilder = new StringBuilder(80).append("ST_AsBinary(");
     if (linearizeCurves) {
       binaryBuilder.append("ST_CurveToLine(");
     }
@@ -130,12 +131,12 @@ public class SqlDialectPgis implements SqlDialect {
     }
     binaryBuilder.append(column);
     if (forcePolygonCCW) {
-      binaryBuilder.append(")");
+      binaryBuilder.append(')');
     }
     if (linearizeCurves) {
       binaryBuilder.append(",32,0,1)");
     }
-    return binaryBuilder.append(")").toString();
+    return binaryBuilder.append(')').toString();
   }
 
   @Override
@@ -236,6 +237,13 @@ public class SqlDialectPgis implements SqlDialect {
         .orElse(String.format("%s::timestamp(0)", column));
   }
 
+  // without the cast, the column keeps its statistics and indexes; a column with a format holds
+  // text and still needs the conversion
+  @Override
+  public String applyToDatetimeForNativeComparison(String column, Optional<String> format) {
+    return format.isPresent() ? applyToDatetime(column, format) : column;
+  }
+
   @Override
   public String applyToDateLiteral(String date) {
     return String.format("DATE '%s'", withEra(date));
@@ -263,7 +271,6 @@ public class SqlDialectPgis implements SqlDialect {
   public String applyToInstantMin() {
     return "-infinity";
   }
-  ;
 
   @Override
   public String applyToInstantMax() {
@@ -293,6 +300,7 @@ public class SqlDialectPgis implements SqlDialect {
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public String applyToJsonValue(
       String alias, String column, String path, PropertyTypeInfo typeInfo) {
 
@@ -314,6 +322,8 @@ public class SqlDialectPgis implements SqlDialect {
         case VALUE_ARRAY:
         case FEATURE_REF_ARRAY:
           cast = typeInfo.getValueType().map(this::getCast).orElse(getCast(Type.STRING));
+          break;
+        default:
           break;
       }
     }
@@ -345,13 +355,14 @@ public class SqlDialectPgis implements SqlDialect {
         return "::integer";
       case BOOLEAN:
         return "::boolean";
-      default:
       case STRING:
+      default:
         return "::varchar";
     }
   }
 
   @Override
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public String applyToJsonArrayOp(
       ArrayFunction op, boolean notInverse, String mainExpression, String jsonValueArray) {
     if (notInverse ? op == A_CONTAINS : op == A_CONTAINEDBY) {

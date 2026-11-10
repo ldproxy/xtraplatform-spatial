@@ -22,6 +22,7 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
 
   public FeatureTokenTransformerRemoveEmptyOptionals(
       Map<String, PropertyTransformations> propertyTransformations) {
+    super();
     this.nestingStack = new ArrayList<>();
     this.schemaStack = new ArrayList<>();
     this.removeNullValues =
@@ -36,7 +37,7 @@ public class FeatureTokenTransformerRemoveEmptyOptionals extends FeatureTokenTra
                                 PropertyTransformations.WILDCARD,
                                 pt ->
                                     pt.getRemoveNullValues().isPresent()
-                                        && pt.getRemoveNullValues().get() == false)))
+                                        && !pt.getRemoveNullValues().get())))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 

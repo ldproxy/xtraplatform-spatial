@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 public class SqlClientRx implements SqlClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlClientRx.class);
+  private static final String SQL_LOG_EXECUTING = "Executing statement: {}";
 
   // Generous on purpose: this is not a query budget but a stall detector, so it has to sit
   // well above the slowest legitimate gap between two rows (a count over a large table, a
@@ -66,10 +67,11 @@ public class SqlClientRx implements SqlClient {
     this.collator = dbmsAdapter.getRowSortingCollator(defaultCollation);
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   @Override
   public CompletableFuture<Collection<SqlRow>> run(String query, SqlQueryOptions options) {
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", query);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, query);
     }
     CompletableFuture<Collection<SqlRow>> result = new CompletableFuture<>();
 
@@ -105,9 +107,10 @@ public class SqlClientRx implements SqlClient {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Reactive.Source<SqlRow> getSourceStream(String query, SqlQueryOptions options) {
     if (LOGGER.isDebugEnabled(MARKER.SQL)) {
-      LOGGER.debug(MARKER.SQL, "Executing statement: {}", query);
+      LOGGER.debug(MARKER.SQL, SQL_LOG_EXECUTING, query);
     }
     List<SqlRow> logBuffer = new ArrayList<>(5);
 
@@ -141,7 +144,7 @@ public class SqlClientRx implements SqlClient {
             connection -> release(connection, streamed),
             true);
 
-    // TODO: prettify, see
+    // NOTE: prettify, see
     // https://github.com/slick/slick/blob/main/slick/src/main/scala/slick/jdbc/StatementInvoker.scala
     if (LOGGER.isDebugEnabled(MARKER.SQL_RESULT)) {
       flowable =
@@ -222,6 +225,7 @@ public class SqlClientRx implements SqlClient {
     return connection;
   }
 
+  @SuppressWarnings({"PMD.CloseResource", "PMD.AvoidCatchingGenericException"})
   private static ResultSet execute(Connection connection, String query, int fetchSize)
       throws SQLException {
     Statement statement = connection.createStatement();
@@ -245,12 +249,16 @@ public class SqlClientRx implements SqlClient {
         // nothing to commit, and a rollback is the cheapest way to close the server-side cursor
         connection.rollback();
       } catch (SQLException e) {
-        LOGGER.debug("Ending the read transaction failed: {}", e.getMessage());
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Ending the read transaction failed: {}", e.getMessage());
+        }
       }
       try {
         connection.setAutoCommit(true);
       } catch (SQLException e) {
-        LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
+        }
       }
     }
 
@@ -258,6 +266,7 @@ public class SqlClientRx implements SqlClient {
   }
 
   /** Closes the result set and the statement it belongs to. */
+  @SuppressWarnings("PMD.CloseResource")
   private static void close(ResultSet resultSet) {
     Statement statement = null;
 
@@ -271,12 +280,16 @@ public class SqlClientRx implements SqlClient {
     close(statement);
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private static void close(AutoCloseable closeable) {
     if (Objects.nonNull(closeable)) {
       try {
         closeable.close();
       } catch (Exception e) {
-        LOGGER.debug("Closing {} failed: {}", closeable.getClass().getSimpleName(), e.getMessage());
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug(
+              "Closing {} failed: {}", closeable.getClass().getSimpleName(), e.getMessage());
+        }
       }
     }
   }

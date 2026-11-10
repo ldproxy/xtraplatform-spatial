@@ -66,7 +66,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-public class CqlFilterExamples {
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.DataClass",
+  "PMD.FieldNamingConventions",
+  "PMD.UnnecessaryVarargsArrayCreation"
+})
+public final class CqlFilterExamples {
 
   public static final Cql2Expression EXAMPLE_1 = Gt.of("floors", ScalarLiteral.of(5));
   public static final Cql2Expression EXAMPLE_1_OLD = Gt.of("floors", ScalarLiteral.of(5));
@@ -1025,4 +1031,6 @@ public class CqlFilterExamples {
                   Neq.of(Property.of("test2"), ScalarLiteral.of("foo")),
                   Gt.of(Property.of("test3"), ScalarLiteral.of("bar"))),
               Eq.of(Property.of("test"), ScalarLiteral.of(1))));
+
+  private CqlFilterExamples() {}
 }

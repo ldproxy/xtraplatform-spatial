@@ -21,7 +21,6 @@ import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.base.domain.LogContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.base.domain.resiliency.AbstractVolatilePolling;
-import de.ii.xtraplatform.base.domain.resiliency.Volatile2.Polling;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry.ChangeHandler;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileUnavailableException;
@@ -38,7 +37,6 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions;
 import de.ii.xtraplatform.features.sql.domain.SqlRow;
 import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -58,10 +56,10 @@ import org.slf4j.MDC;
 /**
  * @author zahnen
  */
-public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnector, Polling {
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass"})
+public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnector {
 
   public static final String CONNECTOR_TYPE = "SLICK";
-  private static final SqlQueryOptions NO_OPTIONS = SqlQueryOptions.withColumnTypes(String.class);
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlConnectorRx.class);
 
   private final SqlDbmsAdapters dbmsAdapters;
@@ -73,8 +71,6 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   private final int minConnections;
   private final int queueSize;
   private final Semaphore connectionBudget;
-  private final Path dataDir;
-  private final String applicationName;
   private final String providerId;
   private final AtomicInteger refCounter;
   private final boolean asyncStartup;
@@ -108,15 +104,11 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     this.connectionBudget = new Semaphore(Math.max(1, maxConnections), true);
 
     // int capacity = maxConnections / maxQueries;
-    // TODO
     this.queueSize = 1024; // Math.max(1024, maxConnections * capacity * 2);
 
-    this.dataDir = appContext.getDataDir();
     // LOGGER.debug("QUEUE {} {} {} {} {}", connectionInfo.getDatabase(), maxQueries,
     // maxConnections, capacity, maxConnections * capacity * 2);
 
-    this.applicationName =
-        String.format("%s %s - %s", appContext.getName(), appContext.getVersion(), providerId);
     this.providerId = providerId;
     this.refCounter = new AtomicInteger(0);
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
@@ -160,6 +152,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public void start() {
     try {
       HikariConfig hikariConfig = createHikariConfig();
@@ -177,6 +170,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   }
 
   @Override
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.NullAssignment"})
   public void stop() {
     getVolatileRegistry().unregister(this);
 
@@ -356,7 +350,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   private static long parseMs(String duration) {
     try {
       return Long.parseLong(duration) * 1000;
-    } catch (Throwable e) {
+    } catch (NumberFormatException e) {
       // ignore
     }
     return Duration.parse("PT" + duration).toMillis();
@@ -395,21 +389,24 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     return consumer;
   }
 
+  // Kept method-level (rather than a dedicated lock object) to stay consistent with the monitor
+  // AbstractVolatilePolling itself synchronizes on for this instance.
   @Override
+  @SuppressWarnings("PMD.AvoidSynchronizedAtMethodLevel")
   protected synchronized void onVolatileStart() {
     super.onVolatileStart();
 
     if (asyncStartup) {
-      if (getState() == State.UNAVAILABLE) {
+      if (getState() == State.UNAVAILABLE && LOGGER.isWarnEnabled()) {
         LOGGER.warn("Could not establish connection to database: {}", getDatasetIdentifier());
       }
 
       onStateChange(
           withMdc(
               (from, to) -> {
-                if (to == State.AVAILABLE) {
+                if (to == State.AVAILABLE && LOGGER.isInfoEnabled()) {
                   LOGGER.info("Re-established connection to database: {}", getDatasetIdentifier());
-                } else if (to == State.UNAVAILABLE) {
+                } else if (to == State.UNAVAILABLE && LOGGER.isWarnEnabled()) {
                   LOGGER.warn("Lost connection to database: {}", getDatasetIdentifier());
                 }
               }),
@@ -426,9 +423,15 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.NullAssignment"
+  })
   public de.ii.xtraplatform.base.domain.util.Tuple<State, String> check() {
     if (Objects.isNull(sqlClient)) {
-      // TODO: retry
+      // NOPMD - TODO: retry
       if (Objects.nonNull(connectionError)) {
         return de.ii.xtraplatform.base.domain.util.Tuple.of(
             State.LIMITED, connectionError.getMessage());
@@ -483,7 +486,7 @@ public class SqlConnectorRx extends AbstractVolatilePolling implements SqlConnec
     return Optional.empty();
   }
 
-  // TODO: SQLite
+  // NOPMD - TODO: SQLite
   private static boolean isUnavailable(SQLException e) {
     // see https://www.postgresql.org/docs/current/errcodes-appendix.html
     return Objects.isNull(e.getSQLState()) // no connection

@@ -12,7 +12,7 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandlerGeneric.GenericCont
 import org.immutables.value.Value;
 import org.immutables.value.Value.Modifiable;
 
-// TODO: more comfortable variant of consumer, use in encoder/transformer
+// NOTE: more comfortable variant of consumer, use in encoder/transformer
 public interface FeatureEventHandlerGeneric
     extends FeatureEventHandler<
             FeatureSchema, SchemaMapping, ModifiableContext<FeatureSchema, SchemaMapping>>,

@@ -14,7 +14,8 @@ import org.immutables.value.Value;
 @Value.Style(deepImmutablesDetection = true)
 public interface FeatureStoreTypeInfo {
 
-  // TODO: multiple main containers, sorted, important for e.g. limit (Instance(s|Container))
+  // TODO: multiple main containers, sorted, important for e.g. limit // NOPMD
+  // (Instance(s|Container))
   // main container must not have oid, is that relevant for read or only for write?
   // main container is itself an attribute container and has 0-n child attribute container
   // (Attribute(s|Container))

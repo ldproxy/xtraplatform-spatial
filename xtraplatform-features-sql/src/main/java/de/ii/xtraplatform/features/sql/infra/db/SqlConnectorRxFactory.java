@@ -97,6 +97,7 @@ public class SqlConnectorRxFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface FactoryAssisted {
     SqlConnectorRx create(
         MetricRegistry metricRegistry,

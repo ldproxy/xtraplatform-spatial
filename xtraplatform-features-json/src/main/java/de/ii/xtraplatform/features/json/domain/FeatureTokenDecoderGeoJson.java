@@ -162,9 +162,11 @@ public class FeatureTokenDecoderGeoJson
   }
 
   @SuppressWarnings({
-    "PMD.NcssCount",
+    "PMD.AvoidDeeplyNestedIfStmts",
     "PMD.CognitiveComplexity",
+    "PMD.NcssCount",
     "PMD.NPathComplexity",
+    "PMD.NullAssignment",
     "PMD.SwitchDensity"
   })
   public boolean advanceParser() {

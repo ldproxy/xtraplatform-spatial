@@ -15,6 +15,7 @@ import java.util.OptionalLong;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.SignatureDeclareThrowsException")
 public interface FeatureReader<T, U> {
   void onStart(OptionalLong numberReturned, OptionalLong numberMatched, T context) throws Exception;
 

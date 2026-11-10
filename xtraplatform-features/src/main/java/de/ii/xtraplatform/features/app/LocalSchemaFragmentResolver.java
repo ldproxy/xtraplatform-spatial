@@ -145,6 +145,7 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
   // property element names per object type (notably GML with `objectTypeNamespaces`) read this
   // tag at runtime; without it they'd inherit the containing feature's objectType, which is
   // wrong for properties that come from a different schema fragment than the feature itself.
+  @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private static FeatureSchema tagOrigin(FeatureSchema property, String originType) {
     if (originType == null) {
       return property;
@@ -153,9 +154,11 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
     Map<String, FeatureSchema> taggedChildren = null;
     for (Map.Entry<String, FeatureSchema> e : property.getPropertyMap().entrySet()) {
       FeatureSchema childTagged = tagOrigin(e.getValue(), originType);
+      // reference comparison is intentional here: tagOrigin returns the same instance
+      // when nothing changed, so this is a cheap way to detect an actual change
       if (childTagged != e.getValue()) {
         if (taggedChildren == null) {
-          taggedChildren = new LinkedHashMap<>(property.getPropertyMap());
+          taggedChildren = copyOf(property.getPropertyMap());
         }
         taggedChildren.put(e.getKey(), childTagged);
       }
@@ -171,6 +174,10 @@ public class LocalSchemaFragmentResolver implements SchemaFragmentResolver {
       b.propertyMap(taggedChildren);
     }
     return b.build();
+  }
+
+  private static Map<String, FeatureSchema> copyOf(Map<String, FeatureSchema> propertyMap) {
+    return new LinkedHashMap<>(propertyMap);
   }
 
   private FeatureSchema resolve(String ref, FeatureProviderDataV2 data) {

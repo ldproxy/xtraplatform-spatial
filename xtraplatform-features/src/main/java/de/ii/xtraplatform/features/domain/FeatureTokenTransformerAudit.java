@@ -25,6 +25,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
   private boolean logAllProperties;
 
   public FeatureTokenTransformerAudit(String requestId, AuditLog auditLog) {
+    super();
     this.requestId = requestId;
     this.auditLog = auditLog;
     this.includePropertyValues = auditLog.getIncludePropertyValues(requestId);
@@ -84,7 +85,7 @@ public class FeatureTokenTransformerAudit extends FeatureTokenTransformer {
     }
 
     List<String> values =
-        (List<String>) featureHolder.computeIfAbsent(schemaName, k -> new ArrayList<String>());
+        (List<String>) featureHolder.computeIfAbsent(schemaName, k -> new ArrayList<>());
 
     values.add(value);
   }

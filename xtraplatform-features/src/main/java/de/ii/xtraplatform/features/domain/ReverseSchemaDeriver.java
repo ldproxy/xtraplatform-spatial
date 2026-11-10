@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 public interface ReverseSchemaDeriver<T extends SchemaBase<T>>
     extends SchemaVisitor<FeatureSchema, List<T>> {
 
+  Splitter SPLITTER = Splitter.on('/').omitEmptyStrings();
+
   @Override
   default List<T> visit(FeatureSchema schema, List<List<T>> visitedProperties) {
 
@@ -82,8 +84,6 @@ public interface ReverseSchemaDeriver<T extends SchemaBase<T>>
   T prependToParentPath(List<String> path, T schema);
 
   T prependToSourcePath(String parentSourcePath, T schema);
-
-  Splitter SPLITTER = Splitter.on('/').omitEmptyStrings();
 
   default List<String> splitPath(String path) {
     return SPLITTER.splitToList(path);

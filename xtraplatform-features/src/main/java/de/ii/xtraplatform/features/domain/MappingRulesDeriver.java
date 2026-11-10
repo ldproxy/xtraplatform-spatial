@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+@SuppressWarnings("PMD.GodClass")
 public class MappingRulesDeriver
     implements SchemaVisitorWithFinalizer<FeatureSchema, List<MappingRule>, List<MappingRule>> {
 
@@ -59,6 +60,11 @@ public class MappingRulesDeriver
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.FinalizeOverloaded"
+  })
   public List<MappingRule> finalize(FeatureSchema featureSchema, List<MappingRule> mappingRules) {
     Map<String, List<MappingRule>> rulesByTable = new LinkedHashMap<>();
     Map<String, Integer> schemaIndexes = new HashMap<>();
@@ -73,57 +79,36 @@ public class MappingRulesDeriver
           continue;
         }
 
-        rulesByTable.put(rule.getIdentifier(), new ArrayList<>(List.of(cleanRule)));
+        rulesByTable.put(rule.getIdentifier(), newRuleList(cleanRule));
 
         continue;
       }
 
-      if (!schemaIndexes.containsKey(rule.getSource())) {
-        schemaIndexes.put(rule.getSource(), 0);
-      } else {
+      if (schemaIndexes.containsKey(rule.getSource())) {
         schemaIndexes.put(rule.getSource(), schemaIndexes.get(rule.getSource()) + 1);
+      } else {
+        schemaIndexes.put(rule.getSource(), 0);
       }
 
+      MappingRule effectiveRule = rule;
       if (schemaIndexes.get(rule.getSource()) > 0) {
-        rule =
-            new ImmutableMappingRule.Builder()
-                .from(rule)
-                .index(schemaIndexes.get(rule.getSource()))
-                .build();
+        effectiveRule = withIndex(rule, schemaIndexes.get(rule.getSource()));
       }
 
-      String tableIdentifier = rule.getIdentifierParent();
+      String tableIdentifier = effectiveRule.getIdentifierParent();
 
       // implicit tables
-      if (rule.hasSourceParent() && !rulesByTable.containsKey(tableIdentifier)) {
-        MappingRule finalRule = rule;
+      if (effectiveRule.hasSourceParent() && !rulesByTable.containsKey(tableIdentifier)) {
+        MappingRule finalRule = effectiveRule;
         List<String> matchingTables =
             rulesByTable.keySet().stream()
                 .filter(id -> id.startsWith(finalRule.getSourceParent() + "-"))
                 .toList();
 
         if (matchingTables.isEmpty()) {
-          MappingRule tableRule =
-              new ImmutableMappingRule.Builder()
-                  .source(rule.getSourceParent())
-                  // a sub-decoder column (e.g. [JSON]properties) is not a property of the target
-                  // schema, it is the container whose values the following rules address. It must
-                  // always be ROOT_TARGET, otherwise it is taken for the enclosing object itself
-                  // and that object gets mapped to the container column.
-                  .target(
-                      MappingRule.endsWithConnector(rule.getSourceParent())
-                          ? ROOT_TARGET
-                          : rule.getTarget().contains(".")
-                              ? rule.getTarget().substring(0, rule.getTarget().lastIndexOf("."))
-                              : ROOT_TARGET)
-                  .type(
-                      rule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
-                          ? Type.VALUE_ARRAY
-                          : Type.OBJECT_ARRAY)
-                  .index(0)
-                  .build();
+          MappingRule tableRule = buildImplicitTableRule(effectiveRule);
 
-          rulesByTable.put(tableIdentifier, new ArrayList<>(List.of(tableRule, cleanup(rule))));
+          rulesByTable.put(tableIdentifier, newRuleList(tableRule, cleanup(effectiveRule)));
 
           continue;
         }
@@ -132,10 +117,41 @@ public class MappingRulesDeriver
         tableIdentifier = matchingTables.get(matchingTables.size() - 1);
       }
 
-      rulesByTable.get(tableIdentifier).add(cleanup(rule));
+      rulesByTable.get(tableIdentifier).add(cleanup(effectiveRule));
     }
 
     return sorted(rulesByTable);
+  }
+
+  private static List<MappingRule> newRuleList(MappingRule... rules) {
+    return new ArrayList<>(List.of(rules));
+  }
+
+  private static MappingRule withIndex(MappingRule rule, int index) {
+    return new ImmutableMappingRule.Builder().from(rule).index(index).build();
+  }
+
+  private static MappingRule buildImplicitTableRule(MappingRule effectiveRule) {
+    return new ImmutableMappingRule.Builder()
+        .source(effectiveRule.getSourceParent())
+        // a sub-decoder column (e.g. [JSON]properties) is not a property of the target schema, it
+        // is the container whose values the following rules address. It must always be
+        // ROOT_TARGET, otherwise it is taken for the enclosing object itself and that object gets
+        // mapped to the container column.
+        .target(
+            MappingRule.endsWithConnector(effectiveRule.getSourceParent())
+                ? ROOT_TARGET
+                : effectiveRule.getTarget().contains(".")
+                    ? effectiveRule
+                        .getTarget()
+                        .substring(0, effectiveRule.getTarget().lastIndexOf('.'))
+                    : ROOT_TARGET)
+        .type(
+            effectiveRule.getTarget().endsWith(VALUE_ARRAY_VALUE_SUFFIX)
+                ? Type.VALUE_ARRAY
+                : Type.OBJECT_ARRAY)
+        .index(0)
+        .build();
   }
 
   private static MappingRule cleanup(MappingRule rule) {
@@ -149,6 +165,7 @@ public class MappingRulesDeriver
     return rule;
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   private static List<MappingRule> sorted(Map<String, List<MappingRule>> rulesByTable) {
     List<MappingRule> sorted = new ArrayList<>();
     List<String> parents = new ArrayList<>();
@@ -157,7 +174,7 @@ public class MappingRulesDeriver
 
     for (String tableIdentifier : rulesByTable.keySet()) {
       String source = tableIdentifier.substring(0, tableIdentifier.lastIndexOf('-'));
-      boolean hasParent = MappingRule.maskPathAttributes(source).indexOf("/", 1) > 1;
+      boolean hasParent = MappingRule.maskPathAttributes(source).indexOf('/', 1) > 1;
 
       if (hasParent) {
         for (int i = parents.size() - 1; i >= 0; i--) {
@@ -173,34 +190,8 @@ public class MappingRulesDeriver
             break;
           }
           if (source.startsWith(parents.get(i) + "/")) {
-            int span = spans.get(i);
-            int index = cursors.get(span);
-            sorted.addAll(index, rulesByTable.get(tableIdentifier));
-
-            cursors.add(span + 1, index + rulesByTable.get(tableIdentifier).size());
-            parents.add(span + 1, source);
-            spans.add(span + 1, span + 1);
-
-            spans.set(i, span + 1);
-            for (int j = 0; j < i; j++) {
-              if (spans.get(j) == span) {
-                spans.set(j, span + 1);
-              }
-            }
-            for (int j = span + 2; j < spans.size(); j++) {
-              spans.set(j, spans.get(j) + 1);
-            }
-
-            cursors.set(i, index + rulesByTable.get(tableIdentifier).size());
-            for (int j = 0; j < i; j++) {
-              if (cursors.get(j) == index) {
-                cursors.set(j, index + rulesByTable.get(tableIdentifier).size());
-              }
-            }
-            for (int j = span + 2; j < cursors.size(); j++) {
-              cursors.set(j, cursors.get(j) + rulesByTable.get(tableIdentifier).size());
-            }
-
+            insertAsChild(
+                i, source, rulesByTable.get(tableIdentifier), parents, spans, cursors, sorted);
             break;
           }
         }
@@ -213,6 +204,43 @@ public class MappingRulesDeriver
     }
 
     return sorted;
+  }
+
+  private static void insertAsChild(
+      int i,
+      String source,
+      List<MappingRule> tableRules,
+      List<String> parents,
+      List<Integer> spans,
+      List<Integer> cursors,
+      List<MappingRule> sorted) {
+    int span = spans.get(i);
+    int index = cursors.get(span);
+    sorted.addAll(index, tableRules);
+
+    cursors.add(span + 1, index + tableRules.size());
+    parents.add(span + 1, source);
+    spans.add(span + 1, span + 1);
+
+    spans.set(i, span + 1);
+    for (int j = 0; j < i; j++) {
+      if (spans.get(j) == span) {
+        spans.set(j, span + 1);
+      }
+    }
+    for (int j = span + 2; j < spans.size(); j++) {
+      spans.set(j, spans.get(j) + 1);
+    }
+
+    cursors.set(i, index + tableRules.size());
+    for (int j = 0; j < i; j++) {
+      if (cursors.get(j) == index) {
+        cursors.set(j, index + tableRules.size());
+      }
+    }
+    for (int j = span + 2; j < cursors.size(); j++) {
+      cursors.set(j, cursors.get(j) + tableRules.size());
+    }
   }
 
   private Stream<MappingRule> toRules(

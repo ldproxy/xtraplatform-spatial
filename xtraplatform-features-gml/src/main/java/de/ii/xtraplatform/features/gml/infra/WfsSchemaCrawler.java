@@ -19,7 +19,6 @@ import de.ii.xtraplatform.features.gml.domain.WfsClientBasic;
 import de.ii.xtraplatform.features.gml.infra.req.DescribeFeatureType;
 import java.io.InputStream;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,13 +27,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.xml.namespace.QName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class WfsSchemaCrawler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(WfsSchemaCrawler.class);
 
-  private WfsClientBasic wfsClient;
+  private final WfsClientBasic wfsClient;
   private final ConnectionInfoWfsHttp connectionInfo;
 
   public WfsSchemaCrawler(WfsClientBasic wfsClient, ConnectionInfoWfsHttp connectionInfo) {
@@ -116,23 +112,21 @@ public class WfsSchemaCrawler {
       Consumer<Map<String, List<String>>> tracker) {
 
     URI baseUri = connectionInfo.getUri();
-    InputStream inputStream = wfsClient.runWfsOperation(new DescribeFeatureType());
-
-    GMLSchemaParser gmlSchemaParser =
-        new GMLSchemaParser(ImmutableList.of(schemaConsumer), baseUri, namespaces);
-    gmlSchemaParser.parse(inputStream, featureTypesByNamespace, tracker);
+    try (InputStream inputStream = wfsClient.runWfsOperation(new DescribeFeatureType())) {
+      GMLSchemaParser gmlSchemaParser =
+          new GMLSchemaParser(ImmutableList.of(schemaConsumer), baseUri, namespaces);
+      gmlSchemaParser.parse(inputStream, featureTypesByNamespace, tracker);
+    } catch (java.io.IOException e) {
+      throw new IllegalStateException("Error reading DescribeFeatureType response", e);
+    }
   }
 
   private Map<String, List<String>> getSupportedFeatureTypesPerNamespace(List<QName> featureTypes) {
-    Map<String, List<String>> featureTypesPerNamespace = new LinkedHashMap<>();
-
-    for (QName featureType : featureTypes) {
-      if (!featureTypesPerNamespace.containsKey(featureType.getNamespaceURI())) {
-        featureTypesPerNamespace.put(featureType.getNamespaceURI(), new ArrayList<>());
-      }
-      featureTypesPerNamespace.get(featureType.getNamespaceURI()).add(featureType.getLocalPart());
-    }
-
-    return featureTypesPerNamespace;
+    return featureTypes.stream()
+        .collect(
+            Collectors.groupingBy(
+                QName::getNamespaceURI,
+                LinkedHashMap::new,
+                Collectors.mapping(QName::getLocalPart, Collectors.toList())));
   }
 }

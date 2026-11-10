@@ -15,7 +15,7 @@ public interface FeatureCrs {
 
   EpsgCrs getNativeCrs();
 
-  // TODO: is there a way to move the whole crs transformation stuff to the provider?
+  // NOTE: is there a way to move the whole crs transformation stuff to the provider?
   // as the crs is part of the query, crs transformation should be part of the normalization
   boolean isCrsSupported(EpsgCrs crs);
 

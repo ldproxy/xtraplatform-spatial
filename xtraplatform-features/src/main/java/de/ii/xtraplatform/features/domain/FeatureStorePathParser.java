@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain;
 
 import java.util.List;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FeatureStorePathParser {
 
   interface PathSyntax {}

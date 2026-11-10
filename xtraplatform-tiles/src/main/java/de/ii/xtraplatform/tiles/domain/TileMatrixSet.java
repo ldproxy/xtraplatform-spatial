@@ -25,17 +25,18 @@ import org.slf4j.LoggerFactory;
 /** This class provides derived information from a tile matrix set. */
 public interface TileMatrixSet extends TileMatrixSetBase {
 
+  Logger LOGGER = LoggerFactory.getLogger(TileMatrixSet.class);
+
   static TileMatrixSet custom(TileMatrixSetData data) {
     return new TileMatrixSetImpl(data);
   }
-
-  Logger LOGGER = LoggerFactory.getLogger(TileMatrixSet.class);
 
   /**
    * fetch the local identifier for the tiling scheme
    *
    * @return the identifier, e.g. "WebMercatorQuad"
    */
+  @Override
   String getId();
 
   /**
@@ -80,6 +81,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    *
    * @return the CRS
    */
+  @Override
   EpsgCrs getCrs();
 
   /**
@@ -108,6 +110,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    * @param col the column
    * @return the bounding box in the coordinate reference system of the tiling scheme
    */
+  @Override
   default BoundingBox getTileBoundingBox(int level, int col, int row) {
     BoundingBox bbox = getBoundingBox();
     double rows = getRows(level);
@@ -150,6 +153,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    * @return the distance in the units of measure of the coordinate references system of the tiling
    *     scheme
    */
+  @Override
   default double getMaxAllowableOffset(int level, int row, int col) {
     return getMaxAllowableOffset(level, row, col, getTileExtent());
   }
@@ -192,6 +196,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    *
    * @return the width/height of a tile
    */
+  @Override
   default int getTileSize() {
     return 256;
   }
@@ -202,6 +207,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    *
    * @return the width/height of a tile in the internal coordinate system
    */
+  @Override
   default int getTileExtent() {
     return 4096;
   }
@@ -239,6 +245,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    *
    * @return bounding box
    */
+  @Override
   BoundingBox getBoundingBox();
 
   /**
@@ -302,7 +309,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
   TileMatrix getTileMatrix(int level);
 
   default BigDecimal getBigDecimal(double value) {
-    BigDecimal decimalValue = new BigDecimal(value);
+    BigDecimal decimalValue = new BigDecimal(value); // NOPMD
     return decimalValue
         .setScale(
             TileMatrix.SIGNIFICANT_DIGITS - decimalValue.precision() + decimalValue.scale(),
@@ -339,6 +346,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    * @param bbox bounding box in the CRS of the tile matrix set
    * @return list of TileMatrixSetLimits
    */
+  @Override
   default TileMatrixSetLimits getLimits(int level, BoundingBox bbox) {
     List<Integer> upperLeftCornerTile = getRowCol(bbox.getXmin(), bbox.getYmax(), level);
     List<Integer> lowerRightCornerTile = getRowCol(bbox.getXmax(), bbox.getYmin(), level);
@@ -358,6 +366,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    * @param bbox bounding box in the CRS of the tile matrix set
    * @return list of TileMatrixSetLimits
    */
+  @Override
   default List<TileMatrixSetLimits> getLimitsList(MinMax tileMatrixRange, BoundingBox bbox) {
     ImmutableList.Builder<TileMatrixSetLimits> limits = new ImmutableList.Builder<>();
     for (int tileMatrix = tileMatrixRange.getMin();
@@ -375,6 +384,7 @@ public interface TileMatrixSet extends TileMatrixSetBase {
    * @param row row number in the XYZ scheme
    * @return row number in the TMS scheme
    */
+  @Override
   default int getTmsRow(int level, int row) {
     return getRows(level) - 1 - row;
   }

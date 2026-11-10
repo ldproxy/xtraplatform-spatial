@@ -18,6 +18,7 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
+@SuppressWarnings("PMD.TooManyMethods")
 public interface FeatureEventHandler<
     T extends SchemaBase<T>, U extends SchemaMappingBase<T>, V extends ModifiableContext<T, U>> {
 
@@ -163,7 +164,7 @@ public interface FeatureEventHandler<
         return List.of();
       }
 
-      // TODO: by target path?
+      // NOTE: by target path?
       List<List<Integer>> positions = parentPositionsForPath();
 
       int schemaIndex = schemaIndex() > -1 ? schemaIndex() : positions.size() - 1;
@@ -238,6 +239,7 @@ public interface FeatureEventHandler<
 
     // a @Value.Default is not cached on a Modifiable, so create the value, store it via the
     // setter and reuse that instance on subsequent calls
+    @Override
     @Value.Default
     default ModifiableCollectionMetadata metadata() {
       ModifiableCollectionMetadata collectionMetadata = ModifiableCollectionMetadata.create();
@@ -254,7 +256,7 @@ public interface FeatureEventHandler<
       // when tracking target paths, if present, use path separator from flatten transformation in
       // mapping().getTargetSchema()
       Optional<String> pathSeparator =
-          Optional.ofNullable(mapping()).flatMap(u -> u.getPathSeparator());
+          Optional.ofNullable(mapping()).flatMap(SchemaMappingBase::getPathSeparator);
 
       FeaturePathTracker pathTracker =
           pathSeparator.isPresent()
@@ -298,13 +300,12 @@ public interface FeatureEventHandler<
       boolean useTargetPaths = isUseTargetPaths();
 
       if (memo.version != version || memo.useTargetPaths != useTargetPaths) {
-        memo.version = version;
-        memo.useTargetPaths = useTargetPaths;
-        memo.path = pathTracker().asList();
-        memo.schemas = null;
-        memo.positions = null;
-        memo.parentSchemas = null;
-        memo.parentPositions = null;
+        PathMemo<T> refreshed = new PathMemo<>();
+        refreshed.version = version;
+        refreshed.useTargetPaths = useTargetPaths;
+        refreshed.path = pathTracker().asList();
+        setPathMemo(refreshed);
+        memo = refreshed;
       }
 
       return memo;
@@ -365,16 +366,15 @@ public interface FeatureEventHandler<
 
     @Value.Lazy
     default boolean shouldSkip() {
-      return schema().isEmpty()
-          || !shouldInclude(schema().get(), parentSchemas(), pathTracker().toString());
+      return schema().isEmpty() || !shouldInclude(schema().get(), pathTracker().toString());
     }
 
-    private boolean shouldInclude(T schema, List<T> parentSchemas, String path) {
+    private boolean shouldInclude(T schema, String path) {
       return schema.isId()
           || (schema.isSpatial()
               && (typeQueries().isEmpty()
                   || typeQueries().stream().anyMatch(typeQuery -> !typeQuery.skipGeometry())))
-          // TODO: enable if projected output needs to be schema valid
+          // TODO: enable if projected output needs to be schema valid // NOPMD
           // || isRequired(schema, parentSchemas)
           || (!schema.isId() && propertyIsInFields(path));
     }

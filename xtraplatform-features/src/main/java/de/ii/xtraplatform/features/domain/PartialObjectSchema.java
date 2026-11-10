@@ -34,7 +34,7 @@ public interface PartialObjectSchema
 
   Optional<String> getSchema();
 
-  @JsonProperty(value = "properties")
+  @JsonProperty("properties")
   @Override
   BuildableMap<FeatureSchema, ImmutableFeatureSchema.Builder> getPropertyMap();
 

@@ -22,7 +22,7 @@ import java.util.Set;
  * Patch: such a body carries the read-only properties of the current feature, whether or not the
  * client sent them, so the patch document has to be checked instead.
  */
-public class FeatureEventHandlerReadOnly<T, U, V extends ModifiableContext<T, U>>
+public final class FeatureEventHandlerReadOnly<T, U, V extends ModifiableContext<T, U>>
     implements FeatureEventHandlerSimple<T, U, V> {
 
   private final FeatureEventHandlerSimple<T, U, V> delegate;

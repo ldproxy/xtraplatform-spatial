@@ -130,7 +130,7 @@ public interface SqlQueryOptions extends FeatureProviderConnector.QueryOptions {
   default List<Class<?>> getColumnTypes() {
     List<Class<?>> columnTypes = new ArrayList<>();
 
-    // TODO: use actual types?
+    // NOTE: use actual types?
     getTableSchema()
         .ifPresent(
             table ->

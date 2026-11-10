@@ -13,11 +13,11 @@ import java.util.function.Consumer;
 public abstract class FeatureEventEncoder<T>
     implements TransformerCustomFuseableIn<Object, T, FeatureEventConsumer>, FeatureEventConsumer {
 
-  private final FeatureTokenReader tokenReader;
+  private final FeatureTokenReader<?, ?, ?> tokenReader;
   private Consumer<T> downstream;
 
   protected FeatureEventEncoder() {
-    this.tokenReader = new FeatureTokenReader(this);
+    this.tokenReader = new FeatureTokenReader<>(this);
   }
 
   @Override

@@ -40,7 +40,7 @@ public interface TypesResolver extends FeatureSchemaTransformer {
             .anyMatch(property -> needsResolving(property, false, false, false))
         || types.values().stream()
             .flatMap(type -> type.getAllNestedPartials().stream())
-            .anyMatch(property -> needsResolving(property))
+            .anyMatch(this::needsResolving)
         || types.values().stream()
             .flatMap(type -> type.getAllNestedConcatProperties().stream())
             .anyMatch(property -> needsResolving(property, false, true, false))

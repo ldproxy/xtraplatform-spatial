@@ -29,7 +29,9 @@ public interface FeaturePropertyTransformerNullValue extends FeaturePropertyValu
 
   @Override
   default String transform(String currentPropertyPath, String input) {
-    if (input.matches(getParameter())) return null;
+    if (input.matches(getParameter())) {
+      return null;
+    }
 
     return input;
   }

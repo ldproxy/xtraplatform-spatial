@@ -25,6 +25,7 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
   private final PropertyEncryption encryptedValues;
 
   public FeatureTokenTransformerDecrypt(PropertyEncryption encryptedValues) {
+    super();
     this.encryptedValues = encryptedValues;
   }
 
@@ -39,6 +40,10 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
     super.onValue(context);
   }
 
+  // The IllegalArgumentException is not kept as the cause on purpose: FeatureStream turns an
+  // IllegalArgumentException anywhere in the cause chain into a 400, but a stored value that cannot
+  // be decrypted is a server-side error.
+  @SuppressWarnings("PMD.PreserveStackTrace")
   String decrypt(String encodedValue, FeatureSchema schema) {
     byte[] encrypted;
     try {
@@ -53,6 +58,7 @@ public class FeatureTokenTransformerDecrypt extends FeatureTokenTransformer {
     return normalize(encryptedValues.decrypt(encrypted, describe(schema)), schema);
   }
 
+  @SuppressWarnings("PMD.PreserveStackTrace")
   String normalize(String plaintext, FeatureSchema schema) {
     try {
       return encryptedValues.normalize(

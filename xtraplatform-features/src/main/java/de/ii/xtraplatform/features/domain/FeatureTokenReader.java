@@ -27,7 +27,6 @@ public class FeatureTokenReader<
   private List<String> nestingStack;
   private Map<List<String>, Integer> schemaIndexes;
 
-  // TODO
   public FeatureTokenReader(FeatureEventConsumer eventConsumer) {
     this.eventHandler = null;
   }
@@ -39,6 +38,7 @@ public class FeatureTokenReader<
     this.schemaIndexes = new HashMap<>();
   }
 
+  @SuppressWarnings("PMD.NullAssignment")
   public void onToken(Object token) {
     if (token instanceof FeatureTokenType) {
       if (Objects.nonNull(currentType)) {
@@ -46,6 +46,7 @@ public class FeatureTokenReader<
         this.context.setSchemaIndex(-1);
       }
       if (token == FeatureTokenType.FLUSH) {
+        // sentinel: no token is currently in progress
         this.currentType = null;
       }
       initEvent((FeatureTokenType) token);
@@ -58,6 +59,7 @@ public class FeatureTokenReader<
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void initEvent(FeatureTokenType token) {
     this.currentType = token;
     this.contextIndex = 0;
@@ -113,9 +115,12 @@ public class FeatureTokenReader<
           this.context.setInObject(false);
         }
         break;
+      default:
+        break;
     }
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
   private void readContext(Object context) {
     switch (currentType) {
       case INPUT:
@@ -163,6 +168,8 @@ public class FeatureTokenReader<
       case FEATURE_END:
       case INPUT_END:
         break;
+      default:
+        break;
     }
 
     this.contextIndex++;
@@ -170,11 +177,12 @@ public class FeatureTokenReader<
 
   private void tryReadPath(Object context) {
     if (contextIndex == 0 && context instanceof List) {
-      // TODO: too expensive
+      // NOTE: too expensive
       this.context.pathTracker().track((List<String>) context);
     }
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   private void emitEvent() {
     switch (currentType) {
       case INPUT:
@@ -206,6 +214,8 @@ public class FeatureTokenReader<
         break;
       case INPUT_END:
         eventHandler.onEnd(context);
+        break;
+      default:
         break;
     }
   }

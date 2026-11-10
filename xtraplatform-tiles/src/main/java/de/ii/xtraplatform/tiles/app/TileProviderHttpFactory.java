@@ -12,7 +12,6 @@ import dagger.assisted.AssistedFactory;
 import de.ii.xtraplatform.entities.domain.AbstractEntityFactory;
 import de.ii.xtraplatform.entities.domain.EntityData;
 import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
-import de.ii.xtraplatform.entities.domain.EntityFactory;
 import de.ii.xtraplatform.entities.domain.PersistentEntity;
 import de.ii.xtraplatform.features.domain.ImmutableProviderCommonData;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax;
@@ -29,7 +28,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @AutoBind
 public class TileProviderHttpFactory
-    extends AbstractEntityFactory<TileProviderHttpData, TileProviderHttp> implements EntityFactory {
+    extends AbstractEntityFactory<TileProviderHttpData, TileProviderHttp> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileProviderHttpFactory.class);
 
@@ -102,6 +101,7 @@ public class TileProviderHttpFactory
   }
 
   @AssistedFactory
+  @FunctionalInterface
   public interface TileProviderHttpFactoryAssisted
       extends FactoryAssisted<TileProviderHttpData, TileProviderHttp> {
     @Override

@@ -25,13 +25,13 @@ public interface FeatureStoreInstanceContainer extends FeatureStoreAttributesCon
 
   Optional<Cql2Expression> getFilter();
 
-  // TODO: find a better way to handle this
+  // NOTE: find a better way to handle this
   @Value.Default
   default int getAttributesPosition() {
     return 0;
   }
 
-  // TODO: see getIdAttributesContainer
+  // NOTE: see getIdAttributesContainer
   @Value.Default
   default String getIdField() {
     return getAttributes().stream()

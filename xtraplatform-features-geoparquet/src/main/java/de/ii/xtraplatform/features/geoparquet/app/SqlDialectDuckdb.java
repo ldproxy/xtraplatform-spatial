@@ -17,12 +17,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import org.threeten.extra.Interval;
 
 /** This implementation of the DuckDB SQL-dialect is for the purpose of reading GeoParquet-files. */
-@SuppressWarnings("PMD.TooManyMethods")
 public class SqlDialectDuckdb implements SqlDialect {
 
   private static final Splitter BBOX_SPLITTER =
@@ -67,8 +67,9 @@ public class SqlDialectDuckdb implements SqlDialect {
 
   @Override
   public String applyToExtent(String column, boolean is3d) {
-    if (is3d)
+    if (is3d) {
       throw new IllegalArgumentException("3d is not supported for GeoParquet feature providers.");
+    }
 
     return String.format("ST_AsText(ST_Extent(%s))", column);
   }
@@ -80,10 +81,8 @@ public class SqlDialectDuckdb implements SqlDialect {
     }
 
     // Example for what DuckDB returns: BOX(7.1053586 50.6424865, 7.2106794 50.7177159)
-    if (extent.contains("BOX")) {
-      extent = extent.replaceFirst("BOX", "");
-    }
-    List<String> bbox = BBOX_SPLITTER.splitToList(extent);
+    String coordinates = extent.contains("BOX") ? extent.replaceFirst("BOX", "") : extent;
+    List<String> bbox = BBOX_SPLITTER.splitToList(coordinates);
 
     if (bbox.size() == 4) {
       return Optional.of(
@@ -119,7 +118,7 @@ public class SqlDialectDuckdb implements SqlDialect {
     // Note: Strictly, INFINITY/-INFINITY and INSTANT.MAX/INSTANT.MIN are not the same! May result
     // in undesired behavior.
     Instant parsedStart;
-    switch (start.toUpperCase()) {
+    switch (start.toUpperCase(Locale.ROOT)) {
       case "-INFINITY" -> parsedStart = Instant.MIN;
       case "INFINITY" -> parsedStart = Instant.MAX;
       default -> parsedStart = parser.parse(start, Instant::from);
@@ -130,7 +129,7 @@ public class SqlDialectDuckdb implements SqlDialect {
     }
 
     Instant parsedEnd;
-    switch (end.toUpperCase()) {
+    switch (end.toUpperCase(Locale.ROOT)) {
       case "INFINITY" -> parsedEnd = Instant.MAX;
       case "-INFINITY" -> parsedEnd = Instant.MIN;
       default -> parsedEnd = parser.parse(end, Instant::from);
@@ -146,14 +145,18 @@ public class SqlDialectDuckdb implements SqlDialect {
 
   @Override
   public String applyToDate(String column, Optional<String> format) {
-    if (format.isEmpty()) return String.format("CAST(%s AS DATE)", column);
+    if (format.isEmpty()) {
+      return String.format("CAST(%s AS DATE)", column);
+    }
 
     return String.format("strftime(CAST(%s AS DATE), '%s')", column, format);
   }
 
   @Override
   public String applyToDatetime(String column, Optional<String> format) {
-    if (format.isEmpty()) return String.format("CAST(%s AS TIMESTAMP)", column);
+    if (format.isEmpty()) {
+      return String.format("CAST(%s AS TIMESTAMP)", column);
+    }
 
     return String.format("strftime(CAST(%s AS TIMESTAMP), '%s')", column, format);
   }

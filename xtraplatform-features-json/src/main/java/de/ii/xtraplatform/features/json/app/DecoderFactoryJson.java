@@ -19,7 +19,6 @@ import java.util.Optional;
 
 @Singleton
 @AutoBind
-@SuppressWarnings("PMD.UseObjectForClearerAPI")
 public class DecoderFactoryJson implements DecoderFactory {
 
   @Inject

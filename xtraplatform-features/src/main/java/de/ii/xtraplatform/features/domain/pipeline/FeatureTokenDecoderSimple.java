@@ -42,15 +42,14 @@ public abstract class FeatureTokenDecoderSimple<
     boolean isTransformerFuseable =
         TranformerCustomFuseableOut.super.canFuse(transformerCustomFuseableIn);
 
-    if (isTransformerFuseable && transformerCustomFuseableIn instanceof FeatureTokenContext<?>) {
-      if (!ModifiableContext.class.isAssignableFrom(
-          ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface())) {
-        throw new IllegalStateException(
-            "Cannot fuse FeatureTokenTransformer: "
-                + ((FeatureTokenContext<?>) transformerCustomFuseableIn).getContextInterface()
-                + " does not extend "
-                + this.getContextInterface());
-      }
+    if (isTransformerFuseable
+        && transformerCustomFuseableIn instanceof FeatureTokenContext<?> featureTokenContext
+        && !ModifiableContext.class.isAssignableFrom(featureTokenContext.getContextInterface())) {
+      throw new IllegalStateException(
+          "Cannot fuse FeatureTokenTransformer: "
+              + featureTokenContext.getContextInterface()
+              + " does not extend "
+              + this.getContextInterface());
     }
 
     return isTransformerFuseable;

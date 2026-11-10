@@ -10,12 +10,13 @@ package de.ii.xtraplatform.features.domain;
 /**
  * @author zahnen
  */
+@SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.TooManyMethods"})
 public class MultiFeatureProviderMetadataConsumer implements FeatureProviderMetadataConsumer {
 
   private final FeatureProviderMetadataConsumer[] analyzers;
 
   public MultiFeatureProviderMetadataConsumer(FeatureProviderMetadataConsumer... analyzers) {
-    this.analyzers = analyzers;
+    this.analyzers = analyzers.clone();
   }
 
   @Override
@@ -286,9 +287,9 @@ public class MultiFeatureProviderMetadataConsumer implements FeatureProviderMeta
 
   @Override
   public void analyzeFeatureTypeBoundingBox(
-      String featureTypeName, String xmin, String ymin, String xmax, String ymax) {
+      String featureTypeName, BoundingBoxStrings boundingBox) {
     for (FeatureProviderMetadataConsumer analyzer : analyzers) {
-      analyzer.analyzeFeatureTypeBoundingBox(featureTypeName, xmin, ymin, xmax, ymax);
+      analyzer.analyzeFeatureTypeBoundingBox(featureTypeName, boundingBox);
     }
   }
 

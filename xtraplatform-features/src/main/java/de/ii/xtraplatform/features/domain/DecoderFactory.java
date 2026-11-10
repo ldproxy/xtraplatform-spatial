@@ -13,7 +13,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Optional;
 
-// TODO: only for byte decoders?
+// NOTE: only for byte decoders?
 @AutoMultiBind
 public interface DecoderFactory {
 
@@ -42,7 +42,7 @@ public interface DecoderFactory {
     return Optional.empty();
   }
 
-  default de.ii.xtraplatform.base.domain.util.Tuple<String, String> parseSourcePath(
+  default Tuple<String, String> parseSourcePath(
       String path, String column, String flags, String connectorSpec) {
     return Tuple.of(column, "");
   }

@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain;
 
 import de.ii.xtraplatform.cql.domain.Cql2Expression;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FilterEncoder<T> {
 
   T encode(Cql2Expression cqlFilter, String featureType);

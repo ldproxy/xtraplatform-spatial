@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain;
 
 import java.util.Optional;
 
+@FunctionalInterface
 public interface FeatureMetadata {
 
   String CAPABILITY = "metadata";

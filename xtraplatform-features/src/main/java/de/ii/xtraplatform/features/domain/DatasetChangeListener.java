@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+@FunctionalInterface
 public interface DatasetChangeListener {
 
   void onDatasetChange(DatasetChange change);

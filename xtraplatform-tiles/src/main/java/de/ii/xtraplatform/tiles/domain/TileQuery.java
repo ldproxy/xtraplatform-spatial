@@ -20,7 +20,7 @@ public interface TileQuery extends TileCoordinates {
 
   Optional<TileGenerationParameters> getGenerationParameters();
 
-  // TODO: is there really a practical use case for these or should we drop them altogether?
+  // NOTE: is there really a practical use case for these or should we drop them altogether?
   Optional<TileGenerationParametersTransient> getGenerationParametersTransient();
 
   @Value.Derived

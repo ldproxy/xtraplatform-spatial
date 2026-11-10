@@ -18,6 +18,11 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableMbtilesMetadata.Builder.class)
 public abstract class MbtilesMetadata {
 
+  @SuppressWarnings({
+    "PMD.FieldNamingConventions",
+    "PMD.TooFewBranchesForSwitch",
+    "PMD.NonExhaustiveSwitch"
+  })
   public enum MbtilesType {
     overlay,
     baselayer;
@@ -55,6 +60,6 @@ public abstract class MbtilesMetadata {
 
   public abstract List<VectorLayer> getVectorLayers();
 
-  // TODO support tilestats
+  // TODO support tilestats // NOPMD
   //      see https://github.com/mapbox/mbtiles-spec/blob/master/1.3/spec.md#tilestats
 }

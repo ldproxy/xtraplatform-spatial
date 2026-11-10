@@ -43,10 +43,9 @@ public enum GmlGeometryType {
   }
 
   public static GmlGeometryType fromString(String type) {
-    for (GmlGeometryType v : GmlGeometryType.values()) {
+    for (GmlGeometryType v : values()) {
       if (v.toString().equals(type)
-          || (v.elementStringRepresentation != null
-              && v.elementStringRepresentation.equals(type))) {
+          || v.elementStringRepresentation != null && v.elementStringRepresentation.equals(type)) {
         return v;
       }
     }
@@ -54,7 +53,7 @@ public enum GmlGeometryType {
   }
 
   public static boolean contains(String type) {
-    for (GmlGeometryType v : GmlGeometryType.values()) {
+    for (GmlGeometryType v : values()) {
       if (v.toString().equals(type)) {
         return true;
       }
@@ -62,6 +61,7 @@ public enum GmlGeometryType {
     return false;
   }
 
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   public GeometryType toSimpleFeatureGeometry() {
     return switch (this) {
       case POINT -> GeometryType.POINT;

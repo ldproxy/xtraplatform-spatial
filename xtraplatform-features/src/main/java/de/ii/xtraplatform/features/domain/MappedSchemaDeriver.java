@@ -32,6 +32,7 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
   List<T> merge(FeatureSchema targetSchema, List<String> parentPath, List<T> visitedProperties);
 
   @Override
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidCatchingGenericException"})
   default List<T> visit(
       FeatureSchema schema, List<FeatureSchema> parents, List<List<T>> visitedProperties) {
     List<List<U>> parentPaths1;
@@ -40,7 +41,8 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
     try {
       parentPaths1 = getParentPaths(parents);
       currentPaths = parseSourcePaths(schema, parentPaths1);
-    } catch (Throwable e) {
+    } catch (Exception e) {
+      // parseSourcePaths is implemented by arbitrary subclasses, no common exception type
       String propertyPath =
           Stream.concat(parents.stream(), Stream.of(schema))
               .map(SchemaBase::getName)
@@ -76,12 +78,7 @@ public interface MappedSchemaDeriver<T extends SchemaBase<T>, U extends SourcePa
               parentPath ->
                   currentPaths.stream()
                       .filter(
-                          currentPath -> {
-                            if (isInConcat && !currentPath.parentsIntersect(parentPath)) {
-                              return false;
-                            }
-                            return true;
-                          })
+                          currentPath -> !isInConcat || currentPath.parentsIntersect(parentPath))
                       .map(
                           currentPath -> {
                             U finalCurrentPath =

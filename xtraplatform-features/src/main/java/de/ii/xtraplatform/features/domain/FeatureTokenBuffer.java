@@ -26,7 +26,7 @@ public class FeatureTokenBuffer<
   public FeatureTokenBuffer(FeatureEventHandler<U, V, W> downstream, W context) {
     this.downstream = downstream;
     this.buffer = new ArrayList<>();
-    this.bufferIn = (FeatureTokenEmitter2<U, V, W>) (buffer::add);
+    this.bufferIn = (FeatureTokenEmitter2<U, V, W>) buffer::add;
     this.bufferOut = new FeatureTokenReader<>(downstream, context);
     this.doBuffer = false;
     this.mark = -1;

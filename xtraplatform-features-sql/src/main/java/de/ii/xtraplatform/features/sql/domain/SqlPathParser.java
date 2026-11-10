@@ -34,13 +34,29 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.URLEncodedUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-// TODO: use parser library, e.g.
+// NOTE: use parser library, e.g.
 // https://github.com/zhong-j-yu/rekex/blob/main/rekex-example/src/main/java/org/rekex/exmple/parser/ExampleParser_Uri.java (Java17)
 // or https://github.com/typemeta/funcj/tree/master/parser
+@SuppressWarnings({
+  "PMD.CouplingBetweenObjects",
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods"
+})
 public class SqlPathParser {
+
+  private static final Splitter PATH_SPLITTER =
+      Splitter.on(Tokens.PATH_SEPARATOR).omitEmptyStrings();
+  private static final Joiner PATH_JOINER = Joiner.on(Tokens.PATH_SEPARATOR).skipNulls();
+  private static final Splitter MULTI_COLUMN_SPLITTER =
+      Splitter.on(Tokens.MULTI_COLUMN_SEPARATOR).omitEmptyStrings();
+
+  private final SqlPathDefaults defaults;
+  private final Cql cql;
+  // NOPMD - TODO: remove
+  private final Optional<Pattern> junctionTableMatcher;
+  private final Map<String, DecoderFactory> connectors;
 
   private enum MatcherGroups {
     PATH,
@@ -92,7 +108,7 @@ public class SqlPathParser {
     String INSERTS_FLAG = String.format("\\{inserts=(?<%s>.+?)\\}", MatcherGroups.INSERTS);
     String GENERATED_FLAG =
         String.format("\\{generated=(?<%s>true|false)\\}", MatcherGroups.GENERATED);
-    // TODO: remove
+    // NOPMD - TODO: remove
     String JUNCTION_FLAG = "\\{junction\\}";
     String JOIN_TYPE_FLAG =
         String.format("\\{joinType=(?<%s>INNER|LEFT|RIGHT|FULL)\\}", MatcherGroups.JOINTYPE);
@@ -175,7 +191,7 @@ public class SqlPathParser {
 
     Pattern COLUMN_PATH = Pattern.compile(PatternStrings.COLUMN_PATH);
 
-    // TODO: remove
+    // NOPMD - TODO: remove
     Pattern JUNCTION_TABLE_FLAG = Pattern.compile(PatternStrings.JUNCTION_FLAG);
 
     Pattern SORT_KEY_FLAG = Pattern.compile(PatternStrings.SORT_KEY_FLAG);
@@ -194,20 +210,6 @@ public class SqlPathParser {
 
     Pattern JOIN_TYPE_FLAG = Pattern.compile(PatternStrings.JOIN_TYPE_FLAG);
   }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SqlPathParser.class);
-
-  private static final Splitter PATH_SPLITTER =
-      Splitter.on(Tokens.PATH_SEPARATOR).omitEmptyStrings();
-  private static final Joiner PATH_JOINER = Joiner.on(Tokens.PATH_SEPARATOR).skipNulls();
-  private static final Splitter MULTI_COLUMN_SPLITTER =
-      Splitter.on(Tokens.MULTI_COLUMN_SEPARATOR).omitEmptyStrings();
-
-  private final SqlPathDefaults defaults;
-  private final Cql cql;
-  // TODO: remove
-  private final Optional<Pattern> junctionTableMatcher;
-  private final Map<String, DecoderFactory> connectors;
 
   public SqlPathParser(SqlPathDefaults defaults, Cql cql, Map<String, DecoderFactory> connectors) {
     this.defaults = defaults;
@@ -237,36 +239,38 @@ public class SqlPathParser {
 
     Matcher matcher = Patterns.COLUMN_PATH.matcher(path);
 
-    if (matcher.find()) {
-      String column = matcher.group(MatcherGroups.COLUMNS.name());
-
-      if (Objects.nonNull(column)) {
-        List<String> columns = MULTI_COLUMN_SPLITTER.splitToList(column);
-        Builder builder = new ImmutableSqlPath.Builder().name(column).columns(columns);
-
-        String tablePath = matcher.group(MatcherGroups.PATH.name());
-
-        if (Objects.nonNull(tablePath)) {
-          builder.parentTables(parseTables(tablePath));
-        }
-
-        String flags = Optional.ofNullable(matcher.group(MatcherGroups.FLAGS.name())).orElse("");
-
-        // TODO
-        builder
-            .sortKey("")
-            .sortKeyUnique(true)
-            .primaryKey("")
-            .junction(false)
-            .constantValue(getConstantFlag(flags))
-            .generated(getGeneratedFlag(flags));
-
-        return builder.build();
-      }
+    if (!matcher.find()) {
+      throw new IllegalArgumentException(
+          String.format("invalid sourcePath '%s', expected column", path));
     }
 
-    throw new IllegalArgumentException(
-        String.format("invalid sourcePath '%s', expected column", path));
+    String column = matcher.group(MatcherGroups.COLUMNS.name());
+
+    if (Objects.isNull(column)) {
+      throw new IllegalArgumentException(
+          String.format("invalid sourcePath '%s', expected column", path));
+    }
+
+    List<String> columns = MULTI_COLUMN_SPLITTER.splitToList(column);
+    Builder builder = new ImmutableSqlPath.Builder().name(column).columns(columns);
+
+    String tablePath = matcher.group(MatcherGroups.PATH.name());
+
+    if (Objects.nonNull(tablePath)) {
+      builder.parentTables(parseTables(tablePath));
+    }
+
+    String flags = Optional.ofNullable(matcher.group(MatcherGroups.FLAGS.name())).orElse("");
+
+    builder
+        .sortKey("")
+        .sortKeyUnique(true)
+        .primaryKey("")
+        .junction(false)
+        .constantValue(getConstantFlag(flags))
+        .generated(getGeneratedFlag(flags));
+
+    return builder.build();
   }
 
   public String tablePathWithDefaults(String path) {
@@ -494,11 +498,8 @@ public class SqlPathParser {
   public boolean getSortKeyUnique(String flags) {
     Matcher matcher = Patterns.SORT_KEY_UNIQUE_FLAG.matcher(flags);
 
-    if (matcher.find()) {
-      return Boolean.parseBoolean(matcher.group(MatcherGroups.SORTKEYUNIQUE.name()));
-    }
-
-    return true;
+    return !matcher.find()
+        || Boolean.parseBoolean(matcher.group(MatcherGroups.SORTKEYUNIQUE.name()));
   }
 
   public JoinType getJoinType(String flags) {
@@ -649,7 +650,7 @@ public class SqlPathParser {
     return Stream.of(toRelation(source, link), toRelation(link, target));
   }
 
-  // TODO: support sortKey flag on table instead of getDefaultPrimaryKey
+  // NOPMD - TODO: support sortKey flag on table instead of getDefaultPrimaryKey
   private SqlRelation toRelation(SqlPath source, SqlPath target) {
     if (!target.getJoin().isPresent()) {
       throw new IllegalArgumentException();

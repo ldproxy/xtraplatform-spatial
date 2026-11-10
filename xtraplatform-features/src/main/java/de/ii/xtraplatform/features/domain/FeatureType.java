@@ -32,12 +32,12 @@ import org.immutables.value.Value;
 @JsonDeserialize(builder = ImmutableFeatureType.Builder.class)
 public interface FeatureType extends Buildable<FeatureType> {
 
-  abstract static class Builder implements BuildableBuilder<FeatureType> {
+  abstract class Builder implements BuildableBuilder<FeatureType> {
     public abstract ImmutableFeatureType.Builder putProperties(
         String key, ImmutableFeatureProperty.Builder builder);
 
     @JsonAnySetter
-    @JsonProperty(value = "properties")
+    @JsonProperty("properties")
     public ImmutableFeatureType.Builder putProperties2(
         String key, ImmutableFeatureProperty.Builder builder) {
       return putProperties(key, builder.name(key));
@@ -56,14 +56,15 @@ public interface FeatureType extends Buildable<FeatureType> {
   // builder deserialization
   // (immutables attributeBuilder does not work with maps yet)
   @JsonMerge
+  @SuppressWarnings("PMD.LooseCoupling")
   BuildableMap<FeatureProperty, ImmutableFeatureProperty.Builder> getProperties();
 
   @JsonIgnore
   String getName();
 
-  // TODO
   @JsonIgnore
   @Value.Derived
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.UseStringBufferForStringAppends"})
   default Map<List<String>, List<FeatureProperty>> getPropertiesByPath() {
     Map<List<String>, List<FeatureProperty>> builder = new LinkedHashMap<>();
 
@@ -71,7 +72,6 @@ public interface FeatureType extends Buildable<FeatureType> {
         .values()
         .forEach(
             featureProperty -> {
-              // TODO
               List<String> path =
                   Splitter.on('/')
                       .omitEmptyStrings()
@@ -85,18 +85,20 @@ public interface FeatureType extends Buildable<FeatureType> {
                               String prefix = entry.getKey();
                               String uri = entry.getValue();
                               if (prefix.isBlank()) {
-                                if (resolvedElement.startsWith(":"))
+                                if (resolvedElement.startsWith(":")) {
                                   resolvedElement = uri + resolvedElement;
-                              } else
+                                }
+                              } else {
                                 resolvedElement =
                                     resolvedElement.replaceAll(prefix + ":", uri + ":");
+                              }
                             }
 
                             return resolvedElement;
                           })
                       .collect(Collectors.toList());
 
-              // TODO: implement double col support as provider transformer and remove this
+              // NOTE: implement double col support as provider transformer and remove this
               String root = path.get(0);
               String column = path.get(path.size() - 1);
               if (column.contains(":") && !root.contains(":")) {

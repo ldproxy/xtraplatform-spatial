@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableMap;
 import de.ii.xtraplatform.features.gml.domain.XMLNamespaceNormalizer;
 import de.ii.xtraplatform.features.gml.infra.req.FES;
 import de.ii.xtraplatform.features.gml.infra.xml.XMLDocument;
+import java.util.Locale;
 import java.util.Map;
 import org.w3c.dom.Element;
 
@@ -19,11 +20,12 @@ public class FesResourceId extends FesExpression {
   private final String id;
 
   public FesResourceId(String id) {
+    super();
     this.id = id;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element ex =
         doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.RESOURCEID));
@@ -37,6 +39,7 @@ public class FesResourceId extends FesExpression {
 
   @Override
   public Map<String, String> toKVP(FES.VERSION version, XMLNamespaceNormalizer nsStore) {
-    return ImmutableMap.of(FES.getWord(version, FES.VOCABULARY.RESOURCEID_KVP).toUpperCase(), id);
+    return ImmutableMap.of(
+        FES.getWord(version, FES.VOCABULARY.RESOURCEID_KVP).toUpperCase(Locale.ROOT), id);
   }
 }

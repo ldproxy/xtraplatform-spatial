@@ -16,15 +16,16 @@ package de.ii.xtraplatform.features.gml.domain;
  * <p>Only 2D (XY) circles are handled; 3D circles would require resolving the circle's plane in
  * 3-space and are not produced by current data.
  */
+@SuppressWarnings("PMD.UseVarargs")
 final class Circles {
-
-  private Circles() {}
 
   /** Coordinate-unit tolerance for the {@link #isFullCircleClosed(double[])} check. */
   private static final double EPS = 1.0e-6;
 
   /** Determinant tolerance below which three points are treated as colinear. */
   private static final double COLINEAR_EPS = 1.0e-12;
+
+  private Circles() {}
 
   /**
    * Expand the 3 control points of a {@code <gml:Circle>} into a 5-position closed CIRCULARSTRING:

@@ -22,9 +22,12 @@ import java.util.List;
 
 public class FeatureTokenTransformerGeometry extends FeatureTokenTransformer {
 
-  public FeatureTokenTransformerGeometry() {}
+  public FeatureTokenTransformerGeometry() {
+    super();
+  }
 
   @Override
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     Geometry<?> geometry = context.geometry();
     if (geometry != null) {

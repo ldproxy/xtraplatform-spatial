@@ -56,6 +56,7 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   private String intervalStartValue;
 
   public FeatureTokenTransformerDeduplicate(boolean idsArePerType) {
+    super();
     this.seen = new PackedIdSet(MAX_FEATURES);
     this.idsArePerType = idsArePerType;
     this.typeHasPrimaryInterval = new HashMap<>();
@@ -73,6 +74,7 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     this.currentType =
         Objects.nonNull(context.mapping()) ? context.mapping().getTargetSchema().getName() : null;
@@ -92,6 +94,7 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidDeeplyNestedIfStmts")
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (dropping) {
       this.dropping = false;
@@ -175,6 +178,7 @@ public class FeatureTokenTransformerDeduplicate extends FeatureTokenTransformer 
   }
 
   @Override
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
     if (dropping) {
       return;

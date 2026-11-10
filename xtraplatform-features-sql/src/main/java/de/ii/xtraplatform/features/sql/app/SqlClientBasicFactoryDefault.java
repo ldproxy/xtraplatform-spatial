@@ -36,17 +36,14 @@ public class SqlClientBasicFactoryDefault implements SqlClientBasicFactory {
     if (!connector.isConnected()) {
       connectorFactory.disposeConnector(connector);
 
-      RuntimeException connectionError =
-          connector
-              .getConnectionError()
-              .map(
-                  throwable ->
-                      throwable instanceof RuntimeException
-                          ? (RuntimeException) throwable
-                          : new RuntimeException(throwable))
-              .orElse(new IllegalStateException("unknown reason"));
-
-      throw connectionError;
+      throw connector
+          .getConnectionError()
+          .map(
+              throwable ->
+                  throwable instanceof RuntimeException
+                      ? (RuntimeException) throwable
+                      : new IllegalStateException(throwable))
+          .orElse(new IllegalStateException("unknown reason"));
     }
 
     return new SqlClientBasicDefault(
@@ -62,7 +59,7 @@ public class SqlClientBasicFactoryDefault implements SqlClientBasicFactory {
     }
   }
 
-  private static class SqlClientBasicDefault implements SqlClientBasic {
+  private static final class SqlClientBasicDefault implements SqlClientBasic {
     private final SqlConnector connector;
     private final SqlDbmsAdapter dbmsAdapter;
     private final SqlDialect dialect;

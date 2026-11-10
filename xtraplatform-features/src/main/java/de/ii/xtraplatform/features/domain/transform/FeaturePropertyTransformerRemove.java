@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.domain.transform;
 
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.immutables.value.Value;
@@ -40,23 +41,26 @@ public interface FeaturePropertyTransformerRemove extends FeaturePropertySchemaT
 
   @Override
   default FeatureSchema transform(String currentPropertyPath, FeatureSchema schema) {
-    Condition condition = Condition.NEVER;
-    String parameter = getParameter().toUpperCase();
+    String parameter = getParameter().toUpperCase(Locale.ROOT);
+    Condition condition;
 
     try {
       condition = Condition.valueOf(parameter);
-    } catch (Throwable e) {
-      LOGGER.warn(
-          "Skipping {} transformation for property '{}', condition '{}' is not supported. Supported types: {}",
-          getType(),
-          getPropertyPath(),
-          getParameter(),
-          Condition.values());
+    } catch (IllegalArgumentException e) {
+      if (LOGGER.isWarnEnabled()) {
+        LOGGER.warn(
+            "Skipping {} transformation for property '{}', condition '{}' is not supported. Supported types: {}",
+            getType(),
+            getPropertyPath(),
+            getParameter(),
+            Condition.values());
+      }
       return schema;
     }
 
     if (condition == Condition.ALWAYS
-        || (condition == Condition.IN_COLLECTION && inCollection())
+        || condition == Condition.IN_COLLECTION
+            && inCollection()
             && currentPropertyPath.startsWith(getPropertyPath())) {
       return null;
     }

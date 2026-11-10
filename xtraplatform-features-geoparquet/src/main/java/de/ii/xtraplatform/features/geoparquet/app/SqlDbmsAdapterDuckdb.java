@@ -23,6 +23,7 @@ import java.sql.SQLException;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -82,17 +83,15 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
   private static void addViews(
       StringBuilder queryBuilder, String prefix, Map<String, String> tableFileMapping) {
     // Add '/' to prefix (bucket or path)
-    if (!prefix.isEmpty() && !prefix.endsWith("/")) {
-      prefix += "/";
-    }
+    String base = !prefix.isEmpty() && !prefix.endsWith("/") ? prefix + "/" : prefix;
 
-    for (var tableName : tableFileMapping.keySet()) {
+    for (String tableName : tableFileMapping.keySet()) {
       if (tableName.startsWith(TABLE_PREFIX)) {
         queryBuilder.append(
             String.format(
                 "CREATE VIEW '%s' AS SELECT * FROM '%s';",
                 tableName.substring(TABLE_PREFIX.length()),
-                prefix + tableFileMapping.get(tableName)));
+                base + tableFileMapping.get(tableName)));
       }
     }
   }
@@ -127,15 +126,15 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     return Optional.of(queryBuilder.toString());
   }
 
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
   private Optional<String> handleS3(StringBuilder queryBuilder, ConnectionInfoSql connectionInfo) {
     // Install and load the httpfs extension of DuckDB to access files via S3
-    queryBuilder.append("INSTALL httpfs;");
-    queryBuilder.append("LOAD httpfs;");
+    queryBuilder.append("INSTALL httpfs;LOAD httpfs;");
 
     // Extract all parameter necessary driver parameter, see
     // https://duckdb.org/docs/current/core_extensions/httpfs/s3api#overview-of-s3-secret-parameters
     // ToDo: Check if the input is valid
-    ArrayList<String> driverParameter = new ArrayList<>();
+    List<String> driverParameter = new ArrayList<>();
     Map<String, String> driverOptions = connectionInfo.getDriverOptions();
 
     // Extract ENDPOINT
@@ -206,7 +205,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
 
     // Create DuckDB Secret containing all the connection parameter
     if (driverOptions.containsKey(DRIVER_OPT_TYPE)) {
-      switch (driverOptions.get(DRIVER_OPT_TYPE).toLowerCase()) {
+      switch (driverOptions.get(DRIVER_OPT_TYPE).toLowerCase(Locale.ROOT)) {
         case "s3" -> queryBuilder.append("CREATE SECRET (TYPE s3");
         case "r2" -> queryBuilder.append("CREATE SECRET (TYPE r2");
         case "gcs" -> queryBuilder.append("CREATE SECRET (TYPE gcs");
@@ -218,8 +217,7 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
       queryBuilder.append("CREATE SECRET (TYPE s3");
     }
     if (!driverParameter.isEmpty()) {
-      queryBuilder.append(",");
-      queryBuilder.append(String.join(",", driverParameter));
+      queryBuilder.append(',').append(String.join(",", driverParameter));
     }
     queryBuilder.append(");");
 
@@ -234,12 +232,13 @@ public class SqlDbmsAdapterDuckdb implements SqlDbmsAdapter {
     StringBuilder queryBuilder = new StringBuilder(512);
 
     // Install and load the spatial extension of DuckDB to access spatial functions
-    queryBuilder.append("INSTALL spatial;");
-    queryBuilder.append("LOAD spatial;");
+    queryBuilder.append("INSTALL spatial;LOAD spatial;");
 
     // Data is retrieved from S3
     // ToDo: Check if host is valid
-    if (connectionInfo.getHost().isPresent()) return handleS3(queryBuilder, connectionInfo);
+    if (connectionInfo.getHost().isPresent()) {
+      return handleS3(queryBuilder, connectionInfo);
+    }
 
     // Data is available as local GeoParquet files
     return handleLocalFiles(queryBuilder, connectionInfo);

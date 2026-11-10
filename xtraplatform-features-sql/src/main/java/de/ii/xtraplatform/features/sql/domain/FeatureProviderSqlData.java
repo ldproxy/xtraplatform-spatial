@@ -11,7 +11,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.docs.DocMarker;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
 import de.ii.xtraplatform.features.domain.ExtensionConfiguration;
@@ -96,10 +95,8 @@ public interface FeatureProviderSqlData
 
   @Value.Check
   default FeatureProviderSqlData initNestedDefault() {
-    /*
-     workaround for https://github.com/interactive-instruments/ldproxy/issues/225
-     TODO: remove when fixed
-    */
+    // workaround for https://github.com/interactive-instruments/ldproxy/issues/225
+    // NOPMD - TODO: remove when fixed
     if (Objects.isNull(getConnectionInfo())) {
       ImmutableFeatureProviderSqlData.Builder builder =
           new ImmutableFeatureProviderSqlData.Builder().from(this);
@@ -127,8 +124,7 @@ public interface FeatureProviderSqlData
   }
 
   abstract class Builder
-      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderSqlData.Builder>
-      implements EntityDataBuilder<FeatureProviderDataV2> {
+      extends FeatureProviderDataV2.Builder<ImmutableFeatureProviderSqlData.Builder> {
 
     public abstract ImmutableFeatureProviderSqlData.Builder connectionInfo(
         ConnectionInfoSql connectionInfo);
@@ -213,7 +209,27 @@ public interface FeatureProviderSqlData
       return Optional.empty();
     }
 
-    // TODO
+    /**
+     * @langEn Option to compare the values of `DATETIME` properties in filters in the data type of
+     *     the database column, so that the database can use indexes and statistics of the column.
+     *     Requires that the columns have a timestamp type (`timestamp` or `timestamptz`);
+     *     properties with a `format` are not affected. With the option, fractions of a second are
+     *     compared exactly; without it, values are compared at the precision of whole seconds. Only
+     *     supported for PostgreSQL, ignored for other dialects.
+     * @langDe Steuert, ob die Werte von `DATETIME`-Eigenschaften in Filtern im Datentyp der
+     *     Datenbankspalte verglichen werden, damit die Datenbank Indizes und Statistiken der Spalte
+     *     nutzen kann. Setzt voraus, dass die Spalten einen Zeitstempel-Typ haben (`timestamp` oder
+     *     `timestamptz`); Eigenschaften mit einem `format` sind nicht betroffen. Mit der Option
+     *     werden Sekundenbruchteile exakt verglichen, ohne sie werden die Werte auf ganze Sekunden
+     *     genau verglichen. Nur für PostgreSQL unterstützt, bei anderen Dialekten ohne Wirkung.
+     * @default false
+     * @since v4.9
+     */
+    @Value.Default
+    default boolean getNativeDatetimeComparison() {
+      return false;
+    }
+
     @DocIgnore
     @Value.Default
     default Optional<String> getAccentiCollation() {
@@ -317,6 +333,7 @@ public interface FeatureProviderSqlData
    */
   @Value.Immutable
   @JsonDeserialize(builder = ImmutableDatasetChangeSettings.Builder.class)
+  @SuppressWarnings("PMD.ImplicitFunctionalInterface")
   interface DatasetChangeSettings {
 
     /**

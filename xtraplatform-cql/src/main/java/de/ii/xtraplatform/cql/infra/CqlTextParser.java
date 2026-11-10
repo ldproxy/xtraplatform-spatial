@@ -47,7 +47,7 @@ public class CqlTextParser {
     return parse(cql, new CqlTextVisitor(defaultCrs));
   }
 
-  @SuppressWarnings("PMD.AvoidUncheckedExceptionsInSignatures")
+  @SuppressWarnings({"PMD.AvoidUncheckedExceptionsInSignatures", "PMD.PreserveStackTrace"})
   public Cql2Expression parse(String cql, CqlTextVisitor visitor) throws CqlParseException {
     checkComplexity(cql);
     try {
@@ -65,7 +65,13 @@ public class CqlTextParser {
   // Reject an over-long or too-deeply-nested filter before parsing. Nesting depth is measured by
   // counting parentheses outside string literals (single-quoted, with '' as an escaped quote), so
   // parentheses inside a literal value do not count toward the limit.
-  private static void checkComplexity(String cql) throws CqlParseException {
+  @SuppressWarnings({
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.AvoidReassigningLoopVariables",
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity"
+  })
+  private static void checkComplexity(String cql) {
     if (cql == null) {
       return;
     }

@@ -24,7 +24,7 @@ public class ImplicitMappingResolver implements TypesResolver {
 
     boolean isFeatureRefInConcat = property.isFeatureRef() && isInConcat;
 
-    return ((property.isObject() || property.isArray()) && (property.getSourcePath().isEmpty()))
+    return ((property.isObject() || property.isArray()) && property.getSourcePath().isEmpty())
         || (property.isObject()
             && property.getSourcePath().isPresent()
             && property.getValueNames().isEmpty())

@@ -63,7 +63,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.GodClass", "PMD.TooManyMethods"})
+@SuppressWarnings({
+  "PMD.CouplingBetweenObjects",
+  "PMD.CyclomaticComplexity",
+  "PMD.GodClass",
+  "PMD.TooManyMethods"
+})
 public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
 
   private static final Set<Type> NUMBER = ImmutableSet.of(Type.Integer, Type.Long, Type.Double);

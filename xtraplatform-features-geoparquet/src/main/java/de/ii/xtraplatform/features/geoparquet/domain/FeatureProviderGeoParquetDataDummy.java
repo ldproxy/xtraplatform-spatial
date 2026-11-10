@@ -21,6 +21,7 @@ import org.immutables.value.Value;
     attributeBuilderDetection = true,
     passAnnotations = DocIgnore.class)
 @JsonDeserialize(builder = ImmutableFeatureProviderGeoParquetDataDummy.Builder.class)
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FeatureProviderGeoParquetDataDummy {
   /**
    * @langEn See [Connection Info](#connection-info).

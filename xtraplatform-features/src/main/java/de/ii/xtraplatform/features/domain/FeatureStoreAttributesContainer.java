@@ -21,12 +21,12 @@ public interface FeatureStoreAttributesContainer {
 
   String getSortKey();
 
-  // TODO: implement predicates
+  // TODO: implement predicates // NOPMD
   // Optional<FeatureStorePredicate> getPredicate();
 
   String getInstanceContainerName();
 
-  // TODO: needed for inserts
+  // TODO: needed for inserts // NOPMD
   // boolean shouldAutoGenerateId();
 
   List<FeatureStoreAttribute> getAttributes();

@@ -18,25 +18,35 @@ import java.util.OptionalLong;
 public interface FeatureReaderGeneric
     extends FeatureReader<Map<String, String>, Map<String, String>> {
 
+  @Override
   void onStart(OptionalLong numberReturned, OptionalLong numberMatched, Map<String, String> context)
       throws Exception;
 
+  @Override
   void onEnd() throws Exception;
 
+  @Override
   void onFeatureStart(List<String> path, Map<String, String> context) throws Exception;
 
+  @Override
   void onFeatureEnd(List<String> path) throws Exception;
 
+  @Override
   void onObjectStart(List<String> path, Map<String, String> context) throws Exception;
 
+  @Override
   void onObjectEnd(List<String> path, Map<String, String> context) throws Exception;
 
+  @Override
   void onArrayStart(List<String> path, Map<String, String> context) throws Exception;
 
+  @Override
   void onArrayEnd(List<String> path, Map<String, String> context) throws Exception;
 
+  @Override
   void onGeometry(List<String> path, Geometry<?> geometry, Map<String, String> context)
       throws Exception;
 
+  @Override
   void onValue(List<String> path, String value, Map<String, String> context) throws Exception;
 }

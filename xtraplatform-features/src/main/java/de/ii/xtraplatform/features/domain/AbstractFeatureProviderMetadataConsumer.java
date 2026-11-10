@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 /**
  * @author zahnen
  */
+@SuppressWarnings("PMD.TooManyMethods")
 public class AbstractFeatureProviderMetadataConsumer implements FeatureProviderMetadataConsumer {
   @Override
   public void analyzeStart() {}
@@ -127,7 +128,7 @@ public class AbstractFeatureProviderMetadataConsumer implements FeatureProviderM
 
   @Override
   public void analyzeFeatureTypeBoundingBox(
-      String featureTypeName, String xmin, String ymin, String xmax, String ymax) {}
+      String featureTypeName, BoundingBoxStrings boundingBox) {}
 
   @Override
   public void analyzeFeatureTypeDefaultCrs(String featureTypeName, String crs) {}

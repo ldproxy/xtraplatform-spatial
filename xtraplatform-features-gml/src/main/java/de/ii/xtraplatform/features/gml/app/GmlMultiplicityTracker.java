@@ -13,15 +13,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author zahnen
  */
 public class GmlMultiplicityTracker {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GmlMultiplicityTracker.class);
   private static final Joiner JOINER = Joiner.on('.');
 
   private final Map<String, Integer> currentMultiplicities;
@@ -34,8 +31,8 @@ public class GmlMultiplicityTracker {
     currentMultiplicities.clear();
   }
 
-  // TODO multilevel, mark multiple properties in mapping and pass multi-elements to constructor,
-  // see SqlMultiplicityMapping
+  // NOPMD TODO multilevel, mark multiple properties in mapping and pass multi-elements to
+  // constructor, see SqlMultiplicityMapping
   public void track(List<String> path) {
     if (!path.isEmpty()) {
       String pathId = JOINER.join(path);

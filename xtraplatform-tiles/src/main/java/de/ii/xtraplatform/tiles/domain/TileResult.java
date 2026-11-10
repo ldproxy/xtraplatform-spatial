@@ -14,6 +14,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 public interface TileResult {
 
+  @SuppressWarnings("PMD.FieldNamingConventions")
   enum Status {
     // Tile is available from the tile provider
     Found,

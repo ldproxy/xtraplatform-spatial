@@ -7,6 +7,7 @@
  */
 package de.ii.xtraplatform.features.domain;
 
+@SuppressWarnings("PMD.FinalizeOverloaded")
 public interface SchemaVisitorWithFinalizer<T extends SchemaBase<T>, U, V>
     extends SchemaVisitorTopDown<T, U> {
 

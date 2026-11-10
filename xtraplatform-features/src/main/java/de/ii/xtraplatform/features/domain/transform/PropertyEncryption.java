@@ -60,7 +60,8 @@ public class PropertyEncryption {
       throw new IllegalArgumentException(
           String.format(
               "The value of the encrypted property '%s' is not a valid %s.",
-              propertyLabel, valueType));
+              propertyLabel, valueType),
+          e);
     }
 
     return plaintext;

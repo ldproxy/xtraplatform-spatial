@@ -24,7 +24,7 @@ public enum GmlType {
   URI("anyURI"),
   NONE("");
 
-  private String stringRepresentation;
+  private final String stringRepresentation;
 
   GmlType(String stringRepresentation) {
     this.stringRepresentation = stringRepresentation;
@@ -36,7 +36,7 @@ public enum GmlType {
   }
 
   public static GmlType fromString(String type) {
-    for (GmlType v : GmlType.values()) {
+    for (GmlType v : values()) {
       if (v.toString().equals(type)) {
         return v;
       }
@@ -46,7 +46,7 @@ public enum GmlType {
   }
 
   public static boolean contains(String type) {
-    for (GmlType v : GmlType.values()) {
+    for (GmlType v : values()) {
       if (v.toString().equals(type)) {
         return true;
       }

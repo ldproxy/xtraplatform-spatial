@@ -17,17 +17,18 @@ public class FesPropertyIsGreaterThan extends FesExpression {
   private final FesLiteral right;
 
   public FesPropertyIsGreaterThan(FesLiteral left, FesLiteral right) {
+    super();
     this.left = left;
     this.right = right;
   }
 
   @Override
-  public void toXML(FES.VERSION version, Element e, XMLDocument doc) {
+  public void appendXml(FES.VERSION version, Element e, XMLDocument doc) {
     doc.addNamespace(FES.getNS(version), FES.getPR(version));
     Element ex =
         doc.createElementNS(FES.getNS(version), FES.getWord(version, FES.VOCABULARY.GREATER));
     e.appendChild(ex);
-    left.toXML(version, ex, doc);
-    right.toXML(version, ex, doc);
+    left.appendXml(version, ex, doc);
+    right.appendXml(version, ex, doc);
   }
 }

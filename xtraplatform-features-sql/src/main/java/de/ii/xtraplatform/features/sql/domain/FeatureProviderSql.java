@@ -48,7 +48,6 @@ import de.ii.xtraplatform.features.domain.FeatureEventHandler.ModifiableContext;
 import de.ii.xtraplatform.features.domain.FeatureExtents;
 import de.ii.xtraplatform.features.domain.FeatureProvider;
 import de.ii.xtraplatform.features.domain.FeatureProviderDataV2;
-import de.ii.xtraplatform.features.domain.FeatureQueries;
 import de.ii.xtraplatform.features.domain.FeatureQuery;
 import de.ii.xtraplatform.features.domain.FeatureQueryEncoder;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
@@ -475,11 +474,15 @@ import org.threeten.extra.Interval;
           value = FeatureProviderSql.PROVIDER_SUB_TYPE)
     },
     data = FeatureProviderSqlData.class)
+@SuppressWarnings({
+  "PMD.CouplingBetweenObjects",
+  "PMD.GodClass",
+  "PMD.CyclomaticComplexity",
+  "PMD.TooManyMethods"
+})
 public class FeatureProviderSql
     extends AbstractFeatureProvider<SqlRow, SqlQueryBatch, SqlQueryOptions, SchemaSql>
-    implements FeatureProvider,
-        FeatureQueries,
-        FeatureExtents,
+    implements FeatureExtents,
         FeatureCrs,
         FeatureTransactions,
         MultiFeatureQueries,
@@ -489,12 +492,13 @@ public class FeatureProviderSql
 
   public static final String ENTITY_SUB_TYPE = "feature/sql";
   public static final String PROVIDER_SUB_TYPE = "SQL";
+  private static final String CACHE_KEY_STATS = "stats";
 
   private final Cql cql;
   private final SqlDbmsAdapters dbmsAdapters;
   private final Map<String, DecoderFactory> subdecoders;
 
-  private final de.ii.xtraplatform.cache.domain.Cache cache;
+  private final Cache cache;
   private final Scheduler scheduler;
 
   private FeatureQueryEncoderSql queryTransformer;
@@ -510,6 +514,7 @@ public class FeatureProviderSql
   private List<CustomFunction> cql2Functions;
   private String cronJob;
 
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @AssistedInject
   public FeatureProviderSql(
       CrsTransformerFactory crsTransformerFactory,
@@ -546,6 +551,11 @@ public class FeatureProviderSql
         decoderFactories.getConnectorDecoders());
   }
 
+  @SuppressWarnings({
+    "PMD.ExcessiveParameterList",
+    "PMD.ConstructorCallsOverridableMethod",
+    "PMD.NullAssignment"
+  })
   protected FeatureProviderSql(
       CrsTransformerFactory crsTransformerFactory,
       CrsInfo crsInfo,
@@ -585,9 +595,9 @@ public class FeatureProviderSql
     this.cql2Functions = List.of();
   }
 
-  private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults, Cql cql) {
+  private static PathParserSql createPathParser2(SqlPathDefaults sqlPathDefaults) {
     SqlPathSyntax syntax = ImmutableSqlPathSyntax.builder().options(sqlPathDefaults).build();
-    return new PathParserSql(syntax, cql);
+    return new PathParserSql(syntax);
   }
 
   private static SqlPathParser createPathParser3(
@@ -642,7 +652,9 @@ public class FeatureProviderSql
                 Optional.ofNullable(queryMappings.get(type))
                     .filter(mappings -> mappings.size() == 1)
                     .map(mappings -> mappings.get(0)),
-            getSpatialIndexes());
+            getSpatialIndexes(),
+            Objects.nonNull(getData().getQueryGeneration())
+                && getData().getQueryGeneration().getNativeDatetimeComparison());
     AggregateStatsQueryGenerator queryGeneratorSql =
         new AggregateStatsQueryGenerator(sqlDialect, filterEncoder);
 
@@ -657,17 +669,15 @@ public class FeatureProviderSql
     Map<String, List<SqlQueryTemplates>> allQueryTemplates =
         queryMappings.entrySet().stream()
             .map(
-                entry -> {
-                  final int[] i = {0};
-                  return new SimpleImmutableEntry<>(
-                      entry.getKey(),
-                      entry.getValue().stream().map(sqlQueryTemplatesDeriver::derive).toList());
-                })
+                entry ->
+                    new SimpleImmutableEntry<>(
+                        entry.getKey(),
+                        entry.getValue().stream().map(sqlQueryTemplatesDeriver::derive).toList()))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
     this.queryTransformer =
         new FeatureQueryEncoderSql(
-            allQueryTemplates, allQueryTemplates, getData().getQueryGeneration(), sqlDialect);
+            allQueryTemplates, allQueryTemplates, getData().getQueryGeneration());
 
     this.resultSetMaterializer =
         new ResultSetMaterializer(
@@ -685,13 +695,8 @@ public class FeatureProviderSql
             getData().getNativeCrs().orElse(OgcCrs.CRS84),
             getData().getNativeTimeZone().orElse(ZoneId.of("UTC")));
     this.featureMutationsSql =
-        new FeatureMutationsSql(
-            new SqlInsertGenerator2(
-                getData().getNativeCrs().orElse(OgcCrs.CRS84),
-                crsTransformerFactory,
-                getData().getSourcePathDefaults()),
-            getData().getSourcePathDefaults());
-    this.pathParser2 = createPathParser2(getData().getSourcePathDefaults(), cql);
+        new FeatureMutationsSql(new SqlInsertGenerator2(getData().getSourcePathDefaults()));
+    this.pathParser2 = createPathParser2(getData().getSourcePathDefaults());
 
     return true;
   }
@@ -701,6 +706,7 @@ public class FeatureProviderSql
    * make use of. Without it, spatial queries keep working, only without the index, so a failure to
    * determine it is logged and does not keep the provider from starting.
    */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private Map<String, String> getSpatialIndexes() {
     try {
       return getSqlClient().getSpatialIndexes();
@@ -715,6 +721,7 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   protected void onStarted() {
     changes()
         .addListener(
@@ -723,48 +730,57 @@ public class FeatureProviderSql
 
     super.onStarted();
 
-    if (Runtime.getRuntime().availableProcessors() > getStreamRunner().getCapacity()) {
+    if (Runtime.getRuntime().availableProcessors() > getStreamRunner().getCapacity()
+        && LOGGER.isInfoEnabled()) {
       LOGGER.info(
           "Recommended max connections for optimal performance under load: {}",
           getMaxQueries() * Runtime.getRuntime().availableProcessors());
     }
     Map<String, List<SchemaSql>> sourceSchema = new LinkedHashMap<>();
+    MutationSchemaDeriver mutationSchemaDeriver =
+        new MutationSchemaDeriver(pathParser2, pathParser3);
     try {
       for (FeatureSchema fs : getData().getTypes().values()) {
         sourceSchema.put(
-            fs.getName(),
-            fs.accept(WITH_SCOPE_RECEIVABLE)
-                .accept(new MutationSchemaDeriver(pathParser2, pathParser3)));
+            fs.getName(), fs.accept(WITH_SCOPE_RECEIVABLE).accept(mutationSchemaDeriver));
       }
     } catch (Throwable e) {
       // ignore
     }
 
-    if (Objects.isNull(cronJob)
-        && Objects.nonNull(getData().getDatasetChanges().getSyncPeriodic())) {
-      if (getData().getDatasetChanges().isModeCrud() || getData().getDatasetChanges().isModeOff()) {
+    if (Objects.nonNull(cronJob)
+        || Objects.isNull(getData().getDatasetChanges().getSyncPeriodic())) {
+      return;
+    }
+
+    if (getData().getDatasetChanges().isModeCrud() || getData().getDatasetChanges().isModeOff()) {
+      if (LOGGER.isWarnEnabled()) {
         LOGGER.warn(
             "Periodic dataset sync is not supported in mode '{}'",
             getData().getDatasetChanges().getMode());
-        return;
       }
+      return;
+    }
+
+    if (LOGGER.isDebugEnabled()) {
       LOGGER.debug(
           "Scheduling periodic dataset sync: {}", getData().getDatasetChanges().getSyncPeriodic());
-
-      this.cronJob =
-          scheduler.schedule(
-              LogContext.withMdc(
-                  () ->
-                      changes()
-                          .handle(
-                              ImmutableDatasetChange.builder()
-                                  .featureTypes(getData().getTypes().keySet())
-                                  .build())),
-              getData().getDatasetChanges().getSyncPeriodic());
     }
+
+    this.cronJob =
+        scheduler.schedule(
+            LogContext.withMdc(
+                () ->
+                    changes()
+                        .handle(
+                            ImmutableDatasetChange.builder()
+                                .featureTypes(getData().getTypes().keySet())
+                                .build())),
+            getData().getDatasetChanges().getSyncPeriodic());
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   protected void onReloaded(boolean forceReload) {
     super.onReloaded(forceReload);
 
@@ -789,6 +805,7 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings("PMD.NullAssignment")
   protected void onStopped() {
     super.onStopped();
 
@@ -811,12 +828,13 @@ public class FeatureProviderSql
 
   private void clearCache(String type) {
     LOGGER.debug("Clearing cache for type: {}", type);
-    cache.del(type, "stats", "count");
-    cache.del(type, "stats", "spatial");
-    cache.del(type, "stats", "temporal");
+    cache.del(type, CACHE_KEY_STATS, "count");
+    cache.del(type, CACHE_KEY_STATS, "spatial");
+    cache.del(type, CACHE_KEY_STATS, "temporal");
   }
 
-  // TODO: implement auto mode for maxConnections=-1, how to get numberOfQueries in Connector?
+  // NOPMD - TODO: implement auto mode for maxConnections=-1, how to get numberOfQueries in
+  // Connector?
   @Override
   protected int getRunnerCapacity(ConnectionInfo connectionInfo) {
     ConnectionInfoSql connectionInfoSql = (ConnectionInfoSql) connectionInfo;
@@ -844,7 +862,7 @@ public class FeatureProviderSql
         .orElse(1);
   }
 
-  // TODO: move to hydration
+  // NOTE: move to hydration
   @Override
   protected ConnectionInfo getConnectionInfo() {
     ConnectionInfoSql connectionInfo = (ConnectionInfoSql) super.getConnectionInfo();
@@ -878,10 +896,8 @@ public class FeatureProviderSql
       maxConnections = maxQueries * Runtime.getRuntime().availableProcessors();
     }
     int capacity = maxConnections / maxQueries;
-    // TODO
-    int queueSize = Math.max(1024, maxConnections * capacity * 2) / maxQueries;
     // LOGGER.info("RUNNERQ: {} {} {} {}", maxQueries ,maxConnections, capacity, queueSize);
-    return queueSize;
+    return Math.max(1024, maxConnections * capacity * 2) / maxQueries;
   }
 
   @Override
@@ -901,7 +917,7 @@ public class FeatureProviderSql
     return Optional.empty();
   }
 
-  // TODO: migrate types validation from SchemaSql to SqlQueryMapping
+  // NOTE: migrate types validation from SchemaSql to SqlQueryMapping
   // for now SchemaSql is generated lazily when validation is enabled
   // and getSourceSchemas() is called from AbstractFeatureProvider
   @Override
@@ -929,7 +945,7 @@ public class FeatureProviderSql
   protected Optional<Map<String, String>> getStartupInfo() {
     String parallelism = String.valueOf(getStreamRunner().getCapacity());
 
-    // TODO: get other infos from connector
+    // NOPMD - TODO: get other infos from connector
 
     ImmutableMap.Builder<String, String> info =
         new ImmutableMap.Builder<String, String>()
@@ -1020,10 +1036,8 @@ public class FeatureProviderSql
 
   @Override
   public boolean supportsMutationsInternal() {
-    if (!Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)) {
-      return false;
-    }
-    return getData().getDatasetChanges().isModeCrud();
+    return Objects.equals(getData().getConnectionInfo().getDialect(), SqlDbmsPgis.ID)
+        && getData().getDatasetChanges().isModeCrud();
   }
 
   @Override
@@ -1042,12 +1056,13 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public long getFeatureCount(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return -1;
     }
 
-    String[] cacheKey = {typeName, "stats", "count"};
+    String[] cacheKey = {typeName, CACHE_KEY_STATS, "count"};
     String cacheValidator = getData().getStableHash();
 
     if (cache.hasValid(cacheValidator, cacheKey)) {
@@ -1088,12 +1103,13 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.AvoidInstanceofChecksInCatchClause"})
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
     }
 
-    String[] cacheKey = {typeName, "stats", "spatial"};
+    String[] cacheKey = {typeName, CACHE_KEY_STATS, "spatial"};
     String cacheValidator = getData().getStableHash();
 
     if (cache.hasValid(cacheValidator, cacheKey)) {
@@ -1142,6 +1158,7 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
     return getSpatialExtent(typeName)
         .flatMap(
@@ -1159,12 +1176,17 @@ public class FeatureProviderSql
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.AvoidCatchingGenericException",
+    "PMD.AvoidInstanceofChecksInCatchClause"
+  })
   public Optional<Interval> getTemporalExtent(String typeName) {
     if (!queryMappings.containsKey(typeName)) {
       return Optional.empty();
     }
 
-    String[] cacheKey = {typeName, "stats", "temporal"};
+    String[] cacheKey = {typeName, CACHE_KEY_STATS, "temporal"};
     String cacheValidator = getData().getStableHash();
 
     if (cache.hasValid(cacheValidator, cacheKey)) {
@@ -1239,14 +1261,14 @@ public class FeatureProviderSql
     return Optional.empty();
   }
 
-  // TODO: cache deser does not work, because the the feature schemas have no name
+  // NOPMD - TODO: cache deser does not work, because the the feature schemas have no name
   // (and there are no map keys to get them from)
   // so to implement this we need the split between cfg and internal schemas
   private Map<String, List<SqlQueryMapping>> generateSqlQueryMappings() {
-    String[] cacheKey = {"schema", "sql"};
+    /*String[] cacheKey = {"schema", "sql"};
     String cacheValidator = getData().getStableHash();
 
-    /*if (cache.hasValid(cacheValidator, cacheKey)) {
+    if (cache.hasValid(cacheValidator, cacheKey)) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Using cached sql schemas");
       }
@@ -1269,19 +1291,15 @@ public class FeatureProviderSql
             .map(entry -> Map.entry(entry.getKey(), entry.getValue().accept(mappingRulesDeriver)))
             .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
     // LOGGER.debug("AFTER Derive MappingRules");
-    Map<String, List<SqlQueryMapping>> mappings =
-        getData().getTypes().entrySet().stream()
-            .map(
-                entry ->
-                    Map.entry(
-                        entry.getKey(),
-                        sqlMappingDeriver.derive(
-                            mappingRules.get(entry.getKey()), entry.getValue())))
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
     // LOGGER.debug("AFTER Derive SqlQueryMapping");
     // cache.put(cacheValidator, mappings, cacheKey);
-
-    return mappings;
+    return getData().getTypes().entrySet().stream()
+        .map(
+            entry ->
+                Map.entry(
+                    entry.getKey(),
+                    sqlMappingDeriver.derive(mappingRules.get(entry.getKey()), entry.getValue())))
+        .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
   }
 
   @Override
@@ -1335,11 +1353,8 @@ public class FeatureProviderSql
     Optional<List<SqlQueryMapping>> queryMapping =
         Optional.ofNullable(queryMappings.get(featureType));
 
-    if (queryMapping.isPresent()) {
-      return queryMapping.get().stream().allMatch(SqlQueryMapping::hasGeneratedId);
-    }
-
-    return true;
+    return queryMapping.isEmpty()
+        || queryMapping.get().stream().allMatch(SqlQueryMapping::hasGeneratedId);
   }
 
   /**
@@ -1347,6 +1362,7 @@ public class FeatureProviderSql
    * back otherwise, and the connection is returned to the pool in every case, including a failed
    * COMMIT or a connection the database has terminated.
    */
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.UseTryWithResources"})
   private MutationResult runInSession(Type type, Function<Session, MutationResult> mutation) {
     Session session;
     try {
@@ -1391,6 +1407,7 @@ public class FeatureProviderSql
    * notably a lost database connection or an exhausted pool, is passed through and reported as a
    * server error.
    */
+  @SuppressWarnings({"PMD.CompareObjectsWithEquals", "PMD.NullAssignment"})
   private static Throwable toMutationError(Throwable error) {
     for (Throwable t = error; Objects.nonNull(t); t = t.getCause() == t ? null : t.getCause()) {
       if (t instanceof JsonParseException) {
@@ -1441,6 +1458,7 @@ public class FeatureProviderSql
     return preprocessQuery(query, new ArrayList<>());
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   protected Query preprocessQuery(Query query, List<String> resultSetTables) {
     if (query instanceof FeatureQuery
         && (((FeatureQuery) query).getFields().size() > 1
@@ -1470,7 +1488,7 @@ public class FeatureProviderSql
       }
     }
     if (query instanceof MultiFeatureQuery) {
-      // TODO: this is a workaround to support subqueries with different numbers of sort keys
+      // NOTE: this is a workaround to support subqueries with different numbers of sort keys
       // to remove this, we have to
       // - disable optimized paging as soon as a sort key is specified for at least one subquery
       // - fix a bug in SqlRowVals or transformations, it seems that the same number of columns is
@@ -1571,10 +1589,8 @@ public class FeatureProviderSql
 
   @Override
   public boolean supportsAccenti() {
-    if (Objects.nonNull(getData().getQueryGeneration())) {
-      return getData().getQueryGeneration().getAccentiCollation().isPresent();
-    }
-    return false;
+    return Objects.nonNull(getData().getQueryGeneration())
+        && getData().getQueryGeneration().getAccentiCollation().isPresent();
   }
 
   @Override
@@ -1625,10 +1641,8 @@ public class FeatureProviderSql
 
   @Override
   public boolean skipUnusedPipelineSteps() {
-    if (Objects.nonNull(getData().getQueryProcessing())) {
-      return getData().getQueryProcessing().getSkipUnusedPipelineSteps();
-    }
-    return false;
+    return Objects.nonNull(getData().getQueryProcessing())
+        && getData().getQueryProcessing().getSkipUnusedPipelineSteps();
   }
 
   @Override

@@ -137,10 +137,12 @@ import java.util.function.BiConsumer;
 @AutoMultiBind
 public interface FeatureQueriesExtension {
 
+  @SuppressWarnings("PMD.ClassNamingConventions")
   enum LIFECYCLE_HOOK {
     STARTED
   }
 
+  @SuppressWarnings("PMD.ClassNamingConventions")
   enum QUERY_HOOK {
     BEFORE,
     AFTER

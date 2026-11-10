@@ -114,6 +114,7 @@ public class FeatureProviderOracle extends FeatureProviderSql {
   public static final String ENTITY_SUB_TYPE = "feature/oracle";
   public static final String PROVIDER_SUB_TYPE = "ORACLE";
 
+  @SuppressWarnings("PMD.ExcessiveParameterList")
   @AssistedInject
   public FeatureProviderOracle(
       CrsTransformerFactory crsTransformerFactory,

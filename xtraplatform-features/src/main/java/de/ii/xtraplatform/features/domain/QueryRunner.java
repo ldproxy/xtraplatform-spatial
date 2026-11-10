@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 
+@FunctionalInterface
 public interface QueryRunner {
   <W extends ResultBase> CompletionStage<W> runQuery(
       BiFunction<FeatureTokenSource, Map<String, String>, Stream<W>> stream,

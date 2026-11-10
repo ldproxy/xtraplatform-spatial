@@ -16,6 +16,8 @@ package de.ii.xtraplatform.features.domain;
  */
 public class FeatureMutationConstraintException extends RuntimeException {
 
+  private static final long serialVersionUID = 1L;
+
   private final String sqlState;
 
   public FeatureMutationConstraintException(String message, Throwable cause, String sqlState) {

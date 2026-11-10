@@ -50,6 +50,7 @@ public class DefaultRolesResolver implements TypesResolver {
   }
 
   @Override
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public FeatureSchema resolve(FeatureSchema property, List<FeatureSchema> parents) {
     boolean isEmbedded = property.isEmbeddedFeature();
     Optional<FeatureSchema> primaryGeometry =

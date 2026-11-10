@@ -109,6 +109,7 @@ public class TokenSliceTransformerChain
             .build());
   }
 
+  @SuppressWarnings("PMD.CognitiveComplexity")
   public Map<String, String> transform(FeatureEventBuffer buffer) {
     Map<String, String> applied = new HashMap<>();
 
@@ -211,11 +212,7 @@ public class TokenSliceTransformerChain
   @Nullable
   @Override
   public List<Object> transform(String path, List<Object> slice) {
-    List<Object> transformed = slice;
-
-    transformed = run(transformers, path, path, slice);
-
-    return transformed;
+    return run(transformers, path, path, slice);
   }
 
   @Override

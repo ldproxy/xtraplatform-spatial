@@ -13,6 +13,7 @@ public class FeatureTokenTransformerProgress extends FeatureTokenTransformer {
   private boolean countFeatures;
 
   public FeatureTokenTransformerProgress(JobHook jobHook) {
+    super();
     this.jobHook = jobHook;
     this.countFeatures = false;
   }

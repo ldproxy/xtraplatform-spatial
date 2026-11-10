@@ -40,10 +40,12 @@ public interface InResultSet extends BinaryScalarOperation, ResultSetReference {
   }
 
   /** Feature type of the query that defines the result set. */
+  @Override
   @JsonIgnore
   Optional<String> getProducerType();
 
   /** Effective filter of the query that defines the result set. */
+  @Override
   @JsonIgnore
   Optional<Cql2Expression> getProducerFilter();
 
@@ -69,9 +71,11 @@ public interface InResultSet extends BinaryScalarOperation, ResultSetReference {
    * {@code IN (SELECT <value column> FROM <table>)} against the pre-materialized, indexed table, so
    * the producing query runs once instead of being re-derived in every consumer.
    */
+  @Override
   @JsonIgnore
   Optional<String> getMaterializedTable();
 
+  @Override
   @JsonIgnore
   @Value.Lazy
   default String getSetName() {

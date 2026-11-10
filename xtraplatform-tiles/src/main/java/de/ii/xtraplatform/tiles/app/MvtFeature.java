@@ -16,6 +16,7 @@ import org.locationtech.jts.geom.Geometry;
 @Value.Immutable
 @Value.Style(builder = "new")
 @JsonDeserialize(builder = ImmutableMvtFeature.Builder.class)
+@SuppressWarnings("PMD.OverrideBothEqualsAndHashCodeOnComparable")
 public abstract class MvtFeature implements Comparable {
   public abstract Geometry getGeometry();
 

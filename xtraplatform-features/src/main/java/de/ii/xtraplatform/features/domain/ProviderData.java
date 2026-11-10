@@ -10,6 +10,7 @@ package de.ii.xtraplatform.features.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.EntityData;
+import java.util.Locale;
 import java.util.Optional;
 import org.immutables.value.Value;
 
@@ -28,7 +29,7 @@ public interface ProviderData extends EntityData {
   @Override
   default Optional<String> getEntitySubType() {
     return Optional.of(
-        String.format("%s/%s", getProviderType(), getProviderSubType()).toLowerCase());
+        String.format("%s/%s", getProviderType(), getProviderSubType()).toLowerCase(Locale.ROOT));
   }
 
   // We need to add the @Value.Auxiliary annotation here again, otherwise createdAt and lastModified

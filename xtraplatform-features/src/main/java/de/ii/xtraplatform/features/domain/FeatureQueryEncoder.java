@@ -20,8 +20,8 @@ public interface FeatureQueryEncoder<T, V extends FeatureProviderConnector.Query
 
   FeatureProviderCapabilities getCapabilities();
 
-  // TODO: validate filters
-  // TODO: anything else?
+  // TODO: validate filters // NOPMD
+  // NOTE: anything else?
   default void validate(TypeQuery typeQuery, Query query) {
     if (query.hitsOnly() && !getCapabilities().supportsQueryOp(Operation.COUNTING)) {
       throw new IllegalArgumentException(

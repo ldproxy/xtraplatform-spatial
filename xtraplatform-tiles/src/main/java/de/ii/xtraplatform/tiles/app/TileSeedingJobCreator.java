@@ -15,7 +15,6 @@ import de.ii.xtralink.jobs.PartialJobConfiguration;
 import de.ii.xtraplatform.base.domain.AppContext;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.entities.domain.EntityRegistry;
-import de.ii.xtraplatform.tiles.domain.TileGenerationParameters;
 import de.ii.xtraplatform.tiles.domain.TileMatrixPartitions;
 import de.ii.xtraplatform.tiles.domain.TileMatrixSetLimits;
 import de.ii.xtraplatform.tiles.domain.TileProvider;
@@ -37,7 +36,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -48,6 +46,7 @@ import org.threeten.extra.AmountFormats;
 
 @Singleton
 @AutoBind(interfaces = JobProcessorBase.class)
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobContextNone> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TileSeedingJobCreator.class);
@@ -73,6 +72,12 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
   }
 
   @Override
+  @SuppressWarnings({
+    "PMD.CognitiveComplexity",
+    "PMD.CyclomaticComplexity",
+    "PMD.AvoidDeeplyNestedIfStmts",
+    "PMD.AvoidInstantiatingObjectsInLoops"
+  })
   public JobResult process(PartialJob partialJob, Job jobSet, JobProcessing jobs) throws Exception {
     boolean isCleanup = TileSeedingJob.TYPE_CLEANUP.equals(partialJob.kind());
     TileSeedingJob seedingJobSet = getInputs(jobSet, jobs);
@@ -138,32 +143,6 @@ public class TileSeedingJobCreator implements JobProcessor<TileSeedingJob, JobCo
         TileMatrixPartitions tileStorePartitions =
             new TileMatrixPartitions(
                 tileProvider.seeding().get().getOptions().getEffectiveJobSize());
-
-        Map<String, List<String>> rasterForVector =
-            seedingJobSet.getTileSets().entrySet().stream()
-                .map(
-                    entry ->
-                        Map.entry(
-                            entry.getKey(),
-                            tileProvider.access().get().getMapStyles(entry.getKey()).stream()
-                                .map(
-                                    style ->
-                                        tileProvider
-                                            .access()
-                                            .get()
-                                            .getMapStyleTileset(entry.getKey(), style))
-                                .collect(Collectors.toList())))
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-
-        Map<String, TileGenerationParameters> rasterForVectorTilesets =
-            seedingJobSet.getTileSetParameters().entrySet().stream()
-                .flatMap(
-                    entry ->
-                        rasterForVector.get(entry.getKey()).stream()
-                            .map(rasterTileset -> Map.entry(rasterTileset, entry.getValue())))
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-        Map<String, Map<String, Set<TileMatrixSetLimits>>> rasterForVectorCoverage =
-            tileProvider.seeding().get().getRasterCoverage(rasterForVectorTilesets);
 
         tileProvider.seeding().get().setupSeeding(seedingJobSet);
 

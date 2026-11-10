@@ -10,6 +10,7 @@ package de.ii.xtraplatform.tiles.domain;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import java.util.Optional;
 
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface GenerationParameters {
   Optional<BoundingBox> getClipBoundingBox();
 }

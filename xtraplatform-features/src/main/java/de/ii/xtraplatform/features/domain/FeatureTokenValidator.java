@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.domain;
 
 import java.util.List;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,32 +19,39 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
   private final NestingTrackerBase<Object> nestingTracker;
 
   public FeatureTokenValidator() {
+    super();
     this.nestingTracker = new NestingTrackerBase<>();
   }
 
   @Override
   public void onFeatureStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("START FEATURE {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("START FEATURE {} {}", context.pathAsString(), context.indexes());
+    }
 
     super.onFeatureStart(context);
   }
 
   @Override
   public void onFeatureEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("END FEATURE {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("END FEATURE {} {}", context.pathAsString(), context.indexes());
+    }
 
     super.onFeatureEnd(context);
   }
 
   @Override
   public void onObjectStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("START OBJECT {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("START OBJECT {} {}", context.pathAsString(), context.indexes());
+    }
 
     if (nestingTracker.isNested() && nestingTracker.doesNotStartWithPreviousPath(context.path())) {
-      error(context.path(), Type.object, true);
+      error(context.path(), Type.OBJECT, true);
     }
     if (nestingTracker.inArray() && !nestingTracker.isSamePath(context.path())) {
-      error(context.path(), Type.object, true);
+      error(context.path(), Type.OBJECT, true);
     }
 
     nestingTracker.openObject(context.path());
@@ -53,10 +61,12 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onObjectEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("END OBJECT {} {}", context.pathAsString(), context.indexes());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("END OBJECT {} {}", context.pathAsString(), context.indexes());
+    }
 
     if (!nestingTracker.inObject() || !nestingTracker.isSamePath(context.path())) {
-      error(context.path(), Type.object, false);
+      error(context.path(), Type.OBJECT, false);
     }
 
     nestingTracker.closeObject();
@@ -66,12 +76,14 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onArrayStart(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("START ARRAY {}", context.pathAsString());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("START ARRAY {}", context.pathAsString());
+    }
     if (nestingTracker.isNested() && nestingTracker.doesNotStartWithPreviousPath(context.path())) {
-      error(context.path(), Type.array, true);
+      error(context.path(), Type.ARRAY, true);
     }
     if (nestingTracker.inArray()) {
-      error(context.path(), Type.array, true);
+      error(context.path(), Type.ARRAY, true);
     }
 
     nestingTracker.openArray(context.path());
@@ -81,9 +93,11 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onArrayEnd(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("END ARRAY {}", context.pathAsString());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("END ARRAY {}", context.pathAsString());
+    }
     if (!nestingTracker.inArray() || !nestingTracker.isSamePath(context.path())) {
-      error(context.path(), Type.array, false);
+      error(context.path(), Type.ARRAY, false);
     }
 
     nestingTracker.closeArray();
@@ -93,12 +107,14 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onValue(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("VALUE {} {}", context.pathAsString(), context.value());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("VALUE {} {}", context.pathAsString(), context.value());
+    }
     if (nestingTracker.isNested() && nestingTracker.doesNotStartWithPreviousPath(context.path())) {
-      error(context.path(), Type.value, true);
+      error(context.path(), Type.VALUE, true);
     }
     if (nestingTracker.inArray() && !nestingTracker.isSamePath(context.path())) {
-      error(context.path(), Type.value, true);
+      error(context.path(), Type.VALUE, true);
     }
 
     super.onValue(context);
@@ -106,15 +122,22 @@ public class FeatureTokenValidator extends FeatureTokenTransformer {
 
   @Override
   public void onGeometry(ModifiableContext<FeatureSchema, SchemaMapping> context) {
-    LOGGER.trace("GEOMETRY {} {}", context.pathAsString(), context.geometry());
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("GEOMETRY {} {}", context.pathAsString(), context.geometry());
+    }
 
     super.onGeometry(context);
   }
 
   private enum Type {
-    object,
-    array,
-    value
+    OBJECT,
+    ARRAY,
+    VALUE;
+
+    @Override
+    public String toString() {
+      return name().toLowerCase(Locale.ROOT);
+    }
   }
 
   private void error(List<String> path, Type type, boolean isOpen) {

@@ -18,17 +18,17 @@ public interface FeatureQueries {
 
   long getFeatureCount(String typeName);
 
-  // TODO: replace with capabilities
+  // NOTE: replace with capabilities
   default boolean supportsCql2() {
     return false;
   }
 
-  // TODO: replace with capabilities
+  // NOTE: replace with capabilities
   default boolean supportsAccenti() {
     return false;
   }
 
-  // TODO: replace with capabilities
+  // NOTE: replace with capabilities
   default boolean supportsIsNull() {
     return false;
   }
@@ -45,7 +45,7 @@ public interface FeatureQueries {
     throw new UnsupportedOperationException();
   }
 
-  // TODO: move to FeatureProvider2 or FeatureMetadata
+  // NOTE: move to FeatureProvider2 or FeatureMetadata
   FeatureSchema getQueryablesSchema(
       FeatureSchema schema,
       List<String> included,
@@ -53,7 +53,7 @@ public interface FeatureQueries {
       String pathSeparator,
       boolean cleanupKeys);
 
-  // TODO: move to FeatureProvider2 or FeatureMetadata
+  // NOTE: move to FeatureProvider2 or FeatureMetadata
   FeatureSchema getSortablesSchema(
       FeatureSchema schema, List<String> included, List<String> excluded, String pathSeparator);
 }

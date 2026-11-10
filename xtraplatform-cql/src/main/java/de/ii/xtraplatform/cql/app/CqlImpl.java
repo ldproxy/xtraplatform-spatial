@@ -224,6 +224,16 @@ public class CqlImpl implements Cql {
     return (Cql2Expression) cqlFilter.accept(visitor, true);
   }
 
+  @Override
+  public Cql2Expression mapAbsentProperties(
+      Cql2Expression cqlFilter, Set<String> absentProperties) {
+    if (absentProperties.isEmpty()) {
+      return cqlFilter;
+    }
+
+    return new CqlAbsentPropertiesMapper(absentProperties).map(cqlFilter);
+  }
+
   static class IntervalConverter extends StdConverter<Interval, List<String>> {
 
     @Override

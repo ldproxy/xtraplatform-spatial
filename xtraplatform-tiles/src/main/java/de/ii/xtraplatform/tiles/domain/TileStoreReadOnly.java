@@ -16,7 +16,7 @@ public interface TileStoreReadOnly {
 
   TileResult get(TileQuery tile) throws IOException;
 
-  Optional<Boolean> isEmpty(TileQuery tile) throws IOException;
+  Optional<Boolean> isEmpty(TileQuery tile) throws IOException; // NOPMD
 
   boolean isEmpty() throws IOException;
 

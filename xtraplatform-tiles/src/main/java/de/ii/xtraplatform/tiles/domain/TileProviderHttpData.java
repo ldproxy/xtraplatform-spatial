@@ -14,9 +14,9 @@ import de.ii.xtraplatform.docs.DocStep.Step;
 import de.ii.xtraplatform.docs.DocTable;
 import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.docs.DocVar;
-import de.ii.xtraplatform.entities.domain.EntityDataBuilder;
 import de.ii.xtraplatform.entities.domain.EntityDataDefaults;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
@@ -118,7 +118,8 @@ import org.immutables.value.Value;
 public interface TileProviderHttpData extends TileProviderData {
 
   String PROVIDER_SUBTYPE = "HTTP";
-  String ENTITY_SUBTYPE = String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase();
+  String ENTITY_SUBTYPE =
+      String.format("%s/%s", PROVIDER_TYPE, PROVIDER_SUBTYPE).toLowerCase(Locale.ROOT);
 
   /**
    * @langEn Always `HTTP`.
@@ -145,8 +146,7 @@ public interface TileProviderHttpData extends TileProviderData {
   @Override
   BuildableMap<TilesetHttp, ImmutableTilesetHttp.Builder> getTilesets();
 
-  abstract class Builder extends TileProviderData.Builder<ImmutableTileProviderHttpData.Builder>
-      implements EntityDataBuilder<TileProviderData> {
+  abstract class Builder extends TileProviderData.Builder<ImmutableTileProviderHttpData.Builder> {
     @Override
     public ImmutableTileProviderHttpData.Builder fillRequiredFieldsWithPlaceholders() {
       return this.id(EntityDataDefaults.PLACEHOLDER)
