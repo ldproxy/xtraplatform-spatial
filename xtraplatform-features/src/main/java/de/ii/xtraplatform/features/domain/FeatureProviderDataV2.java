@@ -219,6 +219,19 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
   @Override
   Optional<Boolean> getAuto();
 
+  /**
+   * @langEn Optional spatial (in the native CRS) and temporal extent for all types in this
+   *     provider. If set, the extent is not computed from the data. SQL providers also restrict
+   *     queries for multiple features to the extent, see `queryGeneration`; other providers do not
+   *     restrict queries.
+   * @langDe Optionaler räumlicher (im nativen Koordinatenreferenzsystem) und zeitlicher Extent für
+   *     alle Types dieses Providers. Wenn gesetzt, wird der Extent nicht aus den Daten berechnet.
+   *     SQL-Provider schränken zudem Abfragen mehrerer Features auf den Extent ein, siehe
+   *     `queryGeneration`; andere Provider schränken Abfragen nicht ein.
+   * @since v4.9
+   */
+  Optional<Extent> getExtent();
+
   // custom builder to automatically use keys of types as name of FeatureTypeV2
   abstract class Builder<T extends Builder<T>> implements EntityDataBuilder<FeatureProviderDataV2> {
 

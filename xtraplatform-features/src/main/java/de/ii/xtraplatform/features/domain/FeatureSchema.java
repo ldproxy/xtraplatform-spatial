@@ -402,6 +402,18 @@ public interface FeatureSchema
   Optional<String> getDescription();
 
   /**
+   * @langEn Optional spatial (in the native CRS) and temporal extent for this feature type. Each
+   *     part replaces the same part of the extent of the provider. SQL providers also restrict
+   *     queries for multiple features to the extent, see `queryGeneration`.
+   * @langDe Optionaler räumlicher (im nativen Koordinatenreferenzsystem) und zeitlicher Extent für
+   *     diesen Feature-Type. Jeder Teil ersetzt denselben Teil des Extents des Providers.
+   *     SQL-Provider schränken zudem Abfragen mehrerer Features auf den Extent ein, siehe
+   *     `queryGeneration`.
+   * @since v4.9
+   */
+  Optional<Extent> getExtent();
+
+  /**
    * @langEn The unit of measurement of the value, only relevant for numeric properties.
    * @langDe Die Maßeinheit des Wertes, nur relevant bei numerischen Eigenschaften.
    */

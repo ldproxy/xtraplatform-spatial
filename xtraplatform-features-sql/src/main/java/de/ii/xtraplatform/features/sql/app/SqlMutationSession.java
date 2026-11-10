@@ -156,9 +156,10 @@ public class SqlMutationSession implements FeatureTransactions.Session {
             .hasFeatures(false);
 
     List<FeatureDataSql> collected = new ArrayList<>();
+    FeatureTokenStatsCollector.Stats stats = new FeatureTokenStatsCollector.Stats(crs);
     try {
       for (FeatureTokenSource src : featureTokenSources) {
-        drainSource(src, mapping, crs, builder, collected, false);
+        drainSource(src, mapping, crs, stats, collected, false);
       }
     } catch (RuntimeException e) {
       return builder.error(translateEncoderError(e)).build();
@@ -172,7 +173,9 @@ public class SqlMutationSession implements FeatureTransactions.Session {
       for (FeatureDataSql feature : collected) {
         applyRoleOverrides(feature, roleOverrides);
       }
+      stats.applyRoleOverrides(roleOverrides);
     }
+    stats.writeTo(builder);
 
     RowCursor rowCursor = new RowCursor(mapping.getMainTable().getFullPath());
 
@@ -1721,11 +1724,13 @@ public class SqlMutationSession implements FeatureTransactions.Session {
         ImmutableMutationResult.builder().type(type).hasFeatures(false);
 
     List<FeatureDataSql> collected = new ArrayList<>();
+    FeatureTokenStatsCollector.Stats stats = new FeatureTokenStatsCollector.Stats(crs);
     try {
-      drainSource(featureTokenSource, mapping, crs, builder, collected, partial);
+      drainSource(featureTokenSource, mapping, crs, stats, collected, partial);
     } catch (RuntimeException e) {
       return builder.error(translateEncoderError(e)).build();
     }
+    stats.writeTo(builder);
 
     RowCursor rowCursor = new RowCursor(mapping.getMainTable().getFullPath());
     boolean deleteFirst =
@@ -1743,17 +1748,16 @@ public class SqlMutationSession implements FeatureTransactions.Session {
 
   // Assembles the token-source → FeatureEncoderSql pipeline and drains it into `collected`. A
   // fresh FeatureTokenStatsCollector is instantiated per source so internal transformer state
-  // doesn't leak across runs; the result builder is shared, so accumulated stats (bbox, temporal
-  // extent) overwrite per source — matching the existing single-source-multi-feature semantics
-  // where the last feature's stats win.
+  // doesn't leak across runs; the stats are shared, so the extents (bbox, temporal extent) cover
+  // the features of all sources.
   private void drainSource(
       FeatureTokenSource featureTokenSource,
       SqlQueryMapping mapping,
       EpsgCrs crs,
-      ImmutableMutationResult.Builder builder,
+      FeatureTokenStatsCollector.Stats stats,
       List<FeatureDataSql> collected,
       boolean partial) {
-    FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(builder, crs);
+    FeatureTokenStatsCollector statsCollector = new FeatureTokenStatsCollector(stats, partial);
 
     Source<FeatureDataSql> featureSqlSource =
         featureTokenSource

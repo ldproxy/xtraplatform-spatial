@@ -13,6 +13,7 @@ import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.Extent;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -37,6 +38,20 @@ public interface TilesetMbTiles extends TilesetCommon, Buildable<TilesetMbTiles>
    * @since v3.4
    */
   String getSource();
+
+  /**
+   * @langEn Fixed extent of the tileset, only `spatial` in CRS84 (longitude/latitude). If set,
+   *     `bounds` from the MBTiles metadata is ignored.
+   * @langDe Fester Extent des Tilesets, nur `spatial` in CRS84 (Länge/Breite). Wenn gesetzt, wird
+   *     `bounds` aus den MBTiles-Metadaten ignoriert.
+   * @since v4.9
+   */
+  Optional<Extent> getExtent();
+
+  @Value.Check
+  default void checkExtentIsSpatial() {
+    Extent.checkSpatialOnly(getExtent());
+  }
 
   /**
    * @langEn Tile Matrix Set of the tiles in the MBTiles file.

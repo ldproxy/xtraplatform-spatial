@@ -18,6 +18,7 @@ import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.entities.domain.Entity;
 import de.ii.xtraplatform.entities.domain.Entity.SubType;
+import de.ii.xtraplatform.features.domain.Extent;
 import de.ii.xtraplatform.features.domain.FeatureSchema;
 import de.ii.xtraplatform.features.domain.ProviderData;
 import de.ii.xtraplatform.tiles.domain.ChainedTileProvider;
@@ -175,12 +176,24 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
         (key, path) -> {
           Tuple<String, String> tilesetKey = toTuple(key);
 
-          metadata.put(tilesetKey.first(), loadMetadata(tilesetKey.second(), path));
+          TilesetMbTiles tileset =
+              getData()
+                  .getTilesets()
+                  .get(tilesetKey.first())
+                  .mergeDefaults(getData().getTilesetDefaults());
+          Optional<BoundingBox> configuredExtent =
+              Extent.inherit(tileset.getExtent(), getData().getTilesetDefaults().getExtent())
+                  .getSpatial()
+                  .flatMap(extent -> extent.toBoundingBox(OgcCrs.CRS84));
+
+          metadata.put(
+              tilesetKey.first(), loadMetadata(tilesetKey.second(), path, configuredExtent));
           tmsRanges.put(tilesetKey.first(), metadata.get(tilesetKey.first()).getTmsRanges());
         });
   }
 
-  private TilesetMetadata loadMetadata(String tms, Path path) {
+  private TilesetMetadata loadMetadata(
+      String tms, Path path, Optional<BoundingBox> configuredExtent) {
     try {
       MbtilesMetadata metadata = new MbtilesTileset(path, false).getMetadata();
       TileMatrixSet tileMatrixSet =
@@ -208,11 +221,12 @@ public class TileProviderMbTiles extends AbstractTileProvider<TileProviderMbtile
               tms,
               new ImmutableMinMax.Builder().min(minzoom).max(maxzoom).getDefault(defzoom).build());
       List<Double> bbox = metadata.getBounds();
-      Optional<BoundingBox> bounds =
+      Optional<BoundingBox> boundsFromMetadata =
           bbox.size() == 4
               ? Optional.of(
                   BoundingBox.of(bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3), OgcCrs.CRS84))
               : Optional.empty();
+      Optional<BoundingBox> bounds = configuredExtent.or(() -> boundsFromMetadata);
       TilesFormat format = metadata.getFormat();
       List<FeatureSchema> vectorSchemas =
           metadata.getVectorLayers().stream()

@@ -41,7 +41,8 @@ class SqlDialectPostGisSpec extends Specification {
         when:
             Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(null, end, ZoneId.of("UTC"))
         then:
-            interval.isEmpty()
+            interval.get().isUnboundedStart()
+            interval.get().getEnd().toString() == "2015-12-21T22:17:56Z"
     }
 
     def 'Temporal extent end is null'() {
@@ -57,7 +58,8 @@ class SqlDialectPostGisSpec extends Specification {
         when:
             Optional<Interval> interval = sqlDialectPostGis.parseTemporalExtent(null, null, ZoneId.of("UTC"))
         then:
-            interval.isEmpty()
+            interval.get().isUnboundedStart()
+            interval.get().isUnboundedEnd()
     }
 
     def 'Temporal extent start > end'() {

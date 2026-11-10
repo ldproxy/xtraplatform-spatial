@@ -12,6 +12,7 @@ import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.Extent;
 import java.util.Map;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -39,6 +40,20 @@ public interface TilesetHttp extends TilesetCommon, WithEncodings, Buildable<Til
   @DocIgnore
   @Override
   Map<TilesFormat, String> getEncodings();
+
+  /**
+   * @langEn Fixed extent of the tileset, only `spatial` in CRS84 (longitude/latitude). If not set,
+   *     the extent of the tile matrix sets is used.
+   * @langDe Fester Extent des Tilesets, nur `spatial` in CRS84 (Länge/Breite). Wenn nicht gesetzt,
+   *     wird der Extent der Kachelschemas verwendet.
+   * @since v4.9
+   */
+  Optional<Extent> getExtent();
+
+  @Value.Check
+  default void checkExtentIsSpatial() {
+    Extent.checkSpatialOnly(getExtent());
+  }
 
   /**
    * @langEn URL template for accessing tiles. Parameters to use are `{{tileMatrix}}`,
