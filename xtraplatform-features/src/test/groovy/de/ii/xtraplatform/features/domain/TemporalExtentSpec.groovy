@@ -33,7 +33,15 @@ class TemporalExtentSpec extends Specification {
         expect:
         extent(null, "2020-12-31").toInterval().get().isUnboundedStart()
         extent("2020-01-01", null).toInterval().get().isUnboundedEnd()
-        extent(null, null).toInterval().isEmpty()
+    }
+
+    def "an extent without start, end and computed is rejected"() {
+        when: 'an empty object, which would otherwise silently stop the inheritance'
+        extent(null, null)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "TemporalExtent: set 'start', 'end' or 'computed: true'."
     }
 
     def "invalid extent '#start' / '#end' is rejected"() {

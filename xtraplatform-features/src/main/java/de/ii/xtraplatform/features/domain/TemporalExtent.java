@@ -52,11 +52,13 @@ public interface TemporalExtent {
 
   /**
    * @langEn Set to `true` to compute the extent from the data instead of inheriting a fixed extent
-   *     from the parent level (provider for types). Must not be combined with `start` or `end`;
-   *     `false` is not allowed.
+   *     from the parent level (provider for types). Without a fixed extent on the parent level,
+   *     this is the same as omitting the extent. Either `start`, `end` or both, or `computed: true`
+   *     must be set; `false` is not allowed.
    * @langDe Auf `true` setzen, um den Extent aus den Daten zu berechnen, statt einen festen Extent
-   *     der übergeordneten Ebene (Provider für Types) zu erben. Darf nicht mit `start` oder `end`
-   *     kombiniert werden; `false` ist nicht erlaubt.
+   *     der übergeordneten Ebene (Provider für Types) zu erben. Ohne festen Extent auf der
+   *     übergeordneten Ebene ist das dasselbe, wie den Extent wegzulassen. Anzugeben sind entweder
+   *     `start`, `end` oder beide oder `computed: true`; `false` ist nicht erlaubt.
    * @since v4.9
    */
   @Nullable
@@ -85,6 +87,10 @@ public interface TemporalExtent {
     Preconditions.checkState(
         !(hasBounds && Boolean.TRUE.equals(getComputed())),
         "TemporalExtent: 'computed' and explicit start/end must not be set at the same time.");
+
+    Preconditions.checkState(
+        hasBounds || Boolean.TRUE.equals(getComputed()),
+        "TemporalExtent: set 'start', 'end' or 'computed: true'.");
 
     try {
       toInterval();

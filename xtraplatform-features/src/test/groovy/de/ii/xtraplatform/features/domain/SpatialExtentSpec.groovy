@@ -27,6 +27,15 @@ class SpatialExtentSpec extends Specification {
         thrown(IllegalStateException)
     }
 
+    def "an extent without coordinates and computed is rejected"() {
+        when: 'an empty object, which would otherwise silently stop the inheritance'
+        new ImmutableSpatialExtent.Builder().build()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "SpatialExtent: set the coordinates or 'computed: true'."
+    }
+
     def "computed must not be combined with coordinates"() {
         when:
         new ImmutableSpatialExtent.Builder().xmin(0).ymin(0).xmax(1).ymax(1).computed(true).build()
