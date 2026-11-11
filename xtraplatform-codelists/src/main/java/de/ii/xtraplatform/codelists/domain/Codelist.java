@@ -7,11 +7,9 @@
  */
 package de.ii.xtraplatform.codelists.domain;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import de.ii.xtraplatform.docs.DocFile;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.docs.DocStep;
@@ -21,8 +19,8 @@ import de.ii.xtraplatform.docs.DocTable.ColumnSet;
 import de.ii.xtraplatform.values.domain.StoredValue;
 import de.ii.xtraplatform.values.domain.ValueBuilder;
 import de.ii.xtraplatform.values.domain.annotations.FromValueStore;
-import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -74,15 +72,16 @@ import org.immutables.value.Value;
  *   water: Wasser
  * ```
  * </code>
- * @langEn If the codelist is just an enumeration of values without separate labels, `entries` can
- *     also be a list of the values. Each value is then also its own label:
- * @langDe Ist die Codelist nur eine Aufzählung von Werten ohne eigene Bezeichnungen, dann kann
- *     `entries` auch eine Liste der Werte sein. Jeder Wert ist dann zugleich seine Bezeichnung:
+ * @langEn If the codelist is just an enumeration of values without separate labels, the values can
+ *     be listed in `enum` instead of `entries`. Each value is then also its own label:
+ * @langDe Ist die Codelist nur eine Aufzählung von Werten ohne eigene Bezeichnungen, dann können
+ *     die Werte statt in `entries` als Liste in `enum` angegeben werden. Jeder Wert ist dann
+ *     zugleich seine Bezeichnung:
  * @langAll <code>
  * ```yaml
  * ---
  * label: Gebäudefunktion
- * entries:
+ * enum:
  *   - Wohngebäude
  *   - Bürogebäude
  *   - Lagerhalle
@@ -151,14 +150,28 @@ public interface Codelist extends StoredValue {
 
   /**
    * @langEn Map with the original value as key and the new value as value. For a codelist that is
-   *     just an enumeration, a list of the values, each value is then mapped to itself.
+   *     just an enumeration, list the values in `enum` instead, each value is then mapped to
+   *     itself.
    * @langDe Jeder Eintrag bildet einen Original-Wert auf den neuen Wert ab. Für eine Codelist, die
-   *     nur eine Aufzählung ist, eine Liste der Werte, jeder Wert wird dann auf sich selbst
-   *     abgebildet.
+   *     nur eine Aufzählung ist, werden die Werte stattdessen in `enum` aufgelistet, jeder Wert
+   *     wird dann auf sich selbst abgebildet.
    * @default `{}`
    */
-  @JsonDeserialize(using = EntriesDeserializer.class)
   Map<String, String> getEntries();
+
+  /**
+   * @langEn For a codelist that is just an enumeration, the list of values. Each value is added to
+   *     `entries` with itself as the new value; a value that is already a key in `entries` keeps
+   *     the value from `entries`.
+   * @langDe Für eine Codelist, die nur eine Aufzählung ist, die Liste der Werte. Jeder Wert wird in
+   *     `entries` mit sich selbst als neuem Wert übernommen; ist ein Wert bereits ein Schlüssel in
+   *     `entries`, gilt der Wert aus `entries`.
+   * @default `[]`
+   * @since v4.9
+   */
+  @JsonProperty("enum")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  List<String> getEnumeration();
 
   /**
    * @langEn Always `TEMPLATES`.
@@ -177,45 +190,24 @@ public interface Codelist extends StoredValue {
    */
   Optional<String> getFallback();
 
-  default String getValue(String key) {
-    return Optional.ofNullable(getEntries().get(key)).orElse(getFallback().orElse(key));
+  /** Moves the values of `enum` into the entries, each value being its own label. */
+  @Value.Check
+  default Codelist normalizeEnumeration() {
+    if (getEnumeration().isEmpty()) {
+      return this;
+    }
+
+    Map<String, String> entries = new LinkedHashMap<>(getEntries());
+    getEnumeration().forEach(value -> entries.putIfAbsent(value, value));
+
+    return new ImmutableCodelist.Builder()
+        .from(this)
+        .entries(entries)
+        .enumeration(List.of())
+        .build();
   }
 
-  /**
-   * Reads `entries` either as a map from code to label or, for an enumeration, as a list of codes
-   * where each code is also its label.
-   */
-  class EntriesDeserializer extends StdDeserializer<Map<String, String>> {
-
-    private static final long serialVersionUID = 1L;
-
-    public EntriesDeserializer() {
-      super(Map.class);
-    }
-
-    @Override
-    public Map<String, String> deserialize(JsonParser parser, DeserializationContext context)
-        throws IOException {
-      if (!parser.isExpectedStartArrayToken()) {
-        return context.readValue(
-            parser,
-            context
-                .getTypeFactory()
-                .constructMapType(LinkedHashMap.class, String.class, String.class));
-      }
-
-      Map<String, String> entries = new LinkedHashMap<>();
-      JsonToken token = parser.nextToken();
-      while (token != JsonToken.END_ARRAY) {
-        if (token == null || !token.isScalarValue() || token == JsonToken.VALUE_NULL) {
-          return context.reportInputMismatch(
-              this, "A codelist enumeration must be a list of values, found: %s", token);
-        }
-        String value = parser.getValueAsString();
-        entries.put(value, value);
-        token = parser.nextToken();
-      }
-      return entries;
-    }
+  default String getValue(String key) {
+    return Optional.ofNullable(getEntries().get(key)).orElse(getFallback().orElse(key));
   }
 }

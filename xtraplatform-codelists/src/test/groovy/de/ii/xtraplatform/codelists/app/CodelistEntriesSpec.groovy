@@ -41,11 +41,11 @@ entries:
         codelist.getValue('11') == 'Load Bearing'
     }
 
-    def "entries as a list of values are an enumeration with the value as label"() {
+    def "values in enum are an enumeration with the value as label"() {
         when:
         Codelist codelist = read('''\
 label: Gebäudefunktion
-entries:
+enum:
   - Wohngebäude
   - Bürogebäude
   - 1000
@@ -60,12 +60,55 @@ entries:
     def "an enumeration with a nested value is rejected"() {
         when:
         read('''\
-entries:
+enum:
   - a
   - b: c
 ''')
 
         then:
         thrown(MismatchedInputException)
+    }
+
+    def "a list in entries is rejected"() {
+        when:
+        read('''\
+entries:
+  - a
+  - b
+''')
+
+        then:
+        thrown(MismatchedInputException)
+    }
+
+    def "enum and entries are combined"(String payload) {
+        when:
+        Codelist codelist = read(payload)
+
+        then:
+        codelist.getEntries() == ['a': 'A', 'b': 'b']
+        codelist.getEnumeration().isEmpty()
+        !yaml.valueToTree(codelist).has('enum')
+
+        where:
+        payload << [
+            'entries:\n  a: A\nenum:\n  - b\n',
+            'enum:\n  - b\nentries:\n  a: A\n'
+        ]
+    }
+
+    def "a value in enum that is also a key in entries keeps the label from entries"() {
+        when:
+        Codelist codelist = read('''\
+entries:
+  a: A
+enum:
+  - a
+  - b
+  - b
+''')
+
+        then:
+        codelist.getEntries() == ['a': 'A', 'b': 'b']
     }
 }
