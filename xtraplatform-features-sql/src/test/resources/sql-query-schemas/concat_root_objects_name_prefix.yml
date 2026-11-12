@@ -1,0 +1,21 @@
+---
+- name: schulen
+  pathSegment: schulen
+  columns:
+  - name: id
+    pathSegment: id
+    type: INTEGER
+    role: ID
+  - name: name
+    pathSegment: name
+    type: STRING
+- name: schulen_erkr
+  pathSegment: schulen_erkr
+  columns:
+  - name: id
+    pathSegment: id
+    type: INTEGER
+    role: ID
+  - name: name
+    pathSegment: name
+    type: STRING

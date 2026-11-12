@@ -69,6 +69,7 @@ class SqlMappingDeriverSpec extends Specification {
         "merge object connector"                      | "merge_object_connector"                     || "connector_object"
         "concat object arrays"                        | "pfs_plan-hatObjekt"                         || "pfs_plan-hatObjekt"
         "concat root objects"                         | "concat_root_objects"                        || "concat_root_objects"
+        "concat root objects with name prefix"        | "concat_root_objects_name_prefix"            || "concat_root_objects_name_prefix"
         "long value path overlap"                     | "long_value_path_overlap"                    || "long_value_path_overlap"
         "self join with nested duplicate and filters" | "okstra_abschnitt"                           || "okstra_abschnitt"
         "embedded object with concat and backlink"    | "pfs_plan-hatObjekt-embedded"                || "pfs_plan-hatObjekt-embedded"

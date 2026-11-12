@@ -1,0 +1,27 @@
+---
+- source: /schulen
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /schulen/id
+  target: 0_id
+  type: INTEGER
+  role: ID
+  index: 0
+- source: /schulen/name
+  target: 0_name
+  type: STRING
+  index: 0
+- source: /schulen_erkr
+  target: $
+  type: OBJECT_ARRAY
+  index: 0
+- source: /schulen_erkr/id
+  target: 1_id
+  type: INTEGER
+  role: ID
+  index: 0
+- source: /schulen_erkr/name
+  target: 1_name
+  type: STRING
+  index: 0
