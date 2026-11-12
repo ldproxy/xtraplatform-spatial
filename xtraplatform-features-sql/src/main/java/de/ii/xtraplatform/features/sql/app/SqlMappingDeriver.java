@@ -89,7 +89,7 @@ public class SqlMappingDeriver {
         break;
       }
 
-      while (mappingRules.get(j).getSource().startsWith(rule.getSource())) {
+      while (isSameOrNestedPath(mappingRules.get(j).getSource(), rule.getSource())) {
         MappingRule columnRule = mappingRules.get(j);
 
         if (pathParser.isTablePath(columnRule.getSource())) {
@@ -562,5 +562,10 @@ public class SqlMappingDeriver {
     }
 
     return operations;
+  }
+
+  // a plain prefix check would treat "/schulen_erkr" as nested in "/schulen"
+  private static boolean isSameOrNestedPath(String path, String tablePath) {
+    return path.equals(tablePath) || path.startsWith(tablePath + "/");
   }
 }
