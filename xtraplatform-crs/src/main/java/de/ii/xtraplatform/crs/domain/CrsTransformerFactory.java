@@ -20,4 +20,25 @@ public interface CrsTransformerFactory extends Volatile2 {
   Optional<CrsTransformer> getTransformer(EpsgCrs sourceCrs, EpsgCrs targetCrs);
 
   Optional<CrsTransformer> getTransformer(EpsgCrs sourceCrs, EpsgCrs targetCrs, boolean force2d);
+
+  /**
+   * Returns a transformer that is selected for an area of interest. When several coordinate
+   * operations between the two coordinate reference systems are available, the most accurate one
+   * whose area of use contains the area of interest is chosen, e.g. a regional grid instead of a
+   * national one. Without an area of interest, or with an area that covers the whole world, the
+   * selection is the same as for {@link #getTransformer(EpsgCrs, EpsgCrs, boolean)}.
+   *
+   * @param areaOfInterest the area of interest, a box in any supported coordinate reference system
+   */
+  Optional<CrsTransformer> getTransformer(
+      EpsgCrs sourceCrs, EpsgCrs targetCrs, boolean force2d, Optional<BoundingBox> areaOfInterest);
+
+  /**
+   * Returns a view of this factory that selects all transformers for the given area of interest,
+   * see {@link #getTransformer(EpsgCrs, EpsgCrs, boolean, Optional)}. All other methods delegate to
+   * this factory. If this factory also implements {@link CrsInfo}, so does the view.
+   */
+  default CrsTransformerFactory withAreaOfInterest(BoundingBox areaOfInterest) {
+    return CrsTransformerFactoryForArea.of(this, areaOfInterest);
+  }
 }
