@@ -350,6 +350,27 @@ class GeometryWktWkbSpec extends Specification {
         new GeometryEncoderWkt().encode(new GeometryDecoderWkb().decode(new GeometryEncoderWkb().encode(geometry))) == wkt
     }
 
+    def 'GEOMETRYCOLLECTION with curve members'() {
+        given:
+        String wkt = "GEOMETRYCOLLECTION(CURVEPOLYGON(COMPOUNDCURVE(CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0),(2.0 0.0,0.0 0.0))),MULTISURFACE(CURVEPOLYGON((1.0 1.0,2.0 2.0,2.0 1.0,1.0 1.0))),GEOMETRYCOLLECTION(CIRCULARSTRING(0.0 0.0,1.0 1.0,2.0 0.0)))"
+        when:
+        Geometry geometry = new GeometryDecoderWkt().decode(wkt)
+        then:
+        geometry.getType() == GeometryType.GEOMETRY_COLLECTION
+        ((GeometryCollection) geometry).getValue()*.getType() == [GeometryType.CURVE_POLYGON, GeometryType.MULTI_SURFACE, GeometryType.GEOMETRY_COLLECTION]
+        ((GeometryCollection) ((GeometryCollection) geometry).getValue().get(2)).getValue().get(0).getType() == GeometryType.CIRCULAR_STRING
+        new GeometryEncoderWkt().encode(geometry) == wkt
+        new GeometryEncoderWkt().encode(new GeometryDecoderWkb().decode(new GeometryEncoderWkb().encode(geometry))) == wkt
+    }
+
+    def 'GEOMETRYCOLLECTION with curve members as simple feature'() {
+        when:
+        new GeometryDecoderWkt().decodeSimpleFeature("GEOMETRYCOLLECTION(POINT(10.0 10.0),CURVEPOLYGON(CIRCULARSTRING(0.0 0.0,1.0 1.0,0.0 2.0,-1.0 -1.0,0.0 0.0)))", Optional.empty())
+        then:
+        IllegalStateException e = thrown()
+        e.message.startsWith("Unexpected geometry type CURVE_POLYGON")
+    }
+
     def 'POLYHEDRALSURFACE XY'() {
         given:
         String wkt = "POLYHEDRALSURFACE(((0.0 0.0,0.0 1.0,1.0 1.0,0.0 0.0)),((0.0 0.0,1.0 1.0,1.0 0.0,0.0 0.0)))"

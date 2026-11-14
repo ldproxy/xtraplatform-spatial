@@ -21,17 +21,16 @@ import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
+import de.ii.xtraplatform.geometries.domain.AbstractGeometryCollection;
 import de.ii.xtraplatform.geometries.domain.Axes;
+import de.ii.xtraplatform.geometries.domain.CompositeGeometry;
+import de.ii.xtraplatform.geometries.domain.CurvePolygon;
 import de.ii.xtraplatform.geometries.domain.Geometry;
-import de.ii.xtraplatform.geometries.domain.GeometryCollection;
-import de.ii.xtraplatform.geometries.domain.LineString;
-import de.ii.xtraplatform.geometries.domain.MultiLineString;
-import de.ii.xtraplatform.geometries.domain.MultiPoint;
-import de.ii.xtraplatform.geometries.domain.MultiPolygon;
 import de.ii.xtraplatform.geometries.domain.Point;
 import de.ii.xtraplatform.geometries.domain.Polygon;
 import de.ii.xtraplatform.geometries.domain.Position;
 import de.ii.xtraplatform.geometries.domain.PositionList;
+import de.ii.xtraplatform.geometries.domain.SingleCurve;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -77,40 +76,37 @@ public class CqlCoordinateChecker extends CqlVisitorBase<Object> {
     return ((CqlNode) spatialLiteral.getValue()).accept(this);
   }
 
+  // a flat dispatch with one case per geometry type; each case adds to the count
+  @SuppressWarnings("PMD.CyclomaticComplexity")
   @Override
   public Object visit(GeometryNode geometry2, List<Object> children) {
     Geometry<?> geom = geometry2.getGeometry();
     switch (geom.getType()) {
-      case POINT:
-        checkPosition(((Point) geom).getValue());
-        return null;
-      case LINE_STRING:
-        PositionList posList = ((LineString) geom).getValue();
+      case POINT -> checkPosition(((Point) geom).getValue());
+      case LINE_STRING, CIRCULAR_STRING -> {
+        PositionList posList = ((SingleCurve) geom).getValue();
         IntStream.range(0, posList.getNumPositions()).forEach(i -> checkPosition(posList.get(i)));
-        return null;
-      case POLYGON:
-        ((Polygon) geom).getValue().forEach(ring -> GeometryNode.of(ring).accept(this));
-        return null;
-      case MULTI_POINT:
-        ((MultiPoint) geom).getValue().forEach(point -> GeometryNode.of(point).accept(this));
-        return null;
-      case MULTI_LINE_STRING:
-        ((MultiLineString) geom)
-            .getValue()
-            .forEach(lineString -> GeometryNode.of(lineString).accept(this));
-        return null;
-      case MULTI_POLYGON:
-        ((MultiPolygon) geom).getValue().forEach(polygon -> GeometryNode.of(polygon).accept(this));
-        return null;
-      case GEOMETRY_COLLECTION:
-        ((GeometryCollection) geom)
-            .getValue()
-            .forEach(geometry -> GeometryNode.of(geometry).accept(this));
-        return null;
-      default:
-        throw new IllegalStateException(
-            String.format("Unsupported geometry type: %s", geom.getType()));
+      }
+      case POLYGON -> checkParts(((Polygon) geom).getValue());
+      case CURVE_POLYGON -> checkParts(((CurvePolygon) geom).getValue());
+      case COMPOUND_CURVE, POLYHEDRAL_SURFACE ->
+          checkParts(((CompositeGeometry<?>) geom).getValue());
+      case MULTI_POINT,
+          MULTI_LINE_STRING,
+          MULTI_POLYGON,
+          MULTI_CURVE,
+          MULTI_SURFACE,
+          GEOMETRY_COLLECTION ->
+          checkParts(((AbstractGeometryCollection<?>) geom).getValue());
+      default ->
+          throw new IllegalStateException(
+              String.format("Unsupported geometry type: %s", geom.getType()));
     }
+    return null;
+  }
+
+  private void checkParts(List<? extends Geometry<?>> parts) {
+    parts.forEach(part -> GeometryNode.of(part).accept(this));
   }
 
   @Override

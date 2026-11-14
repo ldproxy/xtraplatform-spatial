@@ -173,21 +173,7 @@ public class GeometryDecoderWkt extends AbstractGeometryDecoder {
                   Set.of(GeometryType.POLYGON, GeometryType.CURVE_POLYGON)),
               crs);
       case GEOMETRY_COLLECTION ->
-          geometryCollection(
-              readListOf(
-                  tokenizer,
-                  crs,
-                  axes,
-                  null,
-                  Set.of(
-                      GeometryType.POINT,
-                      GeometryType.LINE_STRING,
-                      GeometryType.POLYGON,
-                      GeometryType.MULTI_POINT,
-                      GeometryType.MULTI_LINE_STRING,
-                      GeometryType.MULTI_POLYGON,
-                      GeometryType.GEOMETRY_COLLECTION)),
-              crs);
+          geometryCollection(readListOf(tokenizer, crs, axes, null, allowedTypes), crs);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
   }

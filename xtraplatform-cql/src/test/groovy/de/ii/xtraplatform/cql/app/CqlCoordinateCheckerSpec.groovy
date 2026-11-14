@@ -17,6 +17,9 @@ import de.ii.xtraplatform.crs.domain.EpsgCrs
 import de.ii.xtraplatform.crs.domain.OgcCrs
 import de.ii.xtraplatform.crs.infra.CrsTransformerFactoryProj
 import de.ii.xtraplatform.geometries.domain.Axes
+import de.ii.xtraplatform.geometries.domain.Geometry
+import de.ii.xtraplatform.geometries.domain.GeometryCollection
+import de.ii.xtraplatform.geometries.domain.transcode.wktwkb.GeometryDecoderWkt
 import de.ii.xtraplatform.geometries.domain.MultiLineString
 import de.ii.xtraplatform.geometries.domain.LineString
 import de.ii.xtraplatform.geometries.domain.MultiPolygon
@@ -373,6 +376,56 @@ class CqlCoordinateCheckerSpec extends Specification {
 
         thrown IllegalArgumentException
 
+    }
+
+
+    def 'Curve geometries'() {
+        given:
+        CqlCoordinateChecker checker = new CqlCoordinateChecker((CrsTransformerFactory) transformerFactory, (CrsInfo) transformerFactory, EpsgCrs.of(25832), EpsgCrs.of(25832))
+        Geometry<?> geometry = new GeometryDecoderWkt().decode(wkt, Optional.of(EpsgCrs.of(25832)))
+
+        when:
+        SIntersects.of(Property.of("position"), SpatialLiteral.of(geometry)).accept(checker)
+
+        then:
+        noExceptionThrown()
+
+        where:
+        wkt << [
+                "CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050)",
+                "COMPOUNDCURVE (CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050), (453200 5538050, 453200 5538300))",
+                "CURVEPOLYGON (COMPOUNDCURVE (CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050), (453200 5538050, 453200 5538300, 452900 5538300, 452900 5538050)))",
+                "CURVEPOLYGON (COMPOUNDCURVE ((452900 5538050, 453200 5538050), (453200 5538050, 453200 5538300, 452900 5538300, 452900 5538050)))",
+                "MULTICURVE ((452900 5538050, 453200 5538050), CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050))",
+                "MULTISURFACE (CURVEPOLYGON (CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050, 453050 5538150, 452900 5538050)), ((453300 5538050, 453400 5538050, 453400 5538150, 453300 5538050)))",
+        ]
+    }
+
+    def 'Geometry collection with a curve polygon'() {
+        given:
+        CqlCoordinateChecker checker = new CqlCoordinateChecker((CrsTransformerFactory) transformerFactory, (CrsInfo) transformerFactory, EpsgCrs.of(25832), EpsgCrs.of(25832))
+        GeometryDecoderWkt decoder = new GeometryDecoderWkt()
+        Geometry<?> geometry = GeometryCollection.of(List.of(
+                decoder.decode("CURVEPOLYGON (CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050, 453050 5538150, 452900 5538050))"),
+                decoder.decode("POINT (453300 5538050)")))
+
+        when:
+        SIntersects.of(Property.of("position"), SpatialLiteral.of(geometry)).accept(checker)
+
+        then:
+        noExceptionThrown()
+    }
+
+    def 'Curve geometry outside the domain of validity'() {
+        given:
+        CqlCoordinateChecker checker = new CqlCoordinateChecker((CrsTransformerFactory) transformerFactory, (CrsInfo) transformerFactory, EpsgCrs.of(25832), EpsgCrs.of(25832))
+        Geometry<?> geometry = new GeometryDecoderWkt().decode("CURVEPOLYGON (CIRCULARSTRING (452900 5538050, 453050 5537950, 453200 5538050, 453050 9538150, 452900 5538050))", Optional.of(EpsgCrs.of(25832)))
+
+        when:
+        SIntersects.of(Property.of("position"), SpatialLiteral.of(geometry)).accept(checker)
+
+        then:
+        thrown IllegalArgumentException
     }
 
 }
