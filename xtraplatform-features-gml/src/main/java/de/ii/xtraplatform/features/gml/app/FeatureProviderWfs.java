@@ -170,9 +170,7 @@ public class FeatureProviderWfs
             getData().getNativeCrs().orElse(OgcCrs.CRS84),
             crsTransformerFactory,
             cql);
-    this.aggregateStatsReader =
-        new AggregateStatsReaderWfs(
-            this, crsTransformerFactory, getData().getNativeCrs().orElse(OgcCrs.CRS84));
+    this.aggregateStatsReader = new AggregateStatsReaderWfs(this);
 
     return true;
   }
@@ -299,8 +297,13 @@ public class FeatureProviderWfs
 
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName) {
-    if (getData().getTypes().containsKey(typeName)) {
+    if (!getData().getTypes().containsKey(typeName)) {
       return Optional.empty();
+    }
+
+    Optional<BoundingBox> configured = getConfiguredSpatialExtent(typeName);
+    if (configured.isPresent()) {
+      return configured;
     }
 
     try {
@@ -323,24 +326,32 @@ public class FeatureProviderWfs
 
   @Override
   public Optional<BoundingBox> getSpatialExtent(String typeName, EpsgCrs crs) {
+    // a configured extent is in the native CRS, one from the capabilities in CRS84
     return getSpatialExtent(typeName)
         .flatMap(
             boundingBox ->
-                crsTransformerFactory
-                    .getTransformer(getNativeCrs(), crs, false)
-                    .flatMap(
-                        crsTransformer -> {
-                          try {
-                            return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
-                          } catch (CrsTransformationException e) {
-                            return Optional.empty();
-                          }
-                        }));
+                Objects.equals(boundingBox.getEpsgCrs(), crs)
+                    ? Optional.of(boundingBox)
+                    : crsTransformerFactory
+                        .getTransformer(boundingBox.getEpsgCrs(), crs, false)
+                        .flatMap(
+                            crsTransformer -> {
+                              try {
+                                return Optional.of(
+                                    crsTransformer.transformBoundingBox(boundingBox));
+                              } catch (CrsTransformationException e) {
+                                return Optional.empty();
+                              }
+                            }));
   }
 
   @Override
   public Optional<Interval> getTemporalExtent(String typeName) {
-    return Optional.empty();
+    if (!getData().getTypes().containsKey(typeName)) {
+      return Optional.empty();
+    }
+
+    return getConfiguredTemporalExtent(typeName);
   }
 
   @Override

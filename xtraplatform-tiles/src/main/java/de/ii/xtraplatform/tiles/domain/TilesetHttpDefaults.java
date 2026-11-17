@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.entities.domain.maptobuilder.Buildable;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableBuilder;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.Extent;
+import java.util.Optional;
 import org.immutables.value.Value;
 
 /**
@@ -29,6 +31,20 @@ public interface TilesetHttpDefaults
   @Override
   default ImmutableTilesetHttpDefaults.Builder getBuilder() {
     return new ImmutableTilesetHttpDefaults.Builder().from(this);
+  }
+
+  /**
+   * @langEn Fixed extent of the tileset, only `spatial` in CRS84 (longitude/latitude). If not set,
+   *     the extent of the tile matrix sets is used.
+   * @langDe Fester Extent des Tilesets, nur `spatial` in CRS84 (Länge/Breite). Wenn nicht gesetzt,
+   *     wird der Extent der Kachelschemas verwendet.
+   * @since v4.9
+   */
+  Optional<Extent> getExtent();
+
+  @Value.Check
+  default void checkExtentIsSpatial() {
+    Extent.checkSpatialOnly(getExtent());
   }
 
   abstract class Builder implements BuildableBuilder<TilesetHttpDefaults> {}

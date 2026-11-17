@@ -10,6 +10,7 @@ package de.ii.xtraplatform.tiles.domain;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.maptobuilder.BuildableMap;
+import de.ii.xtraplatform.features.domain.Extent;
 import de.ii.xtraplatform.tiles.domain.ImmutableMinMax.Builder;
 import java.util.Optional;
 import org.immutables.value.Value;
@@ -35,5 +36,19 @@ public interface TilesetMbTilesDefaults extends TilesetCommonDefaults {
   @Value.Default
   default String getTileMatrixSet() {
     return "WebMercatorQuad";
+  }
+
+  /**
+   * @langEn Fixed extent of the tileset, only `spatial` in CRS84 (longitude/latitude). If set,
+   *     `bounds` from the MBTiles metadata is ignored.
+   * @langDe Fester Extent des Tilesets, nur `spatial` in CRS84 (Länge/Breite). Wenn gesetzt, wird
+   *     `bounds` aus den MBTiles-Metadaten ignoriert.
+   * @since v4.9
+   */
+  Optional<Extent> getExtent();
+
+  @Value.Check
+  default void checkExtentIsSpatial() {
+    Extent.checkSpatialOnly(getExtent());
   }
 }
