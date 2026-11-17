@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonMerge;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import de.ii.xtraplatform.cql.domain.CustomFunction;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.docs.DocIgnore;
 import de.ii.xtraplatform.entities.domain.AutoEntity;
@@ -77,6 +78,47 @@ public interface FeatureProviderDataV2 extends ProviderData, AutoEntity, Extenda
    */
   @JsonDeserialize(converter = ZoneIdFromString.class)
   Optional<ZoneId> getNativeTimeZone();
+
+  /**
+   * @langEn Area, as a bounding box in CRS84 (`xmin`, `ymin`, `xmax`, `ymax`), that is used to
+   *     select the transformation between two coordinate reference systems when several are
+   *     available, for example a regional NTv2 grid instead of a national one. The most accurate
+   *     transformation whose area of use contains this box is used; grid files that are not part of
+   *     the default installation have to be provided in `resources/proj`. Without a value, the
+   *     transformation is selected independently of an area.
+   *     <p>The box has to lie completely within the area of use of the intended transformation. If
+   *     it extends beyond it, even by a few hundredths of a degree, a less accurate transformation
+   *     that covers the whole box is selected instead. For this reason, the spatial extent of the
+   *     data, of an API or of a provider is often not suitable: for a dataset that covers the
+   *     region of a regional transformation completely, the extent usually extends slightly beyond
+   *     its area of use, for example because of features on the boundary, or because the extent of
+   *     data stored in a projected coordinate reference system becomes larger when it is converted
+   *     to CRS84. Use the area of use of the intended transformation as given in the EPSG registry
+   *     instead, for example `7.77, 49.39, 10.24, 51.66` for the transformation from DHDN to ETRS89
+   *     in Hessen (HeTA2010). Coordinates slightly outside of the area of use are still transformed
+   *     as long as they are covered by the grid.
+   * @langDe Gebiet als Bounding Box in CRS84 (`xmin`, `ymin`, `xmax`, `ymax`), das bei mehreren
+   *     möglichen Transformationen zwischen zwei Koordinatenreferenzsystemen die Auswahl bestimmt,
+   *     z.B. ein regionales NTv2-Gitter statt eines bundesweiten. Verwendet wird die genaueste
+   *     Transformation, deren Gültigkeitsbereich dieses Gebiet enthält; Gitterdateien, die nicht
+   *     zur Standardinstallation gehören, sind in `resources/proj` bereitzustellen. Ohne Angabe
+   *     wird die Transformation unabhängig von einem Gebiet ausgewählt.
+   *     <p>Das Gebiet muss vollständig im Gültigkeitsbereich der gewünschten Transformation liegen.
+   *     Ragt es darüber hinaus, auch nur um wenige Hundertstel Grad, wird stattdessen eine
+   *     ungenauere Transformation ausgewählt, die das ganze Gebiet abdeckt. Deshalb eignet sich die
+   *     räumliche Ausdehnung der Daten, einer API oder eines Providers oft nicht: Bei einem
+   *     Datensatz, der das Gebiet einer regionalen Transformation vollständig abdeckt, ragt die
+   *     Ausdehnung meist knapp über deren Gültigkeitsbereich hinaus, z.B. wegen Objekten auf der
+   *     Grenze oder weil die Ausdehnung von Daten in einem projizierten Koordinatenreferenzsystem
+   *     bei der Umrechnung nach CRS84 größer wird. Stattdessen ist der Gültigkeitsbereich der
+   *     gewünschten Transformation laut EPSG-Registry anzugeben, z.B. `7.77, 49.39, 10.24, 51.66`
+   *     für die Transformation von DHDN nach ETRS89 in Hessen (HeTA2010). Koordinaten knapp
+   *     außerhalb des Gültigkeitsbereichs werden weiterhin transformiert, solange sie vom Gitter
+   *     abgedeckt sind.
+   * @default null
+   * @since v4.9
+   */
+  Optional<BoundingBox> getTransformationArea();
 
   @DocIgnore
   Optional<String> getDefaultLanguage();
