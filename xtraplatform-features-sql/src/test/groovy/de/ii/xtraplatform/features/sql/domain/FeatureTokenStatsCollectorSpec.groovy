@@ -129,6 +129,26 @@ class FeatureTokenStatsCollectorSpec extends Specification {
         temporal(stats) == Tuple.of(millis(MAR), null)
     }
 
+    def "a partial update that only clears the end makes it unbounded without changing the start"() {
+
+        given: 'the start is unchanged and unknown'
+        def stats = new FeatureTokenStatsCollector.Stats(OgcCrs.CRS84)
+        interval(stats, true, null, FeatureTransactions.PATCH_NULL_VALUE)
+
+        expect: 'the latest possible start, which never widens an extent'
+        temporal(stats) == Tuple.of(Long.MAX_VALUE, null)
+    }
+
+    def "a partial update that only clears the start makes it unbounded without changing the end"() {
+
+        given:
+        def stats = new FeatureTokenStatsCollector.Stats(OgcCrs.CRS84)
+        interval(stats, true, FeatureTransactions.PATCH_NULL_VALUE, null)
+
+        expect:
+        temporal(stats) == Tuple.of(null, Long.MIN_VALUE)
+    }
+
     // one feature as the collector passes it on at the end of the feature
     static void interval(FeatureTokenStatsCollector.Stats stats, boolean partial, String start, String end,
                          boolean hasStart = true, boolean hasEnd = true) {

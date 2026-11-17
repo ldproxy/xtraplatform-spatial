@@ -158,6 +158,12 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
    */
   public static final class Stats {
 
+    // A side without a value, e.g. the start of a partial update that only clears the end, must
+    // not change the extent; since extents only grow, the latest start and the earliest end are
+    // the values that never do. Null would stand for an unbounded side.
+    private static final long NO_START = Long.MAX_VALUE;
+    private static final long NO_END = Long.MIN_VALUE;
+
     private final EpsgCrs crs;
     private Double xmin;
     private Double ymin;
@@ -229,8 +235,9 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
     /**
      * Sets the extents of the mutation result. A side that no written feature determines takes a
      * value of the other side: extents only grow, and the start of a feature is never after its
-     * end, so that value does not change the extent on the unknown side. Without such a value, the
-     * result has no temporal extent.
+     * end, so that value does not change the extent on the unknown side. If the other side is
+     * unbounded and has no value, the unknown side gets a value that never changes an extent.
+     * Without any temporal value, the result has no temporal extent.
      *
      * @param builder the result of the mutation
      */
@@ -242,31 +249,37 @@ public class FeatureTokenStatsCollector extends FeatureTokenTransformerSql {
       writeTemporal(builder);
     }
 
-    // the count comes from the conditional expressions of the two sides, splitting them up would
-    // not make the method easier to follow
-    @SuppressWarnings("PMD.NPathComplexity")
     private void writeTemporal(Builder builder) {
       String startValue = startKnown ? start : end;
       String endValue = endKnown ? end : start;
       boolean startOpen = startKnown && startUnbounded;
       boolean endOpen = endKnown && endUnbounded;
 
-      if ((startOpen || Objects.nonNull(startValue)) && (endOpen || Objects.nonNull(endValue))) {
-        builder.temporalExtent(
-            Tuple.of(
-                startOpen ? null : parseTemporal(startValue),
-                endOpen ? null : parseTemporal(endValue)));
+      boolean nothingWritten =
+          !startOpen && !endOpen && (Objects.isNull(startValue) || Objects.isNull(endValue));
+      if (nothingWritten) {
+        return;
       }
+
+      builder.temporalExtent(
+          Tuple.of(bound(startOpen, startValue, NO_START), bound(endOpen, endValue, NO_END)));
     }
 
-    private static Long parseTemporal(String temporal) {
+    private static Long bound(boolean unbounded, String value, long noValue) {
+      return unbounded ? null : parseTemporal(value, noValue);
+    }
+
+    private static Long parseTemporal(String temporal, long noValue) {
+      if (Objects.isNull(temporal)) {
+        return noValue;
+      }
       try {
         if (temporal.length() > 10) {
           return ZonedDateTime.parse(temporal).toInstant().toEpochMilli();
         }
         return LocalDate.parse(temporal).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
       } catch (DateTimeParseException e) {
-        return null;
+        return noValue;
       }
     }
   }
