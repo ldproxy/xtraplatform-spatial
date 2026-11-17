@@ -61,7 +61,7 @@ public class AggregateStatsReaderWfs implements AggregateStatsReader<FeatureSche
   /**
    * The ids under which the capabilities analyzer stores the bounding box of a feature type: the
    * prefixed name becomes {@code prefix_localname}, and if unique also {@code localname}, both in
-   * lower case.
+   * lower case. The id of the type is the last resort.
    */
   static List<String> getTypeIds(FeatureSchema schema) {
     String prefixedName =
@@ -69,12 +69,13 @@ public class AggregateStatsReaderWfs implements AggregateStatsReader<FeatureSche
     int separator = prefixedName.indexOf(':');
     String localName = prefixedName.substring(separator + 1).toLowerCase(Locale.ROOT);
 
+    // the type id comes last, it may be the local name of another feature type
     List<String> ids = new ArrayList<>();
-    ids.add(schema.getName());
     if (separator > 0) {
       ids.add(prefixedName.substring(0, separator).toLowerCase(Locale.ROOT) + "_" + localName);
     }
     ids.add(localName);
+    ids.add(schema.getName());
     return ids;
   }
 }

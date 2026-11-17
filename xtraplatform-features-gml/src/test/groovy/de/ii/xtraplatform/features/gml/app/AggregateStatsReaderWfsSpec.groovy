@@ -22,8 +22,8 @@ class AggregateStatsReaderWfsSpec extends Specification {
                 .type(SchemaBase.Type.OBJECT)
                 .build()
 
-        expect: 'the type id, then prefix_localname and localname in lower case, not the prefixed name'
-        AggregateStatsReaderWfs.getTypeIds(schema) == ["rbz", "dvg_nw_dvg1_rbz", "nw_dvg1_rbz"]
+        expect: 'prefix_localname and localname in lower case, not the prefixed name, and the type id last'
+        AggregateStatsReaderWfs.getTypeIds(schema) == ["dvg_nw_dvg1_rbz", "nw_dvg1_rbz", "rbz"]
     }
 
     def "a feature type without a prefix"() {
