@@ -119,6 +119,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
         .offset(query.getOffset())
         .chunkSize(chunkSize)
         .isSingleFeature(query.returnsSingleFeature())
+        // count every main table, not only those that fill the page, so numberMatched is the total
+        .isComputeNumberMatched(computeNumberMatched && !query.returnsSingleFeature())
         .build()
         .withQuerySets(querySets);
   }

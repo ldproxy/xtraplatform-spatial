@@ -148,21 +148,7 @@ public class GeometryDecoderWkb extends AbstractGeometryDecoder {
               crs);
       case GEOMETRY_COLLECTION ->
           geometryCollection(
-              readListOfGeometry(
-                  dis,
-                  crs,
-                  axes,
-                  isLittleEndian,
-                  Set.of(
-                      GeometryType.POINT,
-                      GeometryType.LINE_STRING,
-                      GeometryType.POLYGON,
-                      GeometryType.MULTI_POINT,
-                      GeometryType.MULTI_LINE_STRING,
-                      GeometryType.MULTI_POLYGON,
-                      GeometryType.GEOMETRY_COLLECTION),
-                  false),
-              crs);
+              readListOfGeometry(dis, crs, axes, isLittleEndian, allowedTypes, false), crs);
       default -> throw new IllegalStateException("Unsupported geometry type: " + type);
     };
   }

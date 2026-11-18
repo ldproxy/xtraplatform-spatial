@@ -18,6 +18,7 @@ import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.blobs.domain.ResourceStore;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
+import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformer;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
@@ -86,8 +87,7 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
   private final ProjLoader projLoader;
   private final ResourceStore projStore;
   private final Map<EpsgCrs, CoordinateReferenceSystem> crsCache;
-  private final Map<EpsgCrs, Map<EpsgCrs, CrsTransformer>> transformerCache;
-  private final Map<EpsgCrs, Map<EpsgCrs, CrsTransformer>> transformerCacheForce2d;
+  private final Map<TransformerKey, CrsTransformer> transformerCache;
   private final Lock projLock;
   private final boolean useCaches;
   private final boolean asyncStartup;
@@ -103,7 +103,6 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     this.projStore = resourceStore.with("proj");
     this.crsCache = new ConcurrentHashMap<>();
     this.transformerCache = new ConcurrentHashMap<>();
-    this.transformerCacheForce2d = new ConcurrentHashMap<>();
     this.projLock = new ReentrantLock();
     this.useCaches = true;
     this.asyncStartup = appContext.getConfiguration().getModules().isStartupAsync();
@@ -117,7 +116,6 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     this.projStore = resourceStore.with("proj");
     this.crsCache = new ConcurrentHashMap<>();
     this.transformerCache = new ConcurrentHashMap<>();
-    this.transformerCacheForce2d = new ConcurrentHashMap<>();
     this.projLock = new ReentrantLock();
     this.useCaches = true;
     this.asyncStartup = false;
@@ -355,6 +353,12 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
   @Override
   public Optional<CrsTransformer> getTransformer(
       EpsgCrs sourceCrs, EpsgCrs targetCrs, boolean force2d) {
+    return getTransformer(sourceCrs, targetCrs, force2d, Optional.empty());
+  }
+
+  @Override
+  public Optional<CrsTransformer> getTransformer(
+      EpsgCrs sourceCrs, EpsgCrs targetCrs, boolean force2d, Optional<BoundingBox> areaOfInterest) {
     if (Objects.equals(sourceCrs, targetCrs)) {
       return Optional.empty();
     }
@@ -366,19 +370,56 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
       targetProjCrs = getHorizontalCrs(targetProjCrs);
     }
 
+    Optional<BoundingBox> area = toGeographicArea(areaOfInterest);
     CoordinateReferenceSystem finalSourceProjCrs = sourceProjCrs;
     CoordinateReferenceSystem finalTargetProjCrs = targetProjCrs;
     CrsTransformer transformer =
         useCaches
-            ? getCacheForSource(sourceCrs, force2d)
-                .computeIfAbsent(
-                    targetCrs,
-                    ignore ->
-                        createCrsTransformer(
-                            sourceCrs, targetCrs, finalSourceProjCrs, finalTargetProjCrs))
-            : createCrsTransformer(sourceCrs, targetCrs, sourceProjCrs, targetProjCrs);
+            ? transformerCache.computeIfAbsent(
+                new TransformerKey(sourceCrs, targetCrs, force2d, area),
+                ignore ->
+                    createCrsTransformer(
+                        sourceCrs, targetCrs, finalSourceProjCrs, finalTargetProjCrs, area))
+            : createCrsTransformer(sourceCrs, targetCrs, sourceProjCrs, targetProjCrs, area);
 
     return Optional.of(transformer);
+  }
+
+  /**
+   * Converts an area of interest to a 2D box in CRS84. An area that covers the whole world does not
+   * restrict the selection of operations and is dropped, so it shares the cache entry and the
+   * operation of a request without an area.
+   */
+  private Optional<BoundingBox> toGeographicArea(Optional<BoundingBox> areaOfInterest) {
+    if (areaOfInterest.isEmpty()) {
+      return Optional.empty();
+    }
+
+    BoundingBox area = areaOfInterest.get();
+    if (!OgcCrs.CRS84.equals(area.getEpsgCrs()) && !OgcCrs.CRS84h.equals(area.getEpsgCrs())) {
+      try {
+        Optional<CrsTransformer> toCrs84 =
+            getTransformer(area.getEpsgCrs(), OgcCrs.CRS84, true, Optional.empty());
+        if (toCrs84.isPresent()) {
+          area = toCrs84.get().transformBoundingBox(area);
+        }
+      } catch (CrsTransformationException e) {
+        throw new IllegalArgumentException(
+            String.format("The area of interest cannot be converted to CRS84: %s", e.getMessage()),
+            e);
+      }
+    }
+
+    if (area.getXmin() <= -180
+        && area.getYmin() <= -90
+        && area.getXmax() >= 180
+        && area.getYmax() >= 90) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        BoundingBox.of(
+            area.getXmin(), area.getYmin(), area.getXmax(), area.getYmax(), OgcCrs.CRS84));
   }
 
   @Override
@@ -543,18 +584,13 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
     return crs;
   }
 
-  private Map<EpsgCrs, CrsTransformer> getCacheForSource(EpsgCrs crs, boolean force2d) {
-    return force2d
-        ? transformerCacheForce2d.computeIfAbsent(crs, ignore -> new ConcurrentHashMap<>())
-        : transformerCache.computeIfAbsent(crs, ignore -> new ConcurrentHashMap<>());
-  }
-
   @SuppressWarnings("PMD.CyclomaticComplexity")
   private CrsTransformer createCrsTransformer(
       EpsgCrs sourceCrs,
       EpsgCrs targetCrs,
       CoordinateReferenceSystem sourceProjCrs,
-      CoordinateReferenceSystem targetProjCrs) {
+      CoordinateReferenceSystem targetProjCrs,
+      Optional<BoundingBox> areaOfInterest) {
 
     projLock.lock();
     try {
@@ -568,12 +604,28 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
       coordinateOperationContext.setSpatialCriterion(SpatialCriterion.PARTIAL_INTERSECTION);
       coordinateOperationContext.setGridAvailabilityUse(
           GridAvailabilityUse.DISCARD_OPERATION_IF_MISSING_GRID);
+      areaOfInterest.ifPresent(
+          area ->
+              coordinateOperationContext.setAreaOfInterest(
+                  area.getXmin(), area.getXmax(), area.getYmin(), area.getYmax()));
       CoordinateOperation coordinateOperation =
           Proj.createCoordinateOperation(sourceProjCrs, targetProjCrs, coordinateOperationContext);
 
       checkForMissingGridFiles(coordinateOperation);
 
-      if (LOGGER.isDebugEnabled()) {
+      if (areaOfInterest.isPresent() && LOGGER.isInfoEnabled()) {
+        BoundingBox area = areaOfInterest.get();
+        LOGGER.info(
+            "Chosen operation for {} -> {} in area [{}, {}, {}, {}]: {}{}",
+            sourceCrs.toHumanReadableString(),
+            targetCrs.toHumanReadableString(),
+            area.getXmin(),
+            area.getYmin(),
+            area.getXmax(),
+            area.getYmax(),
+            coordinateOperation.getName().getCode(),
+            getGridFile(coordinateOperation).orElse(""));
+      } else if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(
             "Chosen operation for {} -> {}: {}{}",
             sourceCrs.toHumanReadableString(),
@@ -647,5 +699,44 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
           String.format(" with parameter file '%s' (%s)", matcher.group(2), matcher.group(1)));
     }
     return Optional.empty();
+  }
+
+  /** Cache key of a transformer; the area of interest is a 2D box in CRS84 or empty. */
+  private static final class TransformerKey {
+    private final EpsgCrs sourceCrs;
+    private final EpsgCrs targetCrs;
+    private final boolean force2d;
+    private final Optional<BoundingBox> areaOfInterest;
+
+    TransformerKey(
+        EpsgCrs sourceCrs,
+        EpsgCrs targetCrs,
+        boolean force2d,
+        Optional<BoundingBox> areaOfInterest) {
+      this.sourceCrs = sourceCrs;
+      this.targetCrs = targetCrs;
+      this.force2d = force2d;
+      this.areaOfInterest = areaOfInterest;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof TransformerKey)) {
+        return false;
+      }
+      TransformerKey that = (TransformerKey) o;
+      return force2d == that.force2d
+          && sourceCrs.equals(that.sourceCrs)
+          && targetCrs.equals(that.targetCrs)
+          && areaOfInterest.equals(that.areaOfInterest);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(sourceCrs, targetCrs, force2d, areaOfInterest);
+    }
   }
 }

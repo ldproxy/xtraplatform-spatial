@@ -31,6 +31,11 @@ public abstract class FeatureObjectEncoderBase<
 
   public abstract void onFeature(W feature);
 
+  /** The path by which consumers look up a property; by default the path in the token stream. */
+  protected List<String> toPropertyPath(T featureSchema, List<String> path) {
+    return path;
+  }
+
   @Override
   public void onStart(ModifiableContext<T, U> context) {}
 
@@ -139,7 +144,7 @@ public abstract class FeatureObjectEncoderBase<
     property
         .type(type)
         .schema(schema)
-        .propertyPath(path)
+        .propertyPath(toPropertyPath(currentFeature.getSchema().orElseThrow(), path))
         .value(value)
         .geometry(geometry)
         .transformed(transformed);

@@ -17,7 +17,9 @@ import de.ii.xtraplatform.base.domain.resiliency.DelayedVolatile;
 import de.ii.xtraplatform.base.domain.resiliency.Volatile2;
 import de.ii.xtraplatform.base.domain.resiliency.VolatileRegistry;
 import de.ii.xtraplatform.codelists.domain.Codelist;
+import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.CrsInfo;
+import de.ii.xtraplatform.crs.domain.CrsTransformationException;
 import de.ii.xtraplatform.crs.domain.CrsTransformerFactory;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.crs.domain.OgcCrs;
@@ -63,6 +65,7 @@ import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.threeten.extra.Interval;
 
 @SuppressWarnings({
   "PMD.CouplingBetweenObjects",
@@ -77,6 +80,8 @@ public abstract class AbstractFeatureProvider<
     implements FeatureProviderEntity, FeatureInfo, FeatureQueries {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractFeatureProvider.class);
+  private static final String COULD_NOT_START =
+      "Feature provider with id '{}' could not be started: {}";
   protected static final WithScope WITH_SCOPE_RETURNABLE = new WithScope(Scope.RETURNABLE);
   protected static final WithScope WITH_SCOPE_QUERIES =
       new WithScope(
@@ -86,7 +91,13 @@ public abstract class AbstractFeatureProvider<
 
   private final ConnectorFactory connectorFactory;
   private final Reactive reactive;
+
+  /** Selects transformations for the `transformationArea` of the provider, if set. */
   protected final CrsTransformerFactory crsTransformerFactory;
+
+  /** The injected factory, registered as subcomponent; a scoped view is not a volatile. */
+  private final CrsTransformerFactory crsTransformerFactoryComponent;
+
   protected final CrsInfo crsInfo;
   protected final AuditLog auditLog;
   protected final Encryption encryption;
@@ -114,7 +125,11 @@ public abstract class AbstractFeatureProvider<
     super(data, volatileRegistry);
     this.connectorFactory = connectorFactory;
     this.reactive = reactive;
-    this.crsTransformerFactory = crsTransformerFactory;
+    this.crsTransformerFactory =
+        data.getTransformationArea()
+            .map(crsTransformerFactory::withAreaOfInterest)
+            .orElse(crsTransformerFactory);
+    this.crsTransformerFactoryComponent = crsTransformerFactory;
     this.crsInfo = crsInfo;
     this.extensionRegistry = extensionRegistry;
     this.codelistStore = codelistStore;
@@ -135,6 +150,25 @@ public abstract class AbstractFeatureProvider<
   @Override
   public String getType() {
     return ProviderData.ENTITY_TYPE;
+  }
+
+  private static Optional<String> validateArea(BoundingBox area) {
+    if (!OgcCrs.CRS84.equals(area.getEpsgCrs())) {
+      return Optional.of("'transformationArea' must be given in CRS84.");
+    }
+    if (area.getXmin() > area.getXmax() || area.getYmin() > area.getYmax()) {
+      return Optional.of(
+          "'transformationArea' is invalid: 'xmin' and 'ymin' must not exceed 'xmax' and 'ymax'.");
+    }
+    if (area.getXmin() < -180
+        || area.getXmax() > 180
+        || area.getYmin() < -90
+        || area.getYmax() > 90) {
+      return Optional.of(
+          "'transformationArea' is invalid: longitudes must be within [-180, 180] and latitudes"
+              + " within [-90, 90].");
+    }
+    return Optional.empty();
   }
 
   @Override
@@ -170,7 +204,7 @@ public abstract class AbstractFeatureProvider<
     if (multiQueries().isSupported()) {
       addCapability(MultiFeatureQueries.CAPABILITY);
     }
-    addSubcomponent(crsTransformerFactory, FeatureCrs.CAPABILITY);
+    addSubcomponent(crsTransformerFactoryComponent, FeatureCrs.CAPABILITY);
     addSubcomponent(
         connector,
         FeatureQueries.CAPABILITY,
@@ -201,7 +235,7 @@ public abstract class AbstractFeatureProvider<
 
       Optional<Throwable> connectionError = getConnector().getConnectionError();
       String message = connectionError.map(Throwable::getMessage).orElse("unknown reason");
-      LOGGER.error("Feature provider with id '{}' could not be started: {}", getId(), message);
+      LOGGER.error(COULD_NOT_START, getId(), message);
       if (connectionError.isPresent() && LOGGER.isDebugEnabled()) {
         LOGGER.debug("Stacktrace:", connectionError.get());
       }
@@ -216,8 +250,7 @@ public abstract class AbstractFeatureProvider<
     Optional<String> runnerError = getRunnerError(getConnectionInfo());
 
     if (runnerError.isPresent()) {
-      LOGGER.error(
-          "Feature provider with id '{}' could not be started: {}", getId(), runnerError.get());
+      LOGGER.error(COULD_NOT_START, getId(), runnerError.get());
       // TODO: volatile defective // NOPMD
       return false;
     }
@@ -227,8 +260,15 @@ public abstract class AbstractFeatureProvider<
             getData().getTypes().values(), encryption.isEnabled(), supportsEncryptedProperties());
 
     if (encryptionError.isPresent()) {
-      LOGGER.error(
-          "Feature provider with id '{}' could not be started: {}", getId(), encryptionError.get());
+      LOGGER.error(COULD_NOT_START, getId(), encryptionError.get());
+      return false;
+    }
+
+    Optional<String> transformationAreaError =
+        getData().getTransformationArea().flatMap(AbstractFeatureProvider::validateArea);
+
+    if (transformationAreaError.isPresent()) {
+      LOGGER.error(COULD_NOT_START, getId(), transformationAreaError.get());
       return false;
     }
 
@@ -602,6 +642,36 @@ public abstract class AbstractFeatureProvider<
 
   protected Query preprocessQuery(Query query) {
     return query;
+  }
+
+  protected Optional<BoundingBox> getConfiguredSpatialExtent(String typeName) {
+    return getConfiguredExtent(typeName)
+        .getSpatial()
+        .flatMap(extent -> extent.toBoundingBox(getData().getNativeCrs().orElse(OgcCrs.CRS84)));
+  }
+
+  protected Optional<Interval> getConfiguredTemporalExtent(String typeName) {
+    return getConfiguredExtent(typeName).getTemporal().flatMap(TemporalExtent::toInterval);
+  }
+
+  private Extent getConfiguredExtent(String typeName) {
+    return Extent.inherit(
+        Optional.ofNullable(getData().getTypes().get(typeName)).flatMap(FeatureSchema::getExtent),
+        getData().getExtent());
+  }
+
+  protected Optional<BoundingBox> transformSpatialExtent(
+      BoundingBox boundingBox, EpsgCrs targetCrs) {
+    return crsTransformerFactory
+        .getTransformer(getData().getNativeCrs().orElse(OgcCrs.CRS84), targetCrs, false)
+        .flatMap(
+            crsTransformer -> {
+              try {
+                return Optional.of(crsTransformer.transformBoundingBox(boundingBox));
+              } catch (CrsTransformationException e) {
+                return Optional.empty();
+              }
+            });
   }
 
   @Override

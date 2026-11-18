@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.app;
 
 import de.ii.xtraplatform.base.domain.util.Tuple;
+import de.ii.xtraplatform.cql.domain.Cql2Expression;
 import de.ii.xtraplatform.crs.domain.BoundingBox;
 import de.ii.xtraplatform.crs.domain.EpsgCrs;
 import de.ii.xtraplatform.features.domain.AggregateStatsReader;
@@ -50,6 +51,11 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
 
   @Override
   public Stream<Long> getCount(List<SqlQueryMapping> sourceSchemas) {
+    return getCount(sourceSchemas, List.of());
+  }
+
+  /** Like {@link #getCount(List)}, restricted to the features that match the filters. */
+  public Stream<Long> getCount(List<SqlQueryMapping> sourceSchemas, List<Cql2Expression> filters) {
     return Reactive.Source.iterable(sourceSchemas)
         .via(
             Reactive.Transformer.flatMap(
@@ -57,7 +63,8 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
                     sqlClient
                         .get()
                         .getSourceStream(
-                            queryGenerator.getCountQuery(schemaSql), SqlQueryOptions.single())))
+                            queryGenerator.getCountQuery(schemaSql, filters),
+                            SqlQueryOptions.single())))
         .via(Reactive.Transformer.map(sqlRow -> Long.parseLong((String) sqlRow.getValues().get(0))))
         .to(Reactive.Sink.reduce(0L, Long::sum));
   }
@@ -133,6 +140,21 @@ public class AggregateStatsReaderSql implements AggregateStatsReader<SqlQueryMap
                                 intervalStart.get().second(),
                                 intervalEnd.get().first(),
                                 intervalEnd.get().second()),
+                            SqlQueryOptions.tuple());
+                  }
+
+                  // only a start or only an end, the other side is unbounded
+                  Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> bound =
+                      intervalStart.or(() -> intervalEnd);
+                  if (bound.isPresent()) {
+                    return sqlClient
+                        .get()
+                        .getSourceStream(
+                            queryGenerator.getTemporalExtentQuery(
+                                mapping,
+                                bound.get().first(),
+                                bound.get().second(),
+                                intervalStart.isPresent()),
                             SqlQueryOptions.tuple());
                   }
 

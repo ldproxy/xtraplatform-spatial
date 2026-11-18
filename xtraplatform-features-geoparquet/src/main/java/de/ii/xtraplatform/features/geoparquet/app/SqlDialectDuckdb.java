@@ -99,10 +99,6 @@ public class SqlDialectDuckdb implements SqlDialect {
 
   @Override
   public Optional<Interval> parseTemporalExtent(String start, String end, ZoneId timeZone) {
-    if (Objects.isNull(start)) {
-      return Optional.empty();
-    }
-
     DateTimeFormatter parser;
     if (Objects.isNull(timeZone)) {
       parser =
@@ -118,18 +114,14 @@ public class SqlDialectDuckdb implements SqlDialect {
     // Note: Strictly, INFINITY/-INFINITY and INSTANT.MAX/INSTANT.MIN are not the same! May result
     // in undesired behavior.
     Instant parsedStart;
-    switch (start.toUpperCase(Locale.ROOT)) {
+    switch (Objects.requireNonNullElse(start, "-INFINITY").toUpperCase(Locale.ROOT)) {
       case "-INFINITY" -> parsedStart = Instant.MIN;
       case "INFINITY" -> parsedStart = Instant.MAX;
       default -> parsedStart = parser.parse(start, Instant::from);
     }
 
-    if (Objects.isNull(end)) {
-      return Optional.of(Interval.of(parsedStart, Instant.MAX));
-    }
-
     Instant parsedEnd;
-    switch (end.toUpperCase(Locale.ROOT)) {
+    switch (Objects.requireNonNullElse(end, "INFINITY").toUpperCase(Locale.ROOT)) {
       case "INFINITY" -> parsedEnd = Instant.MAX;
       case "-INFINITY" -> parsedEnd = Instant.MIN;
       default -> parsedEnd = parser.parse(end, Instant::from);
