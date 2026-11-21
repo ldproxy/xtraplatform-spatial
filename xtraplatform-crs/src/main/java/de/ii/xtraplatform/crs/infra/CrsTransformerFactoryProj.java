@@ -592,10 +592,16 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
       CoordinateReferenceSystem targetProjCrs,
       Optional<BoundingBox> areaOfInterest) {
 
+    int sourceDimension = isCrs3d(sourceProjCrs) ? 3 : 2;
+    // resolved before projLock is taken: getHorizontalCrs may look up a CRS in crsCache, and a
+    // thread computing an entry of crsCache waits for projLock in createCrs, so a lookup while
+    // holding projLock can deadlock
+    SingleCRS sourceHorizontalCrs = sourceDimension == 3 ? getHorizontalCrs(sourceProjCrs) : null;
+    SingleCRS targetHorizontalCrs = sourceDimension == 3 ? getHorizontalCrs(targetProjCrs) : null;
+
     projLock.lock();
     try {
       boolean is3dTo3d = isCrs3d(sourceProjCrs) && isCrs3d(targetProjCrs);
-      int sourceDimension = isCrs3d(sourceProjCrs) ? 3 : 2;
       // a geocentric position needs all three coordinates, also for a 2D source
       int targetDimension = is3dTo3d || isGeocentric(targetProjCrs) ? 3 : 2;
 
@@ -613,39 +619,18 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
 
       checkForMissingGridFiles(coordinateOperation);
 
-      if (areaOfInterest.isPresent() && LOGGER.isInfoEnabled()) {
-        BoundingBox area = areaOfInterest.get();
-        LOGGER.info(
-            "Chosen operation for {} -> {} in area [{}, {}, {}, {}]: {}{}",
-            sourceCrs.toHumanReadableString(),
-            targetCrs.toHumanReadableString(),
-            area.getXmin(),
-            area.getYmin(),
-            area.getXmax(),
-            area.getYmax(),
-            coordinateOperation.getName().getCode(),
-            getGridFile(coordinateOperation).orElse(""));
-      } else if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug(
-            "Chosen operation for {} -> {}: {}{}",
-            sourceCrs.toHumanReadableString(),
-            targetCrs.toHumanReadableString(),
-            coordinateOperation.getName().getCode(),
-            getGridFile(coordinateOperation).orElse(""));
-      }
+      logChosenOperation(sourceCrs, targetCrs, areaOfInterest, coordinateOperation);
 
       CoordinateOperation horizontalCoordinateOperation = null;
       if (sourceDimension == 3) {
         horizontalCoordinateOperation =
             Proj.createCoordinateOperation(
-                getHorizontalCrs(sourceProjCrs),
-                getHorizontalCrs(targetProjCrs),
-                coordinateOperationContext);
+                sourceHorizontalCrs, targetHorizontalCrs, coordinateOperationContext);
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug(
               "Chosen operation for '{}' -> '{}': {}{}",
-              getHorizontalCrs(sourceProjCrs).getName().getCode(),
-              getHorizontalCrs(targetProjCrs).getName().getCode(),
+              sourceHorizontalCrs.getName().getCode(),
+              targetHorizontalCrs.getName().getCode(),
               coordinateOperation.getName().getCode(),
               getGridFile(horizontalCoordinateOperation).orElse(""));
         }
@@ -668,6 +653,33 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
       throw new IllegalArgumentException(ex.getMessage(), ex);
     } finally {
       projLock.unlock();
+    }
+  }
+
+  private void logChosenOperation(
+      EpsgCrs sourceCrs,
+      EpsgCrs targetCrs,
+      Optional<BoundingBox> areaOfInterest,
+      CoordinateOperation coordinateOperation) {
+    if (areaOfInterest.isPresent() && LOGGER.isInfoEnabled()) {
+      BoundingBox area = areaOfInterest.get();
+      LOGGER.info(
+          "Chosen operation for {} -> {} in area [{}, {}, {}, {}]: {}{}",
+          sourceCrs.toHumanReadableString(),
+          targetCrs.toHumanReadableString(),
+          area.getXmin(),
+          area.getYmin(),
+          area.getXmax(),
+          area.getYmax(),
+          coordinateOperation.getName().getCode(),
+          getGridFile(coordinateOperation).orElse(""));
+    } else if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug(
+          "Chosen operation for {} -> {}: {}{}",
+          sourceCrs.toHumanReadableString(),
+          targetCrs.toHumanReadableString(),
+          coordinateOperation.getName().getCode(),
+          getGridFile(coordinateOperation).orElse(""));
     }
   }
 
