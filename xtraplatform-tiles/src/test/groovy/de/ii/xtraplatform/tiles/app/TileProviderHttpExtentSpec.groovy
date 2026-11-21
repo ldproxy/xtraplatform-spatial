@@ -26,6 +26,8 @@ import de.ii.xtraplatform.tiles.domain.TilesFormat
 import de.ii.xtraplatform.tiles.domain.TilesetHttp
 import spock.lang.Specification
 
+import java.util.concurrent.CompletableFuture
+
 class TileProviderHttpExtentSpec extends Specification {
 
     static SpatialExtent TILESET_EXTENT = new ImmutableSpatialExtent.Builder().xmin(7).ymin(50).xmax(8).ymax(51).build()
@@ -107,6 +109,43 @@ class TileProviderHttpExtentSpec extends Specification {
 
         expect:
         provider(null).loadMetadata(tileset(null, ["broken"])).bounds.isEmpty()
+    }
+
+    def "tile matrix sets in a CRS that PROJ does not know are skipped"() {
+        given:
+        TileMatrixSet unknown = Stub()
+        unknown.getBoundingBoxCrs84(_) >> { throw new IllegalArgumentException("CRS EPSG:3857 is not supported.") }
+        tileMatrixSets.get("unknown") >> Optional.of(unknown)
+        tileMatrixSet("A", crs84(0, 0, 10, 10))
+
+        expect:
+        provider(null).loadMetadata(tileset(null, ["unknown", "A"])).bounds == Optional.of(crs84(0, 0, 10, 10))
+    }
+
+    def "the metadata is loaded only once the tile matrix sets and PROJ are available"() {
+        given:
+        VolatileRegistry registry = Mock()
+        TileMatrixSet tms = Mock()
+        tms.getId() >> "A"
+        tileMatrixSets.get("A") >> Optional.of(tms)
+        def data = new ImmutableTileProviderHttpData.Builder()
+                .id("tiles")
+                .providerType("TILE")
+                .providerSubType("HTTP")
+                .tilesetDefaults(new ImmutableTilesetHttpDefaults.Builder().putEncodings(TilesFormat.MVT, "pbf").build())
+                .putTilesets("ts", tileset(null, ["A"]))
+                .build()
+        def provider = new TileProviderHttp(tileMatrixSets, crsTransformerFactory, registry, data)
+
+        when:
+        provider.onStartup()
+
+        then: 'the provider waits for the tile matrix sets and the CRS transformer factory'
+        1 * registry.onAvailable(tileMatrixSets, crsTransformerFactory) >> CompletableFuture.completedFuture(null)
+
+        then: 'only then the extent of the tile matrix set is transformed'
+        1 * tms.getBoundingBoxCrs84(crsTransformerFactory) >> crs84(0, 0, 10, 10)
+        provider.getMetadata("ts").get().bounds == Optional.of(crs84(0, 0, 10, 10))
     }
 
     def "a temporal extent is rejected for a tileset"() {

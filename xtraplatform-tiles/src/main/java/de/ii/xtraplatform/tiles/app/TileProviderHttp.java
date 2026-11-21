@@ -95,6 +95,12 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
 
   @Override
   protected boolean onStartup() throws InterruptedException {
+    // the metadata of a tileset without an extent derives the extent from the tile matrix sets,
+    // which needs the tile matrix sets and PROJ; both are only available after their own startup
+    getVolatileRegistry()
+        .onAvailable(tileMatrixSetRepository, crsTransformerFactory)
+        .toCompletableFuture()
+        .join();
 
     loadMetadata();
 
@@ -161,10 +167,12 @@ public class TileProviderHttp extends AbstractTileProvider<TileProviderHttpData>
         .reduce(BoundingBox::merge);
   }
 
+  // without a transformation, e.g. for a CRS that PROJ does not know (IllegalArgumentException),
+  // the tileset has no bounds; this must not prevent the start of the provider
   private Optional<BoundingBox> toCrs84(TileMatrixSet tileMatrixSet) {
     try {
       return Optional.of(tileMatrixSet.getBoundingBoxCrs84(crsTransformerFactory));
-    } catch (CrsTransformationException e) {
+    } catch (CrsTransformationException | IllegalArgumentException e) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(
             "Could not transform the extent of tile matrix set '{}' to CRS84: {}",
