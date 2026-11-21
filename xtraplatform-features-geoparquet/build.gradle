@@ -19,16 +19,30 @@ dependencies {
     embedded(libs.duckdb)
 }
 
-// since duckdb is pretty big, only include binary for current platform
+// DuckDB bundles a native library per platform. The published jar is used by every ldproxy
+// distribution (Docker images for linux/amd64 and linux/arm64, development on macOS), so it keeps
+// the natives of these platforms (xtraplatform-native has no Windows build); since duckdb is
+// pretty big, a build for an explicitly given platform (-Pplatform=...) keeps only that one.
+def duckdbNatives = [
+    'linux-amd64': 'libduckdb_java.so_linux_amd64',
+    'linux-arm64': 'libduckdb_java.so_linux_arm64',
+    'osx-arm64'  : 'libduckdb_java.so_macos_arm64',
+    'windows-amd64': 'libduckdb_java.so_windows_amd64',
+]
+def explicitPlatform = gradle.startParameter.projectProperties.containsKey('platform') ? project.platform : null
+
 project.subprojects { Project subproject ->
     if (subproject.name.endsWith("-tpl")) {
         subproject.afterEvaluate {
             subproject.tasks.named("jar") {
-                if (project.platform != "linux-amd64") exclude "libduckdb_java.so_linux_amd64"
-                if (project.platform != "linux-arm64") exclude "libduckdb_java.so_linux_arm64"
-                if (project.platform != "osx-arm64") exclude "libduckdb_java.so_osx_universal"
-                if (project.platform != "windows-amd64") exclude "libduckdb_java.so_windows_amd64"
-            }  
+                if (explicitPlatform == null) {
+                    exclude duckdbNatives['windows-amd64']
+                } else {
+                    duckdbNatives.each { platform, nativeLib ->
+                        if (platform != explicitPlatform) exclude nativeLib
+                    }
+                }
+            }
         }
     }
 }
