@@ -60,6 +60,7 @@ import de.ii.xtraplatform.features.domain.FeatureTransactions.MutationResult.Typ
 import de.ii.xtraplatform.features.domain.FilterEncoder;
 import de.ii.xtraplatform.features.domain.ImmutableDatasetChange;
 import de.ii.xtraplatform.features.domain.ImmutableFeatureQuery;
+import de.ii.xtraplatform.features.domain.ImmutableFeatureSchema;
 import de.ii.xtraplatform.features.domain.ImmutableMultiFeatureQuery;
 import de.ii.xtraplatform.features.domain.ImmutableMutationResult;
 import de.ii.xtraplatform.features.domain.ImmutableSubQuery;
@@ -1651,7 +1652,31 @@ public class FeatureProviderSql
     OnlySortables sortablesSelector =
         new OnlySortables(included, excluded, pathSeparator, excludeConnectors);
 
-    return schema.accept(sortablesSelector);
+    FeatureSchema sortables = schema.accept(sortablesSelector);
+    List<SqlQueryMapping> mappings = queryMappings.getOrDefault(schema.getName(), List.of());
+
+    return onlyMainTableProperties(sortables, mappings);
+  }
+
+  // the sort keys are applied in the query of the main table, so a property in a joined table
+  // cannot be a sortable
+  private static FeatureSchema onlyMainTableProperties(
+      FeatureSchema sortables, List<SqlQueryMapping> mappings) {
+    return new ImmutableFeatureSchema.Builder()
+        .from(sortables)
+        .propertyMap(
+            sortables.getPropertyMap().entrySet().stream()
+                .filter(
+                    entry -> {
+                      String path = entry.getValue().getFullPathAsString();
+                      return mappings.stream().noneMatch(mapping -> mapping.isInJoinedTable(path));
+                    })
+                .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue)))
+        .concat(
+            sortables.getConcat().stream()
+                .map(concatSchema -> onlyMainTableProperties(concatSchema, mappings))
+                .toList())
+        .build();
   }
 
   @Override

@@ -77,4 +77,22 @@ class SqlMappingDeriverSpec extends Specification {
         "strassen_unfaelle2"                          | "strassen_unfaelle2"                         || "strassen_unfaelle2"
         "simple expression"                           | "simple_expression"                          || "simple_expression"
     }
+
+    def 'value in joined table: #property'() {
+
+        when:
+
+        SqlQueryMapping mapping = deriver.derive(MappingRuleFixtures.fromYaml("merge"), null).get(0)
+
+        then:
+
+        mapping.isInJoinedTable(property) == inJoinedTable
+
+        where:
+
+        property   || inJoinedTable
+        "programm" || false
+        "kennung"  || true
+        "unknown"  || false
+    }
 }

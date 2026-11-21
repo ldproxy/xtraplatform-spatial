@@ -306,7 +306,8 @@ public class FeatureQueryEncoderSql implements FeatureQueryEncoder<SqlQueryBatch
               Optional<de.ii.xtraplatform.base.domain.util.Tuple<SqlQuerySchema, SqlQueryColumn>>
                   column = mapping.getColumnForValue(sortKey.getField());
 
-              if (column.isEmpty()) {
+              // the sort keys are applied in the query of the main table
+              if (column.isEmpty() || mapping.isInJoinedTable(sortKey.getField())) {
                 throw new IllegalArgumentException(
                     String.format(
                         "Sort key is invalid, property '%s' is either unknown or inapplicable.",

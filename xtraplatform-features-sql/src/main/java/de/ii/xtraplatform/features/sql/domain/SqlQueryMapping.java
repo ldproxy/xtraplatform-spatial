@@ -92,6 +92,10 @@ public interface SqlQueryMapping {
                     .map(column -> Tuple.of(table, column)));
   }
 
+  default boolean isInJoinedTable(String propertyName) {
+    return getColumnForValue(propertyName).filter(column -> !column.first().isRoot()).isPresent();
+  }
+
   default Optional<Tuple<SqlQuerySchema, SqlQueryColumn>> getColumnForId() {
     return getColumnForRole(Role.ID);
   }
