@@ -76,6 +76,7 @@ import de.ii.xtraplatform.geometries.domain.PositionList;
 import de.ii.xtraplatform.geometries.domain.transform.CoordinatesTransformer;
 import de.ii.xtraplatform.geometries.domain.transform.ImmutableCrsTransform;
 import de.ii.xtraplatform.geometries.domain.transform.MinMaxDeriver;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -866,10 +867,25 @@ public class FilterEncoderSql {
       return geometry;
     }
 
-    Geometry<?> transformed =
-        geometry.accept(
-            new CoordinatesTransformer(
-                ImmutableCrsTransform.of(Optional.empty(), transformer.get())));
+    Geometry<?> transformed;
+    try {
+      transformed =
+          geometry.accept(
+              new CoordinatesTransformer(
+                  ImmutableCrsTransform.of(Optional.empty(), transformer.get())));
+    } catch (IllegalStateException e) {
+      // coordinates outside the valid range of the filter CRS cannot be transformed, an error of
+      // the request; the coordinates transformer reports it as an IOException
+      if (e.getCause() instanceof IOException) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Filter is invalid. The coordinates of a geometry cannot be transformed from the"
+                    + " filter CRS %s, they may be outside its valid range: %s",
+                sourceCrs.get().toUriString(), geometry),
+            e);
+      }
+      throw e;
+    }
     if (Objects.isNull(transformed)) {
       throw new IllegalArgumentException(
           String.format("Filter is invalid. Geometry cannot be transformed: %s", geometry));
