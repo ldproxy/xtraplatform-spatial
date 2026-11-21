@@ -57,7 +57,7 @@ import org.immutables.value.Value;
  * tilesets:
  *   __all__:
  *     id: __all__
- *     urlTemplate: https://demo.ldproxy.net/earthatnight/tiles/{{tileMatrixSet}}/{{tileMatrix}}/{{tileRow}}/{{tileCol}}?f={{fileExtension}}
+ *     urlTemplate: https://demo.ldproxy.net/earthatnight/map/tiles/{{tileMatrixSet}}/{{tileMatrix}}/{{tileRow}}/{{tileCol}}?f={{fileExtension}}
  *     levels:
  *       WebMercatorQuad:
  *         min: 0
