@@ -394,10 +394,13 @@ public class SqlMappingDeriver {
             p -> {
               String path = p.getEffectiveSourcePaths().get(0);
 
+              // segments are separated by dots in the connector, as in
+              // DecoderFactoryJson.parseSourcePath
               String newPathInConnector =
-                  pathInConnector.isEmpty()
-                      ? path.replace(connector + "/", "").replace(connector, "")
-                      : pathInConnector + "." + path;
+                  (pathInConnector.isEmpty()
+                          ? path.replace(connector + "/", "").replace(connector, "")
+                          : pathInConnector + "." + path)
+                      .replace('/', '.');
 
               // always record the path, never rely on the name fallback in
               // SqlQueryMapping.getPathInConnector: the property name is only the same as the path

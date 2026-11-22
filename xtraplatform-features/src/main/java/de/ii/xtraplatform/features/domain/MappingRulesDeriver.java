@@ -96,17 +96,27 @@ public class MappingRulesDeriver
       }
 
       String tableIdentifier = effectiveRule.getIdentifierParent();
+      String tableSource = effectiveRule.getSourceParent();
+
+      if (!rulesByTable.containsKey(tableIdentifier)) {
+        Optional<String> parentInConnector =
+            getParentInConnector(effectiveRule, rulesByTable.keySet());
+        if (parentInConnector.isPresent()) {
+          tableSource = parentInConnector.get();
+          tableIdentifier = tableSource + "-" + effectiveRule.getTargetParent();
+        }
+      }
 
       // implicit tables
       if (effectiveRule.hasSourceParent() && !rulesByTable.containsKey(tableIdentifier)) {
-        MappingRule finalRule = effectiveRule;
+        String finalTableSource = tableSource;
         List<String> matchingTables =
             rulesByTable.keySet().stream()
-                .filter(id -> id.startsWith(finalRule.getSourceParent() + "-"))
+                .filter(id -> id.startsWith(finalTableSource + "-"))
                 .toList();
 
         if (matchingTables.isEmpty()) {
-          MappingRule tableRule = buildImplicitTableRule(effectiveRule);
+          MappingRule tableRule = buildImplicitTableRule(effectiveRule, tableSource);
 
           rulesByTable.put(tableIdentifier, newRuleList(tableRule, cleanup(effectiveRule)));
 
@@ -131,15 +141,43 @@ public class MappingRulesDeriver
     return new ImmutableMappingRule.Builder().from(rule).index(index).build();
   }
 
-  private static MappingRule buildImplicitTableRule(MappingRule effectiveRule) {
+  /**
+   * Inside a sub-decoder column (e.g. [JSON]properties) there are no tables: a value with several
+   * path segments in the column belongs to the nearest enclosing object in the column with the same
+   * target parent, otherwise to the column itself. Empty if the parent of the rule is not inside a
+   * sub-decoder column or is the column itself.
+   */
+  private static Optional<String> getParentInConnector(MappingRule rule, Set<String> tables) {
+    String parent = rule.getSourceParent();
+    List<String> ancestors = new ArrayList<>();
+    String masked = MappingRule.maskPathAttributes(parent);
+
+    while (masked.contains("/") && !MappingRule.endsWithConnector(parent)) {
+      int end = masked.lastIndexOf('/');
+      parent = parent.substring(0, end);
+      masked = masked.substring(0, end);
+      ancestors.add(parent);
+    }
+
+    if (ancestors.isEmpty() || !MappingRule.endsWithConnector(parent)) {
+      return Optional.empty();
+    }
+
+    return ancestors.stream()
+        .filter(ancestor -> tables.contains(ancestor + "-" + rule.getTargetParent()))
+        .findFirst()
+        .or(() -> Optional.of(ancestors.get(ancestors.size() - 1)));
+  }
+
+  private static MappingRule buildImplicitTableRule(MappingRule effectiveRule, String source) {
     return new ImmutableMappingRule.Builder()
-        .source(effectiveRule.getSourceParent())
+        .source(source)
         // a sub-decoder column (e.g. [JSON]properties) is not a property of the target schema, it
         // is the container whose values the following rules address. It must always be
         // ROOT_TARGET, otherwise it is taken for the enclosing object itself and that object gets
         // mapped to the container column.
         .target(
-            MappingRule.endsWithConnector(effectiveRule.getSourceParent())
+            MappingRule.endsWithConnector(source)
                 ? ROOT_TARGET
                 : effectiveRule.getTarget().contains(".")
                     ? effectiveRule
