@@ -648,6 +648,37 @@ class CqlTypeCheckerSpec extends Specification {
         Property.of("number")                  | Property.of("id")     | true
     }
 
+    def 'Booleans are ordered (false < true)'() {
+
+        when:
+
+        operation.accept(visitor2)
+
+        then:
+
+        noExceptionThrown()
+
+        where:
+
+        operation << [
+                Gt.of(Property.of("has_ticket"), ScalarLiteral.of(false)),
+                Gte.of(Property.of("has_ticket"), ScalarLiteral.of(true)),
+                Lt.of(Property.of("has_ticket"), ScalarLiteral.of(true)),
+                Lte.of(Property.of("has_ticket"), Property.of("has_ticket")),
+        ]
+    }
+
+    def 'Booleans are not ordered against numbers'() {
+
+        when:
+
+        Gt.of(Property.of("has_ticket"), ScalarLiteral.of(1)).accept(visitor2)
+
+        then:
+
+        thrown CqlIncompatibleTypes
+    }
+
     def 'Test Coordinate 3D'(){
 
         when:

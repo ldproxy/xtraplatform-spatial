@@ -82,7 +82,6 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
   private static final Set<Type> SPATIAL = ImmutableSet.of(Type.Geometry, Type.Bbox);
   private static final Set<Type> ARRAY = ImmutableSet.of(Type.List);
   private static final List<Set<Type>> SCALAR = ImmutableList.of(NUMBER, TEXT, BOOLEAN, INSTANT);
-  private static final List<Set<Type>> SCALAR_ORDERED = ImmutableList.of(NUMBER, TEXT, INSTANT);
   private static final List<Set<Type>> SCALAR_ARRAY =
       ImmutableList.of(
           ImmutableSet.<Type>builder()
@@ -97,10 +96,10 @@ public class CqlTypeAndFunctionChecker extends CqlVisitorBase<Type> {
       new ImmutableMap.Builder<Class<?>, List<Set<Type>>>()
           .put(ImmutableEq.class, SCALAR)
           .put(ImmutableNeq.class, SCALAR)
-          .put(ImmutableLt.class, SCALAR_ORDERED)
-          .put(ImmutableLte.class, SCALAR_ORDERED)
-          .put(ImmutableGt.class, SCALAR_ORDERED)
-          .put(ImmutableGte.class, SCALAR_ORDERED)
+          .put(ImmutableLt.class, SCALAR)
+          .put(ImmutableLte.class, SCALAR)
+          .put(ImmutableGt.class, SCALAR)
+          .put(ImmutableGte.class, SCALAR)
           .put(ImmutableIn.class, SCALAR_ARRAY)
           .put(ImmutableLike.class, ImmutableList.of(TEXT))
           .put(ImmutableBetween.class, ImmutableList.of(NUMBER))
