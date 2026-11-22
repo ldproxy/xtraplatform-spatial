@@ -41,6 +41,11 @@ public interface Cql2Expression extends Operand {
       }
 
       try {
+        if (CqlJsonOperations.isFunction(node)) {
+          // a function that returns a boolean, CQL2 1.0 form
+          return new Operand.OperandDeserializer()
+              .getFunction(parser, node.get(CqlJsonOperations.OP).textValue(), node);
+        }
         return parser.getCodec().treeToValue(node, Operation.class);
       } catch (IOException e) {
         throw new CqlParseException(e.getMessage(), e);

@@ -8,13 +8,20 @@
 package de.ii.xtraplatform.cql.domain;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @JsonDeserialize(builder = ImmutableCasei.Builder.class)
+@JsonSerialize(using = Casei.Serializer.class)
 @FunctionalInterface
 public interface Casei extends Scalar {
 
@@ -34,5 +41,20 @@ public interface Casei extends Scalar {
 
     return visitor.visit(
         this, Objects.nonNull(value) ? ImmutableList.of(value) : ImmutableList.of());
+  }
+
+  class Serializer extends StdSerializer<Casei> {
+
+    private static final long serialVersionUID = 1L;
+
+    protected Serializer() {
+      super(Casei.class);
+    }
+
+    @Override
+    public void serialize(Casei value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      CqlJsonOperations.write(gen, TYPE, List.of(value.getValue()));
+    }
   }
 }

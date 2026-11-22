@@ -1183,10 +1183,7 @@ class CqlJsonSpec extends Specification {
             {
                 "op": "=",
                 "args": [
-                    {"function": {
-                        "name": "pos",
-                        "args": []
-                    }},
+                    {"op": "pos", "args": []},
                     1
                 ]
             } 
@@ -1213,10 +1210,7 @@ class CqlJsonSpec extends Specification {
             {
                 "op": ">=",
                 "args": [
-                    {"function": {
-                        "name": "indexOf",
-                        "args": [ { "property": "names" }, "Mike" ]
-                    }},
+                    {"op": "indexOf", "args": [ { "property": "names" }, "Mike" ]},
                     5
                 ]
             } 
@@ -1243,10 +1237,7 @@ class CqlJsonSpec extends Specification {
             {
                 "op": "=",
                 "args": [
-                    {"function": {
-                        "name": "year",
-                        "args": [{"timestamp": "2012-06-05T00:00:00Z"}]
-                    }},
+                    {"op": "year", "args": [{"timestamp": "2012-06-05T00:00:00Z"}]},
                     2012
                 ]
             } 
@@ -1273,10 +1264,10 @@ class CqlJsonSpec extends Specification {
             {
               "op": "in",
               "args": [
-                { "casei": { "property": "road_class" } },
+                { "op": "casei", "args": [ { "property": "road_class" } ] },
                 [
-                  { "casei": "Οδος" },
-                  { "casei": "Straße" }
+                  { "op": "casei", "args": [ "Οδος" ] },
+                  { "op": "casei", "args": [ "Straße" ] }
                 ]
               ]
             }
@@ -1303,10 +1294,10 @@ class CqlJsonSpec extends Specification {
             {
               "op": "in",
               "args": [
-                { "accenti": { "property": "road_class" } },
+                { "op": "accenti", "args": [ { "property": "road_class" } ] },
                 [
-                  { "accenti": "Οδος" },
-                  { "accenti": "Straße" }
+                  { "op": "accenti", "args": [ "Οδος" ] },
+                  { "op": "accenti", "args": [ "Straße" ] }
                 ]
               ]
             }
@@ -1327,13 +1318,110 @@ class CqlJsonSpec extends Specification {
         JSONAssert.assertEquals(cqlJson, actual2, true)
     }
 
+    def 'The draft forms of CASEI, ACCENTI and functions are read and written in the CQL2 1.0 form'() {
+        given:
+        String cqlJson = """
+            {
+              "op": "in",
+              "args": [
+                ${operand},
+                [ "a", "b" ]
+              ]
+            }
+        """
+
+        when: 'reading json'
+        Cql2Expression actual = cql.read(cqlJson, Cql.Format.JSON)
+
+        then:
+        JSONAssert.assertEquals(
+                """{ "op": "in", "args": [ ${written}, [ "a", "b" ] ] }""",
+                cql.write(actual, Cql.Format.JSON),
+                true)
+
+        where:
+        operand                                                                          | written
+        '{ "casei": { "property": "road_class" } }'                                      | '{ "op": "casei", "args": [ { "property": "road_class" } ] }'
+        '{ "accenti": { "property": "road_class" } }'                                    | '{ "op": "accenti", "args": [ { "property": "road_class" } ] }'
+        '{ "function": { "name": "upper", "args": [ { "property": "road_class" } ] } }' | '{ "op": "upper", "args": [ { "property": "road_class" } ] }'
+    }
+
+    def 'A function that returns a boolean as the filter expression'() {
+        given:
+        String cqlJson = """
+            { "op": "isValid", "args": [ { "property": "geometry" }, 3 ] }
+        """
+
+        when: 'reading json'
+        Cql2Expression actual = cql.read(cqlJson, Cql.Format.JSON)
+
+        then:
+        actual == cql.read("isValid(geometry, 3)", Cql.Format.TEXT)
+
+        and:
+
+        when: 'writing json'
+        String actual2 = cql.write(actual, Cql.Format.JSON)
+
+        then:
+        JSONAssert.assertEquals(cqlJson, actual2, true)
+    }
+
+    def 'A function without an array of arguments is rejected'() {
+        given:
+        String cqlJson = """
+            { "op": "=", "args": [ { "op": "upper", "args": { "property": "road_class" } }, "A" ] }
+        """
+
+        when: 'reading json'
+        cql.read(cqlJson, Cql.Format.JSON)
+
+        then:
+        thrown(Exception)
+    }
+
+    def 'Nested ACCENTI and CASEI in the CQL2 1.0 form'() {
+        given:
+        String cqlJson = """
+            {"op": "like", "args": [
+              {"op": "accenti", "args": [{"op": "casei", "args": [{"property": "name"}]}]},
+              {"op": "accenti", "args": [{"op": "casei", "args": ["Chiș%"]}]}
+            ]}
+        """
+
+        when: 'reading json'
+        Cql2Expression actual = cql.read(cqlJson, Cql.Format.JSON)
+
+        then:
+        actual == cql.read("ACCENTI(CASEI(name)) LIKE accenti(casei('Chiș%'))", Cql.Format.TEXT)
+    }
+
+    def 'CASEI in the CQL2 1.0 form with more than one argument'() {
+        given:
+        String cqlJson = """
+            {
+              "op": "=",
+              "args": [
+                { "op": "casei", "args": [ { "property": "road_class" }, "x" ] },
+                { "op": "casei", "args": [ "Straße" ] }
+              ]
+            }
+        """
+
+        when: 'reading json'
+        cql.read(cqlJson, Cql.Format.JSON)
+
+        then:
+        thrown(Exception)
+    }
+
     def 'UPPER'() {
         given:
         String cqlJson = """
             {
               "op": "in",
               "args": [
-                { "function": { "name": "upper", "args": [ { "property": "road_class" } ] } },
+                { "op": "upper", "args": [ { "property": "road_class" } ] },
                 [ "A", "B", "L", "K" ]
               ]
             }
@@ -1360,7 +1448,7 @@ class CqlJsonSpec extends Specification {
             {
               "op": "in",
               "args": [
-                { "function": { "name": "lower", "args": [ { "property": "road_class" } ] } },
+                { "op": "lower", "args": [ { "property": "road_class" } ] },
                 [ "a", "b", "l", "k" ]
               ]
             }

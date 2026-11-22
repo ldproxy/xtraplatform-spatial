@@ -86,6 +86,36 @@ public interface Operand extends CqlNode {
       return TemporalLiteral.interval(op1, op2);
     }
 
+    // CQL2 1.0: {"op": "casei"|"accenti"|<function name>, "args": [...]}, else an operator
+    private Operand getOpOperand(JsonParser parser, JsonNode node) throws JsonProcessingException {
+      String op = node.get(CqlJsonOperations.OP).asText();
+      if (CqlJsonOperations.isOperation(op)) {
+        return parser.getCodec().treeToValue(node, Operation.class);
+      }
+      List<Operand> args = getArgs(parser, op, node);
+      if (Casei.TYPE.equalsIgnoreCase(op)) {
+        return Casei.of(CqlJsonOperations.singleArg(parser, op, args));
+      } else if (Accenti.TYPE.equalsIgnoreCase(op)) {
+        return Accenti.of(CqlJsonOperations.singleArg(parser, op, args));
+      }
+      return Function.of(op, args);
+    }
+
+    Function getFunction(JsonParser parser, String name, JsonNode node)
+        throws JsonProcessingException {
+      return Function.of(name, getArgs(parser, name, node));
+    }
+
+    private List<Operand> getArgs(JsonParser parser, String op, JsonNode node)
+        throws JsonProcessingException {
+      List<Operand> list = new ArrayList<>();
+      Iterator<JsonNode> iterator = CqlJsonOperations.args(parser, op, node).elements();
+      while (iterator.hasNext()) {
+        list.add(getOperand(parser, iterator.next(), CqlJsonOperations.ARGS));
+      }
+      return list;
+    }
+
     @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.CyclomaticComplexity"})
     private Operand getOperand(JsonParser parser, JsonNode node, String parent)
         throws JsonProcessingException {
@@ -113,16 +143,12 @@ public interface Operand extends CqlNode {
           return Casei.of(getOperand(parser, node.get("casei"), parent));
         } else if (Objects.nonNull(node.get("accenti"))) {
           return Accenti.of(getOperand(parser, node.get("accenti"), parent));
-        } else if (Objects.nonNull(node.get("op"))) {
-          return oc.treeToValue(node, Operation.class);
+        } else if (Objects.nonNull(node.get(CqlJsonOperations.OP))) {
+          return getOpOperand(parser, node);
         } else if (Objects.nonNull(node.get("function"))) {
-          List<Operand> list = new ArrayList<>();
-          Iterator<JsonNode> iterator = node.get("function").get("args").elements();
-          while (iterator.hasNext()) {
-            JsonNode listNode = iterator.next();
-            list.add(getOperand(parser, listNode, "args"));
-          }
-          return Function.of(node.get("function").get("name").textValue(), list);
+          // draft form {"function": {"name": ..., "args": [...]}}
+          JsonNode function = node.get("function");
+          return getFunction(parser, function.get("name").textValue(), function);
         } else if (Objects.nonNull(node.get("$parameter"))) {
           return oc.treeToValue(node.get("$parameter"), Parameter.class);
         }

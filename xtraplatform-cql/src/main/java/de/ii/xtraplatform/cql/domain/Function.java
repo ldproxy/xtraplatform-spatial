@@ -54,18 +54,7 @@ public interface Function extends Temporal, Cql2Expression {
     @Override
     public void serialize(Function value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      gen.writeStartObject();
-      gen.writeFieldName("function");
-      gen.writeStartObject();
-      gen.writeStringField("name", value.getName());
-      gen.writeFieldName("args");
-      gen.writeStartArray();
-      for (Operand operand : value.getArgs()) {
-        gen.writeObject(operand);
-      }
-      gen.writeEndArray();
-      gen.writeEndObject();
-      gen.writeEndObject();
+      CqlJsonOperations.write(gen, value.getName(), value.getArgs());
     }
   }
 }
