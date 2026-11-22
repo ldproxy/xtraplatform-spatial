@@ -31,9 +31,12 @@ public interface Decoder extends AutoCloseable {
     return new Decoder() {
       @Override
       public void decode(byte[] data, Pipeline pipeline) {
-        boolean isValue = pipeline.context().schema().filter(FeatureSchema::isValue).isPresent();
+        // without a schema, the column belongs to a property that the query does not select; it is
+        // passed on like any other column of such a property, the downstream skips it
+        boolean isNotValue =
+            pipeline.context().schema().filter(schema -> !schema.isValue()).isPresent();
 
-        if (!isValue) {
+        if (isNotValue) {
           throw new IllegalArgumentException(
               String.format("Only allowed in value mappings: [%s]", connector));
         }
