@@ -367,6 +367,20 @@ public class FilterEncoderSql {
     return withoutIndexPredicates;
   }
 
+  // a JSON value is text, temporal operators and literals need a date or timestamp
+  private String temporalJsonValue(String jsonValue, PropertyTypeInfo typeInfo) {
+    if (Objects.isNull(typeInfo) || typeInfo.getInArray()) {
+      return jsonValue;
+    }
+    if (typeInfo.getType() == DATE) {
+      return sqlDialect.applyToDate(jsonValue, Optional.empty());
+    }
+    if (typeInfo.getType() == DATETIME) {
+      return sqlDialect.applyToDatetime(jsonValue, Optional.empty());
+    }
+    return jsonValue;
+  }
+
   /**
    * The bounding box of a geometry literal, derived after the same transformation that {@link
    * de.ii.xtraplatform.cql.domain.CqlToText} applies before encoding it, so that the bounding box
@@ -1200,8 +1214,10 @@ public class FilterEncoderSql {
     private String mapToSubDecoder(String alias, SchemaSql column, String propertyName) {
       if (column.getSubDecoder().filter(JSON_SUB_DECODER::equals).isPresent()) {
         PropertyTypeInfo typeInfo = column.getSubDecoderTypes().get(propertyName);
-        return sqlDialect.applyToJsonValue(
-            alias, column.getName(), column.getSubDecoderPaths().get(propertyName), typeInfo);
+        return temporalJsonValue(
+            sqlDialect.applyToJsonValue(
+                alias, column.getName(), column.getSubDecoderPaths().get(propertyName), typeInfo),
+            typeInfo);
       }
 
       throw new IllegalStateException(
@@ -2321,7 +2337,8 @@ public class FilterEncoderSql {
         PropertyTypeInfo typeInfo =
             PropertyTypeInfo.of(schema.getType(), schema.getValueType(), inArray);
 
-        return sqlDialect.applyToJsonValue(alias, column.getName(), path, typeInfo);
+        return temporalJsonValue(
+            sqlDialect.applyToJsonValue(alias, column.getName(), path, typeInfo), typeInfo);
       }
       if (column
           .getOperationParameter(Operation.CONNECTOR)
