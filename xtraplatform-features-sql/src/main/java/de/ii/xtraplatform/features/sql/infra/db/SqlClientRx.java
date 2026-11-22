@@ -121,13 +121,22 @@ public class SqlClientRx implements SqlClient {
 
     // The connection is leased when the stream is subscribed and returned to the pool when it
     // terminates, whether the rows were exhausted, the read failed or the consumer cancelled.
+    // The statement is executed on the first request, after the subscription is established, so
+    // that a cancellation - by the consumer, by the stall timeout below or because the client is
+    // gone - reaches the read while the database is still working on the statement. Returning the
+    // connection to the pool alone does not stop the statement in the database, so it is
+    // cancelled first.
     Flowable<SqlRow> flowable =
         Flowable.using(
-            () -> lease(streamed),
-            connection ->
+            () -> SqlRead.lease(dataSource, streamed),
+            read ->
                 Flowable.generate(
-                    () -> execute(connection, query, options.getFetchSize()),
-                    (resultSet, emitter) -> {
+                    Cursor::new,
+                    (cursor, emitter) -> {
+                      if (Objects.isNull(cursor.resultSet)) {
+                        cursor.resultSet = read.execute(query, options.getFetchSize());
+                      }
+                      ResultSet resultSet = cursor.resultSet;
                       if (resultSet.next()) {
                         SqlRow row = new SqlRowVals(collator).read(resultSet, options);
 
@@ -137,11 +146,12 @@ public class SqlClientRx implements SqlClient {
 
                         emitter.onNext(row);
                       } else {
+                        read.exhausted();
                         emitter.onComplete();
                       }
                     },
-                    SqlClientRx::close),
-            connection -> release(connection, streamed),
+                    cursor -> SqlRead.close(cursor.resultSet)),
+            SqlRead::release,
             true);
 
     // NOTE: prettify, see
@@ -210,88 +220,9 @@ public class SqlClientRx implements SqlClient {
     return Reactive.Source.publisher(flowable);
   }
 
-  private Connection lease(boolean transaction) throws SQLException {
-    Connection connection = dataSource.getConnection();
-
-    if (transaction) {
-      try {
-        connection.setAutoCommit(false);
-      } catch (SQLException e) {
-        close(connection);
-        throw e;
-      }
-    }
-
-    return connection;
-  }
-
-  @SuppressWarnings({"PMD.CloseResource", "PMD.AvoidCatchingGenericException"})
-  private static ResultSet execute(Connection connection, String query, int fetchSize)
-      throws SQLException {
-    Statement statement = connection.createStatement();
-
-    try {
-      if (fetchSize > 0) {
-        statement.setFetchSize(fetchSize);
-      }
-
-      return statement.executeQuery(query);
-    } catch (SQLException | RuntimeException e) {
-      close(statement);
-      throw e;
-    }
-  }
-
-  /** Ends a read-only transaction, if any, and returns the connection to the pool. */
-  private static void release(Connection connection, boolean transaction) {
-    if (transaction) {
-      try {
-        // nothing to commit, and a rollback is the cheapest way to close the server-side cursor
-        connection.rollback();
-      } catch (SQLException e) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Ending the read transaction failed: {}", e.getMessage());
-        }
-      }
-      try {
-        connection.setAutoCommit(true);
-      } catch (SQLException e) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Resetting autocommit failed: {}", e.getMessage());
-        }
-      }
-    }
-
-    close(connection);
-  }
-
-  /** Closes the result set and the statement it belongs to. */
-  @SuppressWarnings("PMD.CloseResource")
-  private static void close(ResultSet resultSet) {
-    Statement statement = null;
-
-    try {
-      statement = resultSet.getStatement();
-    } catch (SQLException e) {
-      // the result set is closed below regardless
-    }
-
-    close((AutoCloseable) resultSet);
-    close(statement);
-  }
-
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private static void close(AutoCloseable closeable) {
-    if (Objects.nonNull(closeable)) {
-      try {
-        closeable.close();
-      } catch (Exception e) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug(
-              "Closing {} failed: {}", closeable.getClass().getSimpleName(), e.getMessage());
-        }
-      }
-    }
+  /** The result set of a read, available after the statement was executed. */
+  private static final class Cursor {
+    private ResultSet resultSet;
   }
 
   @Override

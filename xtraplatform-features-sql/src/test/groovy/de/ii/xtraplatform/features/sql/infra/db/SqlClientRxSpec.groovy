@@ -14,6 +14,7 @@ import de.ii.xtraplatform.features.sql.domain.SqlQueryOptions
 import de.ii.xtraplatform.features.sql.domain.SqlRow
 import de.ii.xtraplatform.streams.app.SourceDefault
 import io.reactivex.rxjava3.core.Flowable
+import io.reactivex.rxjava3.schedulers.Schedulers
 import io.reactivex.rxjava3.subscribers.TestSubscriber
 import spock.lang.Specification
 
@@ -23,11 +24,16 @@ import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
 import java.util.concurrent.CompletionException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Locks the connection lifecycle of {@link SqlClientRx}: every connection is leased from the pool
  * when it is needed and returned in every case - rows exhausted, statement failed, consumer
- * cancelled - so the pool cannot be drained by a read or a statement that ends abnormally.
+ * cancelled - so the pool cannot be drained by a read or a statement that ends abnormally. A read
+ * that ends while its statement is still running cancels the statement, otherwise the database
+ * keeps working on it after the connection was returned.
  */
 class SqlClientRxSpec extends Specification {
 
@@ -41,6 +47,11 @@ class SqlClientRxSpec extends Specification {
     ResultSet resultSet
     boolean leaseFails
     boolean executeFails
+    boolean executeBlocks
+    CountDownLatch executing
+    CountDownLatch cancelled
+    CountDownLatch closed
+    AtomicInteger cancels
 
     SqlClientRx sqlClient
 
@@ -51,6 +62,11 @@ class SqlClientRxSpec extends Specification {
         resultSet = Mock(ResultSet)
         leaseFails = false
         executeFails = false
+        executeBlocks = false
+        executing = new CountDownLatch(1)
+        cancelled = new CountDownLatch(1)
+        closed = new CountDownLatch(1)
+        cancels = new AtomicInteger()
         dataSource.getConnection() >> {
             if (leaseFails) throw new SQLException('Connection is not available, request timed out after 30000ms')
             return connection
@@ -58,8 +74,21 @@ class SqlClientRxSpec extends Specification {
         connection.createStatement() >> statement
         statement.executeQuery(_ as String) >> {
             if (executeFails) throw new SQLException('relation does not exist', '42P01')
+            if (executeBlocks) {
+                // a long-running statement, it only ends when it is cancelled
+                executing.countDown()
+                if (!cancelled.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException('statement was not cancelled')
+                }
+                throw new SQLException('canceling statement due to user request', '57014')
+            }
             return resultSet
         }
+        statement.cancel() >> {
+            cancels.incrementAndGet()
+            cancelled.countDown()
+        }
+        connection.close() >> { closed.countDown() }
         resultSet.getStatement() >> statement
 
         sqlClient = new SqlClientRx(dataSource, Mock(SqlDbmsAdapter), Mock(SqlDialect), Optional.empty())
@@ -113,6 +142,52 @@ class SqlClientRxSpec extends Specification {
         1 * resultSet.close()
         1 * connection.rollback()
         1 * connection.close()
+    }
+
+    def 'a read cancelled while its statement is running cancels the statement and returns the connection'() {
+        given:
+        executeBlocks = true
+        TestSubscriber<SqlRow> subscriber =
+                Flowable.fromPublisher(publisher('SELECT id FROM t', PAGED)).subscribeOn(Schedulers.io()).test()
+        executing.await(10, TimeUnit.SECONDS)
+
+        when:
+        subscriber.cancel()
+        boolean connectionReturned = closed.await(10, TimeUnit.SECONDS)
+
+        then:
+        connectionReturned
+        cancels.get() == 1
+        subscriber.assertNoValues()
+    }
+
+    def 'a streamed read cancelled while its statement is running cancels the statement and ends the transaction'() {
+        given:
+        executeBlocks = true
+        TestSubscriber<SqlRow> subscriber =
+                Flowable.fromPublisher(publisher('SELECT id FROM t', STREAMED)).subscribeOn(Schedulers.io()).test()
+        executing.await(10, TimeUnit.SECONDS)
+
+        when:
+        subscriber.cancel()
+        boolean connectionReturned = closed.await(10, TimeUnit.SECONDS)
+
+        then:
+        1 * connection.rollback()
+        connectionReturned
+        cancels.get() == 1
+    }
+
+    def 'a read whose rows were exhausted does not cancel its statement'() {
+        given:
+        rows('a', 'b')
+
+        when:
+        TestSubscriber<SqlRow> subscriber = read('SELECT id FROM t', PAGED)
+
+        then:
+        subscriber.assertComplete()
+        cancels.get() == 0
     }
 
     def 'an error while reading rows is delivered and the connection is returned'() {
