@@ -15,6 +15,7 @@ import de.ii.xtraplatform.features.sql.domain.ImmutableSqlRowMeta.Builder;
 import de.ii.xtraplatform.streams.domain.Reactive;
 import de.ii.xtraplatform.streams.domain.Reactive.Source;
 import de.ii.xtraplatform.streams.domain.Reactive.Transformer;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -39,8 +40,26 @@ public interface SqlConnector
 
   String NEWLINE_INDENT = "\n  ";
 
+  /**
+   * Adds the server error details to a failed query. A data exception (SQLSTATE class 22, e.g. a
+   * request value that is not valid for the column type, such as a non-uuid literal compared with a
+   * uuid column, or a number out of range) is caused by the request and becomes an {@link
+   * IllegalArgumentException}, i.e. a client error.
+   */
   Function<Throwable, Throwable> PSQL_CONTEXT =
       throwable -> {
+        if (throwable instanceof SQLException sqlException && isDataException(sqlException)) {
+          String primaryMessage =
+              sqlException instanceof PSQLException psqlException
+                      && Objects.nonNull(psqlException.getServerErrorMessage())
+                      && Objects.nonNull(psqlException.getServerErrorMessage().getMessage())
+                  ? psqlException.getServerErrorMessage().getMessage()
+                  : sqlException.getMessage();
+
+          return new IllegalArgumentException(
+              "A value in the request is not valid for the queried data: " + primaryMessage,
+              throwable);
+        }
         if (throwable instanceof PSQLException) {
           PSQLException e = (PSQLException) throwable;
           String message =
@@ -82,6 +101,11 @@ public interface SqlConnector
         }
         return throwable;
       };
+
+  /** SQLSTATE class 22, data exception. */
+  static boolean isDataException(SQLException e) {
+    return Objects.nonNull(e.getSQLState()) && e.getSQLState().startsWith("22");
+  }
 
   int getMaxConnections();
 
