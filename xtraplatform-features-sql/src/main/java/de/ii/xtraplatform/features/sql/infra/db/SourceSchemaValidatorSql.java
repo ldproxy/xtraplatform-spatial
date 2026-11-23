@@ -78,7 +78,7 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
     "PMD.NPathComplexity",
     "PMD.AvoidDeeplyNestedIfStmts"
   })
-  private ValidationResult validate(
+  ValidationResult validate(
       String typeName, SchemaSql tableSchema, MODE mode, SchemaInfo schemaInfo) {
     ImmutableValidationResult.Builder result = ImmutableValidationResult.builder().mode(mode);
 
@@ -185,7 +185,8 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
         .getProperties()
         .forEach(
             attribute -> {
-              if (attribute.isValue() && !attribute.isConstant()) {
+              // an expression is evaluated by the database, it has no column of its own
+              if (attribute.isValue() && !attribute.isConstant() && !attribute.isExpression()) {
                 String context2 =
                     String.format(
                         "Invalid sourcePath for property '%s' in type '%s'",
