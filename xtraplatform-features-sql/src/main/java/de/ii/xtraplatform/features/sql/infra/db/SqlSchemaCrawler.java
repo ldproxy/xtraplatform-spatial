@@ -160,6 +160,8 @@ public class SqlSchemaCrawler implements Closeable {
 
   private static LoadOptions onlyTableNames() {
     return LoadOptionsBuilder.builder()
+        // the retrieval tasks share the one connection, which is not thread-safe
+        .withMaxThreads(1)
         .withSchemaInfoLevel(
             SchemaInfoLevelBuilder.builder()
                 .setRetrieveTables(true)
@@ -198,6 +200,8 @@ public class SqlSchemaCrawler implements Closeable {
 
   private static LoadOptions fullDetails() {
     return LoadOptionsBuilder.builder()
+        // the retrieval tasks share the one connection, which is not thread-safe
+        .withMaxThreads(1)
         .withSchemaInfoLevel(
             SchemaInfoLevelBuilder.builder()
                 .setRetrieveColumnDataTypes(true)
