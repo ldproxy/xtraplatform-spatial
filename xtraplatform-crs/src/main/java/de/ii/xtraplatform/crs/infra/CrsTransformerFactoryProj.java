@@ -26,6 +26,7 @@ import de.ii.xtraplatform.crs.domain.OgcCrs;
 import de.ii.xtraplatform.proj.domain.ProjLoader;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -43,12 +44,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.measure.Unit;
-import org.kortforsyningen.proj.CoordinateOperationContext;
-import org.kortforsyningen.proj.GridAvailabilityUse;
-import org.kortforsyningen.proj.Proj;
-import org.kortforsyningen.proj.SpatialCriterion;
-import org.kortforsyningen.proj.Units;
-import org.kortforsyningen.proj.spi.EPSG;
 import org.opengis.metadata.extent.Extent;
 import org.opengis.metadata.extent.GeographicBoundingBox;
 import org.opengis.metadata.extent.GeographicExtent;
@@ -64,6 +59,12 @@ import org.opengis.referencing.cs.CoordinateSystem;
 import org.opengis.referencing.cs.EllipsoidalCS;
 import org.opengis.referencing.cs.RangeMeaning;
 import org.opengis.referencing.operation.CoordinateOperation;
+import org.osgeo.proj.CoordinateOperationContext;
+import org.osgeo.proj.GridAvailabilityUse;
+import org.osgeo.proj.Proj;
+import org.osgeo.proj.SpatialCriterion;
+import org.osgeo.proj.Units;
+import org.osgeo.proj.spi.EPSG;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,12 +157,15 @@ public class CrsTransformerFactoryProj extends AbstractVolatile
                         }
                         : new String[] {projLoader.getDataDirectory().toString()};
 
-                Proj.setSearchPath(locations);
+                // has to be set before PROJ is used for the first time
+                System.setProperty(
+                    "org.osgeo.proj.data", String.join(File.pathSeparator, locations));
+                System.setProperty("org.osgeo.proj.logLevel", "none");
+                System.setProperty("org.osgeo.proj.maxThreadsPerInstance", "16");
                 Proj.version()
                     .ifPresent(
                         version ->
                             LOGGER.debug("PROJ version: {}, locations: {}", version, locations));
-                System.setProperty("org.kortforsyningen.proj.maxThreadsPerInstance", "16");
 
                 setState(state);
               } catch (Throwable e) {
