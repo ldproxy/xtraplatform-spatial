@@ -9,6 +9,7 @@ package de.ii.xtraplatform.features.sql.domain;
 
 import de.ii.xtraplatform.streams.domain.Reactive;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -20,6 +21,16 @@ public interface SqlClient extends SqlClientBasic {
   Reactive.Source<SqlRow> getSourceStream(String query, SqlQueryOptions options);
 
   List<String> getNotifications(Connection connection);
+
+  /**
+   * Releases a connection from {@link #getConnection()} that must not be reused, because its
+   * session state may have been changed, for example the search path. A pooled implementation
+   * removes the connection from the pool, so that the pool opens a new one with the configured
+   * initialization. The default implementation closes the connection.
+   */
+  default void discardConnection(Connection connection) throws SQLException {
+    connection.close();
+  }
 
   /**
    * Opens a synchronous, single-connection session for multi-statement transactions. The default

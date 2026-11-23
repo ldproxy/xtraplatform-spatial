@@ -17,6 +17,7 @@ import de.ii.xtraplatform.features.sql.domain.SchemaSql;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
 import de.ii.xtraplatform.features.sql.domain.SqlRelation;
 import java.io.IOException;
+import java.sql.Connection;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -52,7 +53,12 @@ public class SourceSchemaValidatorSql implements SourceSchemaValidator<SchemaSql
 
   @Override
   public ValidationResult validate(String typeName, List<SchemaSql> sourceSchemas, MODE mode) {
-    try (SqlSchemaCrawler schemaCrawler = new SqlSchemaCrawler(sqlClient.get().getConnection())) {
+    SqlClient client = sqlClient.get();
+    Connection connection = client.getConnection();
+    // the crawler changes the schema of the connection, which overwrites the search path of a
+    // PostgreSQL connection; the connection must not return to the pool
+    try (SqlSchemaCrawler schemaCrawler =
+        new SqlSchemaCrawler(connection, () -> client.discardConnection(connection))) {
       Catalog catalog =
           schemaCrawler.getCatalog(schemas, getAllUsedTables(sourceSchemas), ImmutableList.of());
       SchemaInfo schemaInfo = new SchemaInfo(catalog.getTables());

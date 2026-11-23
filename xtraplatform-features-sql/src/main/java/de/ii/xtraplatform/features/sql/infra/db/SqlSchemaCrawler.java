@@ -36,7 +36,15 @@ public class SqlSchemaCrawler implements Closeable {
   private final DatabaseConnectionSource connection;
 
   public SqlSchemaCrawler(Connection connection) {
-    this.connection = new SingleDatabaseConnectionSource(connection);
+    this(connection, connection);
+  }
+
+  /**
+   * @param connection the connection to crawl
+   * @param release releases the connection when the crawler is closed
+   */
+  public SqlSchemaCrawler(Connection connection, AutoCloseable release) {
+    this.connection = new SingleDatabaseConnectionSource(connection, release);
   }
 
   public Catalog getCatalog(List<String> excludeSchemas, List<String> excludeTables) {

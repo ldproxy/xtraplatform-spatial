@@ -8,17 +8,18 @@
 package de.ii.xtraplatform.features.sql.infra.db;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.function.Consumer;
 import us.fatehi.utility.datasource.DatabaseConnectionSource;
 import us.fatehi.utility.datasource.PooledConnectionUtility;
 
 class SingleDatabaseConnectionSource implements DatabaseConnectionSource {
   private final Connection connection;
+  private final AutoCloseable release;
   private Consumer<Connection> connectionInitializer;
 
-  SingleDatabaseConnectionSource(Connection connection) {
+  SingleDatabaseConnectionSource(Connection connection, AutoCloseable release) {
     this.connection = connection;
+    this.release = release;
     this.connectionInitializer = c -> {};
   }
 
@@ -41,7 +42,7 @@ class SingleDatabaseConnectionSource implements DatabaseConnectionSource {
   }
 
   @Override
-  public void close() throws SQLException {
-    this.connection.close();
+  public void close() throws Exception {
+    this.release.close();
   }
 }

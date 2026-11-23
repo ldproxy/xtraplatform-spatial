@@ -8,6 +8,7 @@
 package de.ii.xtraplatform.features.sql.infra.db;
 
 import com.google.common.collect.ImmutableList;
+import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.pool.ProxyConnection;
 import de.ii.xtraplatform.base.domain.LogContext.MARKER;
 import de.ii.xtraplatform.features.sql.domain.SqlClient;
@@ -228,6 +229,14 @@ public class SqlClientRx implements SqlClient {
   @Override
   public Connection getConnection() {
     return leaseConnection();
+  }
+
+  @Override
+  public void discardConnection(Connection connection) throws SQLException {
+    if (dataSource.isWrapperFor(HikariDataSource.class)) {
+      dataSource.unwrap(HikariDataSource.class).evictConnection(connection);
+    }
+    connection.close();
   }
 
   @Override
